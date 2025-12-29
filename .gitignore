@@ -35,6 +35,7 @@ temp/
 
 # Screenshots (from testing)
 screenshots/
+.playwright-mcp/
 
 # Database
 *.db
