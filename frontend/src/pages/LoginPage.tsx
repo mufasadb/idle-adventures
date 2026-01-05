@@ -28,7 +28,7 @@ export const LoginPage = observer(() => {
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
       <div className="bg-gray-800 rounded-lg p-8 w-full max-w-md">
-        <h1 className="text-3xl font-bold text-amber-400 text-center mb-2">
+        <h1 className="text-3xl font-bold text-sky-400 text-center mb-2">
           Idle Adventures
         </h1>
         <p className="text-gray-400 text-center mb-8">
@@ -42,7 +42,7 @@ export const LoginPage = observer(() => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-gray-700 text-white rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400"
+              className="w-full bg-gray-700 text-white rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-sky-400"
               required
             />
           </div>
@@ -54,7 +54,7 @@ export const LoginPage = observer(() => {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-gray-700 text-white rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                className="w-full bg-gray-700 text-white rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-sky-400"
                 required
                 minLength={3}
               />
@@ -67,7 +67,7 @@ export const LoginPage = observer(() => {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-gray-700 text-white rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400"
+              className="w-full bg-gray-700 text-white rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-sky-400"
               required
               minLength={6}
             />
@@ -80,7 +80,7 @@ export const LoginPage = observer(() => {
           <button
             type="submit"
             disabled={authStore.isLoading}
-            className="w-full bg-amber-500 hover:bg-amber-600 text-gray-900 font-bold py-2 px-4 rounded disabled:opacity-50 transition-colors"
+            className="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded disabled:opacity-50 transition-colors"
           >
             {authStore.isLoading
               ? 'Loading...'
@@ -93,7 +93,7 @@ export const LoginPage = observer(() => {
         <div className="mt-6 text-center">
           <button
             onClick={() => setIsRegister(!isRegister)}
-            className="text-amber-400 hover:text-amber-300"
+            className="text-sky-400 hover:text-sky-300"
           >
             {isRegister
               ? 'Already have an account? Login'

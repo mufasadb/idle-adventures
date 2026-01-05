@@ -209,3 +209,125 @@ Equipment tiers for processing stations:
 - [ ] How does offline/AFK work in this new model? (70% efficiency on what?)
 - [ ] Sailing/ships integration with grid system
 - [ ] Combat minigame design
+
+---
+
+## Session Date: 2024-12-30
+
+### Frontend State Architecture Refactor
+
+**Problem**: Original `gameStore.ts` was a "God Object" holding UI state, player data, inventory, expedition state, and map data in one place. This violated separation of concerns and made the code hard to maintain.
+
+**Solution**: Split into domain-specific stores:
+
+1. **`sessionStore`** - Ephemeral session state
+   - Screen navigation (no React Router needed)
+   - Active sheet/modal
+   - Expedition loadout preparation
+   - Active expedition state (when running)
+
+2. **`playerStore`** - Persistent player data
+   - Bank storage (all items when in town)
+   - Skills and levels
+   - Unlocks/achievements
+   - Gold is stored as an item with id 'gold'
+
+3. **Static Data** (`src/data/`)
+   - Item definitions with categories
+   - Town data, map definitions, etc.
+   - Pure data, no state
+
+4. **Game Engine** (future)
+   - Pure functions for mechanics
+   - No state, just calculations
+
+---
+
+### Item Category System
+
+Items have categories that determine where they can be used:
+
+| Category | Slot Compatibility | Examples |
+|----------|-------------------|----------|
+| food | Food slots (3) | Steak, Bread, Cooked Fish |
+| vehicle | Vehicle slot (1) | Horse, Mule, Cart |
+| tool | Misc slots | Pickaxe, Fishing Rod |
+| potion | Misc slots | Health Potion, Speed Elixir |
+| ingredient | Bank only (not loadout) | Raw meat, Herbs |
+| material | Bank only | Iron Ore, Wood |
+| gem | Bank only | Ruby, Diamond |
+| currency | Bank only | Gold |
+| water | Bank only | Water Flask |
+
+**Key Insight**: Ingredients are NOT the same as food. Raw ingredients can't be eaten on expeditions - they must be cooked first.
+
+---
+
+### Expedition Loadout System
+
+**Slot Structure**:
+- 1 Vehicle slot (optional - can go "on foot")
+- 3 Food slots (determines total actions available)
+- 2+ Misc slots (base 2, vehicles add more via `bagSlots`)
+
+**Action Economy**:
+- Each food item has an `actions` property
+- Total actions = sum of all food item actions
+- Actions are consumed during expedition activities
+- Running out of food = expedition ends (but you always make it home safely)
+
+**Drag-Drop Implementation**:
+- HTML5 native drag-and-drop with React context
+- Category validation on drop
+- Visual feedback for valid/invalid targets
+- Items move between bank and loadout
+
+---
+
+### Storage Model
+
+**In Town**: Everything in "bank" - unified storage
+**On Expedition**: Loadout items only, separate "expedition bag" for gathered resources
+
+**Flow**:
+1. Town: All items in bank
+2. Prep Screen: Drag items from bank → loadout slots
+3. Start Expedition: Loadout items consumed/equipped
+4. Expedition: Gathered items go to expedition bag
+5. Return: Expedition bag contents → bank
+
+---
+
+### Mode Toggle (Active vs Passive)
+
+| Mode | Description | Yield |
+|------|-------------|-------|
+| Active | Play minigames for each node | 85-100% |
+| Passive | Auto-complete, no interaction | 75% |
+
+Player chooses mode at expedition prep, can be changed between nodes.
+
+---
+
+### Files Created/Modified
+
+**New Files**:
+- `src/data/items.ts` - Item definitions
+- `src/stores/playerStore.ts` - Player data store
+- `src/stores/sessionStore.ts` - Session state store
+- `src/components/dnd/` - Drag-drop system (DragDropContext, DraggableItem, DropSlot)
+- `src/components/sheets/BankSheet.tsx` - Bank UI
+
+**Modified**:
+- All screen components updated to use new stores
+- All sheet components updated to use new stores
+
+---
+
+### Technical Decisions
+
+- **MobX** for state management (reactive, simple)
+- **No React Router** - sessionStore handles screen navigation
+- **Screen-based navigation** via `sessionStore.currentScreen`
+- **Bottom sheets** via `sessionStore.activeSheet`
+- **Observer pattern** - components wrapped with `observer()` HOC

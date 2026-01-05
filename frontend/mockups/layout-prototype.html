@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Idle Adventures - Layout Mockups</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Custom scrollbar for dark theme */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: #1f2937; }
+    ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 2px; }
+
+    /* Bottom sheet animation */
+    .bottom-sheet {
+      transform: translateY(100%);
+      transition: transform 0.3s ease-out;
+    }
+    .bottom-sheet.open {
+      transform: translateY(0);
+    }
+
+    /* Screen transitions */
+    .screen {
+      display: none;
+    }
+    .screen.active {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Backdrop */
+    .backdrop {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Mobile frame for desktop viewing */
+    .mobile-frame {
+      width: 375px;
+      height: 812px;
+      border: 8px solid #374151;
+      border-radius: 40px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Grid cells */
+    .grid-cell {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      border: 1px solid #374151;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .grid-cell:hover {
+      background-color: #374151;
+    }
+    .grid-cell.player {
+      background-color: #92400e;
+      border-color: #f59e0b;
+    }
+  </style>
+</head>
+<body class="bg-gray-950 min-h-screen flex items-center justify-center p-8">
+
+  <!-- Screen Selection (for demo) -->
+  <div class="fixed top-4 left-4 z-50 bg-gray-800 rounded-lg p-4 text-white">
+    <h3 class="text-amber-400 font-bold mb-2">Screen Selector</h3>
+    <div class="space-y-2">
+      <button onclick="showScreen('town')" class="block w-full text-left px-3 py-1 rounded hover:bg-gray-700">1. Town (Home)</button>
+      <button onclick="showScreen('expedition-prep')" class="block w-full text-left px-3 py-1 rounded hover:bg-gray-700">2. Expedition Prep</button>
+      <button onclick="showScreen('active-expedition')" class="block w-full text-left px-3 py-1 rounded hover:bg-gray-700">3. Active Expedition</button>
+      <button onclick="showScreen('node-interaction')" class="block w-full text-left px-3 py-1 rounded hover:bg-gray-700">4. Node Interaction</button>
+      <button onclick="showScreen('minigame')" class="block w-full text-left px-3 py-1 rounded hover:bg-gray-700">5. Minigame</button>
+    </div>
+    <hr class="my-3 border-gray-600">
+    <h4 class="text-amber-400 font-bold mb-2">Bottom Sheets</h4>
+    <div class="space-y-2 text-sm">
+      <button onclick="openSheet('inventory-sheet')" class="block w-full text-left px-3 py-1 rounded hover:bg-gray-700">Inventory</button>
+      <button onclick="openSheet('skills-sheet')" class="block w-full text-left px-3 py-1 rounded hover:bg-gray-700">Skills</button>
+      <button onclick="openSheet('map-sheet')" class="block w-full text-left px-3 py-1 rounded hover:bg-gray-700">Map Details</button>
+    </div>
+  </div>
+
+  <!-- Mobile Phone Frame -->
+  <div class="mobile-frame bg-gray-900">
+
+    <!-- ==================== SCREEN: TOWN ==================== -->
+    <div id="town" class="screen active h-full">
+      <!-- Status Bar -->
+      <div class="bg-gray-800 px-4 py-2 flex justify-between items-center border-b border-gray-700">
+        <span class="text-amber-400 font-bold">Thornvale</span>
+        <div class="flex items-center gap-3 text-sm">
+          <span class="text-amber-400">1,234 gold</span>
+        </div>
+      </div>
+
+      <!-- Main Content Area (scrollable) -->
+      <div class="flex-1 overflow-y-auto p-4 space-y-4">
+        <!-- Player Card -->
+        <div class="bg-gray-800 rounded-lg p-4">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 bg-amber-900 rounded-full flex items-center justify-center text-2xl">
+              &#x1F9D9;
+            </div>
+            <div>
+              <h2 class="text-white font-bold">Adventurer</h2>
+              <p class="text-gray-400 text-sm">Level 12</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Stats Row -->
+        <div class="grid grid-cols-3 gap-2">
+          <div class="bg-gray-800 rounded-lg p-3 text-center">
+            <div class="text-amber-400 text-lg font-bold">8</div>
+            <div class="text-gray-400 text-xs">Rations</div>
+          </div>
+          <div class="bg-gray-800 rounded-lg p-3 text-center">
+            <div class="text-amber-400 text-lg font-bold">3</div>
+            <div class="text-gray-400 text-xs">Maps</div>
+          </div>
+          <div class="bg-gray-800 rounded-lg p-3 text-center">
+            <div class="text-amber-400 text-lg font-bold">75</div>
+            <div class="text-gray-400 text-xs">Carry Cap</div>
+          </div>
+        </div>
+
+        <!-- Main Actions Grid -->
+        <div class="space-y-3">
+          <h3 class="text-gray-400 text-sm font-medium uppercase tracking-wide">Actions</h3>
+
+          <button onclick="showScreen('expedition-prep')" class="w-full bg-amber-700 hover:bg-amber-600 rounded-lg p-4 text-left flex items-center gap-3">
+            <span class="text-2xl">&#x1F5FA;</span>
+            <div>
+              <div class="text-white font-bold">Start Expedition</div>
+              <div class="text-amber-200 text-sm">Choose a map and prepare</div>
+            </div>
+          </button>
+
+          <div class="grid grid-cols-2 gap-3">
+            <button onclick="openSheet('inventory-sheet')" class="bg-gray-800 hover:bg-gray-700 rounded-lg p-4 text-left">
+              <span class="text-xl">&#x1F392;</span>
+              <div class="text-white font-medium mt-1">Inventory</div>
+              <div class="text-gray-400 text-xs">45 items</div>
+            </button>
+
+            <button onclick="openSheet('skills-sheet')" class="bg-gray-800 hover:bg-gray-700 rounded-lg p-4 text-left">
+              <span class="text-xl">&#x2728;</span>
+              <div class="text-white font-medium mt-1">Skills</div>
+              <div class="text-gray-400 text-xs">23 skills</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Town Buildings -->
+        <div class="space-y-3">
+          <h3 class="text-gray-400 text-sm font-medium uppercase tracking-wide">Town</h3>
+
+          <div class="grid grid-cols-2 gap-3">
+            <button class="bg-gray-800 hover:bg-gray-700 rounded-lg p-3 text-left">
+              <span class="text-lg">&#x1F525;</span>
+              <div class="text-white text-sm font-medium">Smithing</div>
+            </button>
+            <button class="bg-gray-800 hover:bg-gray-700 rounded-lg p-3 text-left">
+              <span class="text-lg">&#x1F373;</span>
+              <div class="text-white text-sm font-medium">Cooking</div>
+            </button>
+            <button class="bg-gray-800 hover:bg-gray-700 rounded-lg p-3 text-left">
+              <span class="text-lg">&#x1F4DA;</span>
+              <div class="text-white text-sm font-medium">Library</div>
+            </button>
+            <button class="bg-gray-800 hover:bg-gray-700 rounded-lg p-3 text-left">
+              <span class="text-lg">&#x1F3EA;</span>
+              <div class="text-white text-sm font-medium">Map Shop</div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Nav -->
+      <div class="bg-gray-800 border-t border-gray-700 px-4 py-3">
+        <div class="flex justify-around">
+          <button class="flex flex-col items-center text-amber-400">
+            <span class="text-xl">&#x1F3E0;</span>
+            <span class="text-xs mt-1">Town</span>
+          </button>
+          <button onclick="openSheet('inventory-sheet')" class="flex flex-col items-center text-gray-400 hover:text-white">
+            <span class="text-xl">&#x1F392;</span>
+            <span class="text-xs mt-1">Inventory</span>
+          </button>
+          <button onclick="openSheet('skills-sheet')" class="flex flex-col items-center text-gray-400 hover:text-white">
+            <span class="text-xl">&#x2728;</span>
+            <span class="text-xs mt-1">Skills</span>
+          </button>
+          <button class="flex flex-col items-center text-gray-400 hover:text-white">
+            <span class="text-xl">&#x2699;</span>
+            <span class="text-xs mt-1">Settings</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: EXPEDITION PREP ==================== -->
+    <div id="expedition-prep" class="screen h-full">
+      <!-- Header with back -->
+      <div class="bg-gray-800 px-4 py-3 flex items-center gap-3 border-b border-gray-700">
+        <button onclick="showScreen('town')" class="text-gray-400 hover:text-white">
+          &#x2190;
+        </button>
+        <span class="text-white font-bold">Prepare Expedition</span>
+      </div>
+
+      <!-- Content -->
+      <div class="flex-1 overflow-y-auto p-4 space-y-4">
+        <!-- Map Selection -->
+        <div class="bg-gray-800 rounded-lg p-4">
+          <h3 class="text-amber-400 font-bold mb-3">Select Map</h3>
+          <div class="space-y-2">
+            <button onclick="openSheet('map-sheet')" class="w-full bg-gray-700 hover:bg-gray-600 rounded-lg p-3 text-left flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <span class="text-xl">&#x1F4DC;</span>
+                <div>
+                  <div class="text-white font-medium">Iron Ridge</div>
+                  <div class="text-gray-400 text-xs">2 days travel | Tier 3</div>
+                </div>
+              </div>
+              <span class="text-gray-400">&#x276F;</span>
+            </button>
+            <button class="w-full bg-gray-700/50 rounded-lg p-3 text-left flex items-center justify-between opacity-60">
+              <div class="flex items-center gap-3">
+                <span class="text-xl">&#x1F4DC;</span>
+                <div>
+                  <div class="text-white font-medium">Whisperwood</div>
+                  <div class="text-gray-400 text-xs">1 day travel | Tier 2</div>
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Rations -->
+        <div class="bg-gray-800 rounded-lg p-4">
+          <div class="flex justify-between items-center mb-3">
+            <h3 class="text-amber-400 font-bold">Rations</h3>
+            <span class="text-gray-400 text-sm">Available: 8 days</span>
+          </div>
+          <div class="flex items-center justify-between bg-gray-700 rounded-lg p-3">
+            <button class="w-10 h-10 bg-gray-600 rounded-lg text-white text-xl">-</button>
+            <div class="text-center">
+              <div class="text-white text-2xl font-bold">6</div>
+              <div class="text-gray-400 text-xs">days packed</div>
+            </div>
+            <button class="w-10 h-10 bg-gray-600 rounded-lg text-white text-xl">+</button>
+          </div>
+          <p class="text-gray-400 text-xs mt-2">4 for travel + 2 on site</p>
+        </div>
+
+        <!-- Gear Summary -->
+        <div class="bg-gray-800 rounded-lg p-4">
+          <h3 class="text-amber-400 font-bold mb-3">Gear</h3>
+          <div class="space-y-2">
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-400">Weapon</span>
+              <span class="text-white">Iron Pickaxe</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-400">Backpack</span>
+              <span class="text-white">Leather (75 cap)</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-400">Mount</span>
+              <span class="text-gray-500">None</span>
+            </div>
+          </div>
+          <button class="w-full mt-3 text-amber-400 text-sm underline">Change Loadout</button>
+        </div>
+
+        <!-- Trip Summary -->
+        <div class="bg-amber-900/30 border border-amber-700/50 rounded-lg p-4">
+          <h3 class="text-amber-400 font-bold mb-2">Trip Summary</h3>
+          <div class="grid grid-cols-2 gap-2 text-sm">
+            <div>
+              <span class="text-gray-400">Travel time:</span>
+              <span class="text-white ml-1">4 days</span>
+            </div>
+            <div>
+              <span class="text-gray-400">Time on site:</span>
+              <span class="text-white ml-1">2 days</span>
+            </div>
+            <div>
+              <span class="text-gray-400">Carry capacity:</span>
+              <span class="text-white ml-1">75</span>
+            </div>
+            <div>
+              <span class="text-gray-400">Expected yield:</span>
+              <span class="text-white ml-1">~50 ore</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Button -->
+      <div class="p-4 bg-gray-800 border-t border-gray-700">
+        <button onclick="showScreen('active-expedition')" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-4 rounded-lg">
+          Begin Expedition
+        </button>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: ACTIVE EXPEDITION ==================== -->
+    <div id="active-expedition" class="screen h-full">
+      <!-- Expedition Header -->
+      <div class="bg-gray-800 px-4 py-2 border-b border-gray-700">
+        <div class="flex justify-between items-center">
+          <span class="text-amber-400 font-bold">Iron Ridge</span>
+          <button onclick="showScreen('town')" class="text-gray-400 text-sm">Return Home</button>
+        </div>
+        <div class="flex justify-between text-xs text-gray-400 mt-1">
+          <span>Day 1 | 10 hrs left</span>
+          <span>Carry: 21/75</span>
+        </div>
+      </div>
+
+      <!-- Grid Area -->
+      <div class="flex-1 overflow-hidden p-2 flex items-center justify-center bg-gray-950">
+        <div class="grid grid-cols-6 gap-0.5 w-full max-w-sm">
+          <!-- Row 0 -->
+          <div class="grid-cell bg-gray-800 player">&#x1F6A9;</div>
+          <div class="grid-cell bg-gray-800"></div>
+          <div class="grid-cell bg-gray-800" onclick="showScreen('node-interaction')">&#x26CF;</div>
+          <div class="grid-cell bg-gray-700">&#x25B2;</div>
+          <div class="grid-cell bg-gray-700">&#x25B2;</div>
+          <div class="grid-cell bg-gray-800"></div>
+          <!-- Row 1 -->
+          <div class="grid-cell bg-gray-800"></div>
+          <div class="grid-cell bg-gray-800">&#x1F33F;</div>
+          <div class="grid-cell bg-gray-800"></div>
+          <div class="grid-cell bg-gray-700">&#x25B2;</div>
+          <div class="grid-cell bg-gray-800" onclick="showScreen('node-interaction')">&#x26CF;</div>
+          <div class="grid-cell bg-gray-800"></div>
+          <!-- Row 2 -->
+          <div class="grid-cell bg-gray-800" onclick="showScreen('node-interaction')">&#x26CF;</div>
+          <div class="grid-cell bg-gray-800"></div>
+          <div class="grid-cell bg-gray-800"></div>
+          <div class="grid-cell bg-gray-800">&#x1F48E;</div>
+          <div class="grid-cell bg-gray-800"></div>
+          <div class="grid-cell bg-gray-800">&#x1F43A;</div>
+          <!-- Row 3 -->
+          <div class="grid-cell bg-gray-800"></div>
+          <div class="grid-cell bg-gray-800">&#x1F33F;</div>
+          <div class="grid-cell bg-gray-700">&#x25B2;</div>
+          <div class="grid-cell bg-gray-700">&#x25B2;</div>
+          <div class="grid-cell bg-gray-800"></div>
+          <div class="grid-cell bg-gray-800" onclick="showScreen('node-interaction')">&#x26CF;</div>
+          <!-- Row 4 -->
+          <div class="grid-cell bg-gray-800"></div>
+          <div class="grid-cell bg-gray-800">&#x1F43A;</div>
+          <div class="grid-cell bg-gray-800"></div>
+          <div class="grid-cell bg-gray-800"></div>
+          <div class="grid-cell bg-gray-800">&#x1F33F;</div>
+          <div class="grid-cell bg-gray-800"></div>
+        </div>
+      </div>
+
+      <!-- Legend / Actions -->
+      <div class="bg-gray-800 p-3 border-t border-gray-700">
+        <div class="flex justify-between items-center text-xs text-gray-400 mb-2">
+          <span>&#x26CF; Mining</span>
+          <span>&#x1F33F; Herbs</span>
+          <span>&#x1F48E; Gems</span>
+          <span>&#x1F43A; Wolves</span>
+          <span>&#x25B2; Mountain</span>
+        </div>
+        <p class="text-gray-400 text-center text-sm">Tap a node to move there</p>
+      </div>
+
+      <!-- Bottom Status -->
+      <div class="bg-gray-800 px-4 py-3 border-t border-gray-700">
+        <div class="flex justify-between">
+          <button onclick="openSheet('inventory-sheet')" class="flex items-center gap-2 text-gray-400 hover:text-white">
+            <span>&#x1F392;</span>
+            <span class="text-sm">21/75</span>
+          </button>
+          <div class="flex items-center gap-2 text-amber-400">
+            <span>&#x1F356;</span>
+            <span class="text-sm">4 days</span>
+          </div>
+          <button class="flex items-center gap-2 text-gray-400 hover:text-white">
+            <span>&#x2764;</span>
+            <span class="text-sm">Full</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: NODE INTERACTION ==================== -->
+    <div id="node-interaction" class="screen h-full">
+      <!-- Header -->
+      <div class="bg-gray-800 px-4 py-3 flex items-center gap-3 border-b border-gray-700">
+        <button onclick="showScreen('active-expedition')" class="text-gray-400 hover:text-white">
+          &#x2190;
+        </button>
+        <span class="text-white font-bold">Iron Ore Deposit</span>
+      </div>
+
+      <!-- Content -->
+      <div class="flex-1 overflow-y-auto p-4 space-y-4">
+        <!-- Node Visual -->
+        <div class="bg-gray-800 rounded-lg p-6 text-center">
+          <div class="text-6xl mb-4">&#x26CF;</div>
+          <h2 class="text-white text-xl font-bold">Iron Ore Deposit</h2>
+          <p class="text-gray-400">Tier 2 Mining Node</p>
+        </div>
+
+        <!-- Node Info -->
+        <div class="bg-gray-800 rounded-lg p-4">
+          <div class="space-y-3">
+            <div class="flex justify-between">
+              <span class="text-gray-400">Ore available</span>
+              <span class="text-white">~18-22</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">Time to clear</span>
+              <span class="text-white">~4 hours</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">Your Mining level</span>
+              <span class="text-amber-400">28 (+28% yield)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Options -->
+        <div class="space-y-3">
+          <button onclick="showScreen('minigame')" class="w-full bg-amber-700 hover:bg-amber-600 rounded-lg p-4 text-left">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">&#x26CF;</span>
+              <div>
+                <div class="text-white font-bold">Mine Manually</div>
+                <div class="text-amber-200 text-sm">Play minigame | 85-100% yield</div>
+              </div>
+            </div>
+          </button>
+
+          <button class="w-full bg-gray-700 hover:bg-gray-600 rounded-lg p-4 text-left">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">&#x1F504;</span>
+              <div>
+                <div class="text-white font-bold">Auto-Mine</div>
+                <div class="text-gray-400 text-sm">Hands-off | 70% yield</div>
+              </div>
+            </div>
+          </button>
+
+          <button onclick="showScreen('active-expedition')" class="w-full bg-gray-800 border border-gray-600 hover:bg-gray-700 rounded-lg p-4 text-left">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">&#x23ED;</span>
+              <div>
+                <div class="text-gray-300 font-bold">Skip Node</div>
+                <div class="text-gray-500 text-sm">Save time for other nodes</div>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: MINIGAME ==================== -->
+    <div id="minigame" class="screen h-full">
+      <!-- Header -->
+      <div class="bg-gray-800 px-4 py-3 border-b border-gray-700 text-center">
+        <span class="text-amber-400 font-bold">Mining</span>
+        <div class="text-gray-400 text-sm">Swing 4 of 12</div>
+      </div>
+
+      <!-- Minigame Area -->
+      <div class="flex-1 flex flex-col items-center justify-center p-6 space-y-8">
+        <!-- Power Meter -->
+        <div class="w-full max-w-xs">
+          <div class="text-center text-gray-400 mb-2">Power</div>
+          <div class="h-8 bg-gray-700 rounded-full overflow-hidden relative">
+            <div class="absolute inset-y-0 left-1/3 w-1/6 bg-green-600/30"></div>
+            <div id="power-bar" class="h-full bg-amber-500 transition-all duration-100" style="width: 45%"></div>
+          </div>
+          <div class="flex justify-between text-xs text-gray-500 mt-1">
+            <span>Low</span>
+            <span class="text-green-400">Sweet Spot</span>
+            <span>High</span>
+          </div>
+        </div>
+
+        <!-- Pickaxe Visual -->
+        <div class="text-8xl" id="pickaxe">&#x26CF;</div>
+
+        <!-- Target Zone -->
+        <div class="w-full max-w-xs">
+          <div class="h-4 bg-gray-700 rounded-full overflow-hidden relative">
+            <!-- Moving target zone -->
+            <div id="target-zone" class="absolute inset-y-0 w-1/5 bg-green-500 rounded transition-all" style="left: 40%"></div>
+            <!-- Static hit marker -->
+            <div class="absolute inset-y-0 left-1/2 w-1 bg-amber-400 -translate-x-1/2"></div>
+          </div>
+          <p class="text-center text-gray-400 text-sm mt-2">Tap when green zone is centered!</p>
+        </div>
+
+        <!-- Swing Button -->
+        <button onclick="doSwing()" class="w-32 h-32 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 rounded-full text-white font-bold text-xl shadow-lg transform active:scale-95 transition-transform">
+          SWING
+        </button>
+      </div>
+
+      <!-- Results Preview -->
+      <div class="bg-gray-800 p-4 border-t border-gray-700">
+        <div class="flex justify-between items-center">
+          <div>
+            <span class="text-gray-400 text-sm">Collected:</span>
+            <span class="text-white ml-2" id="collected">3 ore</span>
+          </div>
+          <div>
+            <span class="text-gray-400 text-sm">Efficiency:</span>
+            <span class="text-green-400 ml-2" id="efficiency">92%</span>
+          </div>
+          <button onclick="showScreen('active-expedition')" class="text-amber-400 underline text-sm">
+            Finish Early
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== BOTTOM SHEETS ==================== -->
+
+    <!-- Backdrop -->
+    <div id="backdrop" class="backdrop fixed inset-0 bg-black/60 z-40" onclick="closeAllSheets()"></div>
+
+    <!-- Inventory Bottom Sheet -->
+    <div id="inventory-sheet" class="bottom-sheet fixed inset-x-0 bottom-0 bg-gray-800 rounded-t-2xl z-50 max-h-[80%]">
+      <div class="p-4 border-b border-gray-700">
+        <div class="w-12 h-1 bg-gray-600 rounded-full mx-auto mb-3"></div>
+        <div class="flex justify-between items-center">
+          <h2 class="text-white font-bold text-lg">Inventory</h2>
+          <span class="text-gray-400">45/75 weight</span>
+        </div>
+      </div>
+      <div class="overflow-y-auto p-4 max-h-96">
+        <div class="space-y-3">
+          <!-- Category -->
+          <div>
+            <h3 class="text-amber-400 text-sm font-medium mb-2">Raw Materials</h3>
+            <div class="space-y-2">
+              <div class="flex items-center justify-between bg-gray-700 rounded-lg p-3">
+                <div class="flex items-center gap-3">
+                  <span class="text-xl">&#x1FAA8;</span>
+                  <div>
+                    <div class="text-white">Iron Ore</div>
+                    <div class="text-gray-400 text-xs">Weight: 1 each</div>
+                  </div>
+                </div>
+                <span class="text-white font-bold">21</span>
+              </div>
+              <div class="flex items-center justify-between bg-gray-700 rounded-lg p-3">
+                <div class="flex items-center gap-3">
+                  <span class="text-xl">&#x1F33F;</span>
+                  <div>
+                    <div class="text-white">Alpine Herbs</div>
+                    <div class="text-gray-400 text-xs">Weight: 0.5 each</div>
+                  </div>
+                </div>
+                <span class="text-white font-bold">8</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h3 class="text-amber-400 text-sm font-medium mb-2">Processed</h3>
+            <div class="space-y-2">
+              <div class="flex items-center justify-between bg-gray-700 rounded-lg p-3">
+                <div class="flex items-center gap-3">
+                  <span class="text-xl">&#x1F9F1;</span>
+                  <div>
+                    <div class="text-white">Copper Ingots</div>
+                    <div class="text-gray-400 text-xs">Weight: 2 each</div>
+                  </div>
+                </div>
+                <span class="text-white font-bold">15</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h3 class="text-amber-400 text-sm font-medium mb-2">Equipment</h3>
+            <div class="space-y-2">
+              <div class="flex items-center justify-between bg-gray-700 rounded-lg p-3">
+                <div class="flex items-center gap-3">
+                  <span class="text-xl">&#x26CF;</span>
+                  <div>
+                    <div class="text-white">Iron Pickaxe</div>
+                    <div class="text-green-400 text-xs">Equipped</div>
+                  </div>
+                </div>
+                <span class="text-amber-400">+15%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Skills Bottom Sheet -->
+    <div id="skills-sheet" class="bottom-sheet fixed inset-x-0 bottom-0 bg-gray-800 rounded-t-2xl z-50 max-h-[80%]">
+      <div class="p-4 border-b border-gray-700">
+        <div class="w-12 h-1 bg-gray-600 rounded-full mx-auto mb-3"></div>
+        <h2 class="text-white font-bold text-lg">Skills</h2>
+      </div>
+      <div class="overflow-y-auto p-4 max-h-96">
+        <div class="space-y-4">
+          <!-- Gathering -->
+          <div>
+            <h3 class="text-amber-400 text-sm font-medium mb-2">Gathering</h3>
+            <div class="space-y-2">
+              <div class="bg-gray-700 rounded-lg p-3">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-white">Mining</span>
+                  <span class="text-amber-400 font-bold">28</span>
+                </div>
+                <div class="h-2 bg-gray-600 rounded-full overflow-hidden">
+                  <div class="h-full bg-amber-500" style="width: 65%"></div>
+                </div>
+                <div class="text-gray-400 text-xs mt-1">4,230 / 6,500 XP</div>
+              </div>
+              <div class="bg-gray-700 rounded-lg p-3">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-white">Woodcutting</span>
+                  <span class="text-amber-400 font-bold">15</span>
+                </div>
+                <div class="h-2 bg-gray-600 rounded-full overflow-hidden">
+                  <div class="h-full bg-amber-500" style="width: 30%"></div>
+                </div>
+              </div>
+              <div class="bg-gray-700 rounded-lg p-3">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-white">Herbalism</span>
+                  <span class="text-amber-400 font-bold">12</span>
+                </div>
+                <div class="h-2 bg-gray-600 rounded-full overflow-hidden">
+                  <div class="h-full bg-amber-500" style="width: 45%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Combat -->
+          <div>
+            <h3 class="text-amber-400 text-sm font-medium mb-2">Combat</h3>
+            <div class="space-y-2">
+              <div class="bg-gray-700 rounded-lg p-3">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-white">Melee</span>
+                  <span class="text-amber-400 font-bold">22</span>
+                </div>
+                <div class="h-2 bg-gray-600 rounded-full overflow-hidden">
+                  <div class="h-full bg-amber-500" style="width: 78%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Crafting -->
+          <div>
+            <h3 class="text-amber-400 text-sm font-medium mb-2">Crafting</h3>
+            <div class="space-y-2">
+              <div class="bg-gray-700 rounded-lg p-3">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-white">Smithing</span>
+                  <span class="text-amber-400 font-bold">18</span>
+                </div>
+                <div class="h-2 bg-gray-600 rounded-full overflow-hidden">
+                  <div class="h-full bg-amber-500" style="width: 55%"></div>
+                </div>
+              </div>
+              <div class="bg-gray-700 rounded-lg p-3">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-white">Tailoring</span>
+                  <span class="text-amber-400 font-bold">12</span>
+                </div>
+                <div class="h-2 bg-gray-600 rounded-full overflow-hidden">
+                  <div class="h-full bg-amber-500" style="width: 25%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Map Details Bottom Sheet -->
+    <div id="map-sheet" class="bottom-sheet fixed inset-x-0 bottom-0 bg-gray-800 rounded-t-2xl z-50 max-h-[85%]">
+      <div class="p-4 border-b border-gray-700">
+        <div class="w-12 h-1 bg-gray-600 rounded-full mx-auto mb-3"></div>
+        <h2 class="text-white font-bold text-lg">Iron Ridge</h2>
+        <p class="text-gray-400 text-sm">Tier 3 Mountain Region</p>
+      </div>
+      <div class="overflow-y-auto p-4 max-h-96">
+        <div class="space-y-4">
+          <!-- Travel Info -->
+          <div class="bg-gray-700 rounded-lg p-4">
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span class="text-gray-400">Distance</span>
+                <p class="text-white">Moderate (2 days)</p>
+              </div>
+              <div>
+                <span class="text-gray-400">Terrain</span>
+                <p class="text-white">Mountain (+2 move)</p>
+              </div>
+              <div>
+                <span class="text-gray-400">Danger</span>
+                <p class="text-amber-400">Medium</p>
+              </div>
+              <div>
+                <span class="text-gray-400">Your Cartography</span>
+                <p class="text-green-400">28 (Good detail)</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Contents -->
+          <div>
+            <h3 class="text-amber-400 text-sm font-medium mb-2">Known Contents</h3>
+            <div class="space-y-2">
+              <div class="flex items-center gap-3 bg-gray-700 rounded-lg p-3">
+                <span class="text-xl">&#x26CF;</span>
+                <div>
+                  <div class="text-white">Iron Ore Deposits (x4)</div>
+                  <div class="text-gray-400 text-xs">Est. 60-80 ore | Tier 2</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-3 bg-gray-700 rounded-lg p-3">
+                <span class="text-xl">&#x1F48E;</span>
+                <div>
+                  <div class="text-white">Gem Pocket (x1)</div>
+                  <div class="text-gray-400 text-xs">Rare gems | Requires Mining 25+</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-3 bg-gray-700 rounded-lg p-3">
+                <span class="text-xl">&#x1F43A;</span>
+                <div>
+                  <div class="text-white">Mountain Wolves (x2)</div>
+                  <div class="text-amber-400 text-xs">Combat: Medium | Drops: Pelts, Fangs</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-3 bg-gray-700 rounded-lg p-3">
+                <span class="text-xl">&#x1F33F;</span>
+                <div>
+                  <div class="text-white">Alpine Herbs (x2)</div>
+                  <div class="text-gray-400 text-xs">Rare medicinal herbs</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recommendations -->
+          <div class="bg-amber-900/30 border border-amber-700/50 rounded-lg p-4">
+            <h3 class="text-amber-400 font-bold mb-2">Recommended</h3>
+            <ul class="space-y-1 text-sm text-gray-300">
+              <li>&#x2022; Rations: 6+ days</li>
+              <li>&#x2022; Mining: 20+ for full value</li>
+              <li>&#x2022; Combat gear for wolves</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="p-4 border-t border-gray-700">
+        <button onclick="closeAllSheets()" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-lg">
+          Select This Map
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Screen switching
+    function showScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(screenId).classList.add('active');
+      closeAllSheets();
+    }
+
+    // Bottom sheet handling
+    function openSheet(sheetId) {
+      document.getElementById('backdrop').classList.add('open');
+      document.getElementById(sheetId).classList.add('open');
+    }
+
+    function closeAllSheets() {
+      document.getElementById('backdrop').classList.remove('open');
+      document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open'));
+    }
+
+    // Minigame animation
+    let powerLevel = 0;
+    let powerDirection = 1;
+    let targetPosition = 40;
+    let targetDirection = 1;
+    let swingCount = 3;
+    let collectedOre = 3;
+
+    function animatePower() {
+      powerLevel += powerDirection * 2;
+      if (powerLevel >= 100 || powerLevel <= 0) powerDirection *= -1;
+      document.getElementById('power-bar').style.width = powerLevel + '%';
+      requestAnimationFrame(animatePower);
+    }
+
+    function animateTarget() {
+      targetPosition += targetDirection * 0.5;
+      if (targetPosition >= 70 || targetPosition <= 10) targetDirection *= -1;
+      document.getElementById('target-zone').style.left = targetPosition + '%';
+      requestAnimationFrame(animateTarget);
+    }
+
+    function doSwing() {
+      swingCount++;
+      // Check if target is near center (40-60%)
+      if (targetPosition >= 35 && targetPosition <= 55) {
+        collectedOre += 2;
+        document.getElementById('efficiency').textContent = '92%';
+        document.getElementById('efficiency').className = 'text-green-400 ml-2';
+      } else {
+        collectedOre += 1;
+        document.getElementById('efficiency').textContent = '78%';
+        document.getElementById('efficiency').className = 'text-amber-400 ml-2';
+      }
+      document.getElementById('collected').textContent = collectedOre + ' ore';
+
+      // Animate pickaxe
+      const pickaxe = document.getElementById('pickaxe');
+      pickaxe.style.transform = 'rotate(-30deg)';
+      setTimeout(() => pickaxe.style.transform = 'rotate(0deg)', 150);
+
+      if (swingCount >= 12) {
+        alert('Mining complete! Collected ' + collectedOre + ' iron ore');
+        showScreen('active-expedition');
+        swingCount = 3;
+        collectedOre = 3;
+      }
+    }
+
+    // Start animations when minigame is shown
+    animatePower();
+    animateTarget();
+  </script>
+
+</body>
+</html>

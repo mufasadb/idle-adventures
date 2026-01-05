@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Idle Adventures - Layout Mockups v2</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* ==================== THEME SYSTEM ==================== */
+    :root {
+      /* Azure Blue accent */
+      --accent-50: #f0f9ff;
+      --accent-100: #e0f2fe;
+      --accent-200: #bae6fd;
+      --accent-300: #7dd3fc;
+      --accent-400: #38bdf8;
+      --accent-500: #0ea5e9;
+      --accent-600: #0284c7;
+      --accent-700: #0369a1;
+      --accent-800: #075985;
+      --accent-900: #0c4a6e;
+    }
+
+    /* Dark theme (default) */
+    [data-theme="dark"] {
+      --bg-primary: #111827;
+      --bg-secondary: #1f2937;
+      --bg-tertiary: #374151;
+      --bg-hover: #4b5563;
+      --text-primary: #ffffff;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --border: #374151;
+      --shadow: rgba(0, 0, 0, 0.5);
+    }
+
+    /* Light theme */
+    [data-theme="light"] {
+      --bg-primary: #f9fafb;
+      --bg-secondary: #ffffff;
+      --bg-tertiary: #f3f4f6;
+      --bg-hover: #e5e7eb;
+      --text-primary: #111827;
+      --text-secondary: #4b5563;
+      --text-muted: #9ca3af;
+      --border: #e5e7eb;
+      --shadow: rgba(0, 0, 0, 0.1);
+    }
+
+    /* Apply theme variables */
+    .bg-primary { background-color: var(--bg-primary); }
+    .bg-secondary { background-color: var(--bg-secondary); }
+    .bg-tertiary { background-color: var(--bg-tertiary); }
+    .bg-hover:hover { background-color: var(--bg-hover); }
+    .text-primary { color: var(--text-primary); }
+    .text-secondary { color: var(--text-secondary); }
+    .text-muted { color: var(--text-muted); }
+    .border-themed { border-color: var(--border); }
+    .accent { color: var(--accent-400); }
+    .accent-bg { background-color: var(--accent-600); }
+    .accent-bg:hover { background-color: var(--accent-500); }
+    .accent-bg-subtle { background-color: var(--accent-900); }
+    .accent-border { border-color: var(--accent-700); }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: var(--bg-tertiary); }
+    ::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: 2px; }
+
+    /* ==================== MOBILE FRAME ==================== */
+    .mobile-frame {
+      width: 375px;
+      height: 812px;
+      border: 8px solid #374151;
+      border-radius: 40px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ==================== BOTTOM SHEET (FIXED FOR MOBILE FRAME) ==================== */
+    .sheet-container {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .sheet-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+    }
+
+    .sheet-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .bottom-sheet {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      max-height: 85%;
+      transform: translateY(100%);
+      transition: transform 0.3s ease-out;
+      pointer-events: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .bottom-sheet.open {
+      transform: translateY(0);
+    }
+
+    .sheet-content {
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    /* ==================== SCREENS ==================== */
+    .screen {
+      display: none;
+      height: 100%;
+    }
+    .screen.active {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ==================== INVENTORY GRID ==================== */
+    .inventory-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 4px;
+    }
+
+    .inventory-slot {
+      aspect-ratio: 1;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      position: relative;
+      border: 1px dashed var(--border);
+      background: var(--bg-tertiary);
+    }
+
+    .inventory-slot.filled {
+      border-style: solid;
+      background: var(--bg-secondary);
+    }
+
+    .inventory-slot .count {
+      position: absolute;
+      bottom: 2px;
+      right: 4px;
+      font-size: 0.65rem;
+      font-weight: bold;
+      color: var(--text-primary);
+    }
+
+    /* ==================== PAN & ZOOM MAP ==================== */
+    .map-viewport {
+      overflow: hidden;
+      touch-action: none;
+      cursor: grab;
+      position: relative;
+      flex: 1;
+    }
+
+    .map-viewport:active {
+      cursor: grabbing;
+    }
+
+    .map-container {
+      position: absolute;
+      transform-origin: 0 0;
+      transition: transform 0.1s ease-out;
+    }
+
+    .grid-cell {
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: background-color 0.2s;
+      background: var(--bg-secondary);
+    }
+
+    .grid-cell:hover {
+      background: var(--bg-hover);
+    }
+
+    .grid-cell.player {
+      background: var(--accent-800);
+      border-color: var(--accent-400);
+    }
+
+    .grid-cell.mountain {
+      background: var(--bg-tertiary);
+    }
+
+    .grid-cell.fog {
+      background: var(--bg-primary);
+      opacity: 0.5;
+    }
+
+    /* Zoom controls */
+    .zoom-controls {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      z-index: 10;
+    }
+
+    .zoom-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      font-weight: bold;
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      cursor: pointer;
+    }
+
+    .zoom-btn:hover {
+      background: var(--bg-hover);
+    }
+
+    /* Minimap */
+    .minimap {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 80px;
+      height: 80px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      z-index: 10;
+    }
+
+    .minimap-viewport {
+      position: absolute;
+      border: 2px solid var(--accent-400);
+      background: rgba(56, 189, 248, 0.2);
+    }
+  </style>
+</head>
+<body class="bg-gray-950 min-h-screen flex items-center justify-center p-8">
+
+  <!-- Control Panel (for demo) -->
+  <div class="fixed top-4 left-4 z-50 bg-gray-800 rounded-lg p-4 text-white max-w-xs">
+    <h3 class="text-sky-400 font-bold mb-3">Controls</h3>
+
+    <!-- Theme Toggle -->
+    <div class="mb-4">
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" id="theme-toggle" class="w-4 h-4" onchange="toggleTheme()">
+        <span class="text-sm">Light Mode</span>
+      </label>
+    </div>
+
+    <div class="space-y-2 text-sm">
+      <button onclick="showScreen('town')" class="block w-full text-left px-3 py-1 rounded hover:bg-gray-700">1. Town (Home)</button>
+      <button onclick="showScreen('expedition-prep')" class="block w-full text-left px-3 py-1 rounded hover:bg-gray-700">2. Expedition Prep</button>
+      <button onclick="showScreen('active-expedition')" class="block w-full text-left px-3 py-1 rounded hover:bg-gray-700">3. Active Expedition</button>
+      <button onclick="showScreen('node-interaction')" class="block w-full text-left px-3 py-1 rounded hover:bg-gray-700">4. Node Interaction</button>
+      <button onclick="showScreen('minigame')" class="block w-full text-left px-3 py-1 rounded hover:bg-gray-700">5. Minigame</button>
+    </div>
+
+    <hr class="my-3 border-gray-600">
+
+    <div class="space-y-2 text-sm">
+      <button onclick="openSheet('inventory-sheet')" class="block w-full text-left px-3 py-1 rounded hover:bg-gray-700">Inventory (Grid)</button>
+      <button onclick="openSheet('skills-sheet')" class="block w-full text-left px-3 py-1 rounded hover:bg-gray-700">Skills</button>
+      <button onclick="openSheet('map-sheet')" class="block w-full text-left px-3 py-1 rounded hover:bg-gray-700">Map Details</button>
+    </div>
+
+    <hr class="my-3 border-gray-600">
+    <p class="text-xs text-gray-400">Map: Pinch/scroll to zoom, drag to pan</p>
+  </div>
+
+  <!-- Mobile Phone Frame -->
+  <div class="mobile-frame" data-theme="dark" id="app">
+
+    <!-- ==================== SCREEN: TOWN ==================== -->
+    <div id="town" class="screen active bg-primary">
+      <!-- Status Bar -->
+      <div class="bg-secondary px-4 py-2 flex justify-between items-center border-b border-themed">
+        <span class="accent font-bold">Thornvale</span>
+        <div class="flex items-center gap-3">
+          <button onclick="toggleTheme()" class="text-secondary hover:text-primary text-lg">
+            <span id="theme-icon">&#x1F319;</span>
+          </button>
+          <span class="accent">1,234 gold</span>
+        </div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="flex-1 overflow-y-auto p-4 space-y-4">
+        <!-- Player Card -->
+        <div class="bg-secondary rounded-lg p-4">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 accent-bg-subtle rounded-full flex items-center justify-center text-2xl">
+              &#x1F9D9;
+            </div>
+            <div>
+              <h2 class="text-primary font-bold">Adventurer</h2>
+              <p class="text-secondary text-sm">Level 12</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Stats Row -->
+        <div class="grid grid-cols-3 gap-2">
+          <div class="bg-secondary rounded-lg p-3 text-center">
+            <div class="accent text-lg font-bold">8</div>
+            <div class="text-muted text-xs">Rations</div>
+          </div>
+          <div class="bg-secondary rounded-lg p-3 text-center">
+            <div class="accent text-lg font-bold">3</div>
+            <div class="text-muted text-xs">Maps</div>
+          </div>
+          <div class="bg-secondary rounded-lg p-3 text-center">
+            <div class="accent text-lg font-bold">21/30</div>
+            <div class="text-muted text-xs">Carry</div>
+          </div>
+        </div>
+
+        <!-- Main Actions -->
+        <div class="space-y-3">
+          <h3 class="text-muted text-sm font-medium uppercase tracking-wide">Actions</h3>
+
+          <button onclick="showScreen('expedition-prep')" class="w-full accent-bg hover:opacity-90 rounded-lg p-4 text-left flex items-center gap-3">
+            <span class="text-2xl">&#x1F5FA;</span>
+            <div>
+              <div class="text-white font-bold">Start Expedition</div>
+              <div class="text-sky-200 text-sm">Choose a map and prepare</div>
+            </div>
+          </button>
+
+          <div class="grid grid-cols-2 gap-3">
+            <button onclick="openSheet('inventory-sheet')" class="bg-secondary bg-hover rounded-lg p-4 text-left">
+              <span class="text-xl">&#x1F392;</span>
+              <div class="text-primary font-medium mt-1">Inventory</div>
+              <div class="text-muted text-xs">21/30 slots</div>
+            </button>
+
+            <button onclick="openSheet('skills-sheet')" class="bg-secondary bg-hover rounded-lg p-4 text-left">
+              <span class="text-xl">&#x2728;</span>
+              <div class="text-primary font-medium mt-1">Skills</div>
+              <div class="text-muted text-xs">23 skills</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Town Buildings -->
+        <div class="space-y-3">
+          <h3 class="text-muted text-sm font-medium uppercase tracking-wide">Town</h3>
+          <div class="grid grid-cols-2 gap-3">
+            <button class="bg-secondary bg-hover rounded-lg p-3 text-left">
+              <span class="text-lg">&#x1F525;</span>
+              <div class="text-primary text-sm font-medium">Smithing</div>
+            </button>
+            <button class="bg-secondary bg-hover rounded-lg p-3 text-left">
+              <span class="text-lg">&#x1F373;</span>
+              <div class="text-primary text-sm font-medium">Cooking</div>
+            </button>
+            <button class="bg-secondary bg-hover rounded-lg p-3 text-left">
+              <span class="text-lg">&#x1F4DA;</span>
+              <div class="text-primary text-sm font-medium">Library</div>
+            </button>
+            <button class="bg-secondary bg-hover rounded-lg p-3 text-left">
+              <span class="text-lg">&#x1F3EA;</span>
+              <div class="text-primary text-sm font-medium">Map Shop</div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Nav -->
+      <div class="bg-secondary border-t border-themed px-4 py-3">
+        <div class="flex justify-around">
+          <button class="flex flex-col items-center accent">
+            <span class="text-xl">&#x1F3E0;</span>
+            <span class="text-xs mt-1">Town</span>
+          </button>
+          <button onclick="openSheet('inventory-sheet')" class="flex flex-col items-center text-secondary hover:text-primary">
+            <span class="text-xl">&#x1F392;</span>
+            <span class="text-xs mt-1">Inventory</span>
+          </button>
+          <button onclick="openSheet('skills-sheet')" class="flex flex-col items-center text-secondary hover:text-primary">
+            <span class="text-xl">&#x2728;</span>
+            <span class="text-xs mt-1">Skills</span>
+          </button>
+          <button class="flex flex-col items-center text-secondary hover:text-primary">
+            <span class="text-xl">&#x2699;</span>
+            <span class="text-xs mt-1">Settings</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: EXPEDITION PREP ==================== -->
+    <div id="expedition-prep" class="screen bg-primary">
+      <div class="bg-secondary px-4 py-3 flex items-center gap-3 border-b border-themed">
+        <button onclick="showScreen('town')" class="text-secondary hover:text-primary">&#x2190;</button>
+        <span class="text-primary font-bold">Prepare Expedition</span>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-4 space-y-4">
+        <!-- Map Selection -->
+        <div class="bg-secondary rounded-lg p-4">
+          <h3 class="accent font-bold mb-3">Select Map</h3>
+          <div class="space-y-2">
+            <button onclick="openSheet('map-sheet')" class="w-full bg-tertiary bg-hover rounded-lg p-3 text-left flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <span class="text-xl">&#x1F4DC;</span>
+                <div>
+                  <div class="text-primary font-medium">Iron Ridge</div>
+                  <div class="text-muted text-xs">2 days travel | Tier 3</div>
+                </div>
+              </div>
+              <span class="text-muted">&#x276F;</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Rations -->
+        <div class="bg-secondary rounded-lg p-4">
+          <div class="flex justify-between items-center mb-3">
+            <h3 class="accent font-bold">Rations</h3>
+            <span class="text-muted text-sm">Available: 8 days</span>
+          </div>
+          <div class="flex items-center justify-between bg-tertiary rounded-lg p-3">
+            <button class="w-10 h-10 bg-hover rounded-lg text-primary text-xl">-</button>
+            <div class="text-center">
+              <div class="text-primary text-2xl font-bold">6</div>
+              <div class="text-muted text-xs">days packed</div>
+            </div>
+            <button class="w-10 h-10 bg-hover rounded-lg text-primary text-xl">+</button>
+          </div>
+        </div>
+
+        <!-- Gear Summary -->
+        <div class="bg-secondary rounded-lg p-4">
+          <h3 class="accent font-bold mb-3">Gear</h3>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between">
+              <span class="text-muted">Weapon</span>
+              <span class="text-primary">Iron Pickaxe</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-muted">Backpack</span>
+              <span class="text-primary">Leather (30 slots)</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-muted">Mount</span>
+              <span class="text-muted">None</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Trip Summary -->
+        <div class="accent-bg-subtle border accent-border rounded-lg p-4">
+          <h3 class="accent font-bold mb-2">Trip Summary</h3>
+          <div class="grid grid-cols-2 gap-2 text-sm">
+            <div><span class="text-secondary">Travel:</span> <span class="text-primary">4 days</span></div>
+            <div><span class="text-secondary">On site:</span> <span class="text-primary">2 days</span></div>
+            <div><span class="text-secondary">Carry:</span> <span class="text-primary">30 slots</span></div>
+            <div><span class="text-secondary">Yield:</span> <span class="text-primary">~50 ore</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 bg-secondary border-t border-themed">
+        <button onclick="showScreen('active-expedition')" class="w-full accent-bg text-white font-bold py-4 rounded-lg">
+          Begin Expedition
+        </button>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: ACTIVE EXPEDITION (PAN & ZOOM) ==================== -->
+    <div id="active-expedition" class="screen bg-primary">
+      <!-- Header -->
+      <div class="bg-secondary px-4 py-2 border-b border-themed">
+        <div class="flex justify-between items-center">
+          <span class="accent font-bold">Iron Ridge</span>
+          <button onclick="showScreen('town')" class="text-muted text-sm hover:text-primary">Return Home</button>
+        </div>
+        <div class="flex justify-between text-xs text-muted mt-1">
+          <span>Day 1 | 10 hrs left</span>
+          <span>Carry: 21/30</span>
+        </div>
+      </div>
+
+      <!-- Map Viewport with Pan & Zoom -->
+      <div class="map-viewport bg-primary" id="map-viewport">
+        <!-- Minimap -->
+        <div class="minimap" id="minimap">
+          <div class="minimap-viewport" id="minimap-viewport"></div>
+        </div>
+
+        <!-- Zoom Controls -->
+        <div class="zoom-controls">
+          <button class="zoom-btn" onclick="zoomIn()">+</button>
+          <button class="zoom-btn" onclick="zoomOut()">-</button>
+          <button class="zoom-btn" onclick="centerOnPlayer()" style="font-size: 0.9rem;">&#x1F3AF;</button>
+        </div>
+
+        <!-- The actual map grid (larger than viewport) -->
+        <div class="map-container" id="map-container">
+          <div id="expedition-grid" style="display: grid; gap: 2px;">
+            <!-- Grid cells will be generated by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Legend -->
+      <div class="bg-secondary p-2 border-t border-themed">
+        <div class="flex justify-between items-center text-xs text-muted">
+          <span>&#x26CF; Mine</span>
+          <span>&#x1F33F; Herb</span>
+          <span>&#x1F48E; Gem</span>
+          <span>&#x1F43A; Wolf</span>
+          <span>&#x25B2; Mtn</span>
+        </div>
+      </div>
+
+      <!-- Bottom Status -->
+      <div class="bg-secondary px-4 py-3 border-t border-themed">
+        <div class="flex justify-between">
+          <button onclick="openSheet('inventory-sheet')" class="flex items-center gap-2 text-muted hover:text-primary">
+            <span>&#x1F392;</span>
+            <span class="text-sm">21/30</span>
+          </button>
+          <div class="flex items-center gap-2 accent">
+            <span>&#x1F356;</span>
+            <span class="text-sm">4 days</span>
+          </div>
+          <button class="flex items-center gap-2 text-muted hover:text-primary">
+            <span>&#x2764;</span>
+            <span class="text-sm">Full</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: NODE INTERACTION ==================== -->
+    <div id="node-interaction" class="screen bg-primary">
+      <div class="bg-secondary px-4 py-3 flex items-center gap-3 border-b border-themed">
+        <button onclick="showScreen('active-expedition')" class="text-secondary hover:text-primary">&#x2190;</button>
+        <span class="text-primary font-bold">Iron Ore Deposit</span>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-4 space-y-4">
+        <div class="bg-secondary rounded-lg p-6 text-center">
+          <div class="text-6xl mb-4">&#x26CF;</div>
+          <h2 class="text-primary text-xl font-bold">Iron Ore Deposit</h2>
+          <p class="text-muted">Tier 2 Mining Node</p>
+        </div>
+
+        <div class="bg-secondary rounded-lg p-4 space-y-3">
+          <div class="flex justify-between">
+            <span class="text-muted">Ore available</span>
+            <span class="text-primary">~18-22</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-muted">Time to clear</span>
+            <span class="text-primary">~4 hours</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-muted">Your Mining level</span>
+            <span class="accent">28 (+28% yield)</span>
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <button onclick="showScreen('minigame')" class="w-full accent-bg rounded-lg p-4 text-left">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">&#x26CF;</span>
+              <div>
+                <div class="text-white font-bold">Mine Manually</div>
+                <div class="text-sky-200 text-sm">Play minigame | 85-100% yield</div>
+              </div>
+            </div>
+          </button>
+
+          <button class="w-full bg-secondary bg-hover rounded-lg p-4 text-left">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">&#x1F504;</span>
+              <div>
+                <div class="text-primary font-bold">Auto-Mine</div>
+                <div class="text-muted text-sm">Hands-off | 70% yield</div>
+              </div>
+            </div>
+          </button>
+
+          <button onclick="showScreen('active-expedition')" class="w-full bg-tertiary bg-hover rounded-lg p-4 text-left border border-themed">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">&#x23ED;</span>
+              <div>
+                <div class="text-secondary font-bold">Skip Node</div>
+                <div class="text-muted text-sm">Save time for other nodes</div>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: MINIGAME ==================== -->
+    <div id="minigame" class="screen bg-primary">
+      <div class="bg-secondary px-4 py-3 border-b border-themed text-center">
+        <span class="accent font-bold">Mining</span>
+        <div class="text-muted text-sm">Swing 4 of 12</div>
+      </div>
+
+      <div class="flex-1 flex flex-col items-center justify-center p-6 space-y-8">
+        <div class="w-full max-w-xs">
+          <div class="text-center text-muted mb-2">Power</div>
+          <div class="h-8 bg-tertiary rounded-full overflow-hidden relative">
+            <div class="absolute inset-y-0 left-1/3 w-1/6 bg-green-600/30"></div>
+            <div id="power-bar" class="h-full transition-all duration-100" style="width: 45%; background: var(--accent-500)"></div>
+          </div>
+        </div>
+
+        <div class="text-8xl" id="pickaxe">&#x26CF;</div>
+
+        <div class="w-full max-w-xs">
+          <div class="h-4 bg-tertiary rounded-full overflow-hidden relative">
+            <div id="target-zone" class="absolute inset-y-0 w-1/5 bg-green-500 rounded" style="left: 40%"></div>
+            <div class="absolute inset-y-0 left-1/2 w-1 -translate-x-1/2" style="background: var(--accent-400)"></div>
+          </div>
+          <p class="text-center text-muted text-sm mt-2">Tap when green zone is centered!</p>
+        </div>
+
+        <button onclick="doSwing()" class="w-32 h-32 accent-bg rounded-full text-white font-bold text-xl shadow-lg transform active:scale-95 transition-transform">
+          SWING
+        </button>
+      </div>
+
+      <div class="bg-secondary p-4 border-t border-themed">
+        <div class="flex justify-between items-center">
+          <div>
+            <span class="text-muted text-sm">Collected:</span>
+            <span class="text-primary ml-2" id="collected">3 ore</span>
+          </div>
+          <div>
+            <span class="text-muted text-sm">Efficiency:</span>
+            <span class="text-green-400 ml-2" id="efficiency">92%</span>
+          </div>
+          <button onclick="showScreen('active-expedition')" class="accent underline text-sm">Finish</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== BOTTOM SHEETS ==================== -->
+    <div class="sheet-container">
+      <div id="sheet-backdrop" class="sheet-backdrop" onclick="closeAllSheets()"></div>
+
+      <!-- Inventory Sheet (Grid-based) -->
+      <div id="inventory-sheet" class="bottom-sheet bg-secondary rounded-t-2xl">
+        <div class="p-4 border-b border-themed">
+          <div class="w-12 h-1 bg-tertiary rounded-full mx-auto mb-3"></div>
+          <div class="flex justify-between items-center">
+            <h2 class="text-primary font-bold text-lg">Inventory</h2>
+            <span class="text-muted">21/30 slots used</span>
+          </div>
+        </div>
+        <div class="sheet-content p-4">
+          <!-- Visual Grid Inventory -->
+          <div class="inventory-grid" id="inventory-grid">
+            <!-- Slots generated by JS -->
+          </div>
+
+          <!-- Item Details (when selected) -->
+          <div class="mt-4 p-3 bg-tertiary rounded-lg hidden" id="item-details">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl" id="detail-icon">&#x1FAA8;</span>
+              <div>
+                <div class="text-primary font-bold" id="detail-name">Iron Ore</div>
+                <div class="text-muted text-sm" id="detail-desc">Raw ore, needs smelting</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Skills Sheet -->
+      <div id="skills-sheet" class="bottom-sheet bg-secondary rounded-t-2xl">
+        <div class="p-4 border-b border-themed">
+          <div class="w-12 h-1 bg-tertiary rounded-full mx-auto mb-3"></div>
+          <h2 class="text-primary font-bold text-lg">Skills</h2>
+        </div>
+        <div class="sheet-content p-4 space-y-4">
+          <div>
+            <h3 class="accent text-sm font-medium mb-2">Gathering</h3>
+            <div class="space-y-2">
+              <div class="bg-tertiary rounded-lg p-3">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-primary">Mining</span>
+                  <span class="accent font-bold">28</span>
+                </div>
+                <div class="h-2 bg-primary rounded-full overflow-hidden">
+                  <div class="h-full" style="width: 65%; background: var(--accent-500)"></div>
+                </div>
+              </div>
+              <div class="bg-tertiary rounded-lg p-3">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-primary">Woodcutting</span>
+                  <span class="accent font-bold">15</span>
+                </div>
+                <div class="h-2 bg-primary rounded-full overflow-hidden">
+                  <div class="h-full" style="width: 30%; background: var(--accent-500)"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <h3 class="accent text-sm font-medium mb-2">Combat</h3>
+            <div class="bg-tertiary rounded-lg p-3">
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-primary">Melee</span>
+                <span class="accent font-bold">22</span>
+              </div>
+              <div class="h-2 bg-primary rounded-full overflow-hidden">
+                <div class="h-full" style="width: 78%; background: var(--accent-500)"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Map Details Sheet -->
+      <div id="map-sheet" class="bottom-sheet bg-secondary rounded-t-2xl">
+        <div class="p-4 border-b border-themed">
+          <div class="w-12 h-1 bg-tertiary rounded-full mx-auto mb-3"></div>
+          <h2 class="text-primary font-bold text-lg">Iron Ridge</h2>
+          <p class="text-muted text-sm">Tier 3 Mountain Region</p>
+        </div>
+        <div class="sheet-content p-4 space-y-4">
+          <div class="bg-tertiary rounded-lg p-4 grid grid-cols-2 gap-4 text-sm">
+            <div><span class="text-muted">Distance</span><p class="text-primary">2 days</p></div>
+            <div><span class="text-muted">Terrain</span><p class="text-primary">Mountain</p></div>
+            <div><span class="text-muted">Danger</span><p class="accent">Medium</p></div>
+            <div><span class="text-muted">Cartography</span><p class="text-green-400">28</p></div>
+          </div>
+
+          <div>
+            <h3 class="accent text-sm font-medium mb-2">Contents</h3>
+            <div class="space-y-2">
+              <div class="flex items-center gap-3 bg-tertiary rounded-lg p-3">
+                <span>&#x26CF;</span>
+                <div><div class="text-primary text-sm">Iron Ore (x4)</div><div class="text-muted text-xs">~60-80 ore</div></div>
+              </div>
+              <div class="flex items-center gap-3 bg-tertiary rounded-lg p-3">
+                <span>&#x1F43A;</span>
+                <div><div class="text-primary text-sm">Wolves (x2)</div><div class="text-muted text-xs">Medium combat</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="p-4 border-t border-themed">
+          <button onclick="closeAllSheets()" class="w-full accent-bg text-white font-bold py-3 rounded-lg">Select Map</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ==================== THEME TOGGLE ====================
+    function toggleTheme() {
+      const app = document.getElementById('app');
+      const toggle = document.getElementById('theme-toggle');
+      const icon = document.getElementById('theme-icon');
+
+      if (app.dataset.theme === 'dark') {
+        app.dataset.theme = 'light';
+        toggle.checked = true;
+        icon.innerHTML = '&#x2600;';
+      } else {
+        app.dataset.theme = 'dark';
+        toggle.checked = false;
+        icon.innerHTML = '&#x1F319;';
+      }
+    }
+
+    // ==================== SCREEN SWITCHING ====================
+    function showScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(screenId).classList.add('active');
+      closeAllSheets();
+
+      if (screenId === 'active-expedition') {
+        initMap();
+      }
+    }
+
+    // ==================== BOTTOM SHEETS ====================
+    function openSheet(sheetId) {
+      document.getElementById('sheet-backdrop').classList.add('open');
+      document.getElementById(sheetId).classList.add('open');
+
+      if (sheetId === 'inventory-sheet') {
+        generateInventoryGrid();
+      }
+    }
+
+    function closeAllSheets() {
+      document.getElementById('sheet-backdrop').classList.remove('open');
+      document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open'));
+    }
+
+    // ==================== INVENTORY GRID ====================
+    const inventoryItems = [
+      { icon: '&#x1FAA8;', name: 'Iron Ore', count: 12 },
+      { icon: '&#x1FAA8;', name: 'Iron Ore', count: 9 },
+      { icon: '&#x1F33F;', name: 'Alpine Herbs', count: 4 },
+      { icon: '&#x1F33F;', name: 'Alpine Herbs', count: 4 },
+      { icon: '&#x1F9F1;', name: 'Copper Ingot', count: 8 },
+      { icon: '&#x1F9F1;', name: 'Copper Ingot', count: 7 },
+      { icon: '&#x1F48E;', name: 'Raw Gem', count: 2 },
+      { icon: '&#x1F3AF;', name: 'Wolf Pelt', count: 2 },
+      { icon: '&#x1F9B4;', name: 'Wolf Fangs', count: 4 },
+      null, null, null, null, null, null, null, null, null, null, null, null,
+      null, null, null, null, null, null, null, null, null
+    ];
+
+    function generateInventoryGrid() {
+      const grid = document.getElementById('inventory-grid');
+      grid.innerHTML = '';
+
+      for (let i = 0; i < 30; i++) {
+        const slot = document.createElement('div');
+        slot.className = 'inventory-slot' + (inventoryItems[i] ? ' filled' : '');
+
+        if (inventoryItems[i]) {
+          slot.innerHTML = `
+            <span>${inventoryItems[i].icon}</span>
+            <span class="count">${inventoryItems[i].count}</span>
+          `;
+          slot.onclick = () => showItemDetails(inventoryItems[i]);
+        }
+
+        grid.appendChild(slot);
+      }
+    }
+
+    function showItemDetails(item) {
+      const details = document.getElementById('item-details');
+      document.getElementById('detail-icon').innerHTML = item.icon;
+      document.getElementById('detail-name').textContent = item.name + ' x' + item.count;
+      details.classList.remove('hidden');
+    }
+
+    // ==================== PAN & ZOOM MAP ====================
+    let mapScale = 1;
+    let mapX = 0;
+    let mapY = 0;
+    let isDragging = false;
+    let startX, startY;
+    let playerPos = { x: 0, y: 0 };
+
+    const MAP_SIZE = 10; // 10x10 grid
+    const CELL_SIZE = 50; // 48px + 2px gap
+
+    const mapData = [
+      ['P', '', '', 'M', 'M', '', '', '', '', ''],
+      ['', '⛏', '', 'M', '', '⛏', '', '🌿', '', ''],
+      ['⛏', '', '', '', '💎', '', '🐺', '', '', ''],
+      ['', '🌿', 'M', 'M', '', '🌿', '', '⛏', '', ''],
+      ['', '🐺', '', '', '', '', '', '', '⛏', ''],
+      ['', '', '⛏', '', '', 'M', '', '', '', '🌿'],
+      ['🌿', '', '', '', '⛏', '', '', '🐺', '', ''],
+      ['', '', 'M', 'M', '', '', '', '', '💎', ''],
+      ['⛏', '', '', '', '🌿', '', '', '', '', ''],
+      ['', '', '', '', '', '⛏', '', '🌿', '', ''],
+    ];
+
+    function initMap() {
+      const grid = document.getElementById('expedition-grid');
+      grid.innerHTML = '';
+      grid.style.gridTemplateColumns = `repeat(${MAP_SIZE}, 48px)`;
+
+      for (let y = 0; y < MAP_SIZE; y++) {
+        for (let x = 0; x < MAP_SIZE; x++) {
+          const cell = document.createElement('div');
+          const content = mapData[y][x];
+
+          cell.className = 'grid-cell';
+          if (content === 'P') {
+            cell.className += ' player';
+            cell.innerHTML = '&#x1F6A9;';
+            playerPos = { x, y };
+          } else if (content === 'M') {
+            cell.className += ' mountain';
+            cell.innerHTML = '&#x25B2;';
+          } else if (content === '⛏') {
+            cell.innerHTML = '&#x26CF;';
+            cell.onclick = () => showScreen('node-interaction');
+          } else if (content) {
+            cell.innerHTML = content;
+            cell.onclick = () => showScreen('node-interaction');
+          }
+
+          grid.appendChild(cell);
+        }
+      }
+
+      // Center on player
+      setTimeout(centerOnPlayer, 100);
+      initPanZoom();
+      updateMinimap();
+    }
+
+    function initPanZoom() {
+      const viewport = document.getElementById('map-viewport');
+      const container = document.getElementById('map-container');
+
+      // Mouse drag
+      viewport.onmousedown = (e) => {
+        isDragging = true;
+        startX = e.clientX - mapX;
+        startY = e.clientY - mapY;
+      };
+
+      document.onmousemove = (e) => {
+        if (!isDragging) return;
+        mapX = e.clientX - startX;
+        mapY = e.clientY - startY;
+        updateMapTransform();
+      };
+
+      document.onmouseup = () => isDragging = false;
+
+      // Touch drag
+      viewport.ontouchstart = (e) => {
+        if (e.touches.length === 1) {
+          isDragging = true;
+          startX = e.touches[0].clientX - mapX;
+          startY = e.touches[0].clientY - mapY;
+        }
+      };
+
+      viewport.ontouchmove = (e) => {
+        if (!isDragging || e.touches.length !== 1) return;
+        e.preventDefault();
+        mapX = e.touches[0].clientX - startX;
+        mapY = e.touches[0].clientY - startY;
+        updateMapTransform();
+      };
+
+      viewport.ontouchend = () => isDragging = false;
+
+      // Scroll zoom
+      viewport.onwheel = (e) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        mapScale = Math.max(0.5, Math.min(2, mapScale + delta));
+        updateMapTransform();
+      };
+    }
+
+    function updateMapTransform() {
+      const container = document.getElementById('map-container');
+      container.style.transform = `translate(${mapX}px, ${mapY}px) scale(${mapScale})`;
+      updateMinimap();
+    }
+
+    function zoomIn() {
+      mapScale = Math.min(2, mapScale + 0.2);
+      updateMapTransform();
+    }
+
+    function zoomOut() {
+      mapScale = Math.max(0.5, mapScale - 0.2);
+      updateMapTransform();
+    }
+
+    function centerOnPlayer() {
+      const viewport = document.getElementById('map-viewport');
+      const vw = viewport.offsetWidth;
+      const vh = viewport.offsetHeight;
+
+      const playerPixelX = playerPos.x * CELL_SIZE + CELL_SIZE / 2;
+      const playerPixelY = playerPos.y * CELL_SIZE + CELL_SIZE / 2;
+
+      mapX = (vw / 2) - (playerPixelX * mapScale);
+      mapY = (vh / 2) - (playerPixelY * mapScale);
+
+      updateMapTransform();
+    }
+
+    function updateMinimap() {
+      const minimap = document.getElementById('minimap');
+      const viewport = document.getElementById('map-viewport');
+      const mmViewport = document.getElementById('minimap-viewport');
+
+      const mapWidth = MAP_SIZE * CELL_SIZE;
+      const mapHeight = MAP_SIZE * CELL_SIZE;
+      const mmWidth = minimap.offsetWidth;
+      const mmHeight = minimap.offsetHeight;
+
+      const scaleX = mmWidth / mapWidth;
+      const scaleY = mmHeight / mapHeight;
+
+      const vpWidth = (viewport.offsetWidth / mapScale) * scaleX;
+      const vpHeight = (viewport.offsetHeight / mapScale) * scaleY;
+      const vpX = (-mapX / mapScale) * scaleX;
+      const vpY = (-mapY / mapScale) * scaleY;
+
+      mmViewport.style.width = vpWidth + 'px';
+      mmViewport.style.height = vpHeight + 'px';
+      mmViewport.style.left = Math.max(0, vpX) + 'px';
+      mmViewport.style.top = Math.max(0, vpY) + 'px';
+    }
+
+    // ==================== MINIGAME ====================
+    let powerLevel = 0;
+    let powerDirection = 1;
+    let targetPosition = 40;
+    let targetDirection = 1;
+    let swingCount = 3;
+    let collectedOre = 3;
+
+    function animatePower() {
+      powerLevel += powerDirection * 2;
+      if (powerLevel >= 100 || powerLevel <= 0) powerDirection *= -1;
+      document.getElementById('power-bar').style.width = powerLevel + '%';
+      requestAnimationFrame(animatePower);
+    }
+
+    function animateTarget() {
+      targetPosition += targetDirection * 0.5;
+      if (targetPosition >= 70 || targetPosition <= 10) targetDirection *= -1;
+      document.getElementById('target-zone').style.left = targetPosition + '%';
+      requestAnimationFrame(animateTarget);
+    }
+
+    function doSwing() {
+      swingCount++;
+      if (targetPosition >= 35 && targetPosition <= 55) {
+        collectedOre += 2;
+        document.getElementById('efficiency').textContent = '92%';
+        document.getElementById('efficiency').className = 'text-green-400 ml-2';
+      } else {
+        collectedOre += 1;
+        document.getElementById('efficiency').textContent = '78%';
+        document.getElementById('efficiency').className = 'accent ml-2';
+      }
+      document.getElementById('collected').textContent = collectedOre + ' ore';
+
+      const pickaxe = document.getElementById('pickaxe');
+      pickaxe.style.transform = 'rotate(-30deg)';
+      setTimeout(() => pickaxe.style.transform = 'rotate(0deg)', 150);
+
+      if (swingCount >= 12) {
+        alert('Mining complete! Collected ' + collectedOre + ' iron ore');
+        showScreen('active-expedition');
+        swingCount = 3;
+        collectedOre = 3;
+      }
+    }
+
+    animatePower();
+    animateTarget();
+  </script>
+
+</body>
+</html>
