@@ -2,13 +2,13 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
 import { authStore } from './stores/authStore';
 import { LoginPage } from './pages/LoginPage';
-import { HomePage } from './pages/HomePage';
+import { Game } from './components/Game';
 
 const ProtectedRoute = observer(({ children }: { children: React.ReactNode }) => {
   if (authStore.isLoading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-amber-400 text-xl">Loading...</div>
+        <div className="text-sky-400 text-xl">Loading...</div>
       </div>
     );
   }
@@ -29,7 +29,7 @@ function App() {
           path="/"
           element={
             <ProtectedRoute>
-              <HomePage />
+              <Game />
             </ProtectedRoute>
           }
         />

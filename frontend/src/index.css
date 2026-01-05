@@ -1,5 +1,44 @@
 @import "tailwindcss";
 
+/* ==================== THEME SYSTEM ==================== */
+:root {
+  /* Azure Blue accent */
+  --accent-50: #f0f9ff;
+  --accent-100: #e0f2fe;
+  --accent-200: #bae6fd;
+  --accent-300: #7dd3fc;
+  --accent-400: #38bdf8;
+  --accent-500: #0ea5e9;
+  --accent-600: #0284c7;
+  --accent-700: #0369a1;
+  --accent-800: #075985;
+  --accent-900: #0c4a6e;
+}
+
+/* Dark theme (default) */
+[data-theme="dark"] {
+  --bg-primary: #111827;
+  --bg-secondary: #1f2937;
+  --bg-tertiary: #374151;
+  --bg-hover: #4b5563;
+  --text-primary: #ffffff;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+  --border-color: #374151;
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --bg-primary: #f9fafb;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f3f4f6;
+  --bg-hover: #e5e7eb;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+  --border-color: #e5e7eb;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -7,4 +46,137 @@ body {
 
 #root {
   min-height: 100vh;
+}
+
+/* ==================== CUSTOM UTILITIES ==================== */
+
+/* Backgrounds */
+.bg-app-primary { background-color: var(--bg-primary); }
+.bg-app-secondary { background-color: var(--bg-secondary); }
+.bg-app-tertiary { background-color: var(--bg-tertiary); }
+.hover\:bg-app-hover:hover { background-color: var(--bg-hover); }
+
+/* Text */
+.text-app-primary { color: var(--text-primary); }
+.text-app-secondary { color: var(--text-secondary); }
+.text-app-muted { color: var(--text-muted); }
+
+/* Accent */
+.text-accent { color: var(--accent-400); }
+.bg-accent { background-color: var(--accent-600); }
+.bg-accent-hover:hover { background-color: var(--accent-500); }
+.bg-accent-subtle { background-color: var(--accent-900); }
+.border-accent { border-color: var(--accent-700); }
+
+/* Border */
+.border-app { border-color: var(--border-color); }
+
+/* ==================== SCROLLBAR ==================== */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-hover);
+  border-radius: 2px;
+}
+
+/* ==================== BOTTOM SHEET ==================== */
+.bottom-sheet {
+  transform: translateY(100%);
+  transition: transform 0.3s ease-out;
+}
+
+.bottom-sheet.open {
+  transform: translateY(0);
+}
+
+/* ==================== MAP GRID ==================== */
+.map-viewport {
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+}
+
+.map-viewport:active {
+  cursor: grabbing;
+}
+
+/* ==================== INVENTORY GRID ==================== */
+.inventory-slot {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border: 1px dashed var(--border-color);
+  background: var(--bg-tertiary);
+  font-size: 1.25rem;
+}
+
+.inventory-slot.filled {
+  border-style: solid;
+  background: var(--bg-secondary);
+}
+
+.inventory-slot .count {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  font-size: 0.65rem;
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+/* ==================== GRID CELLS ==================== */
+.grid-cell {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: background-color 0.2s;
+  background: var(--bg-secondary);
+}
+
+.grid-cell:hover {
+  background: var(--bg-hover);
+}
+
+.grid-cell.player {
+  background: var(--accent-800);
+  border-color: var(--accent-400);
+}
+
+.grid-cell.mountain {
+  background: var(--bg-tertiary);
+}
+
+/* ==================== ANIMATIONS ==================== */
+@keyframes swing {
+  0% { transform: rotate(0deg); }
+  50% { transform: rotate(-30deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.animate-swing {
+  animation: swing 0.15s ease-out;
+}
+
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
 }
