@@ -3,3 +3,4 @@ export { ExpeditionPrepScreen } from './ExpeditionPrepScreen';
 export { ActiveExpeditionScreen } from './ActiveExpeditionScreen';
 export { NodeInteractionScreen } from './NodeInteractionScreen';
 export { MinigameScreen } from './MinigameScreen';
+export { MiningMinigameScreen } from './MiningMinigameScreen';

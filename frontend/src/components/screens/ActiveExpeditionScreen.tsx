@@ -3,10 +3,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Flag, Pickaxe, Leaf, Gem, Swords, Mountain, Eraser, Play, CircleUser } from 'lucide-react';
 import { sessionStore } from '../../stores/sessionStore';
 import { expeditionPathStore } from '../../engine/expeditionStore';
-import {
-  expeditionExecutionStore,
-  type ResourceEarned,
-} from '../../engine/expeditionExecutionStore';
+import { expeditionExecutionStore } from '../../engine/expeditionExecutionStore';
 import {
   type Coord,
   coordsEqual,
@@ -256,9 +253,9 @@ export const ActiveExpeditionScreen = observer(() => {
               );
 
               // During execution, highlight current position
-              const isCurrentExecution = isExecuting &&
+              const isCurrentExecution = !!(isExecuting &&
                 expeditionExecutionStore.currentPosition &&
-                coordsEqual(coord, expeditionExecutionStore.currentPosition);
+                coordsEqual(coord, expeditionExecutionStore.currentPosition));
 
               let IconComponent: typeof Pickaxe | null = null;
               if (hasActivity && mapNode?.activity) {

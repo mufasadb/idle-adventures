@@ -10,6 +10,7 @@ import { type Coord, coordKey, type MapNode } from './nodes';
 import { expeditionPathStore } from './expeditionStore';
 import { sessionStore } from '../stores/sessionStore';
 import { playerStore } from '../stores/playerStore';
+import { getActivityReward, type ActivityType } from '../data/activities';
 
 /** Timing constants (in ms) */
 const BASE_TICK_MS = 600;
@@ -24,7 +25,14 @@ export interface ResourceEarned {
 }
 
 /** Execution state */
-export type ExecutionState = 'idle' | 'running' | 'paused' | 'completed';
+export type ExecutionState = 'idle' | 'running' | 'paused' | 'completed' | 'minigame';
+
+/** Pending minigame info */
+export interface PendingMinigame {
+  activityType: 'mining' | 'herbs' | 'gems' | 'combat';
+  coord: Coord;
+  baseReward: { itemId: string; count: number };
+}
 
 /**
  * Expedition Execution Store
@@ -48,6 +56,9 @@ class ExpeditionExecutionStore {
 
   /** Recent resources for animation (cleared after animation completes) */
   animatingResources: ResourceEarned[] = [];
+
+  /** Pending minigame waiting to be played (active mode) */
+  pendingMinigame: PendingMinigame | null = null;
 
   /** Timer reference for cleanup */
   private tickTimer: number | null = null;
@@ -168,6 +179,7 @@ class ExpeditionExecutionStore {
     this.currentIndex = 0;
     this.earnedResources = [];
     this.animatingResources = [];
+    this.pendingMinigame = null;
   }
 
   /**
@@ -206,6 +218,54 @@ class ExpeditionExecutionStore {
     );
   }
 
+  /**
+   * Complete a minigame and apply the reward multiplier
+   * @param rewardMultiplier - 1.5 for perfect, down to 0.7 minimum
+   */
+  completeMinigame(rewardMultiplier: number) {
+    if (this.state !== 'minigame' || !this.pendingMinigame) return;
+
+    const { baseReward, coord } = this.pendingMinigame;
+
+    // Calculate final reward with multiplier
+    const finalCount = Math.max(1, Math.round(baseReward.count * rewardMultiplier));
+
+    const earned: ResourceEarned = {
+      itemId: baseReward.itemId,
+      count: finalCount,
+      coord,
+      timestamp: Date.now(),
+    };
+
+    this.earnedResources.push(earned);
+    this.animatingResources.push(earned);
+    sessionStore.addToBag(baseReward.itemId, finalCount);
+
+    // Clear pending minigame
+    this.pendingMinigame = null;
+
+    // Navigate back to expedition screen
+    sessionStore.navigateTo('active-expedition');
+
+    // Resume execution - move to next position and continue
+    this.currentIndex++;
+
+    if (this.currentIndex < this.executionPath.length) {
+      const nextCoord = this.executionPath[this.currentIndex];
+      sessionStore.movePlayer(nextCoord.x, nextCoord.y);
+    }
+
+    sessionStore.useAction(1);
+
+    // Check if complete or continue
+    if (this.isComplete) {
+      this.state = 'completed';
+    } else {
+      this.state = 'running';
+      this.scheduleTick();
+    }
+  }
+
   // ============================================
   // Private Methods
   // ============================================
@@ -239,11 +299,16 @@ class ExpeditionExecutionStore {
     const key = coordKey(currentCoord);
     const node = this.nodeMap.get(key);
 
+    let shouldContinue = true;
+
     runInAction(() => {
       // Check if there's an active activity at this node
       if (node?.activity && this.activeActivities.has(key)) {
-        this.processActivity(node.activity, currentCoord);
+        shouldContinue = this.processActivity(node.activity, currentCoord);
       }
+
+      // If minigame triggered, don't advance - completeMinigame will handle it
+      if (!shouldContinue) return;
 
       // Move to next position
       this.currentIndex++;
@@ -258,6 +323,9 @@ class ExpeditionExecutionStore {
       sessionStore.useAction(1);
     });
 
+    // If minigame was triggered, don't schedule next tick
+    if (!shouldContinue) return;
+
     // Schedule next tick or complete
     if (this.isComplete) {
       runInAction(() => {
@@ -268,8 +336,8 @@ class ExpeditionExecutionStore {
     }
   }
 
-  private processActivity(activityType: string, coord: Coord) {
-    // In passive/auto mode, automatically collect resources
+  private processActivity(activityType: string, coord: Coord): boolean {
+    // Returns true if execution should continue, false if paused for minigame
     const mode = sessionStore.loadout.mode;
 
     if (mode === 'passive') {
@@ -289,26 +357,46 @@ class ExpeditionExecutionStore {
         // Add to expedition bag
         sessionStore.addToBag(resource.itemId, resource.count);
       }
+      return true;
+    } else {
+      // Active mode - trigger minigame
+      const resource = this.getResourceForActivity(activityType);
+      if (resource && activityType === 'mining') {
+        this.pendingMinigame = {
+          activityType: 'mining',
+          coord,
+          baseReward: resource,
+        };
+        this.state = 'minigame';
+        sessionStore.navigateTo('mining-minigame');
+        return false; // Pause execution
+      }
+      // For non-mining activities in active mode, auto-collect for now
+      if (resource) {
+        const earned: ResourceEarned = {
+          itemId: resource.itemId,
+          count: resource.count,
+          coord,
+          timestamp: Date.now(),
+        };
+        this.earnedResources.push(earned);
+        this.animatingResources.push(earned);
+        sessionStore.addToBag(resource.itemId, resource.count);
+      }
+      return true;
     }
-    // In active mode, would trigger minigame (not implemented yet)
   }
 
   private getResourceForActivity(activityType: string): { itemId: string; count: number } | null {
-    // For testing, mining gives 2 iron ore
-    // Later this can be based on map tier, player skills, etc.
-    switch (activityType) {
-      case 'mining':
-        return { itemId: 'iron-ore', count: 2 };
-      case 'herbs':
-        return { itemId: 'alpine-herbs', count: 2 };
-      case 'gems':
-        return { itemId: 'raw-ruby', count: 1 };
-      case 'combat':
-        // Combat could give various drops - for now give gold
-        return { itemId: 'gold', count: 10 };
-      default:
-        return null;
+    // Get the current map tier from the expedition
+    const mapTier = sessionStore.expedition?.map.tier ?? 1;
+
+    // Use the centralized activity rewards system
+    if (['mining', 'herbs', 'gems', 'combat'].includes(activityType)) {
+      return getActivityReward(activityType as ActivityType, mapTier);
     }
+
+    return null;
   }
 
   private clearTimer() {

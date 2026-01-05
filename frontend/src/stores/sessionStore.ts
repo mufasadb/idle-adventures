@@ -10,7 +10,8 @@ export type GameScreen =
   | 'expedition-prep'
   | 'active-expedition'
   | 'node-interaction'
-  | 'minigame';
+  | 'minigame'
+  | 'mining-minigame';
 
 /**
  * Expedition play mode

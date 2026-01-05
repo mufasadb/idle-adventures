@@ -7,6 +7,7 @@ import {
   ActiveExpeditionScreen,
   NodeInteractionScreen,
   MinigameScreen,
+  MiningMinigameScreen,
 } from './screens';
 import { SkillsSheet, MapDetailsSheet, BankSheet } from './sheets';
 
@@ -23,6 +24,8 @@ export const Game = observer(() => {
         return <NodeInteractionScreen />;
       case 'minigame':
         return <MinigameScreen />;
+      case 'mining-minigame':
+        return <MiningMinigameScreen />;
       default:
         return <TownScreen />;
     }
