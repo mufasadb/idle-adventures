@@ -8,9 +8,16 @@
  * - authStore: Authentication state
  *
  * The old gameStore is deprecated - use sessionStore + playerStore instead.
+ *
+ * Note: Types are now centralized in src/types/. Import types from '../types' or '@/types'.
  */
 
 export { sessionStore } from './sessionStore';
+export { playerStore } from './playerStore';
+export { themeStore } from './themeStore';
+export { authStore } from './authStore';
+
+// Re-export commonly used types for convenience (from central types)
 export type {
   GameScreen,
   ExpeditionMode,
@@ -18,12 +25,6 @@ export type {
   ExpeditionMap,
   ExpeditionLoadout,
   ActiveExpedition,
-} from './sessionStore';
-
-export { playerStore } from './playerStore';
-export type { ItemStack, PlayerSkill } from './playerStore';
-
-export { themeStore } from './themeStore';
-export type { Theme } from './themeStore';
-
-export { authStore } from './authStore';
+  ItemStack,
+  PlayerSkill,
+} from '../types';

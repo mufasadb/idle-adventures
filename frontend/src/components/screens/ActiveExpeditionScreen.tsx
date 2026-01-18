@@ -1,6 +1,6 @@
 import { observer } from 'mobx-react-lite';
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Flag, Pickaxe, Leaf, Gem, Swords, Mountain, Eraser, Play, CircleUser } from 'lucide-react';
+import { Flag, Pickaxe, Leaf, Gem, Swords, Mountain, Eraser, Play, CircleUser, Fish } from 'lucide-react';
 import { sessionStore } from '../../stores/sessionStore';
 import { expeditionPathStore } from '../../engine/expeditionStore';
 import { expeditionExecutionStore } from '../../engine/expeditionExecutionStore';
@@ -22,6 +22,7 @@ const ACTIVITY_ICONS: Record<ActivityType, typeof Pickaxe> = {
   herbs: Leaf,
   gems: Gem,
   combat: Swords,
+  fishing: Fish,
 };
 
 const TERRAIN_ICONS: Record<TerrainType, typeof Mountain | null> = {
@@ -239,13 +240,12 @@ export const ActiveExpeditionScreen = observer(() => {
             style={{ gridTemplateColumns: `repeat(${map.width}, 48px)` }}
           >
             {map.nodes.map((node, i) => {
-              const coord = { x: node.x, y: node.y };
+              const coord = node.coord;
               const isPlayerHere = coordsEqual(coord, expedition.position);
               const isOnPath = isExecuting
                 ? expeditionExecutionStore.executionPath.some(c => coordsEqual(c, coord))
                 : expeditionPathStore.isOnPath(coord);
-              const mapNode = expeditionPathStore.getNode(coord);
-              const hasActivity = !!mapNode?.activity;
+              const hasActivity = !!node.activity;
               const isActivityActive = hasActivity && (
                 isExecuting
                   ? expeditionExecutionStore.activeActivities.has(coordKey(coord))
@@ -258,10 +258,10 @@ export const ActiveExpeditionScreen = observer(() => {
                 coordsEqual(coord, expeditionExecutionStore.currentPosition));
 
               let IconComponent: typeof Pickaxe | null = null;
-              if (hasActivity && mapNode?.activity) {
-                IconComponent = ACTIVITY_ICONS[mapNode.activity];
-              } else if (mapNode?.terrain && mapNode.terrain !== 'ground') {
-                IconComponent = TERRAIN_ICONS[mapNode.terrain];
+              if (hasActivity && node.activity) {
+                IconComponent = ACTIVITY_ICONS[node.activity];
+              } else if (node.terrain !== 'ground') {
+                IconComponent = TERRAIN_ICONS[node.terrain];
               }
 
               return (
@@ -272,7 +272,7 @@ export const ActiveExpeditionScreen = observer(() => {
                   isOnPath={isOnPath}
                   hasActivity={hasActivity}
                   isActivityActive={isActivityActive}
-                  isMountain={node.type === 'mountain'}
+                  isMountain={node.terrain === 'mountain'}
                   IconComponent={IconComponent}
                   isExecuting={isExecuting}
                   isCurrentExecution={isCurrentExecution}

@@ -9,11 +9,16 @@ export const MapDetailsSheet = observer(() => {
 
   if (!map) return null;
 
-  // Count node types
+  // Count node activities and special terrains
   const nodeCounts = map.nodes.reduce(
     (acc, node) => {
-      if (node.type !== 'empty' && node.type !== 'player') {
-        acc[node.type] = (acc[node.type] || 0) + 1;
+      // Count activities (mining, herbs, gems, combat)
+      if (node.activity) {
+        acc[node.activity] = (acc[node.activity] || 0) + 1;
+      }
+      // Also count special terrains like mountain
+      if (node.terrain === 'mountain') {
+        acc['mountain'] = (acc['mountain'] || 0) + 1;
       }
       return acc;
     },

@@ -5,41 +5,13 @@
  * This file defines what resources each activity yields at different tiers.
  */
 
-export type ActivityType = 'mining' | 'herbs' | 'gems' | 'combat';
-
-/** A possible reward from an activity */
-export interface ActivityReward {
-  itemId: string;
-  /** Base count before multipliers */
-  baseCount: number;
-  /** Weight for random selection (higher = more common) */
-  weight: number;
-}
-
-/** Activity tier configuration */
-export interface ActivityTier {
-  /** Map tier this applies to */
-  tier: number;
-  /** Possible rewards at this tier */
-  rewards: ActivityReward[];
-}
-
-/** Full activity definition */
-export interface ActivityDefinition {
-  type: ActivityType;
-  /** Display name */
-  name: string;
-  /** Icon for UI */
-  icon: string;
-  /** Tiers and their rewards */
-  tiers: ActivityTier[];
-}
+import type { ActivityType, ActivityTier, ActivityDataDefinition, ActivityReward } from '../types';
 
 /**
  * All activity definitions
  * Add new activities or tiers here
  */
-export const ACTIVITIES: Record<ActivityType, ActivityDefinition> = {
+export const ACTIVITIES: Record<ActivityType, ActivityDataDefinition> = {
   mining: {
     type: 'mining',
     name: 'Mining',
@@ -86,31 +58,31 @@ export const ACTIVITIES: Record<ActivityType, ActivityDefinition> = {
       {
         tier: 1,
         rewards: [
-          { itemId: 'meadow-herbs', baseCount: 10, weight: 70 },
-          { itemId: 'healing-moss', baseCount: 8, weight: 30 },
+          { itemId: 'curaweed', baseCount: 10, weight: 70 },
+          { itemId: 'mendaloe', baseCount: 8, weight: 30 },
         ],
       },
       {
         tier: 2,
         rewards: [
-          { itemId: 'forest-herbs', baseCount: 10, weight: 60 },
-          { itemId: 'moonpetal', baseCount: 8, weight: 40 },
+          { itemId: 'vitalroot', baseCount: 10, weight: 60 },
+          { itemId: 'soothebloom', baseCount: 8, weight: 40 },
         ],
       },
       {
         tier: 3,
         rewards: [
-          { itemId: 'alpine-herbs', baseCount: 10, weight: 50 },
-          { itemId: 'frostbloom', baseCount: 8, weight: 30 },
-          { itemId: 'starflower', baseCount: 8, weight: 20 },
+          { itemId: 'restoria', baseCount: 10, weight: 50 },
+          { itemId: 'glacial-mint', baseCount: 8, weight: 30 },
+          { itemId: 'luminleaf', baseCount: 8, weight: 20 },
         ],
       },
       {
         tier: 4,
         rewards: [
-          { itemId: 'volcanic-herbs', baseCount: 10, weight: 50 },
-          { itemId: 'dragons-tongue', baseCount: 8, weight: 30 },
-          { itemId: 'phoenix-feather', baseCount: 8, weight: 20 },
+          { itemId: 'emberheart', baseCount: 10, weight: 50 },
+          { itemId: 'lifebane', baseCount: 8, weight: 30 },
+          { itemId: 'phoenixwort', baseCount: 8, weight: 20 },
         ],
       },
     ],
@@ -191,6 +163,39 @@ export const ACTIVITIES: Record<ActivityType, ActivityDefinition> = {
           { itemId: 'dragon-scale', baseCount: 10, weight: 25 },
           { itemId: 'rare-drop', baseCount: 10, weight: 20 },
           { itemId: 'legendary-essence', baseCount: 8, weight: 15 },
+        ],
+      },
+    ],
+  },
+
+  fishing: {
+    type: 'fishing',
+    name: 'Fishing',
+    icon: '🎣',
+    tiers: [
+      {
+        tier: 1,
+        rewards: [{ itemId: 'raw-sardines', baseCount: 10, weight: 100 }],
+      },
+      {
+        tier: 2,
+        rewards: [
+          { itemId: 'raw-sardines', baseCount: 8, weight: 60 },
+          { itemId: 'raw-trout', baseCount: 8, weight: 40 },
+        ],
+      },
+      {
+        tier: 3,
+        rewards: [
+          { itemId: 'raw-trout', baseCount: 8, weight: 50 },
+          { itemId: 'raw-salmon', baseCount: 8, weight: 50 },
+        ],
+      },
+      {
+        tier: 4,
+        rewards: [
+          { itemId: 'raw-salmon', baseCount: 8, weight: 60 },
+          { itemId: 'raw-lobster', baseCount: 6, weight: 40 },
         ],
       },
     ],

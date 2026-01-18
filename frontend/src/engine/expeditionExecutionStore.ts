@@ -6,30 +6,28 @@
  */
 
 import { makeAutoObservable, runInAction } from 'mobx';
-import { type Coord, coordKey, type MapNode } from './nodes';
+import { coordKey } from '../types';
+import type { Coord, MapNode, ExecutionState, ActivityType } from '../types';
 import { expeditionPathStore } from './expeditionStore';
 import { sessionStore } from '../stores/sessionStore';
 import { playerStore } from '../stores/playerStore';
-import { getActivityReward, type ActivityType } from '../data/activities';
+import { getActivityReward } from '../data/activities';
+import { TICK_MS } from '../data/combat';
 
-/** Timing constants (in ms) */
-const BASE_TICK_MS = 600;
-const ACTIVITY_EXTRA_MS = 600; // Activity nodes take 1.2s total
+/** Activity nodes take an extra tick (1.2s total) */
+const ACTIVITY_EXTRA_MS = TICK_MS;
 
 /** Resource earned during execution */
-export interface ResourceEarned {
+interface ResourceEarned {
   itemId: string;
   count: number;
   coord: Coord;
   timestamp: number;
 }
 
-/** Execution state */
-export type ExecutionState = 'idle' | 'running' | 'paused' | 'completed' | 'minigame';
-
 /** Pending minigame info */
-export interface PendingMinigame {
-  activityType: 'mining' | 'herbs' | 'gems' | 'combat';
+interface PendingMinigame {
+  activityType: ActivityType;
   coord: Coord;
   baseReward: { itemId: string; count: number };
 }
@@ -130,14 +128,8 @@ class ExpeditionExecutionStore {
     const expedition = sessionStore.expedition;
     if (expedition) {
       for (const node of expedition.map.nodes) {
-        const key = coordKey({ x: node.x, y: node.y });
-        this.nodeMap.set(key, {
-          coord: { x: node.x, y: node.y },
-          terrain: node.type === 'mountain' ? 'mountain' : 'ground',
-          activity: ['mining', 'herbs', 'gems', 'combat'].includes(node.type)
-            ? (node.type as 'mining' | 'herbs' | 'gems' | 'combat')
-            : undefined,
-        });
+        const key = coordKey(node.coord);
+        this.nodeMap.set(key, node);
       }
     }
 
@@ -285,7 +277,7 @@ class ExpeditionExecutionStore {
     const node = this.nodeMap.get(key);
     const hasActiveActivity = node?.activity && this.activeActivities.has(key);
 
-    const delay = hasActiveActivity ? BASE_TICK_MS + ACTIVITY_EXTRA_MS : BASE_TICK_MS;
+    const delay = hasActiveActivity ? TICK_MS + ACTIVITY_EXTRA_MS : TICK_MS;
 
     this.tickTimer = window.setTimeout(() => {
       this.processTick();
@@ -371,7 +363,38 @@ class ExpeditionExecutionStore {
         sessionStore.navigateTo('mining-minigame');
         return false; // Pause execution
       }
-      // For non-mining activities in active mode, auto-collect for now
+      if (resource && activityType === 'herbs') {
+        this.pendingMinigame = {
+          activityType: 'herbs',
+          coord,
+          baseReward: resource,
+        };
+        this.state = 'minigame';
+        sessionStore.navigateTo('herbs-minigame');
+        return false; // Pause execution
+      }
+      if (activityType === 'combat') {
+        // Combat minigame - reward is gold, handled by the minigame itself
+        this.pendingMinigame = {
+          activityType: 'combat',
+          coord,
+          baseReward: { itemId: 'gold', count: 10 }, // Base gold reward
+        };
+        this.state = 'minigame';
+        sessionStore.navigateTo('combat-minigame');
+        return false; // Pause execution
+      }
+      if (resource && activityType === 'fishing') {
+        this.pendingMinigame = {
+          activityType: 'fishing',
+          coord,
+          baseReward: resource,
+        };
+        this.state = 'minigame';
+        sessionStore.navigateTo('fishing-minigame');
+        return false; // Pause execution
+      }
+      // For other activities in active mode, auto-collect for now
       if (resource) {
         const earned: ResourceEarned = {
           itemId: resource.itemId,
@@ -392,7 +415,7 @@ class ExpeditionExecutionStore {
     const mapTier = sessionStore.expedition?.map.tier ?? 1;
 
     // Use the centralized activity rewards system
-    if (['mining', 'herbs', 'gems', 'combat'].includes(activityType)) {
+    if (['mining', 'herbs', 'gems', 'combat', 'fishing'].includes(activityType)) {
       return getActivityReward(activityType as ActivityType, mapTier);
     }
 

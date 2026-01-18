@@ -1,3 +1,11 @@
+/**
+ * @deprecated This store is legacy code.
+ * Use sessionStore for UI state and playerStore for player data.
+ *
+ * Types have been moved to src/types/:
+ * - GameScreen -> types/session.ts
+ * - MapNode, ExpeditionMap -> types/expedition.ts
+ */
 import { makeAutoObservable } from 'mobx';
 
 export type GameScreen = 'town' | 'expedition-prep' | 'active-expedition' | 'node-interaction' | 'minigame';
@@ -23,7 +31,7 @@ export interface Skill {
 export interface MapNode {
   x: number;
   y: number;
-  type: 'empty' | 'mining' | 'herbs' | 'gems' | 'combat' | 'mountain' | 'player';
+  type: 'empty' | 'mining' | 'herbs' | 'gems' | 'combat' | 'fishing' | 'mountain' | 'water' | 'player';
   icon?: string;
   cleared?: boolean;
 }
@@ -110,14 +118,14 @@ class GameStore {
 
     const layout = [
       ['player', 'empty', 'empty', 'mountain', 'mountain', 'empty', 'empty', 'empty', 'empty', 'empty'],
-      ['empty', 'mining', 'empty', 'mountain', 'empty', 'mining', 'empty', 'herbs', 'empty', 'empty'],
-      ['mining', 'empty', 'empty', 'empty', 'gems', 'empty', 'combat', 'empty', 'empty', 'empty'],
-      ['empty', 'herbs', 'mountain', 'mountain', 'empty', 'herbs', 'empty', 'mining', 'empty', 'empty'],
+      ['empty', 'mining', 'empty', 'mountain', 'empty', 'mining', 'empty', 'herbs', 'empty', 'fishing'],
+      ['mining', 'empty', 'empty', 'empty', 'empty', 'empty', 'combat', 'empty', 'empty', 'water'],
+      ['empty', 'herbs', 'mountain', 'mountain', 'empty', 'herbs', 'empty', 'mining', 'empty', 'fishing'],
       ['empty', 'combat', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'mining', 'empty'],
       ['empty', 'empty', 'mining', 'empty', 'empty', 'mountain', 'empty', 'empty', 'empty', 'herbs'],
       ['herbs', 'empty', 'empty', 'empty', 'mining', 'empty', 'empty', 'combat', 'empty', 'empty'],
-      ['empty', 'empty', 'mountain', 'mountain', 'empty', 'empty', 'empty', 'empty', 'gems', 'empty'],
-      ['mining', 'empty', 'empty', 'empty', 'herbs', 'empty', 'empty', 'empty', 'empty', 'empty'],
+      ['fishing', 'water', 'mountain', 'mountain', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty'],
+      ['mining', 'fishing', 'empty', 'empty', 'herbs', 'empty', 'empty', 'empty', 'empty', 'empty'],
       ['empty', 'empty', 'empty', 'empty', 'empty', 'mining', 'empty', 'herbs', 'empty', 'empty'],
     ];
 
@@ -126,6 +134,8 @@ class GameStore {
       herbs: '🌿',
       gems: '💎',
       combat: '🐺',
+      fishing: '🐟',
+      water: '🌊',
       mountain: '▲',
       player: '🚩',
     };

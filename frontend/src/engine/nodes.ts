@@ -14,63 +14,22 @@ import {
   Waves,
   Trees,
   Flag,
+  Fish,
   type LucideIcon,
 } from 'lucide-react';
 
-// ============================================
-// Core Types
-// ============================================
+import type {
+  Coord,
+  TerrainType,
+  TerrainDefinition,
+  ActivityType,
+  ActivityUIDefinition,
+  MapNode,
+} from '../types';
 
-/**
- * Grid coordinate - used throughout the expedition system
- */
-export interface Coord {
-  x: number;
-  y: number;
-}
-
-/**
- * Helper to create a string key from coordinates (for Set/Map lookups)
- */
-export function coordKey(c: Coord): string {
-  return `${c.x},${c.y}`;
-}
-
-/**
- * Helper to parse a coord key back to Coord
- */
-export function parseCoordKey(key: string): Coord {
-  const [x, y] = key.split(',').map(Number);
-  return { x, y };
-}
-
-/**
- * Check if two coordinates are equal
- */
-export function coordsEqual(a: Coord, b: Coord): boolean {
-  return a.x === b.x && a.y === b.y;
-}
-
-// ============================================
-// Terrain Types
-// ============================================
-
-/**
- * Terrain affects movement cost
- */
-export type TerrainType = 'ground' | 'water' | 'mountain' | 'forest';
-
-export interface TerrainDefinition {
-  type: TerrainType;
-  name: string;
-  baseCost: number;
-  icon: LucideIcon;
-  /** Items that reduce movement cost on this terrain */
-  modifiers?: {
-    itemId: string;
-    costOverride: number;
-  }[];
-}
+// Re-export types for backwards compatibility during migration
+export type { Coord, TerrainType, TerrainDefinition, ActivityType, MapNode };
+export { coordKey, parseCoordKey, coordsEqual } from '../types';
 
 export const TERRAINS: Record<TerrainType, TerrainDefinition> = {
   ground: {
@@ -102,24 +61,10 @@ export const TERRAINS: Record<TerrainType, TerrainDefinition> = {
 };
 
 // ============================================
-// Activity Types
+// Activity UI Definitions
 // ============================================
 
-/**
- * Activities are optional interactions at a node
- * Player can choose to "use" them (+1 action) or pass through
- */
-export type ActivityType = 'mining' | 'herbs' | 'gems' | 'combat';
-
-export interface ActivityDefinition {
-  type: ActivityType;
-  name: string;
-  icon: LucideIcon;
-  /** Extra action cost to perform this activity */
-  actionCost: number;
-}
-
-export const ACTIVITIES: Record<ActivityType, ActivityDefinition> = {
+export const ACTIVITIES: Record<ActivityType, ActivityUIDefinition> = {
   mining: {
     type: 'mining',
     name: 'Mining',
@@ -144,22 +89,17 @@ export const ACTIVITIES: Record<ActivityType, ActivityDefinition> = {
     icon: Swords,
     actionCost: 1,
   },
+  fishing: {
+    type: 'fishing',
+    name: 'Fishing',
+    icon: Fish,
+    actionCost: 1,
+  },
 };
 
 // ============================================
-// Map Node (combines terrain + optional activity)
+// Map Node Helpers
 // ============================================
-
-/**
- * A single tile on the expedition map
- */
-export interface MapNode {
-  coord: Coord;
-  terrain: TerrainType;
-  activity?: ActivityType;
-  /** Whether this node has been cleared/completed */
-  cleared?: boolean;
-}
 
 /**
  * Special node types that map to the old system
@@ -181,6 +121,8 @@ export function legacyTypeToNode(
       return { coord, terrain: 'ground', activity: 'gems' };
     case 'combat':
       return { coord, terrain: 'ground', activity: 'combat' };
+    case 'fishing':
+      return { coord, terrain: 'water', activity: 'fishing' };
     case 'mountain':
       return { coord, terrain: 'mountain' };
     case 'water':

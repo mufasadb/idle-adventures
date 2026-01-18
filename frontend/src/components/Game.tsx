@@ -8,6 +8,10 @@ import {
   NodeInteractionScreen,
   MinigameScreen,
   MiningMinigameScreen,
+  HerbMinigameScreen,
+  CombatMinigameScreen,
+  FishingMinigameScreen,
+  CookingScreen,
 } from './screens';
 import { SkillsSheet, MapDetailsSheet, BankSheet } from './sheets';
 
@@ -26,6 +30,14 @@ export const Game = observer(() => {
         return <MinigameScreen />;
       case 'mining-minigame':
         return <MiningMinigameScreen />;
+      case 'herbs-minigame':
+        return <HerbMinigameScreen />;
+      case 'combat-minigame':
+        return <CombatMinigameScreen />;
+      case 'fishing-minigame':
+        return <FishingMinigameScreen />;
+      case 'cooking':
+        return <CookingScreen />;
       default:
         return <TownScreen />;
     }
@@ -34,15 +46,18 @@ export const Game = observer(() => {
   return (
     <div
       data-theme={themeStore.theme}
-      className="h-screen w-screen bg-app-primary overflow-hidden relative"
+      className="h-screen w-screen bg-black flex items-center justify-center"
     >
-      {/* Current Screen */}
-      {renderScreen()}
+      {/* iPhone-sized container - max 430px (iPhone 14 Pro Max) */}
+      <div className="h-full w-full max-w-[430px] bg-app-primary overflow-hidden relative">
+        {/* Current Screen */}
+        {renderScreen()}
 
-      {/* Bottom Sheets */}
-      <BankSheet />
-      <SkillsSheet />
-      <MapDetailsSheet />
+        {/* Bottom Sheets */}
+        <BankSheet />
+        <SkillsSheet />
+        <MapDetailsSheet />
+      </div>
     </div>
   );
 });

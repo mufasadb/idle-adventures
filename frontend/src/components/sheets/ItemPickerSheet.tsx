@@ -33,7 +33,7 @@ export const ItemPickerSheet = observer(() => {
 
   // For food items, the bank count already reflects what's available
   // (items are removed from bank when placed in loadout)
-  const getAvailableCount = (itemId: string, bankCount: number): number => {
+  const getAvailableCount = (_itemId: string, bankCount: number): number => {
     return bankCount;
   };
 

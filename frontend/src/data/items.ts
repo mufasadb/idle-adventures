@@ -5,31 +5,10 @@
  * Categories determine which loadout slots items can be placed in.
  */
 
-export type ItemCategory =
-  | 'ingredient'  // Raw materials for cooking - cannot go in food slots
-  | 'food'        // Cooked/prepared food - goes in food slots, provides actions
-  | 'water'       // Water containers - future: separate hydration system
-  | 'tool'        // Equipment that aids gathering/combat - misc slots
-  | 'potion'      // Consumable buffs - misc slots
-  | 'vehicle'     // Transport - vehicle slot, affects bag size/speed
-  | 'material'    // Gathered resources (ore, wood, etc) - loot only
-  | 'gem'         // Valuable items - loot only
-  | 'currency';   // Gold, tokens - special handling
+import type { ItemDefinition, LoadoutSlotType, ItemCategory } from '../types';
 
-export interface ItemDefinition {
-  id: string;
-  name: string;
-  icon: string;
-  category: ItemCategory;
-  stackSize: number;
-  description?: string;
-
-  // Optional properties based on category
-  actions?: number;        // For food: how many actions this provides
-  bagSlots?: number;       // For vehicles: extra misc slots provided
-  speedBonus?: number;     // For vehicles: % bonus to travel (future)
-  effect?: string;         // For potions: what buff it provides (future)
-}
+// Re-export ItemCategory for consumers that import from data/items
+export type { ItemCategory };
 
 /**
  * All item definitions in the game.
@@ -37,14 +16,41 @@ export interface ItemDefinition {
  */
 export const ITEMS: Record<string, ItemDefinition> = {
   // === FOOD (goes in food slots, provides actions) ===
-  'cooked-fish': {
-    id: 'cooked-fish',
-    name: 'Cooked Fish',
+  'sardines': {
+    id: 'sardines',
+    name: 'Cooked Sardines',
     icon: '🐟',
     category: 'food',
-    stackSize: 10,
+    stackSize: 20,
+    actions: 2,
+    description: 'Small tasty fish. Provides 2 actions.',
+  },
+  'trout': {
+    id: 'trout',
+    name: 'Cooked Trout',
+    icon: '🐟',
+    category: 'food',
+    stackSize: 20,
     actions: 3,
-    description: 'A hearty meal. Provides 3 actions.',
+    description: 'Flaky freshwater fish. Provides 3 actions.',
+  },
+  'salmon': {
+    id: 'salmon',
+    name: 'Cooked Salmon',
+    icon: '🍣',
+    category: 'food',
+    stackSize: 20,
+    actions: 4,
+    description: 'Rich pink fish. Provides 4 actions.',
+  },
+  'lobster': {
+    id: 'lobster',
+    name: 'Cooked Lobster',
+    icon: '🦞',
+    category: 'food',
+    stackSize: 15,
+    actions: 6,
+    description: 'Luxurious shellfish. Provides 6 actions.',
   },
   'bread': {
     id: 'bread',
@@ -66,13 +72,37 @@ export const ITEMS: Record<string, ItemDefinition> = {
   },
 
   // === INGREDIENTS (raw materials, cannot go in food slots) ===
-  'raw-fish': {
-    id: 'raw-fish',
-    name: 'Raw Fish',
+  'raw-sardines': {
+    id: 'raw-sardines',
+    name: 'Raw Sardines',
     icon: '🐠',
     category: 'ingredient',
     stackSize: 20,
-    description: 'Needs cooking before eating.',
+    description: 'Small fish. Can be cooked.',
+  },
+  'raw-trout': {
+    id: 'raw-trout',
+    name: 'Raw Trout',
+    icon: '🐟',
+    category: 'ingredient',
+    stackSize: 20,
+    description: 'Freshwater fish. Can be cooked.',
+  },
+  'raw-salmon': {
+    id: 'raw-salmon',
+    name: 'Raw Salmon',
+    icon: '🐟',
+    category: 'ingredient',
+    stackSize: 20,
+    description: 'Pink-fleshed fish. Can be cooked.',
+  },
+  'raw-lobster': {
+    id: 'raw-lobster',
+    name: 'Raw Lobster',
+    icon: '🦞',
+    category: 'ingredient',
+    stackSize: 15,
+    description: 'Prized crustacean. Can be cooked.',
   },
   'wheat': {
     id: 'wheat',
@@ -218,85 +248,85 @@ export const ITEMS: Record<string, ItemDefinition> = {
   },
 
   // === MATERIALS - Herbs ===
-  'meadow-herbs': {
-    id: 'meadow-herbs',
-    name: 'Meadow Herbs',
+  'curaweed': {
+    id: 'curaweed',
+    name: 'Curaweed',
     icon: '🌱',
     category: 'material',
     stackSize: 30,
-    description: 'Common herbs from the meadows.',
+    description: 'Common herb with mild restorative properties.',
   },
-  'healing-moss': {
-    id: 'healing-moss',
-    name: 'Healing Moss',
+  'mendaloe': {
+    id: 'mendaloe',
+    name: 'Mendaloe',
     icon: '🌿',
     category: 'material',
     stackSize: 30,
-    description: 'Moss with healing properties.',
+    description: 'Succulent that soothes wounds.',
   },
-  'forest-herbs': {
-    id: 'forest-herbs',
-    name: 'Forest Herbs',
+  'vitalroot': {
+    id: 'vitalroot',
+    name: 'Vitalroot',
     icon: '🌿',
     category: 'material',
     stackSize: 30,
-    description: 'Herbs from the deep forest.',
+    description: 'Root known for restoring vigor.',
   },
-  'moonpetal': {
-    id: 'moonpetal',
-    name: 'Moonpetal',
+  'soothebloom': {
+    id: 'soothebloom',
+    name: 'Soothebloom',
     icon: '🌸',
     category: 'material',
     stackSize: 20,
-    description: 'Blooms only at night.',
+    description: 'Calming flower that eases pain.',
   },
-  'alpine-herbs': {
-    id: 'alpine-herbs',
-    name: 'Alpine Herbs',
+  'restoria': {
+    id: 'restoria',
+    name: 'Restoria',
     icon: '🌿',
     category: 'material',
     stackSize: 30,
-    description: 'Medicinal herbs from the mountains.',
+    description: 'Potent herb for healing salves.',
   },
-  'frostbloom': {
-    id: 'frostbloom',
-    name: 'Frostbloom',
+  'glacial-mint': {
+    id: 'glacial-mint',
+    name: 'Glacial Mint',
     icon: '❄️',
     category: 'material',
     stackSize: 20,
-    description: 'Cold-resistant flower.',
+    description: 'Cooling herb that numbs injuries.',
   },
-  'starflower': {
-    id: 'starflower',
-    name: 'Starflower',
+  'luminleaf': {
+    id: 'luminleaf',
+    name: 'Luminleaf',
     icon: '⭐',
     category: 'material',
     stackSize: 20,
-    description: 'Rare glowing flower.',
+    description: 'Glowing leaf with purifying essence.',
   },
-  'volcanic-herbs': {
-    id: 'volcanic-herbs',
-    name: 'Volcanic Herbs',
+  'emberheart': {
+    id: 'emberheart',
+    name: 'Emberheart',
     icon: '🔥',
     category: 'material',
     stackSize: 30,
-    description: 'Heat-resistant herbs.',
+    description: 'Warm herb that speeds recovery.',
   },
-  'dragons-tongue': {
-    id: 'dragons-tongue',
-    name: "Dragon's Tongue",
+  'lifebane': {
+    id: 'lifebane',
+    name: 'Lifebane',
     icon: '🐉',
     category: 'material',
     stackSize: 10,
-    description: 'Fiery red flower.',
+    description: 'Paradoxically named, it revives the weary.',
   },
-  'phoenix-feather': {
-    id: 'phoenix-feather',
-    name: 'Phoenix Feather',
+  'phoenixwort': {
+    id: 'phoenixwort',
+    name: 'Phoenixwort',
     icon: '🔶',
     category: 'material',
     stackSize: 10,
-    description: 'Legendary crafting material.',
+    description: 'Legendary herb said to bring back the fallen.',
   },
 
   // === MATERIALS - Combat Drops ===
@@ -470,7 +500,7 @@ export function getItem(id: string): ItemDefinition | undefined {
  */
 export function canItemGoInSlot(
   itemId: string,
-  slotType: 'vehicle' | 'food' | 'misc'
+  slotType: LoadoutSlotType
 ): boolean {
   const item = ITEMS[itemId];
   if (!item) return false;

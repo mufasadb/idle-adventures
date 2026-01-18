@@ -6,12 +6,8 @@
  */
 
 import { makeAutoObservable } from 'mobx';
-import {
-  type Coord,
-  type MapNode,
-  coordKey,
-  legacyTypeToNode,
-} from './nodes';
+import { coordKey } from '../types';
+import type { Coord, MapNode } from '../types';
 import {
   extendPath,
   erasePathTo,
@@ -56,8 +52,7 @@ class ExpeditionPathStore {
 
     this.nodeMap.clear();
     for (const node of expedition.map.nodes) {
-      const mapNode = legacyTypeToNode(node.type, node.x, node.y);
-      this.nodeMap.set(coordKey(mapNode.coord), mapNode);
+      this.nodeMap.set(coordKey(node.coord), node);
     }
 
     this.startPosition = { ...expedition.position };

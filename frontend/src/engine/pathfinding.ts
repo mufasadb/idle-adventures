@@ -5,15 +5,9 @@
  * They calculate paths and costs based on input data.
  */
 
-import {
-  type Coord,
-  type MapNode,
-  type TerrainType,
-  coordsEqual,
-  coordKey,
-  TERRAINS,
-  ACTIVITIES,
-} from './nodes';
+import { coordsEqual, coordKey } from '../types';
+import type { Coord, MapNode, TerrainType } from '../types';
+import { TERRAINS, ACTIVITIES } from './nodes';
 
 // ============================================
 // Path Calculation

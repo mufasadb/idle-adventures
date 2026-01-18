@@ -1,8 +1,11 @@
+/**
+ * @deprecated This component uses the legacy gameStore.
+ * Use BankSheet with playerStore.bank instead.
+ */
 import { observer } from 'mobx-react-lite';
 import { useState } from 'react';
 import { BottomSheet } from '../layout';
-import { gameStore } from '../../stores/gameStore';
-import type { InventoryItem } from '../../stores/gameStore';
+import { gameStore, type InventoryItem } from '../../stores/gameStore';
 
 export const InventorySheet = observer(() => {
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);

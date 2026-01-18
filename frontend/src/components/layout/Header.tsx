@@ -1,6 +1,7 @@
 import { observer } from 'mobx-react-lite';
 import { themeStore } from '../../stores/themeStore';
-import { gameStore } from '../../stores/gameStore';
+import { sessionStore } from '../../stores/sessionStore';
+import { playerStore } from '../../stores/playerStore';
 
 interface HeaderProps {
   title: string;
@@ -32,8 +33,8 @@ export const Header = observer(({ title, showBack, onBack, rightContent }: Heade
         >
           {themeStore.isDark ? '🌙' : '☀️'}
         </button>
-        {gameStore.currentScreen === 'town' && (
-          <span className="text-accent">{gameStore.gold.toLocaleString()} gold</span>
+        {sessionStore.currentScreen === 'town' && (
+          <span className="text-accent">{playerStore.gold.toLocaleString()} gold</span>
         )}
       </div>
     </div>

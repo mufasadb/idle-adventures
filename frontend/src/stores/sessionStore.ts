@@ -1,76 +1,21 @@
 import { makeAutoObservable } from 'mobx';
-import type { ItemStack } from './playerStore';
 import { ITEMS } from '../data/items';
+import { PLAYER_COMBAT } from '../data/combat';
+import type {
+  GameScreen,
+  ExpeditionMode,
+  ExpeditionMap,
+  ExpeditionLoadout,
+  ActiveExpedition,
+  LoadoutItem,
+  ItemStack,
+  MapNode,
+  Coord,
+} from '../types';
+import { legacyTypeToNode } from '../engine/nodes';
 
-/**
- * Game screens - the main navigation state
- */
-export type GameScreen =
-  | 'town'
-  | 'expedition-prep'
-  | 'active-expedition'
-  | 'node-interaction'
-  | 'minigame'
-  | 'mining-minigame';
-
-/**
- * Expedition play mode
- */
-export type ExpeditionMode = 'active' | 'passive';
-
-/**
- * Map node types
- */
-export interface MapNode {
-  x: number;
-  y: number;
-  type: 'empty' | 'mining' | 'herbs' | 'gems' | 'combat' | 'mountain' | 'player';
-  icon?: string;
-  cleared?: boolean;
-}
-
-/**
- * Expedition map definition
- */
-export interface ExpeditionMap {
-  id: string;
-  name: string;
-  tier: number;
-  travelDays: number;
-  terrain: string;
-  danger: 'low' | 'medium' | 'high';
-  nodes: MapNode[];
-  width: number;
-  height: number;
-}
-
-/**
- * Single item in a loadout slot (always count of 1)
- */
-export interface LoadoutItem {
-  itemId: string;
-}
-
-/**
- * Expedition loadout - what player is taking on the trip
- */
-export interface ExpeditionLoadout {
-  vehicle: ItemStack | null;
-  food: (LoadoutItem | null)[];  // 6 slots, 1 item each
-  misc: (ItemStack | null)[];    // 2 slots base, more with vehicle
-  mode: ExpeditionMode;
-}
-
-/**
- * Active expedition state - runtime state during expedition
- */
-export interface ActiveExpedition {
-  map: ExpeditionMap;
-  position: { x: number; y: number };
-  actionsRemaining: number;
-  actionsTotal: number;
-  bag: ItemStack[];  // Loot collected during expedition
-}
+// Re-export types for backwards compatibility
+export type { GameScreen, ExpeditionMode, ExpeditionMap, ExpeditionLoadout, ActiveExpedition, LoadoutItem, MapNode };
 
 /**
  * SessionStore - Ephemeral session state
@@ -135,9 +80,9 @@ class SessionStore {
     const nodes: MapNode[] = [];
 
     const layout = [
-      ['player', 'empty', 'empty', 'mountain', 'mountain', 'empty', 'empty', 'empty', 'empty', 'empty'],
-      ['empty', 'mining', 'empty', 'mountain', 'empty', 'mining', 'empty', 'herbs', 'empty', 'empty'],
-      ['mining', 'empty', 'empty', 'empty', 'gems', 'empty', 'combat', 'empty', 'empty', 'empty'],
+      ['player', 'fishing', 'empty', 'mountain', 'mountain', 'empty', 'empty', 'empty', 'empty', 'empty'],
+      ['fishing', 'mining', 'empty', 'mountain', 'empty', 'mining', 'empty', 'herbs', 'empty', 'empty'],
+      ['mining', 'empty', 'fishing', 'empty', 'gems', 'empty', 'combat', 'empty', 'empty', 'empty'],
       ['empty', 'herbs', 'mountain', 'mountain', 'empty', 'herbs', 'empty', 'mining', 'empty', 'empty'],
       ['empty', 'combat', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'mining', 'empty'],
       ['empty', 'empty', 'mining', 'empty', 'empty', 'mountain', 'empty', 'empty', 'empty', 'herbs'],
@@ -147,24 +92,10 @@ class SessionStore {
       ['empty', 'empty', 'empty', 'empty', 'empty', 'mining', 'empty', 'herbs', 'empty', 'empty'],
     ];
 
-    const icons: Record<string, string> = {
-      mining: '⛏',
-      herbs: '🌿',
-      gems: '💎',
-      combat: '🐺',
-      mountain: '▲',
-      player: '🚩',
-    };
-
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        const type = layout[y][x] as MapNode['type'];
-        nodes.push({
-          x,
-          y,
-          type,
-          icon: icons[type] || undefined,
-        });
+        const type = layout[y][x];
+        nodes.push(legacyTypeToNode(type, x, y));
       }
     }
 
@@ -332,11 +263,8 @@ class SessionStore {
   startExpedition() {
     if (!this.canStartExpedition || !this.selectedMap) return;
 
-    // Find starting position (player node)
-    const startNode = this.selectedMap.nodes.find(n => n.type === 'player');
-    const startPos = startNode
-      ? { x: startNode.x, y: startNode.y }
-      : { x: 0, y: 0 };
+    // Start at position (0,0) by default
+    const startPos: Coord = { x: 0, y: 0 };
 
     this.expedition = {
       map: this.selectedMap,
@@ -344,6 +272,7 @@ class SessionStore {
       actionsRemaining: this.totalActions,
       actionsTotal: this.totalActions,
       bag: [],
+      combatHp: PLAYER_COMBAT.maxHp,
     };
 
     this.navigateTo('active-expedition');
@@ -386,6 +315,42 @@ class SessionStore {
     } else {
       this.expedition.bag.push({ itemId, count });
     }
+  }
+
+  /**
+   * Take combat damage
+   * Returns true if player is still alive, false if dead
+   */
+  takeDamage(amount: number): boolean {
+    if (!this.expedition) return false;
+
+    this.expedition.combatHp = Math.max(0, this.expedition.combatHp - amount);
+
+    if (this.expedition.combatHp <= 0) {
+      // Player died - expedition ends
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Heal combat HP (up to max)
+   */
+  healHp(amount: number) {
+    if (!this.expedition) return;
+
+    this.expedition.combatHp = Math.min(
+      PLAYER_COMBAT.maxHp,
+      this.expedition.combatHp + amount
+    );
+  }
+
+  /**
+   * Get current combat HP
+   */
+  get combatHp(): number {
+    return this.expedition?.combatHp ?? PLAYER_COMBAT.maxHp;
   }
 }
 

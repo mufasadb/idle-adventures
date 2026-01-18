@@ -16,32 +16,17 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { observer } from 'mobx-react-lite';
 import { expeditionExecutionStore } from '../../engine/expeditionExecutionStore';
 import { ITEMS } from '../../data/items';
-
-/** Total hits required */
-const TOTAL_HITS = 10;
-
-/** First N hits establish rhythm (can't fail) */
-const RHYTHM_ESTABLISH_HITS = 2;
-
-/** Timing tolerance (±5%) */
-const TIMING_TOLERANCE = 0.05;
-
-/** Perfect reward multiplier */
-const PERFECT_MULTIPLIER = 1.5;
-
-/** Penalty per failed hit */
-const FAIL_PENALTY = 0.1;
-
-/** Minimum reward multiplier */
-const MIN_MULTIPLIER = 0.7;
-
-/** Delay before starting circle growth (ms) */
-const GROWTH_START_DELAY_MS = 50;
-
-interface HitFeedback {
-  type: 'success' | 'fail';
-  timestamp: number;
-}
+import {
+  RhythmCircle,
+  RhythmCircleStyles,
+  TOTAL_HITS,
+  RHYTHM_ESTABLISH_HITS,
+  TIMING_TOLERANCE,
+  PERFECT_MULTIPLIER,
+  FAIL_PENALTY,
+  MIN_MULTIPLIER,
+  type HitFeedback,
+} from '../minigames/mining';
 
 export const MiningMinigameScreen = observer(() => {
   const { pendingMinigame } = expeditionExecutionStore;
@@ -77,20 +62,62 @@ export const MiningMinigameScreen = observer(() => {
   }, []);
 
   // Start growing animation after a hit - uses performance.now() for accuracy
-  const startGrowAnimation = useCallback(() => {
+  // Animation grows to 1 + TIMING_TOLERANCE (105%), then auto-resets if missed
+  const startGrowAnimation = useCallback((tapTimestamp: number) => {
     if (!lastIntervalRef.current) return;
 
     const expectedInterval = lastIntervalRef.current;
-    animationStartTimeRef.current = performance.now();
+    // Animation starts from the tap timestamp, not performance.now()
+    // This keeps animation in sync with timing validation
+    const animationOrigin = tapTimestamp;
+    animationStartTimeRef.current = animationOrigin;
+    const maxProgress = 1 + TIMING_TOLERANCE; // 1.05 - circle can overflow 5%
 
     const animate = () => {
       if (!animationStartTimeRef.current || !lastIntervalRef.current) return;
 
-      const elapsed = performance.now() - animationStartTimeRef.current;
-      const progress = Math.min(elapsed / expectedInterval, 1);
-      setCircleProgress(progress);
+      const elapsed = performance.now() - animationOrigin;
+      const progress = elapsed / expectedInterval;
+      setCircleProgress(Math.min(progress, maxProgress));
 
-      if (progress < 1) {
+      if (progress >= maxProgress) {
+        // Missed the window - reset and update timing reference
+        setCircleProgress(0);
+
+        // Update the last timestamp reference to the expected beat time
+        // This ensures the next tap is measured from the "virtual" beat
+        const missedBeatTime = animationOrigin + expectedInterval;
+        const prevTimestamps = hitTimestampsRef.current;
+        if (prevTimestamps.length > 0) {
+          // Replace the last timestamp with the missed beat time
+          hitTimestampsRef.current = [...prevTimestamps.slice(0, -1), missedBeatTime];
+        }
+
+        // Start new animation from the missed beat time
+        animationStartTimeRef.current = missedBeatTime;
+        const newAnimationOrigin = missedBeatTime;
+
+        const animateFromReset = () => {
+          if (!lastIntervalRef.current) return;
+
+          const elapsedSinceReset = performance.now() - newAnimationOrigin;
+          const resetProgress = elapsedSinceReset / expectedInterval;
+          setCircleProgress(Math.min(resetProgress, maxProgress));
+
+          if (resetProgress >= maxProgress) {
+            // Missed again - recurse
+            setCircleProgress(0);
+            const nextMissedBeat = newAnimationOrigin + expectedInterval;
+            if (hitTimestampsRef.current.length > 0) {
+              hitTimestampsRef.current = [...hitTimestampsRef.current.slice(0, -1), nextMissedBeat];
+            }
+            startGrowAnimation(nextMissedBeat);
+          } else {
+            animationRef.current = requestAnimationFrame(animateFromReset);
+          }
+        };
+        animationRef.current = requestAnimationFrame(animateFromReset);
+      } else {
         animationRef.current = requestAnimationFrame(animate);
       }
     };
@@ -134,13 +161,13 @@ export const MiningMinigameScreen = observer(() => {
         } else {
           setFeedback({ type: 'success', timestamp: eventTime });
         }
+        // Don't update interval after establish phase - keep the original rhythm locked
       } else {
-        // Rhythm establishing phase - always success
+        // Rhythm establishing phase - always success and set the interval
         setFeedback({ type: 'success', timestamp: eventTime });
+        // Only update interval during establish phase (hits 1-2)
+        lastIntervalRef.current = currentInterval;
       }
-
-      // Update expected interval for next hit
-      lastIntervalRef.current = currentInterval;
     }
 
     // Update display state
@@ -151,20 +178,9 @@ export const MiningMinigameScreen = observer(() => {
       isCompleteRef.current = true;
       setIsComplete(true);
     } else {
-      // Start growing animation for next expected hit
-      // Use requestAnimationFrame for precise timing instead of setTimeout
-      requestAnimationFrame(() => {
-        // Small delay before starting growth
-        const delayStart = performance.now();
-        const startAfterDelay = () => {
-          if (performance.now() - delayStart >= GROWTH_START_DELAY_MS) {
-            startGrowAnimation();
-          } else {
-            requestAnimationFrame(startAfterDelay);
-          }
-        };
-        requestAnimationFrame(startAfterDelay);
-      });
+      // Start growing animation from the tap time
+      // No delay - animation origin matches the timing validation reference
+      startGrowAnimation(eventTime);
     }
 
     // Clear feedback after animation (use rAF-based timing)
@@ -221,10 +237,6 @@ export const MiningMinigameScreen = observer(() => {
   const multiplier = calculateMultiplier();
   const finalReward = Math.max(1, Math.round(pendingMinigame.baseReward.count * multiplier));
 
-  // Circle sizes - 60% of viewport width
-  const circleSize = '60vw';
-  const maxCirclePx = 'calc(60vw - 8px)'; // Inner circle slightly smaller
-
   return (
     <div className="h-full flex flex-col bg-app-primary">
       {/* Header */}
@@ -237,73 +249,12 @@ export const MiningMinigameScreen = observer(() => {
 
       {/* Main tap area - uses ref for native event listener */}
       <div className="flex-1 flex items-center justify-center">
-        <div
+        <RhythmCircle
           ref={tapAreaRef}
-          className="relative cursor-pointer select-none touch-none"
-          style={{ width: circleSize, height: circleSize }}
-        >
-          {/* Outer circle - white outline */}
-          <div
-            className="absolute inset-0 rounded-full border-4 border-white/80 pointer-events-none"
-            style={{ boxSizing: 'border-box' }}
-          />
-
-          {/* Inner growing circle - dark purple */}
-          <div
-            className="absolute rounded-full transition-none pointer-events-none"
-            style={{
-              width: `calc(${circleProgress * 100}% - 8px)`,
-              height: `calc(${circleProgress * 100}% - 8px)`,
-              maxWidth: maxCirclePx,
-              maxHeight: maxCirclePx,
-              backgroundColor: '#4a1d6e', // Dark purple
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              minWidth: circleProgress > 0 ? '1px' : '0',
-              minHeight: circleProgress > 0 ? '1px' : '0',
-            }}
-          />
-
-          {/* Success feedback - yellow glow */}
-          {feedback?.type === 'success' && (
-            <div
-              className="absolute inset-0 rounded-full pointer-events-none"
-              style={{
-                boxShadow: '0 0 40px 20px rgba(255, 255, 180, 0.6)',
-                animation: 'pulse 0.3s ease-out',
-              }}
-            />
-          )}
-
-          {/* Fail feedback - black spark */}
-          {feedback?.type === 'fail' && (
-            <div
-              className="absolute rounded-full bg-black pointer-events-none"
-              style={{
-                width: '20px',
-                height: '20px',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                animation: 'shrink 0.3s ease-out forwards',
-              }}
-            />
-          )}
-
-          {/* Hit count display */}
-          <div
-            className="absolute text-white font-bold text-4xl pointer-events-none"
-            style={{
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              textShadow: '0 2px 8px rgba(0,0,0,0.8)',
-            }}
-          >
-            {hitCount}
-          </div>
-        </div>
+          hitCount={hitCount}
+          circleProgress={circleProgress}
+          feedback={feedback}
+        />
       </div>
 
       {/* Results / Continue section */}
@@ -327,7 +278,7 @@ export const MiningMinigameScreen = observer(() => {
             onClick={handleContinue}
             className="w-full bg-accent hover:bg-accent/90 text-white font-bold py-3 px-4 rounded-lg transition-colors"
           >
-            Continue Adventure
+            Continue Expedition
           </button>
         </div>
       ) : (
@@ -346,16 +297,7 @@ export const MiningMinigameScreen = observer(() => {
       )}
 
       {/* CSS animations */}
-      <style>{`
-        @keyframes pulse {
-          0% { opacity: 1; }
-          100% { opacity: 0; }
-        }
-        @keyframes shrink {
-          0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-          100% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-        }
-      `}</style>
+      <style>{RhythmCircleStyles}</style>
     </div>
   );
 });

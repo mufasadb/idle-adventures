@@ -1,25 +1,9 @@
 import { makeAutoObservable } from 'mobx';
-import { ITEMS, type ItemDefinition } from '../data/items';
+import { ITEMS } from '../data/items';
+import type { ItemStack, PlayerSkill, ItemDefinition } from '../types';
 
-/**
- * Represents a stack of items in a slot
- */
-export interface ItemStack {
-  itemId: string;
-  count: number;
-}
-
-/**
- * Skill data for the player
- */
-export interface PlayerSkill {
-  id: string;
-  name: string;
-  level: number;
-  xp: number;
-  xpToNext: number;
-  category: 'gathering' | 'combat' | 'crafting' | 'support';
-}
+// Re-export types for backwards compatibility
+export type { ItemStack, PlayerSkill };
 
 /**
  * PlayerStore - Persistent player data
@@ -61,7 +45,7 @@ class PlayerStore {
     // Starting bank items
     this.bank = [
       { itemId: 'gold', count: 1234 },
-      { itemId: 'cooked-fish', count: 5 },
+      { itemId: 'sardines', count: 10 },
       { itemId: 'bread', count: 3 },
       { itemId: 'iron-pickaxe', count: 1 },
       { itemId: 'herbalist-kit', count: 1 },
@@ -71,7 +55,7 @@ class PlayerStore {
       { itemId: 'iron-ore', count: 45 },
       { itemId: 'alpine-herbs', count: 12 },
       { itemId: 'raw-ruby', count: 2 },
-      { itemId: 'raw-fish', count: 8 },
+      { itemId: 'raw-sardines', count: 8 },
     ];
 
     // Starting skills
@@ -79,6 +63,7 @@ class PlayerStore {
       { id: 'mining', name: 'Mining', level: 28, xp: 4230, xpToNext: 6500, category: 'gathering' },
       { id: 'woodcutting', name: 'Woodcutting', level: 15, xp: 1200, xpToNext: 4000, category: 'gathering' },
       { id: 'herbalism', name: 'Herbalism', level: 12, xp: 890, xpToNext: 2000, category: 'gathering' },
+      { id: 'fishing', name: 'Fishing', level: 10, xp: 650, xpToNext: 1800, category: 'gathering' },
       { id: 'melee', name: 'Melee', level: 22, xp: 3900, xpToNext: 5000, category: 'combat' },
       { id: 'ranged', name: 'Ranged', level: 8, xp: 450, xpToNext: 1500, category: 'combat' },
       { id: 'smithing', name: 'Smithing', level: 18, xp: 2750, xpToNext: 5000, category: 'crafting' },

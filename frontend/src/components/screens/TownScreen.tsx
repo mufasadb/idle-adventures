@@ -92,7 +92,11 @@ export const TownScreen = observer(() => {
           </h3>
           <div className="grid grid-cols-2 gap-3">
             <TownButton icon="🔥" label="Smithing" />
-            <TownButton icon="🍳" label="Cooking" />
+            <TownButton
+              icon="🍳"
+              label="Cooking"
+              onClick={() => sessionStore.navigateTo('cooking')}
+            />
             <TownButton icon="📚" label="Library" />
             <TownButton icon="🏪" label="Map Shop" />
           </div>
@@ -104,9 +108,20 @@ export const TownScreen = observer(() => {
   );
 });
 
-function TownButton({ icon, label }: { icon: string; label: string }) {
+function TownButton({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: string;
+  label: string;
+  onClick?: () => void;
+}) {
   return (
-    <button className="bg-app-secondary hover:bg-app-hover rounded-lg p-3 text-left">
+    <button
+      onClick={onClick}
+      className="bg-app-secondary hover:bg-app-hover rounded-lg p-3 text-left"
+    >
       <span className="text-lg">{icon}</span>
       <div className="text-app-primary text-sm font-medium">{label}</div>
     </button>
