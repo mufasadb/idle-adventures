@@ -14,6 +14,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { observer } from 'mobx-react-lite';
 import { expeditionExecutionStore } from '../../engine/expeditionExecutionStore';
 import { ITEMS } from '../../data/items';
+import { useGameLoop, useAnimationDelay } from '../../hooks';
 import {
   GoodHerb,
   BadHerb,
@@ -40,8 +41,8 @@ export const HerbMinigameScreen = observer(() => {
 
   // Refs for animation and container
   const gameStartRef = useRef<number>(0);
-  const animationRef = useRef<number | null>(null);
   const fieldRef = useRef<HTMLDivElement>(null);
+  const delay = useAnimationDelay();
 
   // Calculate good flower count and max reward
   const goodFlowerCount = useMemo(() => {
@@ -152,30 +153,17 @@ export const HerbMinigameScreen = observer(() => {
     return Math.max(0, Math.min(1, Math.pow(base, 2)));
   }, [sunProgress]);
 
-  // Game timer
-  useEffect(() => {
-    if (phase !== 'playing') return;
+  // Game timer using useGameLoop hook
+  useGameLoop(phase === 'playing', (now) => {
+    const elapsed = now - gameStartRef.current;
+    const remaining = Math.max(0, GAME_DURATION_MS - elapsed);
+    setTimeRemaining(remaining);
 
-    const animate = () => {
-      const elapsed = performance.now() - gameStartRef.current;
-      const remaining = Math.max(0, GAME_DURATION_MS - elapsed);
-      setTimeRemaining(remaining);
-
-      if (remaining > 0) {
-        animationRef.current = requestAnimationFrame(animate);
-      } else {
-        setPhase('complete');
-      }
-    };
-
-    animationRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [phase]);
+    if (remaining <= 0) {
+      setPhase('complete');
+      return false; // Stop the loop
+    }
+  });
 
   // Start the game
   const handleStart = useCallback(() => {
@@ -214,7 +202,7 @@ export const HerbMinigameScreen = observer(() => {
         setCorrectPicks(prev => prev + 1);
 
         // After animation, mark as collected
-        setTimeout(() => {
+        delay(500, () => {
           setFlowers(prev =>
             prev.map(f =>
               f.id === selectedFlower.id ? { ...f, state: 'collected' } : f
@@ -225,7 +213,7 @@ export const HerbMinigameScreen = observer(() => {
             next.delete(selectedFlower.id);
             return next;
           });
-        }, 500);
+        });
       } else {
         // Bad flower - crumble it
         setWrongPicks(prev => prev + 1);
@@ -236,7 +224,7 @@ export const HerbMinigameScreen = observer(() => {
         );
       }
     },
-    [phase, flowers]
+    [phase, flowers, delay]
   );
 
   // Calculate final reward

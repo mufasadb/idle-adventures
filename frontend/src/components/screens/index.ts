@@ -8,3 +8,4 @@ export { HerbMinigameScreen } from './HerbMinigameScreen';
 export { CombatMinigameScreen } from './CombatMinigameScreen';
 export { FishingMinigameScreen } from './FishingMinigameScreen';
 export { CookingScreen } from './CookingScreen';
+export { SmithingScreen } from './SmithingScreen';

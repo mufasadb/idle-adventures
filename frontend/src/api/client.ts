@@ -60,6 +60,21 @@ class ApiClient {
   async getPlayer(): Promise<Player> {
     return this.request<Player>('/player');
   }
+
+  async getGameState(): Promise<Record<string, unknown>> {
+    return this.request<Record<string, unknown>>('/game-state');
+  }
+
+  async saveGameState(state: Record<string, unknown>): Promise<{ saved: boolean }> {
+    return this.request<{ saved: boolean }>('/game-state', {
+      method: 'POST',
+      body: JSON.stringify(state),
+    });
+  }
+
+  get hasToken(): boolean {
+    return this.token !== null;
+  }
 }
 
 export const api = new ApiClient();

@@ -13,6 +13,7 @@ import type {
   Coord,
 } from '../types';
 import { legacyTypeToNode } from '../engine/nodes';
+import { playerStore } from './playerStore';
 
 // Re-export types for backwards compatibility
 export type { GameScreen, ExpeditionMode, ExpeditionMap, ExpeditionLoadout, ActiveExpedition, LoadoutItem, MapNode };
@@ -171,12 +172,18 @@ class SessionStore {
   // === Navigation Actions ===
 
   navigateTo(screen: GameScreen) {
+    const previousScreen = this.currentScreen;
     this.currentScreen = screen;
     this.activeSheet = null;
 
     // Reset loadout when entering prep screen
     if (screen === 'expedition-prep') {
       this.resetLoadout();
+    }
+
+    // Sync to server when returning to town from an activity
+    if (screen === 'town' && previousScreen !== 'town') {
+      playerStore.syncToServer();
     }
   }
 
@@ -282,9 +289,14 @@ class SessionStore {
    * End expedition and return to town
    */
   endExpedition() {
-    // TODO: Transfer bag contents to bank
+    // Transfer bag contents to bank
+    if (this.expedition) {
+      for (const item of this.expedition.bag) {
+        playerStore.addToBank(item.itemId, item.count);
+      }
+    }
     this.expedition = null;
-    this.navigateTo('town');
+    this.navigateTo('town'); // This will trigger sync
   }
 
   /**

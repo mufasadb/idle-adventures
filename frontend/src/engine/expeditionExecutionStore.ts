@@ -7,7 +7,7 @@
 
 import { makeAutoObservable, runInAction } from 'mobx';
 import { coordKey } from '../types';
-import type { Coord, MapNode, ExecutionState, ActivityType } from '../types';
+import type { Coord, MapNode, ExecutionState, ActivityType, GameScreen } from '../types';
 import { expeditionPathStore } from './expeditionStore';
 import { sessionStore } from '../stores/sessionStore';
 import { playerStore } from '../stores/playerStore';
@@ -16,6 +16,17 @@ import { TICK_MS } from '../data/combat';
 
 /** Activity nodes take an extra tick (1.2s total) */
 const ACTIVITY_EXTRA_MS = TICK_MS;
+
+/**
+ * Activity-to-minigame screen mapping
+ * Activities not in this map will auto-collect in active mode
+ */
+const MINIGAME_SCREENS: Partial<Record<ActivityType, GameScreen>> = {
+  mining: 'mining-minigame',
+  herbs: 'herbs-minigame',
+  combat: 'combat-minigame',
+  fishing: 'fishing-minigame',
+};
 
 /** Resource earned during execution */
 interface ResourceEarned {
@@ -331,83 +342,71 @@ class ExpeditionExecutionStore {
   private processActivity(activityType: string, coord: Coord): boolean {
     // Returns true if execution should continue, false if paused for minigame
     const mode = sessionStore.loadout.mode;
+    const resource = this.getResourceForActivity(activityType);
 
+    // Passive mode: always auto-collect
     if (mode === 'passive') {
-      // Auto-collect: For now, all mining nodes give iron ore
-      // Later this can be expanded based on node type and map
-      const resource = this.getResourceForActivity(activityType);
-      if (resource) {
-        const earned: ResourceEarned = {
-          itemId: resource.itemId,
-          count: resource.count,
-          coord,
-          timestamp: Date.now(),
-        };
-        this.earnedResources.push(earned);
-        this.animatingResources.push(earned);
-
-        // Add to expedition bag
-        sessionStore.addToBag(resource.itemId, resource.count);
-      }
-      return true;
-    } else {
-      // Active mode - trigger minigame
-      const resource = this.getResourceForActivity(activityType);
-      if (resource && activityType === 'mining') {
-        this.pendingMinigame = {
-          activityType: 'mining',
-          coord,
-          baseReward: resource,
-        };
-        this.state = 'minigame';
-        sessionStore.navigateTo('mining-minigame');
-        return false; // Pause execution
-      }
-      if (resource && activityType === 'herbs') {
-        this.pendingMinigame = {
-          activityType: 'herbs',
-          coord,
-          baseReward: resource,
-        };
-        this.state = 'minigame';
-        sessionStore.navigateTo('herbs-minigame');
-        return false; // Pause execution
-      }
-      if (activityType === 'combat') {
-        // Combat minigame - reward is gold, handled by the minigame itself
-        this.pendingMinigame = {
-          activityType: 'combat',
-          coord,
-          baseReward: { itemId: 'gold', count: 10 }, // Base gold reward
-        };
-        this.state = 'minigame';
-        sessionStore.navigateTo('combat-minigame');
-        return false; // Pause execution
-      }
-      if (resource && activityType === 'fishing') {
-        this.pendingMinigame = {
-          activityType: 'fishing',
-          coord,
-          baseReward: resource,
-        };
-        this.state = 'minigame';
-        sessionStore.navigateTo('fishing-minigame');
-        return false; // Pause execution
-      }
-      // For other activities in active mode, auto-collect for now
-      if (resource) {
-        const earned: ResourceEarned = {
-          itemId: resource.itemId,
-          count: resource.count,
-          coord,
-          timestamp: Date.now(),
-        };
-        this.earnedResources.push(earned);
-        this.animatingResources.push(earned);
-        sessionStore.addToBag(resource.itemId, resource.count);
-      }
+      this.collectResource(resource, coord);
       return true;
     }
+
+    // Active mode: check for minigame
+    const minigameScreen = MINIGAME_SCREENS[activityType as ActivityType];
+
+    if (minigameScreen) {
+      // Trigger minigame for this activity
+      const baseReward = activityType === 'combat'
+        ? { itemId: 'gold', count: 10 } // Combat has fixed gold reward
+        : resource;
+
+      if (baseReward) {
+        this.triggerMinigame(activityType as ActivityType, coord, baseReward, minigameScreen);
+        return false; // Pause execution for minigame
+      }
+    }
+
+    // No minigame for this activity, auto-collect
+    this.collectResource(resource, coord);
+    return true;
+  }
+
+  /**
+   * Collect a resource and add to earned/animating lists
+   */
+  private collectResource(
+    resource: { itemId: string; count: number } | null,
+    coord: Coord
+  ): void {
+    if (!resource) return;
+
+    const earned: ResourceEarned = {
+      itemId: resource.itemId,
+      count: resource.count,
+      coord,
+      timestamp: Date.now(),
+    };
+
+    this.earnedResources.push(earned);
+    this.animatingResources.push(earned);
+    sessionStore.addToBag(resource.itemId, resource.count);
+  }
+
+  /**
+   * Trigger a minigame for an activity
+   */
+  private triggerMinigame(
+    activityType: ActivityType,
+    coord: Coord,
+    baseReward: { itemId: string; count: number },
+    screen: GameScreen
+  ): void {
+    this.pendingMinigame = {
+      activityType,
+      coord,
+      baseReward,
+    };
+    this.state = 'minigame';
+    sessionStore.navigateTo(screen);
   }
 
   private getResourceForActivity(activityType: string): { itemId: string; count: number } | null {

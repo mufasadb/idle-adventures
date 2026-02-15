@@ -1,0 +1,302 @@
+/**
+ * Material Items
+ *
+ * Ores, herbs, combat drops, and bars from smithing.
+ */
+
+import type { ItemDefinition } from '../../types';
+
+// === Mining Ores ===
+export const ORE_ITEMS: Record<string, ItemDefinition> = {
+  'copper-ore': {
+    id: 'copper-ore',
+    name: 'Copper Ore',
+    icon: '🟤',
+    category: 'material',
+    stackSize: 50,
+    description: 'Common ore, needs smelting.',
+  },
+  'tin-ore': {
+    id: 'tin-ore',
+    name: 'Tin Ore',
+    icon: '⚪',
+    category: 'material',
+    stackSize: 50,
+    description: 'Light ore, combines with copper.',
+  },
+  'iron-ore': {
+    id: 'iron-ore',
+    name: 'Iron Ore',
+    icon: '🪨',
+    category: 'material',
+    stackSize: 50,
+    description: 'Raw ore, needs smelting.',
+  },
+  'coal': {
+    id: 'coal',
+    name: 'Coal',
+    icon: '⬛',
+    category: 'material',
+    stackSize: 50,
+    description: 'Fuel for smelting.',
+  },
+  'gold-ore': {
+    id: 'gold-ore',
+    name: 'Gold Ore',
+    icon: '🟡',
+    category: 'material',
+    stackSize: 50,
+    description: 'Precious metal ore.',
+  },
+  'silver-ore': {
+    id: 'silver-ore',
+    name: 'Silver Ore',
+    icon: '🔘',
+    category: 'material',
+    stackSize: 50,
+    description: 'Shiny ore for jewelry.',
+  },
+  'mithril-ore': {
+    id: 'mithril-ore',
+    name: 'Mithril Ore',
+    icon: '💠',
+    category: 'material',
+    stackSize: 50,
+    description: 'Rare magical ore.',
+  },
+  'adamant-ore': {
+    id: 'adamant-ore',
+    name: 'Adamant Ore',
+    icon: '💚',
+    category: 'material',
+    stackSize: 50,
+    description: 'Extremely hard ore.',
+  },
+};
+
+// === Herbs ===
+export const HERB_ITEMS: Record<string, ItemDefinition> = {
+  'curaweed': {
+    id: 'curaweed',
+    name: 'Curaweed',
+    icon: '🌱',
+    category: 'material',
+    stackSize: 30,
+    description: 'Common herb with mild restorative properties.',
+  },
+  'mendaloe': {
+    id: 'mendaloe',
+    name: 'Mendaloe',
+    icon: '🌿',
+    category: 'material',
+    stackSize: 30,
+    description: 'Succulent that soothes wounds.',
+  },
+  'vitalroot': {
+    id: 'vitalroot',
+    name: 'Vitalroot',
+    icon: '🌿',
+    category: 'material',
+    stackSize: 30,
+    description: 'Root known for restoring vigor.',
+  },
+  'soothebloom': {
+    id: 'soothebloom',
+    name: 'Soothebloom',
+    icon: '🌸',
+    category: 'material',
+    stackSize: 20,
+    description: 'Calming flower that eases pain.',
+  },
+  'restoria': {
+    id: 'restoria',
+    name: 'Restoria',
+    icon: '🌿',
+    category: 'material',
+    stackSize: 30,
+    description: 'Potent herb for healing salves.',
+  },
+  'glacial-mint': {
+    id: 'glacial-mint',
+    name: 'Glacial Mint',
+    icon: '❄️',
+    category: 'material',
+    stackSize: 20,
+    description: 'Cooling herb that numbs injuries.',
+  },
+  'luminleaf': {
+    id: 'luminleaf',
+    name: 'Luminleaf',
+    icon: '⭐',
+    category: 'material',
+    stackSize: 20,
+    description: 'Glowing leaf with purifying essence.',
+  },
+  'emberheart': {
+    id: 'emberheart',
+    name: 'Emberheart',
+    icon: '🔥',
+    category: 'material',
+    stackSize: 30,
+    description: 'Warm herb that speeds recovery.',
+  },
+  'lifebane': {
+    id: 'lifebane',
+    name: 'Lifebane',
+    icon: '🐉',
+    category: 'material',
+    stackSize: 10,
+    description: 'Paradoxically named, it revives the weary.',
+  },
+  'phoenixwort': {
+    id: 'phoenixwort',
+    name: 'Phoenixwort',
+    icon: '🔶',
+    category: 'material',
+    stackSize: 10,
+    description: 'Legendary herb said to bring back the fallen.',
+  },
+};
+
+// === Combat Drops ===
+export const COMBAT_DROP_ITEMS: Record<string, ItemDefinition> = {
+  'leather-scraps': {
+    id: 'leather-scraps',
+    name: 'Leather Scraps',
+    icon: '🟫',
+    category: 'material',
+    stackSize: 50,
+    description: 'Basic crafting material.',
+  },
+  'wolf-fang': {
+    id: 'wolf-fang',
+    name: 'Wolf Fang',
+    icon: '🦷',
+    category: 'material',
+    stackSize: 30,
+    description: 'Trophy from wolf.',
+  },
+  'beast-hide': {
+    id: 'beast-hide',
+    name: 'Beast Hide',
+    icon: '🐾',
+    category: 'material',
+    stackSize: 30,
+    description: 'Tough hide from beasts.',
+  },
+  'monster-bone': {
+    id: 'monster-bone',
+    name: 'Monster Bone',
+    icon: '🦴',
+    category: 'material',
+    stackSize: 30,
+    description: 'Hard bone from monsters.',
+  },
+  'rare-drop': {
+    id: 'rare-drop',
+    name: 'Rare Drop',
+    icon: '✨',
+    category: 'material',
+    stackSize: 20,
+    description: 'Uncommon monster loot.',
+  },
+  'dragon-scale': {
+    id: 'dragon-scale',
+    name: 'Dragon Scale',
+    icon: '🐲',
+    category: 'material',
+    stackSize: 10,
+    description: 'Legendary crafting material.',
+  },
+  'legendary-essence': {
+    id: 'legendary-essence',
+    name: 'Legendary Essence',
+    icon: '💫',
+    category: 'material',
+    stackSize: 5,
+    description: 'Pure magical essence.',
+  },
+  'oak-log': {
+    id: 'oak-log',
+    name: 'Oak Log',
+    icon: '🪵',
+    category: 'material',
+    stackSize: 30,
+    description: 'Sturdy wood for crafting.',
+  },
+};
+
+// === Bars (Smithing outputs) ===
+export const BAR_ITEMS: Record<string, ItemDefinition> = {
+  'copper-bar': {
+    id: 'copper-bar',
+    name: 'Copper Bar',
+    icon: '🟫',
+    category: 'material',
+    stackSize: 50,
+    description: 'Soft metal bar. Good for basic tools.',
+  },
+  'bronze-bar': {
+    id: 'bronze-bar',
+    name: 'Bronze Bar',
+    icon: '🟤',
+    category: 'material',
+    stackSize: 50,
+    description: 'Sturdy alloy of copper and tin.',
+  },
+  'iron-bar': {
+    id: 'iron-bar',
+    name: 'Iron Bar',
+    icon: '⬜',
+    category: 'material',
+    stackSize: 50,
+    description: 'Common metal bar for tools and weapons.',
+  },
+  'steel-bar': {
+    id: 'steel-bar',
+    name: 'Steel Bar',
+    icon: '🔲',
+    category: 'material',
+    stackSize: 50,
+    description: 'Strong iron-carbon alloy. Holds an edge well.',
+  },
+  'silver-bar': {
+    id: 'silver-bar',
+    name: 'Silver Bar',
+    icon: '⬜',
+    category: 'material',
+    stackSize: 50,
+    description: 'Precious metal for jewelry and magic.',
+  },
+  'gold-bar': {
+    id: 'gold-bar',
+    name: 'Gold Bar',
+    icon: '🟨',
+    category: 'material',
+    stackSize: 50,
+    description: 'Valuable metal for jewelry and trade.',
+  },
+  'mithril-bar': {
+    id: 'mithril-bar',
+    name: 'Mithril Bar',
+    icon: '🟦',
+    category: 'material',
+    stackSize: 50,
+    description: 'Magical lightweight metal. Incredibly strong.',
+  },
+  'adamant-bar': {
+    id: 'adamant-bar',
+    name: 'Adamant Bar',
+    icon: '🟩',
+    category: 'material',
+    stackSize: 50,
+    description: 'The hardest known metal. Nearly unbreakable.',
+  },
+};
+
+export const MATERIAL_ITEMS: Record<string, ItemDefinition> = {
+  ...ORE_ITEMS,
+  ...HERB_ITEMS,
+  ...COMBAT_DROP_ITEMS,
+  ...BAR_ITEMS,
+};

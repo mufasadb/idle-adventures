@@ -1,5 +1,7 @@
-import { makeAutoObservable } from 'mobx';
+import { makeAutoObservable, runInAction } from 'mobx';
 import { ITEMS } from '../data/items';
+import { DEFAULT_BANK, DEFAULT_SKILLS, DEFAULT_UNLOCKS } from '../data/defaults';
+import { api } from '../api/client';
 import type { ItemStack, PlayerSkill, ItemDefinition } from '../types';
 
 // Re-export types for backwards compatibility
@@ -33,46 +35,24 @@ class PlayerStore {
    */
   unlocked: Set<string> = new Set();
 
+  /**
+   * Whether the store has been initialized from server
+   */
+  isLoaded: boolean = false;
+
   constructor() {
     makeAutoObservable(this);
-    this.initializeTestData();
   }
 
   /**
-   * Initialize with test data for development
+   * Initialize with default values for new players
+   * Called when server returns empty state or on first load
    */
-  private initializeTestData() {
-    // Starting bank items
-    this.bank = [
-      { itemId: 'gold', count: 1234 },
-      { itemId: 'sardines', count: 10 },
-      { itemId: 'bread', count: 3 },
-      { itemId: 'iron-pickaxe', count: 1 },
-      { itemId: 'herbalist-kit', count: 1 },
-      { itemId: 'health-potion', count: 3 },
-      { itemId: 'rope', count: 1 },
-      { itemId: 'cart', count: 1 },
-      { itemId: 'iron-ore', count: 45 },
-      { itemId: 'alpine-herbs', count: 12 },
-      { itemId: 'raw-ruby', count: 2 },
-      { itemId: 'raw-sardines', count: 8 },
-    ];
-
-    // Starting skills
-    this.skills = [
-      { id: 'mining', name: 'Mining', level: 28, xp: 4230, xpToNext: 6500, category: 'gathering' },
-      { id: 'woodcutting', name: 'Woodcutting', level: 15, xp: 1200, xpToNext: 4000, category: 'gathering' },
-      { id: 'herbalism', name: 'Herbalism', level: 12, xp: 890, xpToNext: 2000, category: 'gathering' },
-      { id: 'fishing', name: 'Fishing', level: 10, xp: 650, xpToNext: 1800, category: 'gathering' },
-      { id: 'melee', name: 'Melee', level: 22, xp: 3900, xpToNext: 5000, category: 'combat' },
-      { id: 'ranged', name: 'Ranged', level: 8, xp: 450, xpToNext: 1500, category: 'combat' },
-      { id: 'smithing', name: 'Smithing', level: 18, xp: 2750, xpToNext: 5000, category: 'crafting' },
-      { id: 'cooking', name: 'Cooking', level: 15, xp: 1800, xpToNext: 3600, category: 'crafting' },
-      { id: 'cartography', name: 'Cartography', level: 28, xp: 4100, xpToNext: 6200, category: 'support' },
-    ];
-
-    // Starting unlocks
-    this.unlocked = new Set(['smithy', 'kitchen', 'library']);
+  initializeDefaults() {
+    this.bank = [...DEFAULT_BANK];
+    this.skills = DEFAULT_SKILLS.map(s => ({ ...s }));
+    this.unlocked = new Set(DEFAULT_UNLOCKS);
+    this.isLoaded = true;
   }
 
   // === Computed Properties ===
@@ -176,6 +156,78 @@ class PlayerStore {
    */
   isUnlocked(id: string): boolean {
     return this.unlocked.has(id);
+  }
+
+  // === Serialization ===
+
+  /**
+   * Serialize state to JSON for cloud save
+   */
+  toJSON(): Record<string, unknown> {
+    return {
+      bank: this.bank,
+      skills: this.skills,
+      unlocked: Array.from(this.unlocked),
+    };
+  }
+
+  /**
+   * Load state from JSON (cloud save or local storage)
+   */
+  loadFromJSON(data: Record<string, unknown>) {
+    if (data.bank && Array.isArray(data.bank)) {
+      this.bank = data.bank as ItemStack[];
+    }
+    if (data.skills && Array.isArray(data.skills)) {
+      this.skills = data.skills as PlayerSkill[];
+    }
+    if (data.unlocked && Array.isArray(data.unlocked)) {
+      this.unlocked = new Set(data.unlocked as string[]);
+    }
+    this.isLoaded = true;
+  }
+
+  // === Cloud Sync ===
+
+  /**
+   * Save current state to server (fire and forget)
+   * Only syncs if user is authenticated
+   */
+  syncToServer() {
+    if (!api.hasToken) return;
+
+    const state = this.toJSON();
+    api.saveGameState(state).catch(err => {
+      console.warn('Failed to sync to server:', err);
+    });
+  }
+
+  /**
+   * Load state from server
+   * Server returns defaults for new players, so we always load the response
+   */
+  async loadFromServer(): Promise<boolean> {
+    if (!api.hasToken) {
+      // No auth - use defaults for offline/unauthenticated play
+      runInAction(() => {
+        this.initializeDefaults();
+      });
+      return true;
+    }
+
+    try {
+      const state = await api.getGameState();
+      runInAction(() => {
+        this.loadFromJSON(state);
+      });
+      return true;
+    } catch (err) {
+      console.warn('Failed to load from server, using defaults:', err);
+      runInAction(() => {
+        this.initializeDefaults();
+      });
+      return false;
+    }
   }
 }
 

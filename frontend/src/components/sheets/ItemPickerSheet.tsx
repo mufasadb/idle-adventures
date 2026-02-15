@@ -37,6 +37,13 @@ export const ItemPickerSheet = observer(() => {
     return bankCount;
   };
 
+  // Get empty food slot indices
+  const getEmptyFoodSlots = (): number[] => {
+    return sessionStore.loadout.food
+      .map((slot, idx) => slot === null ? idx : -1)
+      .filter(idx => idx !== -1);
+  };
+
   // Handle selecting a single food item
   const handleSelectFoodItem = (itemId: string) => {
     // Get current item in this slot
@@ -56,6 +63,35 @@ export const ItemPickerSheet = observer(() => {
     // Remove 1 from bank and add to loadout
     playerStore.removeFromBank(itemId, 1);
     sessionStore.setFood(slotIndex, { itemId });
+
+    sessionStore.closeSheet();
+  };
+
+  // Fill one empty slot with food item
+  const handleFillOne = (itemId: string) => {
+    const emptySlots = getEmptyFoodSlots();
+    if (emptySlots.length === 0) return;
+
+    const bankStack = playerStore.bank.find(s => s.itemId === itemId);
+    if (!bankStack || bankStack.count <= 0) return;
+
+    playerStore.removeFromBank(itemId, 1);
+    sessionStore.setFood(emptySlots[0], { itemId });
+  };
+
+  // Fill all remaining empty slots with food item
+  const handleFillAll = (itemId: string) => {
+    const emptySlots = getEmptyFoodSlots();
+    if (emptySlots.length === 0) return;
+
+    const bankStack = playerStore.bank.find(s => s.itemId === itemId);
+    if (!bankStack || bankStack.count <= 0) return;
+
+    const toFill = Math.min(emptySlots.length, bankStack.count);
+    for (let i = 0; i < toFill; i++) {
+      playerStore.removeFromBank(itemId, 1);
+      sessionStore.setFood(emptySlots[i], { itemId });
+    }
 
     sessionStore.closeSheet();
   };
@@ -178,45 +214,69 @@ export const ItemPickerSheet = observer(() => {
             // Don't show item if no remaining count (unless it's current)
             if (availableCount <= 0 && !isCurrentItem) return null;
 
+            const emptySlots = slotType === 'food' ? getEmptyFoodSlots().length : 0;
+
             return (
-              <button
+              <div
                 key={stack.itemId}
-                onClick={() => {
-                  if (slotType === 'food') {
-                    handleSelectFoodItem(stack.itemId);
-                  } else {
-                    handleSelectStackItem(stack);
-                  }
-                }}
-                disabled={availableCount <= 0}
                 className={`
-                  w-full flex items-center gap-3 rounded-lg p-3 text-left transition-colors
+                  rounded-lg p-3 transition-colors
                   ${availableCount <= 0
-                    ? 'bg-app-tertiary/50 opacity-50 cursor-not-allowed'
-                    : 'bg-app-tertiary hover:bg-app-hover'
+                    ? 'bg-app-tertiary/50 opacity-50'
+                    : 'bg-app-tertiary'
                   }
                 `}
               >
-                <span className="text-2xl">{itemDef.icon}</span>
-                <div className="flex-1">
-                  <div className="text-app-primary font-medium">{itemDef.name}</div>
-                  <div className="text-app-muted text-xs">
-                    {slotType === 'food' ? (
-                      <>
-                        {availableCount} available
-                        {itemDef.actions && ` • ${itemDef.actions} actions each`}
-                      </>
-                    ) : (
-                      <>
-                        x{stack.count}
-                        {itemDef.bagSlots && ` • +${itemDef.bagSlots} bag slots`}
-                        {itemDef.speedBonus && ` • ${itemDef.speedBonus > 0 ? '+' : ''}${itemDef.speedBonus}% speed`}
-                      </>
-                    )}
+                <button
+                  onClick={() => {
+                    if (slotType === 'food') {
+                      handleSelectFoodItem(stack.itemId);
+                    } else {
+                      handleSelectStackItem(stack);
+                    }
+                  }}
+                  disabled={availableCount <= 0}
+                  className="w-full flex items-center gap-3 text-left"
+                >
+                  <span className="text-2xl">{itemDef.icon}</span>
+                  <div className="flex-1">
+                    <div className="text-app-primary font-medium">{itemDef.name}</div>
+                    <div className="text-app-muted text-xs">
+                      {slotType === 'food' ? (
+                        <>
+                          {availableCount} available
+                          {itemDef.actions && ` • ${itemDef.actions} actions each`}
+                        </>
+                      ) : (
+                        <>
+                          x{stack.count}
+                          {itemDef.bagSlots && ` • +${itemDef.bagSlots} bag slots`}
+                          {itemDef.speedBonus && ` • ${itemDef.speedBonus > 0 ? '+' : ''}${itemDef.speedBonus}% speed`}
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
-                {availableCount > 0 && <span className="text-accent">❯</span>}
-              </button>
+                  {availableCount > 0 && <span className="text-accent">❯</span>}
+                </button>
+
+                {/* Fill buttons for food items */}
+                {slotType === 'food' && availableCount > 0 && emptySlots > 0 && (
+                  <div className="flex gap-2 mt-2 pt-2 border-t border-app/30">
+                    <button
+                      onClick={() => handleFillOne(stack.itemId)}
+                      className="flex-1 py-1.5 px-3 text-xs font-medium bg-accent/20 hover:bg-accent/30 text-accent rounded-md transition-colors"
+                    >
+                      Fill +1
+                    </button>
+                    <button
+                      onClick={() => handleFillAll(stack.itemId)}
+                      className="flex-1 py-1.5 px-3 text-xs font-medium bg-accent/20 hover:bg-accent/30 text-accent rounded-md transition-colors"
+                    >
+                      Fill All ({Math.min(emptySlots, availableCount)})
+                    </button>
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>

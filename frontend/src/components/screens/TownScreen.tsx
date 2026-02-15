@@ -91,7 +91,11 @@ export const TownScreen = observer(() => {
             Town
           </h3>
           <div className="grid grid-cols-2 gap-3">
-            <TownButton icon="🔥" label="Smithing" />
+            <TownButton
+              icon="🔥"
+              label="Smithing"
+              onClick={() => sessionStore.navigateTo('smithing')}
+            />
             <TownButton
               icon="🍳"
               label="Cooking"

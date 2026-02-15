@@ -8,11 +8,12 @@
  * - Rewards: based on fish caught
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { observer } from 'mobx-react-lite';
 import { Fish } from 'lucide-react';
 import { expeditionExecutionStore } from '../../engine/expeditionExecutionStore';
 import { ITEMS } from '../../data/items';
+import { useGameLoop, useAnimationDelay } from '../../hooks';
 import {
   TOTAL_HARPOONS,
   FISH_SPAWN_INTERVAL,
@@ -39,70 +40,60 @@ export const FishingMinigameScreen = observer(() => {
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const fishIdRef = useRef(0);
   const harpoonIdRef = useRef(0);
-  const animationRef = useRef<number | null>(null);
   const lastFishSpawnRef = useRef<number>(0);
   const gameStartRef = useRef<number | null>(null);
   const isCompleteRef = useRef(false);
+  const delay = useAnimationDelay();
 
-  // Fish swimming animation loop
-  useEffect(() => {
-    if (isComplete) return;
+  // Fish swimming animation loop using useGameLoop hook
+  useGameLoop(!isComplete, (now) => {
+    if (isCompleteRef.current) return false; // Stop the loop
 
-    gameStartRef.current = performance.now();
+    // Initialize game start time on first frame
+    if (!gameStartRef.current) {
+      gameStartRef.current = now;
+      lastFishSpawnRef.current = now;
+    }
 
-    const animate = (now: number) => {
-      if (isCompleteRef.current) return;
+    const elapsed = now - gameStartRef.current;
+    const remaining = Math.max(0, GAME_DURATION - elapsed);
+    setTimeLeft(remaining);
 
-      const elapsed = now - (gameStartRef.current ?? now);
-      const remaining = Math.max(0, GAME_DURATION - elapsed);
-      setTimeLeft(remaining);
+    // Check if game over
+    if (remaining <= 0) {
+      isCompleteRef.current = true;
+      setIsComplete(true);
+      return false; // Stop the loop
+    }
 
-      // Check if game over
-      if (remaining <= 0) {
-        isCompleteRef.current = true;
-        setIsComplete(true);
-        return;
-      }
+    // Spawn new fish periodically
+    if (now - lastFishSpawnRef.current > FISH_SPAWN_INTERVAL) {
+      lastFishSpawnRef.current = now;
+      const newFish: SwimmingFish = {
+        id: fishIdRef.current++,
+        startTime: now,
+        y: 0.2 + Math.random() * 0.6, // Keep fish in middle 60% of pool
+        speed: 0.7 + Math.random() * 0.6, // Random speed
+        direction: Math.random() > 0.5 ? 'left' : 'right',
+        caught: false,
+      };
+      setFish(prev => [...prev, newFish]);
+    }
 
-      // Spawn new fish periodically
-      if (now - lastFishSpawnRef.current > FISH_SPAWN_INTERVAL) {
-        lastFishSpawnRef.current = now;
-        const newFish: SwimmingFish = {
-          id: fishIdRef.current++,
-          startTime: now,
-          y: 0.2 + Math.random() * 0.6, // Keep fish in middle 60% of pool
-          speed: 0.7 + Math.random() * 0.6, // Random speed
-          direction: Math.random() > 0.5 ? 'left' : 'right',
-          caught: false,
-        };
-        setFish(prev => [...prev, newFish]);
-      }
+    // Update fish positions and remove off-screen fish
+    setFish(prev => prev.filter(f => {
+      if (f.caught) return false;
+      const age = now - f.startTime;
+      const duration = FISH_SWIM_DURATION / f.speed;
+      return age < duration;
+    }));
 
-      // Update fish positions and remove off-screen fish
-      setFish(prev => prev.filter(f => {
-        if (f.caught) return false;
-        const age = now - f.startTime;
-        const duration = FISH_SWIM_DURATION / f.speed;
-        return age < duration;
-      }));
-
-      // Update harpoons and remove completed ones
-      setHarpoons(prev => prev.filter(h => {
-        const age = now - h.startTime;
-        return age < HARPOON_FLY_DURATION + 200; // Keep briefly after landing
-      }));
-
-      animationRef.current = requestAnimationFrame(animate);
-    };
-
-    animationRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [isComplete]);
+    // Update harpoons and remove completed ones
+    setHarpoons(prev => prev.filter(h => {
+      const age = now - h.startTime;
+      return age < HARPOON_FLY_DURATION + 200; // Keep briefly after landing
+    }));
+  });
 
   // Calculate fish position based on time
   const getFishPosition = useCallback((f: SwimmingFish, now: number): { x: number; y: number } => {
@@ -186,7 +177,7 @@ export const FishingMinigameScreen = observer(() => {
     setHarpoonsLeft(prev => prev - 1);
 
     // Check for hits when harpoon reaches the click position
-    setTimeout(() => {
+    delay(HARPOON_FLY_DURATION, () => {
       if (isCompleteRef.current) return;
 
       setFish(prev => {
@@ -212,16 +203,16 @@ export const FishingMinigameScreen = observer(() => {
 
         return updated;
       });
-    }, HARPOON_FLY_DURATION);
+    });
 
     // End game if out of harpoons (after a brief delay)
     if (harpoonsLeft <= 1) {
-      setTimeout(() => {
+      delay(HARPOON_FLY_DURATION + 500, () => {
         isCompleteRef.current = true;
         setIsComplete(true);
-      }, HARPOON_FLY_DURATION + 500);
+      });
     }
-  }, [harpoonsLeft, getFishPosition]);
+  }, [harpoonsLeft, getFishPosition, delay]);
 
   // Calculate reward multiplier based on fish caught
   const calculateMultiplier = useCallback(() => {

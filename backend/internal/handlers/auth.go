@@ -69,7 +69,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		Email:        req.Email,
 		Username:     req.Username,
 		PasswordHash: string(hashedPassword),
-		GameState:    models.NewGameState(req.Username),
+		GameState:    models.NewGameState(),
 		LastOnline:   time.Now(),
 	}
 

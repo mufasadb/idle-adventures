@@ -1,5 +1,6 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import { api } from '../api/client';
+import { playerStore } from './playerStore';
 import type { Player } from '../types';
 
 class AuthStore {
@@ -26,6 +27,8 @@ class AuthStore {
       runInAction(() => {
         this.player = player;
       });
+      // Try to load game state from server
+      await playerStore.loadFromServer();
     } catch {
       // DEV MODE: If backend unavailable but token exists, use mock
       if (import.meta.env.DEV && token === 'dev-token') {
@@ -98,6 +101,8 @@ class AuthStore {
       runInAction(() => {
         this.player = response.player;
       });
+      // Try to load game state from server
+      await playerStore.loadFromServer();
     } catch (err) {
       // DEV MODE: If backend is unavailable, use mock data
       if (import.meta.env.DEV) {

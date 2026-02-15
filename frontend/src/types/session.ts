@@ -17,4 +17,5 @@ export type GameScreen =
   | 'herbs-minigame'
   | 'combat-minigame'
   | 'fishing-minigame'
-  | 'cooking';
+  | 'cooking'
+  | 'smithing';

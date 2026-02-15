@@ -52,6 +52,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			playerHandler := handlers.NewPlayerHandler(db)
 			protected.GET("/player", playerHandler.GetPlayer)
 			protected.GET("/game-state", playerHandler.GetGameState)
+			protected.POST("/game-state", playerHandler.SaveGameState)
 		}
 	}
 
