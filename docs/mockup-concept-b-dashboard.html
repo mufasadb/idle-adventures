@@ -3,48 +3,54 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Idle Adventures — Dashboard (Concept B)</title>
+  <title>Idle Adventures — Concept B (Revised)</title>
   <style>
     /* =============================================
-       CLEAN DASHBOARD — Modern Minimalist
-       Dark / Neon / Data-forward
+       JOURNAL DASHBOARD — Earthy / Worn Leather
+       Dark browns, forest greens, muted ochres
        ============================================= */
     :root {
-      --bg:           #0f0f13;
-      --bg-panel:     #16161e;
-      --bg-card:      #1c1c26;
-      --bg-card-hover:#22222e;
-      --border:       #2a2a38;
-      --border-light: #38384a;
+      --bg:              #110e08;
+      --bg-panel:        #1c1710;
+      --bg-card:         #241e13;
+      --bg-card-hover:   #2e2719;
+      --border:          #3a2f1e;
+      --border-light:    #4d3f28;
+      --border-worn:     #5a4830;
 
-      --teal:         #22d4c8;
-      --teal-dim:     #1a9e96;
-      --teal-glow:    rgba(34, 212, 200, 0.15);
-      --teal-glow-strong: rgba(34, 212, 200, 0.35);
-      --amber:        #f59e0b;
-      --amber-dim:    #b87210;
-      --amber-glow:   rgba(245, 158, 11, 0.15);
-      --amber-glow-strong: rgba(245, 158, 11, 0.35);
+      --green:           #6e8c52;
+      --green-dim:       #4d6338;
+      --green-muted:     rgba(110, 140, 82, 0.12);
+      --green-warm:      rgba(110, 140, 82, 0.28);
 
-      --text-primary: #e8e8f0;
-      --text-secondary: #8888a0;
-      --text-dim:     #4a4a60;
+      --ochre:           #b87a2e;
+      --ochre-dim:       #7a5020;
+      --ochre-muted:     rgba(184, 122, 46, 0.12);
+      --ochre-warm:      rgba(184, 122, 46, 0.28);
 
-      --skill-1:  #22d4c8;  /* teal */
-      --skill-2:  #a78bfa;  /* violet */
-      --skill-3:  #34d399;  /* emerald */
-      --skill-4:  #fb923c;  /* orange */
-      --skill-5:  #f87171;  /* red */
-      --skill-6:  #60a5fa;  /* blue */
-      --skill-7:  #e879f9;  /* fuchsia */
-      --skill-8:  #fbbf24;  /* yellow */
-      --skill-9:  #94a3b8;  /* slate */
+      --rust:            #8c4a2e;
+      --rust-dim:        #5a2e18;
+
+      --text-primary:    #e2d4be;
+      --text-secondary:  #9a8870;
+      --text-dim:        #5a4a38;
+      --text-faint:      #3a2f22;
+
+      --skill-1:  #6e8c52;
+      --skill-2:  #8c7a4e;
+      --skill-3:  #5a8070;
+      --skill-4:  #b87a2e;
+      --skill-5:  #8c4a2e;
+      --skill-6:  #6a7a8c;
+      --skill-7:  #7a6a8c;
+      --skill-8:  #8c7038;
+      --skill-9:  #6a5a4a;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background: #080810;
+      background: #0a0805;
       font-family: 'Courier New', 'Lucida Console', monospace;
       color: var(--text-primary);
       min-height: 100vh;
@@ -67,46 +73,47 @@
       position: relative;
       box-shadow:
         0 0 0 1px var(--border),
-        0 0 80px rgba(34, 212, 200, 0.03),
-        0 0 120px rgba(0,0,0,0.8);
+        0 0 60px rgba(0,0,0,0.9);
       overflow: hidden;
     }
 
-    /* Subtle grid overlay */
+    /* Subtle paper grain texture overlay */
     .app-shell::before {
       content: '';
       position: absolute;
       inset: 0;
       background-image:
-        linear-gradient(rgba(34,212,200,0.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(34,212,200,0.025) 1px, transparent 1px);
-      background-size: 32px 32px;
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
       pointer-events: none;
       z-index: 0;
+      opacity: 0.6;
     }
 
-    /* Corner accents */
+    /* Worn corner accent — top left only */
     .app-shell::after {
       content: '';
       position: absolute;
       top: 0; left: 0;
-      width: 40px; height: 40px;
-      border-top: 2px solid var(--teal);
-      border-left: 2px solid var(--teal);
-      opacity: 0.6;
+      width: 36px; height: 36px;
+      border-top: 1px solid var(--border-worn);
+      border-left: 1px solid var(--border-worn);
+      opacity: 0.7;
       pointer-events: none;
       z-index: 10;
     }
 
-    .corner-br {
-      position: absolute;
-      bottom: 60px; right: 0;
-      width: 30px; height: 30px;
-      border-bottom: 2px solid var(--teal);
-      border-right: 2px solid var(--teal);
-      opacity: 0.4;
-      pointer-events: none;
-      z-index: 10;
+    /* ─────────────────────────────
+       SCREEN SYSTEM
+    ───────────────────────────── */
+    .screen {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .screen.active {
+      display: flex;
     }
 
     /* ─────────────────────────────
@@ -121,6 +128,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      flex-shrink: 0;
     }
 
     .header::after {
@@ -129,15 +137,15 @@
       bottom: -1px; left: 0; right: 0;
       height: 1px;
       background: linear-gradient(90deg,
-        transparent 0%, var(--teal-dim) 30%,
-        var(--teal) 50%, var(--teal-dim) 70%, transparent 100%);
-      opacity: 0.8;
+        transparent 0%, var(--border-worn) 30%,
+        var(--ochre-dim) 50%, var(--border-worn) 70%, transparent 100%);
+      opacity: 0.6;
     }
 
     .logo-area { display: flex; flex-direction: column; }
 
     .game-title {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: bold;
       color: var(--text-primary);
       letter-spacing: 3px;
@@ -145,15 +153,15 @@
     }
 
     .game-title span {
-      color: var(--teal);
-      text-shadow: 0 0 10px var(--teal), 0 0 20px var(--teal-dim);
+      color: var(--ochre);
     }
 
-    .version-tag {
-      font-size: 9px;
+    .game-subtitle {
+      font-size: 8px;
       color: var(--text-dim);
       letter-spacing: 2px;
-      margin-top: 1px;
+      margin-top: 2px;
+      text-transform: uppercase;
     }
 
     .header-stats {
@@ -169,60 +177,65 @@
     }
 
     .stat-label {
-      font-size: 8px;
+      font-size: 7px;
       color: var(--text-dim);
       letter-spacing: 1.5px;
       text-transform: uppercase;
     }
 
     .stat-value {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: bold;
       letter-spacing: 1px;
     }
 
-    .stat-value.gold { color: var(--amber); text-shadow: 0 0 8px var(--amber-dim); }
-    .stat-value.player { color: var(--teal); font-size: 11px; }
+    .stat-value.gold { color: var(--ochre); }
+    .stat-value.name { color: var(--green); font-size: 10px; }
 
     /* ─────────────────────────────
-       STATUS BAR
+       NAV BAR
     ───────────────────────────── */
-    .status-bar {
+    .nav-bar {
       background: var(--bg-panel);
-      border-bottom: 1px solid var(--border);
-      padding: 6px 16px;
+      border-top: 1px solid var(--border);
+      padding: 0;
       display: flex;
-      align-items: center;
-      gap: 12px;
       position: relative;
       z-index: 5;
+      flex-shrink: 0;
     }
 
-    .status-dot {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: var(--teal);
-      box-shadow: 0 0 6px var(--teal);
-      animation: pulse-dot 2s ease-in-out infinite;
-    }
-
-    @keyframes pulse-dot {
-      0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--teal); }
-      50% { opacity: 0.5; box-shadow: 0 0 2px var(--teal); }
-    }
-
-    .status-text {
-      font-size: 10px;
-      color: var(--teal);
+    .nav-btn {
+      flex: 1;
+      background: none;
+      border: none;
+      border-top: 2px solid transparent;
+      color: var(--text-dim);
+      font-family: 'Courier New', monospace;
+      font-size: 8px;
       letter-spacing: 1.5px;
       text-transform: uppercase;
+      padding: 10px 4px 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
     }
 
-    .status-location {
-      margin-left: auto;
-      font-size: 10px;
+    .nav-btn:hover {
       color: var(--text-secondary);
-      letter-spacing: 0.5px;
+    }
+
+    .nav-btn.active {
+      color: var(--ochre);
+      border-top-color: var(--ochre);
+    }
+
+    .nav-btn-icon {
+      font-size: 14px;
+      line-height: 1;
     }
 
     /* ─────────────────────────────
@@ -236,119 +249,14 @@
       scrollbar-width: thin;
       scrollbar-color: var(--border-light) var(--bg);
       padding-bottom: 4px;
+      min-height: 0;
     }
 
-    .content-area::-webkit-scrollbar { width: 4px; }
+    .content-area::-webkit-scrollbar { width: 3px; }
     .content-area::-webkit-scrollbar-track { background: var(--bg); }
     .content-area::-webkit-scrollbar-thumb {
       background: var(--border-light);
       border-radius: 2px;
-    }
-
-    /* ─────────────────────────────
-       EXPEDITION CTA
-    ───────────────────────────── */
-    .expedition-cta {
-      margin: 12px 12px 4px;
-      position: relative;
-    }
-
-    .expedition-cta-inner {
-      background: linear-gradient(135deg,
-        rgba(34,212,200,0.08) 0%,
-        rgba(34,212,200,0.04) 50%,
-        rgba(34,212,200,0.08) 100%);
-      border: 1px solid var(--teal-dim);
-      border-radius: 6px;
-      padding: 14px 16px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      cursor: pointer;
-      position: relative;
-      overflow: hidden;
-      transition: all 0.2s;
-      box-shadow:
-        0 0 20px rgba(34,212,200,0.06),
-        inset 0 1px 0 rgba(34,212,200,0.1);
-    }
-
-    .expedition-cta-inner:hover {
-      background: linear-gradient(135deg,
-        rgba(34,212,200,0.14) 0%,
-        rgba(34,212,200,0.08) 50%,
-        rgba(34,212,200,0.14) 100%);
-      box-shadow:
-        0 0 30px rgba(34,212,200,0.15),
-        inset 0 1px 0 rgba(34,212,200,0.2);
-    }
-
-    /* scanning line animation */
-    .expedition-cta-inner::before {
-      content: '';
-      position: absolute;
-      top: -100%; left: 0; right: 0;
-      height: 2px;
-      background: linear-gradient(90deg,
-        transparent, var(--teal), transparent);
-      opacity: 0.6;
-      animation: scan-line 3s ease-in-out infinite;
-    }
-
-    @keyframes scan-line {
-      0% { top: -2px; opacity: 0; }
-      10% { opacity: 0.6; }
-      90% { opacity: 0.6; }
-      100% { top: 100%; opacity: 0; }
-    }
-
-    .cta-text-area { flex: 1; }
-
-    .cta-sys-label {
-      font-size: 8px;
-      color: var(--teal-dim);
-      letter-spacing: 2.5px;
-      text-transform: uppercase;
-      margin-bottom: 4px;
-    }
-
-    .cta-title {
-      font-size: 20px;
-      font-weight: bold;
-      color: var(--text-primary);
-      letter-spacing: 2px;
-      text-transform: uppercase;
-    }
-
-    .cta-title span { color: var(--teal); }
-
-    .cta-detail {
-      font-size: 10px;
-      color: var(--text-secondary);
-      margin-top: 4px;
-      letter-spacing: 0.5px;
-    }
-
-    .cta-btn {
-      background: var(--teal);
-      color: var(--bg);
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
-      font-weight: bold;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      border: none;
-      border-radius: 3px;
-      padding: 10px 14px;
-      cursor: pointer;
-      flex-shrink: 0;
-      margin-left: 12px;
-      box-shadow: 0 0 16px var(--teal-dim);
-      transition: all 0.15s;
-    }
-
-    .cta-btn:hover {
-      box-shadow: 0 0 24px var(--teal);
     }
 
     /* ─────────────────────────────
@@ -358,7 +266,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 12px 12px 6px;
+      padding: 14px 14px 6px;
     }
 
     .section-heading-line {
@@ -369,26 +277,26 @@
     }
 
     .section-heading-text {
-      font-size: 9px;
+      font-size: 8px;
       color: var(--text-dim);
       letter-spacing: 3px;
       text-transform: uppercase;
     }
 
     /* ─────────────────────────────
-       SKILLS LIST
+       SKILLS LIST (HOME SCREEN)
     ───────────────────────────── */
     .skills-list {
       padding: 0 12px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 3px;
     }
 
     .skill-card {
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 4px;
+      border-radius: 3px;
       padding: 8px 12px;
       display: flex;
       align-items: center;
@@ -409,16 +317,20 @@
       content: '';
       position: absolute;
       left: 0; top: 0; bottom: 0;
-      width: 3px;
-      background: var(--accent-color, var(--teal));
-      box-shadow: 0 0 8px var(--accent-color, var(--teal));
+      width: 2px;
+      background: var(--accent-color, var(--green));
+      opacity: 0.8;
     }
 
-    .skill-icon-box {
-      width: 28px; height: 28px;
+    .skill-sigil {
+      width: 26px; height: 26px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 16px;
       flex-shrink: 0;
+      border: 1px solid var(--border-light);
+      border-radius: 2px;
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 0;
     }
 
     .skill-data { flex: 1; min-width: 0; }
@@ -431,7 +343,7 @@
     }
 
     .skill-name {
-      font-size: 11px;
+      font-size: 10px;
       color: var(--text-primary);
       letter-spacing: 1px;
       text-transform: uppercase;
@@ -444,561 +356,1628 @@
     }
 
     .skill-bar-track {
-      height: 3px;
+      height: 2px;
       background: var(--border);
-      border-radius: 2px;
+      border-radius: 1px;
       overflow: hidden;
     }
 
     .skill-bar-fill {
       height: 100%;
-      background: var(--accent-color, var(--teal));
-      border-radius: 2px;
-      box-shadow: 0 0 6px var(--accent-color, var(--teal));
-      transition: width 0.4s ease;
+      background: var(--accent-color, var(--green));
+      border-radius: 1px;
+      opacity: 0.8;
     }
 
     .skill-level-box {
-      width: 32px; height: 32px;
-      border: 1px solid var(--accent-color, var(--teal));
-      border-radius: 3px;
+      width: 30px; height: 30px;
+      border: 1px solid var(--border-light);
+      border-radius: 2px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: bold;
-      color: var(--accent-color, var(--teal));
+      color: var(--accent-color, var(--green));
       flex-shrink: 0;
-      box-shadow:
-        0 0 8px rgba(0,0,0,0.4),
-        inset 0 0 6px rgba(var(--accent-color, 34,212,200), 0.05);
     }
 
     /* ─────────────────────────────
-       BANK / INVENTORY
+       CONDITION PANEL (HOME)
     ───────────────────────────── */
-    .bank-panel {
+    .condition-panel {
       margin: 0 12px;
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 6px;
+      border-radius: 3px;
       overflow: hidden;
     }
 
-    .bank-panel-header {
+    .condition-panel-header {
       background: var(--bg-panel);
       border-bottom: 1px solid var(--border);
-      padding: 8px 12px;
+      padding: 7px 12px;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
 
-    .bank-panel-title {
-      font-size: 9px;
+    .condition-panel-title {
+      font-size: 8px;
       letter-spacing: 2.5px;
       color: var(--text-secondary);
       text-transform: uppercase;
     }
 
-    .bank-capacity-chip {
-      font-size: 9px;
-      color: var(--amber);
-      letter-spacing: 1px;
-      border: 1px solid var(--amber-dim);
-      border-radius: 20px;
-      padding: 1px 8px;
-    }
-
-    .bank-summary-row {
+    .condition-row {
       display: flex;
       gap: 0;
       border-bottom: 1px solid var(--border);
     }
 
-    .bank-stat {
+    .condition-row:last-child { border-bottom: none; }
+
+    .condition-stat {
       flex: 1;
       padding: 8px 10px;
       border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
     }
 
-    .bank-stat:last-child { border-right: none; }
+    .condition-stat:last-child { border-right: none; }
 
-    .bank-stat-label {
-      font-size: 8px;
-      color: var(--text-dim);
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-    }
-
-    .bank-stat-value {
-      font-size: 14px;
-      font-weight: bold;
-      color: var(--text-primary);
-    }
-
-    .bank-stat-value.teal { color: var(--teal); text-shadow: 0 0 8px var(--teal-dim); }
-    .bank-stat-value.amber { color: var(--amber); text-shadow: 0 0 6px var(--amber-dim); }
-
-    .inv-grid {
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 1px;
-      background: var(--border);
-      padding: 1px;
-    }
-
-    .inv-cell {
-      background: var(--bg);
-      aspect-ratio: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-      cursor: pointer;
-      position: relative;
-      transition: background 0.1s;
-    }
-
-    .inv-cell:hover { background: var(--bg-card); }
-
-    .inv-cell.empty { opacity: 0.12; }
-    .inv-cell.empty::after {
-      content: '';
-      width: 14px; height: 14px;
-      border: 1px dashed var(--border-light);
-      border-radius: 2px;
-    }
-
-    .inv-qty {
-      position: absolute;
-      bottom: 2px; right: 3px;
+    .condition-label {
       font-size: 7px;
-      color: var(--text-secondary);
-      letter-spacing: 0;
-    }
-
-    .inv-cell-glow {
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(circle at center,
-        var(--cell-glow, transparent) 0%, transparent 70%);
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.1s;
-    }
-
-    .inv-cell:hover .inv-cell-glow { opacity: 1; }
-
-    /* ─────────────────────────────
-       MODE TOGGLE
-    ───────────────────────────── */
-    .mode-row {
-      display: flex;
-      gap: 4px;
-      margin: 8px 12px 0;
-    }
-
-    .mode-btn {
-      flex: 1;
-      padding: 8px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-
-    .mode-btn.active {
-      background: var(--teal-glow);
-      border-color: var(--teal-dim);
-      box-shadow: 0 0 10px var(--teal-glow-strong);
-    }
-
-    .mode-btn-label {
-      font-size: 9px;
       color: var(--text-dim);
       letter-spacing: 1.5px;
       text-transform: uppercase;
       margin-bottom: 2px;
     }
 
-    .mode-btn.active .mode-btn-label { color: var(--teal); }
-
-    .mode-btn-value {
+    .condition-value {
       font-size: 13px;
       font-weight: bold;
-      color: var(--text-secondary);
+      color: var(--text-primary);
     }
 
-    .mode-btn.active .mode-btn-value { color: var(--text-primary); }
+    .condition-value.green { color: var(--green); }
+    .condition-value.ochre { color: var(--ochre); }
+    .condition-value.rust  { color: var(--rust);  }
+
+    .cond-bar-wrap {
+      margin-top: 4px;
+      height: 2px;
+      background: var(--border);
+      border-radius: 1px;
+      overflow: hidden;
+    }
+
+    .cond-bar-fill {
+      height: 100%;
+      background: var(--fill-color, var(--green));
+      opacity: 0.7;
+    }
 
     /* ─────────────────────────────
-       BOTTOM NAV
+       EXPEDITION CTA (HOME)
     ───────────────────────────── */
-    .bottom-nav {
-      background: var(--bg-panel);
-      border-top: 1px solid var(--border);
-      display: flex;
-      position: relative;
-      z-index: 5;
+    .expedition-cta {
+      margin: 12px 12px 4px;
     }
 
-    .bottom-nav::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 1px;
-      background: linear-gradient(90deg,
-        transparent, var(--teal-dim), transparent);
-      opacity: 0.5;
-    }
-
-    .nav-tab {
-      flex: 1;
+    .expedition-cta-inner {
+      background: linear-gradient(135deg,
+        rgba(110,140,82,0.07) 0%,
+        rgba(110,140,82,0.03) 50%,
+        rgba(110,140,82,0.07) 100%);
+      border: 1px solid var(--green-dim);
+      border-radius: 3px;
+      padding: 14px 16px;
       display: flex;
-      flex-direction: column;
       align-items: center;
-      justify-content: center;
-      padding: 10px 4px 8px;
+      justify-content: space-between;
       cursor: pointer;
       position: relative;
-      transition: background 0.15s;
+      overflow: hidden;
+      transition: all 0.2s;
     }
 
-    .nav-tab.active {
-      background: rgba(34,212,200,0.06);
+    .expedition-cta-inner:hover {
+      background: linear-gradient(135deg,
+        rgba(110,140,82,0.12) 0%,
+        rgba(110,140,82,0.06) 50%,
+        rgba(110,140,82,0.12) 100%);
+      border-color: var(--green);
     }
 
-    .nav-tab.active::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 20%; right: 20%;
-      height: 2px;
-      background: var(--teal);
-      box-shadow: 0 0 8px var(--teal);
+    .cta-text-area { flex: 1; }
+
+    .cta-sys-label {
+      font-size: 7px;
+      color: var(--green-dim);
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
     }
 
-    .nav-tab-icon { font-size: 18px; margin-bottom: 3px; }
-    .nav-tab-label {
+    .cta-title {
+      font-size: 18px;
+      font-weight: bold;
+      color: var(--text-primary);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    .cta-title span { color: var(--green); }
+
+    .cta-detail {
+      font-size: 10px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .cta-btn {
+      background: var(--green-dim);
+      color: var(--text-primary);
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      border: 1px solid var(--green);
+      border-radius: 2px;
+      padding: 10px 14px;
+      cursor: pointer;
+      flex-shrink: 0;
+      margin-left: 12px;
+      transition: all 0.15s;
+    }
+
+    .cta-btn:hover {
+      background: var(--green);
+      color: var(--bg);
+    }
+
+    /* ─────────────────────────────
+       ACTIVITY FEED (HOME)
+    ───────────────────────────── */
+    .feed-list {
+      padding: 0 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .feed-entry {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      padding: 7px 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .feed-time {
+      font-size: 8px;
+      color: var(--text-dim);
+      flex-shrink: 0;
+      letter-spacing: 0.5px;
+    }
+
+    .feed-text {
+      font-size: 10px;
+      color: var(--text-secondary);
+      letter-spacing: 0.3px;
+      flex: 1;
+    }
+
+    .feed-text strong {
+      color: var(--text-primary);
+      font-weight: bold;
+    }
+
+    /* ─────────────────────────────
+       EXPEDITION PREP SCREEN
+    ───────────────────────────── */
+    .prep-region-list {
+      padding: 0 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .region-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .region-card:hover {
+      border-color: var(--border-light);
+      background: var(--bg-card-hover);
+    }
+
+    .region-card.selected {
+      border-color: var(--ochre-dim);
+    }
+
+    .region-header {
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .region-name {
+      font-size: 11px;
+      color: var(--text-primary);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    .region-rank {
+      font-size: 8px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      border: 1px solid var(--border-light);
+      border-radius: 20px;
+      padding: 2px 8px;
+    }
+
+    .region-body {
+      padding: 8px 12px;
+    }
+
+    .region-desc {
+      font-size: 10px;
+      color: var(--text-secondary);
+      letter-spacing: 0.3px;
+      line-height: 1.5;
+      margin-bottom: 8px;
+    }
+
+    .region-activities {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .activity-tag {
+      font-size: 8px;
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      padding: 2px 6px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .activity-tag.available {
+      color: var(--green);
+      border-color: var(--green-dim);
+    }
+
+    .activity-tag.locked {
+      opacity: 0.4;
+    }
+
+    /* Loadout config */
+    .loadout-panel {
+      margin: 0 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .loadout-header {
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      padding: 7px 12px;
+      font-size: 8px;
+      letter-spacing: 2.5px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+    }
+
+    .loadout-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .loadout-row:last-child { border-bottom: none; }
+
+    .loadout-slot-label {
       font-size: 8px;
       color: var(--text-dim);
       letter-spacing: 1.5px;
       text-transform: uppercase;
+      width: 68px;
+      flex-shrink: 0;
     }
-    .nav-tab.active .nav-tab-label { color: var(--teal); }
+
+    .loadout-slot-item {
+      flex: 1;
+      font-size: 10px;
+      color: var(--text-primary);
+      letter-spacing: 0.5px;
+    }
+
+    .loadout-slot-item.empty {
+      color: var(--text-faint);
+      font-style: italic;
+    }
+
+    .loadout-slot-rarity {
+      font-size: 8px;
+      padding: 1px 6px;
+      border-radius: 2px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .rarity-common  { background: rgba(90,74,56,0.4); color: var(--text-dim); border: 1px solid var(--border); }
+    .rarity-uncommon { background: rgba(78,100,58,0.3); color: var(--green); border: 1px solid var(--green-dim); }
+    .rarity-rare    { background: rgba(100,90,50,0.3); color: var(--ochre); border: 1px solid var(--ochre-dim); }
+
+    .depart-bar {
+      margin: 12px;
+      padding: 12px;
+      background: rgba(110,140,82,0.07);
+      border: 1px solid var(--green-dim);
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .depart-info {
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
+
+    .depart-info strong {
+      color: var(--text-primary);
+      display: block;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+
+    .depart-btn {
+      background: var(--green-dim);
+      color: var(--text-primary);
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      border: 1px solid var(--green);
+      border-radius: 2px;
+      padding: 10px 18px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .depart-btn:hover {
+      background: var(--green);
+      color: var(--bg);
+    }
 
     /* ─────────────────────────────
-       LABEL
+       ACTIVE EXPEDITION SCREEN
     ───────────────────────────── */
-    .concept-label {
-      position: fixed;
-      top: 12px; left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0,0,0,0.9);
-      border: 1px solid var(--teal-dim);
-      color: var(--teal);
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
-      padding: 5px 14px;
-      border-radius: 3px;
-      letter-spacing: 1.5px;
-      z-index: 200;
-      pointer-events: none;
-      text-align: center;
-      box-shadow: 0 0 14px var(--teal-glow);
+    .expedition-status-bar {
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 5;
     }
 
-    /* Spacer after mode row */
+    .status-indicator {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      flex-shrink: 0;
+      animation: breathe 3s ease-in-out infinite;
+    }
+
+    @keyframes breathe {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .status-indicator.danger { background: var(--rust); }
+
+    .status-label {
+      font-size: 9px;
+      color: var(--green);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    .status-label.danger { color: var(--rust); }
+
+    .status-region {
+      margin-left: auto;
+      font-size: 9px;
+      color: var(--text-secondary);
+      letter-spacing: 0.5px;
+    }
+
+    /* Progress track */
+    .progress-track {
+      margin: 12px 12px 4px;
+    }
+
+    .progress-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .progress-label {
+      font-size: 8px;
+      color: var(--text-dim);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .progress-fraction {
+      font-size: 10px;
+      color: var(--text-secondary);
+      letter-spacing: 0.5px;
+    }
+
+    .progress-bar-track {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--green);
+      border-radius: 2px;
+      opacity: 0.75;
+      position: relative;
+      transition: width 1s ease;
+    }
+
+    /* Encounter panel */
+    .encounter-panel {
+      margin: 4px 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .encounter-header {
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      padding: 7px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .encounter-title {
+      font-size: 8px;
+      letter-spacing: 2.5px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+    }
+
+    .encounter-phase {
+      font-size: 8px;
+      color: var(--ochre);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .encounter-body {
+      padding: 10px 12px;
+    }
+
+    .encounter-name {
+      font-size: 13px;
+      font-weight: bold;
+      color: var(--text-primary);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .encounter-desc {
+      font-size: 10px;
+      color: var(--text-secondary);
+      letter-spacing: 0.3px;
+      line-height: 1.5;
+      margin-bottom: 10px;
+    }
+
+    /* Combatant rows */
+    .combatant-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .combatant-name {
+      font-size: 10px;
+      color: var(--text-secondary);
+      letter-spacing: 0.5px;
+      width: 90px;
+      flex-shrink: 0;
+    }
+
+    .combatant-name.player {
+      color: var(--text-primary);
+    }
+
+    .combatant-hp-track {
+      flex: 1;
+      height: 3px;
+      background: var(--border);
+      border-radius: 1px;
+      overflow: hidden;
+    }
+
+    .combatant-hp-fill {
+      height: 100%;
+      border-radius: 1px;
+    }
+
+    .combatant-hp-fill.player { background: var(--green); opacity: 0.8; }
+    .combatant-hp-fill.enemy  { background: var(--rust);  opacity: 0.7; }
+
+    .combatant-hp-text {
+      font-size: 9px;
+      color: var(--text-dim);
+      letter-spacing: 0.5px;
+      width: 50px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* Combat log */
+    .combat-log {
+      margin: 4px 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .combat-log-header {
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      padding: 7px 12px;
+      font-size: 8px;
+      letter-spacing: 2.5px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+    }
+
+    .combat-log-entries {
+      padding: 6px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+
+    .log-line {
+      font-size: 10px;
+      color: var(--text-secondary);
+      letter-spacing: 0.3px;
+      line-height: 1.4;
+    }
+
+    .log-line .log-tick {
+      color: var(--text-dim);
+      font-size: 9px;
+    }
+
+    .log-line .log-hit { color: var(--ochre); }
+    .log-line .log-crit { color: var(--rust); }
+    .log-line .log-reward { color: var(--green); }
+
+    /* Gather panel */
+    .gather-panel {
+      margin: 4px 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .gather-header {
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      padding: 7px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 8px;
+      letter-spacing: 2.5px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+    }
+
+    .gather-rows {
+      padding: 6px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .gather-item-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .gather-item-name {
+      font-size: 10px;
+      color: var(--text-secondary);
+      flex: 1;
+      letter-spacing: 0.5px;
+    }
+
+    .gather-item-count {
+      font-size: 10px;
+      font-weight: bold;
+      color: var(--text-primary);
+      letter-spacing: 0.5px;
+      min-width: 40px;
+      text-align: right;
+    }
+
+    .gather-item-bar-track {
+      width: 60px;
+      height: 2px;
+      background: var(--border);
+      border-radius: 1px;
+      overflow: hidden;
+    }
+
+    .gather-item-bar-fill {
+      height: 100%;
+      background: var(--green);
+      opacity: 0.7;
+    }
+
+    /* ─────────────────────────────
+       INVENTORY / RESOURCES SCREEN
+    ───────────────────────────── */
+    .resource-summary {
+      margin: 0 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .resource-summary-header {
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      padding: 7px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .resource-summary-title {
+      font-size: 8px;
+      letter-spacing: 2.5px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+    }
+
+    .capacity-chip {
+      font-size: 8px;
+      color: var(--ochre);
+      letter-spacing: 1px;
+      border: 1px solid var(--ochre-dim);
+      border-radius: 10px;
+      padding: 1px 7px;
+    }
+
+    .resource-grid-row {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .resource-grid-row:last-child { border-bottom: none; }
+
+    .resource-cell {
+      flex: 1;
+      padding: 8px 10px;
+      border-right: 1px solid var(--border);
+    }
+
+    .resource-cell:last-child { border-right: none; }
+
+    .resource-cell-label {
+      font-size: 7px;
+      color: var(--text-dim);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+
+    .resource-cell-value {
+      font-size: 13px;
+      font-weight: bold;
+      color: var(--text-primary);
+    }
+
+    .resource-cell-value.green { color: var(--green); }
+    .resource-cell-value.ochre { color: var(--ochre); }
+
+    /* Item catalog */
+    .item-category-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      padding: 0 12px;
+      gap: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .item-category-tabs::-webkit-scrollbar { display: none; }
+
+    .item-tab {
+      font-family: 'Courier New', monospace;
+      font-size: 8px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      padding: 8px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+
+    .item-tab:hover { color: var(--text-secondary); }
+
+    .item-tab.active {
+      color: var(--ochre);
+      border-bottom-color: var(--ochre);
+    }
+
+    .item-list {
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .item-row {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      padding: 7px 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .item-row:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-light);
+    }
+
+    .item-icon-box {
+      width: 28px; height: 28px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-light);
+      border-radius: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 9px;
+      color: var(--text-dim);
+      letter-spacing: 0;
+    }
+
+    .item-info { flex: 1; min-width: 0; }
+
+    .item-name {
+      font-size: 11px;
+      color: var(--text-primary);
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+
+    .item-name.common  { }
+    .item-name.uncommon { color: var(--green); }
+    .item-name.rare    { color: var(--ochre); }
+
+    .item-detail {
+      font-size: 9px;
+      color: var(--text-dim);
+      letter-spacing: 0.3px;
+    }
+
+    .item-qty {
+      font-size: 12px;
+      font-weight: bold;
+      color: var(--text-secondary);
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+    }
+
+    /* Equipment slots */
+    .equip-slots {
+      margin: 0 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .equip-slots-header {
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      padding: 7px 12px;
+      font-size: 8px;
+      letter-spacing: 2.5px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+    }
+
+    .equip-slot-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .equip-slot-row:last-child { border-bottom: none; }
+
+    .equip-slot-name {
+      font-size: 8px;
+      color: var(--text-dim);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      width: 68px;
+      flex-shrink: 0;
+    }
+
+    .equip-slot-item {
+      flex: 1;
+      font-size: 10px;
+      color: var(--text-primary);
+      letter-spacing: 0.5px;
+    }
+
+    .equip-slot-item.empty {
+      color: var(--text-faint);
+      font-style: italic;
+    }
+
+    .equip-slot-stats {
+      font-size: 9px;
+      color: var(--text-dim);
+      letter-spacing: 0.3px;
+    }
+
+    /* ─────────────────────────────
+       DIVIDER
+    ───────────────────────────── */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 6px 12px;
+      opacity: 0.5;
+    }
+
+    /* ─────────────────────────────
+       UTIL
+    ───────────────────────────── */
     .spacer { height: 12px; }
+
+    .pill-tag {
+      display: inline-block;
+      font-size: 7px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      border-radius: 10px;
+      padding: 1px 7px;
+      border: 1px solid;
+    }
+
+    .pill-tag.green {
+      color: var(--green);
+      border-color: var(--green-dim);
+    }
+
+    .pill-tag.ochre {
+      color: var(--ochre);
+      border-color: var(--ochre-dim);
+    }
+
   </style>
 </head>
 <body>
 
-<div class="concept-label">CONCEPT-B // DASHBOARD</div>
-<div class="corner-br"></div>
-
 <div class="app-shell">
 
-  <!-- ── HEADER ── -->
-  <div class="header">
+  <!-- ═══════════════════════════
+       HEADER (persistent)
+  ════════════════════════════ -->
+  <header class="header">
     <div class="logo-area">
-      <div class="game-title">IDLE <span>ADV</span></div>
-      <div class="version-tag">v0.4.2 // EARLY ACCESS</div>
+      <div class="game-title">IDLE <span>ADVENTURES</span></div>
+      <div class="game-subtitle">Field Journal — Season III</div>
     </div>
     <div class="header-stats">
       <div class="stat-pill">
-        <div class="stat-label">Adventurer</div>
-        <div class="stat-value player">ALDRIC_W</div>
+        <span class="stat-label">Coin</span>
+        <span class="stat-value gold">4,820</span>
       </div>
       <div class="stat-pill">
-        <div class="stat-label">Gold</div>
-        <div class="stat-value gold">⬡ 2,840</div>
+        <span class="stat-label">Wanderer</span>
+        <span class="stat-value name">Calder</span>
       </div>
     </div>
-  </div>
+  </header>
 
-  <!-- ── STATUS BAR ── -->
-  <div class="status-bar">
-    <div class="status-dot"></div>
-    <div class="status-text">Town · Safe</div>
-    <div class="status-location">📍 Thornvale · The Wanderer's Rest</div>
-  </div>
 
-  <!-- ── CONTENT ── -->
-  <div class="content-area">
+  <!-- ═══════════════════════════
+       SCREEN: HOME / BASE
+  ════════════════════════════ -->
+  <div class="screen active" id="screen-home">
+    <div class="content-area">
 
-    <!-- Expedition CTA -->
-    <div class="expedition-cta">
-      <div class="expedition-cta-inner">
-        <div class="cta-text-area">
-          <div class="cta-sys-label">// ready to deploy</div>
-          <div class="cta-title">BEGIN <span>EXPEDITION</span></div>
-          <div class="cta-detail">Select map · Pack loadout · Choose mode</div>
+      <!-- Expedition CTA -->
+      <div class="expedition-cta">
+        <div class="expedition-cta-inner" onclick="switchScreen('prep')">
+          <div class="cta-text-area">
+            <div class="cta-sys-label">Next Departure</div>
+            <div class="cta-title">SET <span>OUT</span></div>
+            <div class="cta-detail">Choose a region and configure your loadout</div>
+          </div>
+          <button class="cta-btn">Depart</button>
         </div>
-        <button class="cta-btn">DEPART →</button>
       </div>
+
+      <!-- Condition -->
+      <div class="section-heading">
+        <span class="section-heading-text">Condition</span>
+        <div class="section-heading-line"></div>
+      </div>
+
+      <div class="condition-panel">
+        <div class="condition-row">
+          <div class="condition-stat">
+            <div class="condition-label">Stamina</div>
+            <div class="condition-value green">87 / 100</div>
+            <div class="cond-bar-wrap">
+              <div class="cond-bar-fill" style="width:87%; --fill-color: var(--green);"></div>
+            </div>
+          </div>
+          <div class="condition-stat">
+            <div class="condition-label">Morale</div>
+            <div class="condition-value ochre">64 / 100</div>
+            <div class="cond-bar-wrap">
+              <div class="cond-bar-fill" style="width:64%; --fill-color: var(--ochre);"></div>
+            </div>
+          </div>
+          <div class="condition-stat">
+            <div class="condition-label">Rations</div>
+            <div class="condition-value rust">12</div>
+            <div class="cond-bar-wrap">
+              <div class="cond-bar-fill" style="width:24%; --fill-color: var(--rust);"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Skills -->
+      <div class="section-heading">
+        <span class="section-heading-text">Skills</span>
+        <div class="section-heading-line"></div>
+      </div>
+
+      <div class="skills-list">
+
+        <div class="skill-card" style="--accent-color: var(--skill-1);">
+          <div class="skill-sigil">Ws</div>
+          <div class="skill-data">
+            <div class="skill-name-row">
+              <span class="skill-name">Woodscraft</span>
+              <span class="skill-xp-fraction">1,840 / 2,300 xp</span>
+            </div>
+            <div class="skill-bar-track">
+              <div class="skill-bar-fill" style="width: 80%;"></div>
+            </div>
+          </div>
+          <div class="skill-level-box">14</div>
+        </div>
+
+        <div class="skill-card" style="--accent-color: var(--skill-4);">
+          <div class="skill-sigil">Mn</div>
+          <div class="skill-data">
+            <div class="skill-name-row">
+              <span class="skill-name">Mining</span>
+              <span class="skill-xp-fraction">340 / 800 xp</span>
+            </div>
+            <div class="skill-bar-track">
+              <div class="skill-bar-fill" style="width: 43%;"></div>
+            </div>
+          </div>
+          <div class="skill-level-box">7</div>
+        </div>
+
+        <div class="skill-card" style="--accent-color: var(--skill-3);">
+          <div class="skill-sigil">Ht</div>
+          <div class="skill-data">
+            <div class="skill-name-row">
+              <span class="skill-name">Hunting</span>
+              <span class="skill-xp-fraction">620 / 1,050 xp</span>
+            </div>
+            <div class="skill-bar-track">
+              <div class="skill-bar-fill" style="width: 59%;"></div>
+            </div>
+          </div>
+          <div class="skill-level-box">10</div>
+        </div>
+
+        <div class="skill-card" style="--accent-color: var(--skill-5);">
+          <div class="skill-sigil">Cm</div>
+          <div class="skill-data">
+            <div class="skill-name-row">
+              <span class="skill-name">Combat</span>
+              <span class="skill-xp-fraction">910 / 1,200 xp</span>
+            </div>
+            <div class="skill-bar-track">
+              <div class="skill-bar-fill" style="width: 76%;"></div>
+            </div>
+          </div>
+          <div class="skill-level-box">12</div>
+        </div>
+
+        <div class="skill-card" style="--accent-color: var(--skill-2);">
+          <div class="skill-sigil">Hb</div>
+          <div class="skill-data">
+            <div class="skill-name-row">
+              <span class="skill-name">Herbalism</span>
+              <span class="skill-xp-fraction">190 / 450 xp</span>
+            </div>
+            <div class="skill-bar-track">
+              <div class="skill-bar-fill" style="width: 42%;"></div>
+            </div>
+          </div>
+          <div class="skill-level-box">5</div>
+        </div>
+
+        <div class="skill-card" style="--accent-color: var(--skill-9);">
+          <div class="skill-sigil">Cp</div>
+          <div class="skill-data">
+            <div class="skill-name-row">
+              <span class="skill-name">Crafting</span>
+              <span class="skill-xp-fraction">2,100 / 2,100 xp</span>
+            </div>
+            <div class="skill-bar-track">
+              <div class="skill-bar-fill" style="width: 100%;"></div>
+            </div>
+          </div>
+          <div class="skill-level-box">16</div>
+        </div>
+
+      </div>
+
+      <!-- Activity feed -->
+      <div class="section-heading">
+        <span class="section-heading-text">Recent</span>
+        <div class="section-heading-line"></div>
+      </div>
+
+      <div class="feed-list">
+        <div class="feed-entry">
+          <span class="feed-time">2h ago</span>
+          <span class="feed-text">Returned from the <strong>Brackwater Fen</strong> — 3 encounters survived</span>
+        </div>
+        <div class="feed-entry">
+          <span class="feed-time">2h ago</span>
+          <span class="feed-text">Collected <strong>Iron Ore x4</strong>, <strong>Peat x12</strong></span>
+        </div>
+        <div class="feed-entry">
+          <span class="feed-time">5h ago</span>
+          <span class="feed-text">Crafting reached <strong>Level 16</strong></span>
+        </div>
+        <div class="feed-entry">
+          <span class="feed-time">7h ago</span>
+          <span class="feed-text">Equipped <strong>Worn Bearskin Cloak</strong></span>
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+    </div>
+  </div><!-- /screen-home -->
+
+
+  <!-- ═══════════════════════════
+       SCREEN: EXPEDITION PREP
+  ════════════════════════════ -->
+  <div class="screen" id="screen-prep">
+    <div class="content-area">
+
+      <!-- Region select -->
+      <div class="section-heading">
+        <span class="section-heading-text">Choose Region</span>
+        <div class="section-heading-line"></div>
+      </div>
+
+      <div class="prep-region-list">
+
+        <div class="region-card selected">
+          <div class="region-header">
+            <span class="region-name">Brackwater Fen</span>
+            <span class="region-rank">Rank 8 — 14 req.</span>
+          </div>
+          <div class="region-body">
+            <div class="region-desc">
+              A sodden lowland of dark peat and twisted willows. Difficult ground but rich with iron deposits and marsh herbs.
+            </div>
+            <div class="region-activities">
+              <span class="activity-tag available">Mining</span>
+              <span class="activity-tag available">Herbalism</span>
+              <span class="activity-tag available">Combat</span>
+              <span class="activity-tag locked">Woodscraft</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="region-card">
+          <div class="region-header">
+            <span class="region-name">Ashwood Ridge</span>
+            <span class="region-rank">Rank 12 — 18 req.</span>
+          </div>
+          <div class="region-body">
+            <div class="region-desc">
+              Elevated hardwood forest, scorched at the summit by an old fire. Sparse but rewarding for skilled woodsmen.
+            </div>
+            <div class="region-activities">
+              <span class="activity-tag available">Woodscraft</span>
+              <span class="activity-tag available">Hunting</span>
+              <span class="activity-tag locked">Mining</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="region-card">
+          <div class="region-header">
+            <span class="region-name">Saltmere Flats</span>
+            <span class="region-rank">Rank 5 — 10 req.</span>
+          </div>
+          <div class="region-body">
+            <div class="region-desc">
+              Open coastal plain, easy ground but contested. Good for beginners seeking salt, fish, and low-threat beasts.
+            </div>
+            <div class="region-activities">
+              <span class="activity-tag available">Hunting</span>
+              <span class="activity-tag available">Herbalism</span>
+              <span class="activity-tag available">Combat</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Loadout -->
+      <div class="section-heading">
+        <span class="section-heading-text">Loadout</span>
+        <div class="section-heading-line"></div>
+      </div>
+
+      <div class="loadout-panel">
+        <div class="loadout-header">Equipment</div>
+        <div class="loadout-row">
+          <span class="loadout-slot-label">Weapon</span>
+          <span class="loadout-slot-item">Notched Iron Hatchet</span>
+          <span class="loadout-slot-rarity rarity-common">Common</span>
+        </div>
+        <div class="loadout-row">
+          <span class="loadout-slot-label">Armour</span>
+          <span class="loadout-slot-item">Worn Bearskin Cloak</span>
+          <span class="loadout-slot-rarity rarity-uncommon">Uncommon</span>
+        </div>
+        <div class="loadout-row">
+          <span class="loadout-slot-label">Tool</span>
+          <span class="loadout-slot-item">Iron Pickaxe</span>
+          <span class="loadout-slot-rarity rarity-common">Common</span>
+        </div>
+        <div class="loadout-row">
+          <span class="loadout-slot-label">Trinket</span>
+          <span class="loadout-slot-item empty">— empty —</span>
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="loadout-panel" style="margin: 0 12px;">
+        <div class="loadout-header">Provisions</div>
+        <div class="loadout-row">
+          <span class="loadout-slot-label">Rations</span>
+          <span class="loadout-slot-item">Dried Meat</span>
+          <span class="loadout-slot-rarity rarity-common">x 18</span>
+        </div>
+        <div class="loadout-row">
+          <span class="loadout-slot-label">Remedy</span>
+          <span class="loadout-slot-item">Marsh Root Poultice</span>
+          <span class="loadout-slot-rarity rarity-uncommon">x 3</span>
+        </div>
+      </div>
+
+      <!-- Depart -->
+      <div class="depart-bar">
+        <div class="depart-info">
+          <strong>Brackwater Fen</strong>
+          Est. 4h — Mining + Combat
+        </div>
+        <button class="depart-btn" onclick="switchScreen('active')">Depart</button>
+      </div>
+
+      <div class="spacer"></div>
+    </div>
+  </div><!-- /screen-prep -->
+
+
+  <!-- ═══════════════════════════
+       SCREEN: ACTIVE EXPEDITION
+  ════════════════════════════ -->
+  <div class="screen" id="screen-active">
+
+    <!-- Expedition status bar -->
+    <div class="expedition-status-bar">
+      <div class="status-indicator danger"></div>
+      <span class="status-label danger">Combat</span>
+      <span class="status-region">Brackwater Fen — Depth 3</span>
     </div>
 
-    <!-- Mode row -->
-    <div class="mode-row">
-      <div class="mode-btn active">
-        <div class="mode-btn-label">Mode</div>
-        <div class="mode-btn-value">⚡ ACTIVE</div>
+    <div class="content-area">
+
+      <!-- Expedition progress -->
+      <div class="progress-track">
+        <div class="progress-header">
+          <span class="progress-label">Expedition Progress</span>
+          <span class="progress-fraction">Depth 3 / 5</span>
+        </div>
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" style="width: 60%;"></div>
+        </div>
       </div>
-      <div class="mode-btn">
-        <div class="mode-btn-label">Yield</div>
-        <div class="mode-btn-value">85–100%</div>
+
+      <!-- Current encounter -->
+      <div class="encounter-panel">
+        <div class="encounter-header">
+          <span class="encounter-title">Encounter</span>
+          <span class="encounter-phase">Round 4</span>
+        </div>
+        <div class="encounter-body">
+          <div class="encounter-name">Fen Lurker</div>
+          <div class="encounter-desc">
+            A hulking creature of mud and sinew, half-submerged. It lashes out with barbed forelimbs.
+          </div>
+
+          <div class="combatant-row">
+            <span class="combatant-name player">Calder</span>
+            <div class="combatant-hp-track">
+              <div class="combatant-hp-fill player" style="width: 72%;"></div>
+            </div>
+            <span class="combatant-hp-text">72 / 100</span>
+          </div>
+          <div class="combatant-row">
+            <span class="combatant-name">Fen Lurker</span>
+            <div class="combatant-hp-track">
+              <div class="combatant-hp-fill enemy" style="width: 31%;"></div>
+            </div>
+            <span class="combatant-hp-text">38 / 120</span>
+          </div>
+        </div>
       </div>
-      <div class="mode-btn">
-        <div class="mode-btn-label">Auto Yield</div>
-        <div class="mode-btn-value" style="color: #4a4a60">70%</div>
+
+      <!-- Combat log -->
+      <div class="combat-log">
+        <div class="combat-log-header">Log</div>
+        <div class="combat-log-entries">
+          <div class="log-line">
+            <span class="log-tick">[t.41]</span> Calder strikes for <span class="log-hit">14 dmg</span>
+          </div>
+          <div class="log-line">
+            <span class="log-tick">[t.40]</span> Lurker rakes for <span class="log-crit">22 dmg</span> (critical)
+          </div>
+          <div class="log-line">
+            <span class="log-tick">[t.39]</span> Calder strikes for <span class="log-hit">11 dmg</span>
+          </div>
+          <div class="log-line">
+            <span class="log-tick">[t.38]</span> Lurker misses
+          </div>
+          <div class="log-line">
+            <span class="log-tick">[t.37]</span> Calder strikes for <span class="log-hit">9 dmg</span>
+          </div>
+          <div class="log-line">
+            <span class="log-tick">[t.36]</span> Lurker rakes for <span class="log-hit">7 dmg</span>
+          </div>
+          <div class="log-line">
+            <span class="log-tick">[t.35]</span> Depth 3 reached — <span class="log-reward">Iron Ore x2 found</span>
+          </div>
+        </div>
       </div>
+
+      <!-- Gathering this run -->
+      <div class="gather-panel">
+        <div class="gather-header">
+          <span>Gathered This Run</span>
+          <span class="pill-tag green">In Progress</span>
+        </div>
+        <div class="gather-rows">
+          <div class="gather-item-row">
+            <span class="gather-item-name">Iron Ore</span>
+            <div class="gather-item-bar-track">
+              <div class="gather-item-bar-fill" style="width: 40%;"></div>
+            </div>
+            <span class="gather-item-count">x 2</span>
+          </div>
+          <div class="gather-item-row">
+            <span class="gather-item-name">Peat</span>
+            <div class="gather-item-bar-track">
+              <div class="gather-item-bar-fill" style="width: 75%;"></div>
+            </div>
+            <span class="gather-item-count">x 9</span>
+          </div>
+          <div class="gather-item-row">
+            <span class="gather-item-name">Marsh Root</span>
+            <div class="gather-item-bar-track">
+              <div class="gather-item-bar-fill" style="width: 20%;"></div>
+            </div>
+            <span class="gather-item-count">x 1</span>
+          </div>
+          <div class="gather-item-row">
+            <span class="gather-item-name">Combat XP</span>
+            <div class="gather-item-bar-track">
+              <div class="gather-item-bar-fill" style="width: 55%;"></div>
+            </div>
+            <span class="gather-item-count">+210</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="spacer"></div>
     </div>
+  </div><!-- /screen-active -->
 
-    <!-- SKILLS -->
-    <div class="section-heading">
-      <div class="section-heading-text">Skills</div>
-      <div class="section-heading-line"></div>
+
+  <!-- ═══════════════════════════
+       SCREEN: INVENTORY
+  ════════════════════════════ -->
+  <div class="screen" id="screen-inv">
+    <div class="content-area">
+
+      <!-- Resource summary -->
+      <div class="section-heading">
+        <span class="section-heading-text">Resources</span>
+        <div class="section-heading-line"></div>
+      </div>
+
+      <div class="resource-summary">
+        <div class="resource-summary-header">
+          <span class="resource-summary-title">Stockpile</span>
+          <span class="capacity-chip">74 / 200 slots</span>
+        </div>
+        <div class="resource-grid-row">
+          <div class="resource-cell">
+            <div class="resource-cell-label">Iron Ore</div>
+            <div class="resource-cell-value green">28</div>
+          </div>
+          <div class="resource-cell">
+            <div class="resource-cell-label">Peat</div>
+            <div class="resource-cell-value">44</div>
+          </div>
+          <div class="resource-cell">
+            <div class="resource-cell-label">Timber</div>
+            <div class="resource-cell-value">12</div>
+          </div>
+        </div>
+        <div class="resource-grid-row">
+          <div class="resource-cell">
+            <div class="resource-cell-label">Marsh Root</div>
+            <div class="resource-cell-value">7</div>
+          </div>
+          <div class="resource-cell">
+            <div class="resource-cell-label">Dried Meat</div>
+            <div class="resource-cell-value">18</div>
+          </div>
+          <div class="resource-cell">
+            <div class="resource-cell-label">Coin</div>
+            <div class="resource-cell-value ochre">4,820</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Equipment slots -->
+      <div class="section-heading">
+        <span class="section-heading-text">Equipped</span>
+        <div class="section-heading-line"></div>
+      </div>
+
+      <div class="equip-slots">
+        <div class="equip-slot-row">
+          <span class="equip-slot-name">Weapon</span>
+          <span class="equip-slot-item">Notched Iron Hatchet</span>
+          <span class="equip-slot-stats">+8 atk</span>
+        </div>
+        <div class="equip-slot-row">
+          <span class="equip-slot-name">Armour</span>
+          <span class="equip-slot-item">Worn Bearskin Cloak</span>
+          <span class="equip-slot-stats">+5 def</span>
+        </div>
+        <div class="equip-slot-row">
+          <span class="equip-slot-name">Tool</span>
+          <span class="equip-slot-item">Iron Pickaxe</span>
+          <span class="equip-slot-stats">+12 mine</span>
+        </div>
+        <div class="equip-slot-row">
+          <span class="equip-slot-name">Trinket</span>
+          <span class="equip-slot-item empty">— none —</span>
+          <span class="equip-slot-stats"></span>
+        </div>
+      </div>
+
+      <!-- Item catalog -->
+      <div class="section-heading">
+        <span class="section-heading-text">Items</span>
+        <div class="section-heading-line"></div>
+      </div>
+
+      <div class="item-category-tabs">
+        <button class="item-tab active">All</button>
+        <button class="item-tab">Weapons</button>
+        <button class="item-tab">Armour</button>
+        <button class="item-tab">Tools</button>
+        <button class="item-tab">Consumable</button>
+        <button class="item-tab">Material</button>
+      </div>
+
+      <div class="item-list">
+
+        <div class="item-row">
+          <div class="item-icon-box">Hx</div>
+          <div class="item-info">
+            <div class="item-name">Notched Iron Hatchet</div>
+            <div class="item-detail">Weapon — +8 atk — Equipped</div>
+          </div>
+          <span class="item-qty">x1</span>
+        </div>
+
+        <div class="item-row">
+          <div class="item-icon-box">Cl</div>
+          <div class="item-info">
+            <div class="item-name uncommon">Worn Bearskin Cloak</div>
+            <div class="item-detail">Armour — +5 def — Equipped</div>
+          </div>
+          <span class="item-qty">x1</span>
+        </div>
+
+        <div class="item-row">
+          <div class="item-icon-box">Pk</div>
+          <div class="item-info">
+            <div class="item-name">Iron Pickaxe</div>
+            <div class="item-detail">Tool — +12 mining — Equipped</div>
+          </div>
+          <span class="item-qty">x1</span>
+        </div>
+
+        <div class="item-row">
+          <div class="item-icon-box">Pt</div>
+          <div class="item-info">
+            <div class="item-name rare">Brackwater Totem</div>
+            <div class="item-detail">Trinket — +4% marsh XP</div>
+          </div>
+          <span class="item-qty">x1</span>
+        </div>
+
+        <div class="item-row">
+          <div class="item-icon-box">Rs</div>
+          <div class="item-info">
+            <div class="item-name">Marsh Root Poultice</div>
+            <div class="item-detail">Consumable — Restores 30 stamina</div>
+          </div>
+          <span class="item-qty">x3</span>
+        </div>
+
+        <div class="item-row">
+          <div class="item-icon-box">Dm</div>
+          <div class="item-info">
+            <div class="item-name">Dried Meat</div>
+            <div class="item-detail">Provision — Restores 20 morale</div>
+          </div>
+          <span class="item-qty">x18</span>
+        </div>
+
+        <div class="item-row">
+          <div class="item-icon-box">Fe</div>
+          <div class="item-info">
+            <div class="item-name">Iron Ore</div>
+            <div class="item-detail">Material — Crafting component</div>
+          </div>
+          <span class="item-qty">x28</span>
+        </div>
+
+      </div>
+
+      <div class="spacer"></div>
     </div>
+  </div><!-- /screen-inv -->
 
-    <div class="skills-list">
 
-      <div class="skill-card" style="--accent-color: var(--skill-1)">
-        <div class="skill-icon-box">⛏</div>
-        <div class="skill-data">
-          <div class="skill-name-row">
-            <div class="skill-name">Mining</div>
-            <div class="skill-xp-fraction">14,320 / 19,850</div>
-          </div>
-          <div class="skill-bar-track">
-            <div class="skill-bar-fill" style="width:72%; --accent-color:var(--skill-1)"></div>
-          </div>
-        </div>
-        <div class="skill-level-box" style="--accent-color: var(--skill-1)">24</div>
-      </div>
+  <!-- ═══════════════════════════
+       NAV BAR (persistent)
+  ════════════════════════════ -->
+  <nav class="nav-bar">
+    <button class="nav-btn active" id="nav-home" onclick="switchScreen('home')">
+      <span class="nav-btn-icon">[ ]</span>
+      <span>Base</span>
+    </button>
+    <button class="nav-btn" id="nav-prep" onclick="switchScreen('prep')">
+      <span class="nav-btn-icon">[ ]</span>
+      <span>Depart</span>
+    </button>
+    <button class="nav-btn" id="nav-active" onclick="switchScreen('active')">
+      <span class="nav-btn-icon">[ ]</span>
+      <span>Field</span>
+    </button>
+    <button class="nav-btn" id="nav-inv" onclick="switchScreen('inv')">
+      <span class="nav-btn-icon">[ ]</span>
+      <span>Pack</span>
+    </button>
+  </nav>
 
-      <div class="skill-card" style="--accent-color: var(--skill-3)">
-        <div class="skill-icon-box">🌿</div>
-        <div class="skill-data">
-          <div class="skill-name-row">
-            <div class="skill-name">Herbalism</div>
-            <div class="skill-xp-fraction">5,400 / 12,100</div>
-          </div>
-          <div class="skill-bar-track">
-            <div class="skill-bar-fill" style="width:45%; --accent-color:var(--skill-3)"></div>
-          </div>
-        </div>
-        <div class="skill-level-box" style="--accent-color: var(--skill-3)">18</div>
-      </div>
+</div>
 
-      <div class="skill-card" style="--accent-color: var(--skill-6)">
-        <div class="skill-icon-box">🐟</div>
-        <div class="skill-data">
-          <div class="skill-name-row">
-            <div class="skill-name">Fishing</div>
-            <div class="skill-xp-fraction">9,200 / 10,450</div>
-          </div>
-          <div class="skill-bar-track">
-            <div class="skill-bar-fill" style="width:88%; --accent-color:var(--skill-6)"></div>
-          </div>
-        </div>
-        <div class="skill-level-box" style="--accent-color: var(--skill-6)">22</div>
-      </div>
+<script>
+  function switchScreen(name) {
+    // Hide all screens
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
 
-      <div class="skill-card" style="--accent-color: var(--skill-4)">
-        <div class="skill-icon-box">🪓</div>
-        <div class="skill-data">
-          <div class="skill-name-row">
-            <div class="skill-name">Woodcutting</div>
-            <div class="skill-xp-fraction">2,800 / 9,300</div>
-          </div>
-          <div class="skill-bar-track">
-            <div class="skill-bar-fill" style="width:30%; --accent-color:var(--skill-4)"></div>
-          </div>
-        </div>
-        <div class="skill-level-box" style="--accent-color: var(--skill-4)">15</div>
-      </div>
+    // Show target screen
+    const screen = document.getElementById('screen-' + name);
+    if (screen) screen.classList.add('active');
 
-      <div class="skill-card" style="--accent-color: var(--skill-5)">
-        <div class="skill-icon-box">⚔️</div>
-        <div class="skill-data">
-          <div class="skill-name-row">
-            <div class="skill-name">Melee</div>
-            <div class="skill-xp-fraction">6,600 / 12,000</div>
-          </div>
-          <div class="skill-bar-track">
-            <div class="skill-bar-fill" style="width:55%; --accent-color:var(--skill-5)"></div>
-          </div>
-        </div>
-        <div class="skill-level-box" style="--accent-color: var(--skill-5)">19</div>
-      </div>
-
-      <div class="skill-card" style="--accent-color: var(--skill-2)">
-        <div class="skill-icon-box">🏹</div>
-        <div class="skill-data">
-          <div class="skill-name-row">
-            <div class="skill-name">Ranged</div>
-            <div class="skill-xp-fraction">900 / 4,600</div>
-          </div>
-          <div class="skill-bar-track">
-            <div class="skill-bar-fill" style="width:20%; --accent-color:var(--skill-2)"></div>
-          </div>
-        </div>
-        <div class="skill-level-box" style="--accent-color: var(--skill-2)">11</div>
-      </div>
-
-      <div class="skill-card" style="--accent-color: var(--skill-7)">
-        <div class="skill-icon-box">🔨</div>
-        <div class="skill-data">
-          <div class="skill-name-row">
-            <div class="skill-name">Smithing</div>
-            <div class="skill-xp-fraction">8,100 / 13,000</div>
-          </div>
-          <div class="skill-bar-track">
-            <div class="skill-bar-fill" style="width:62%; --accent-color:var(--skill-7)"></div>
-          </div>
-        </div>
-        <div class="skill-level-box" style="--accent-color: var(--skill-7)">21</div>
-      </div>
-
-      <div class="skill-card" style="--accent-color: var(--skill-8)">
-        <div class="skill-icon-box">🍲</div>
-        <div class="skill-data">
-          <div class="skill-name-row">
-            <div class="skill-name">Cooking</div>
-            <div class="skill-xp-fraction">4,200 / 10,500</div>
-          </div>
-          <div class="skill-bar-track">
-            <div class="skill-bar-fill" style="width:40%; --accent-color:var(--skill-8)"></div>
-          </div>
-        </div>
-        <div class="skill-level-box" style="--accent-color: var(--skill-8)">17</div>
-      </div>
-
-      <div class="skill-card" style="--accent-color: var(--skill-9)">
-        <div class="skill-icon-box">🧭</div>
-        <div class="skill-data">
-          <div class="skill-name-row">
-            <div class="skill-name">Cartography</div>
-            <div class="skill-xp-fraction">480 / 4,800</div>
-          </div>
-          <div class="skill-bar-track">
-            <div class="skill-bar-fill" style="width:10%; --accent-color:var(--skill-9)"></div>
-          </div>
-        </div>
-        <div class="skill-level-box" style="--accent-color: var(--skill-9)">8</div>
-      </div>
-
-    </div>
-
-    <!-- BANK -->
-    <div class="section-heading">
-      <div class="section-heading-text">Bank</div>
-      <div class="section-heading-line"></div>
-    </div>
-
-    <div class="bank-panel">
-      <div class="bank-panel-header">
-        <div class="bank-panel-title">// Stash · Thornvale Branch</div>
-        <div class="bank-capacity-chip">24 / 120</div>
-      </div>
-
-      <div class="bank-summary-row">
-        <div class="bank-stat">
-          <div class="bank-stat-label">Ores</div>
-          <div class="bank-stat-value teal">62</div>
-        </div>
-        <div class="bank-stat">
-          <div class="bank-stat-label">Herbs</div>
-          <div class="bank-stat-value" style="color: #34d399">52</div>
-        </div>
-        <div class="bank-stat">
-          <div class="bank-stat-label">Fish</div>
-          <div class="bank-stat-value" style="color: #60a5fa">19</div>
-        </div>
-        <div class="bank-stat">
-          <div class="bank-stat-label">Gold</div>
-          <div class="bank-stat-value amber">2,840</div>
-        </div>
-      </div>
-
-      <div class="inv-grid">
-        <!-- Row 1 -->
-        <div class="inv-cell" title="Iron Ore ×48">🪨<div class="inv-qty">48</div><div class="inv-cell-glow" style="--cell-glow:rgba(34,212,200,0.1)"></div></div>
-        <div class="inv-cell" title="Iron Pickaxe">⛏<div class="inv-qty">1</div><div class="inv-cell-glow" style="--cell-glow:rgba(34,212,200,0.1)"></div></div>
-        <div class="inv-cell" title="Curaweed ×32">🌿<div class="inv-qty">32</div><div class="inv-cell-glow" style="--cell-glow:rgba(52,211,153,0.1)"></div></div>
-        <div class="inv-cell" title="Sardines ×19">🐟<div class="inv-qty">19</div><div class="inv-cell-glow" style="--cell-glow:rgba(96,165,250,0.1)"></div></div>
-        <div class="inv-cell" title="Quartz ×5">💎<div class="inv-qty">5</div><div class="inv-cell-glow" style="--cell-glow:rgba(168,139,250,0.1)"></div></div>
-        <div class="inv-cell" title="Bread ×12">🍞<div class="inv-qty">12</div><div class="inv-cell-glow" style="--cell-glow:rgba(251,191,36,0.1)"></div></div>
-        <!-- Row 2 -->
-        <div class="inv-cell" title="Health Potions ×3">⚗️<div class="inv-qty">3</div><div class="inv-cell-glow"></div></div>
-        <div class="inv-cell" title="Oak Logs ×27">🪵<div class="inv-qty">27</div><div class="inv-cell-glow"></div></div>
-        <div class="inv-cell" title="Cooked Meat ×8">🥩<div class="inv-qty">8</div><div class="inv-cell-glow"></div></div>
-        <div class="inv-cell" title="Copper Ore ×14">🪨<div class="inv-qty">14</div><div class="inv-cell-glow"></div></div>
-        <div class="inv-cell" title="Iron Bar ×6">🧱<div class="inv-qty">6</div><div class="inv-cell-glow"></div></div>
-        <div class="inv-cell" title="Vitalroot ×20">🌱<div class="inv-qty">20</div><div class="inv-cell-glow"></div></div>
-        <!-- Empty row -->
-        <div class="inv-cell empty"></div>
-        <div class="inv-cell empty"></div>
-        <div class="inv-cell empty"></div>
-        <div class="inv-cell empty"></div>
-        <div class="inv-cell empty"></div>
-        <div class="inv-cell empty"></div>
-      </div>
-    </div>
-
-    <div class="spacer"></div>
-
-  </div><!-- /content-area -->
-
-  <!-- ── BOTTOM NAV ── -->
-  <div class="bottom-nav">
-    <div class="nav-tab active">
-      <div class="nav-tab-icon">🏦</div>
-      <div class="nav-tab-label">Bank</div>
-    </div>
-    <div class="nav-tab">
-      <div class="nav-tab-icon">📈</div>
-      <div class="nav-tab-label">Skills</div>
-    </div>
-    <div class="nav-tab">
-      <div class="nav-tab-icon">🔨</div>
-      <div class="nav-tab-label">Smithy</div>
-    </div>
-    <div class="nav-tab">
-      <div class="nav-tab-icon">🍲</div>
-      <div class="nav-tab-label">Kitchen</div>
-    </div>
-    <div class="nav-tab">
-      <div class="nav-tab-icon">🗺</div>
-      <div class="nav-tab-label">Expedition</div>
-    </div>
-  </div>
-
-</div><!-- /app-shell -->
+    const nav = document.getElementById('nav-' + name);
+    if (nav) nav.classList.add('active');
+  }
+</script>
 
 </body>
 </html>
