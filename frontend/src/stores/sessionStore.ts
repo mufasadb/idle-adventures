@@ -1,6 +1,7 @@
 import { makeAutoObservable } from 'mobx';
 import { ITEMS } from '../data/items';
 import { PLAYER_COMBAT } from '../data/combat';
+import { DEV_MAP } from '../data/devMap';
 import type {
   GameScreen,
   ExpeditionMode,
@@ -12,7 +13,6 @@ import type {
   MapNode,
   Coord,
 } from '../types';
-import { legacyTypeToNode } from '../engine/nodes';
 import { playerStore } from './playerStore';
 
 // Re-export types for backwards compatibility
@@ -70,47 +70,8 @@ class SessionStore {
   }
 
   private initializeTestData() {
-    // Generate a sample map for testing
-    this.availableMaps = [this.generateSampleMap()];
-    this.selectedMapId = 'iron-ridge';
-  }
-
-  private generateSampleMap(): ExpeditionMap {
-    const width = 10;
-    const height = 10;
-    const nodes: MapNode[] = [];
-
-    const layout = [
-      ['player', 'fishing', 'empty', 'mountain', 'mountain', 'empty', 'empty', 'empty', 'empty', 'empty'],
-      ['fishing', 'mining', 'empty', 'mountain', 'empty', 'mining', 'empty', 'herbs', 'empty', 'empty'],
-      ['mining', 'empty', 'fishing', 'empty', 'gems', 'empty', 'combat', 'empty', 'empty', 'empty'],
-      ['empty', 'herbs', 'mountain', 'mountain', 'empty', 'herbs', 'empty', 'mining', 'empty', 'empty'],
-      ['empty', 'combat', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'mining', 'empty'],
-      ['empty', 'empty', 'mining', 'empty', 'empty', 'mountain', 'empty', 'empty', 'empty', 'herbs'],
-      ['herbs', 'empty', 'empty', 'empty', 'mining', 'empty', 'empty', 'combat', 'empty', 'empty'],
-      ['empty', 'empty', 'mountain', 'mountain', 'empty', 'empty', 'empty', 'empty', 'gems', 'empty'],
-      ['mining', 'empty', 'empty', 'empty', 'herbs', 'empty', 'empty', 'empty', 'empty', 'empty'],
-      ['empty', 'empty', 'empty', 'empty', 'empty', 'mining', 'empty', 'herbs', 'empty', 'empty'],
-    ];
-
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const type = layout[y][x];
-        nodes.push(legacyTypeToNode(type, x, y));
-      }
-    }
-
-    return {
-      id: 'iron-ridge',
-      name: 'Iron Ridge',
-      tier: 3,
-      travelDays: 2,
-      terrain: 'Mountain',
-      danger: 'medium',
-      nodes,
-      width,
-      height,
-    };
+    this.availableMaps = [DEV_MAP];
+    this.selectedMapId = DEV_MAP.id;
   }
 
   // === Computed Properties ===
