@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Idle Adventures — Thornvale (Concept A: Tavern)</title>
+  <style>
+    /* =============================================
+       THORNVALE TAVERN — Warm Fantasy RPG Aesthetic
+       ============================================= */
+    :root {
+      --parchment:        #f2dfa4;
+      --parchment-dark:   #d9c17c;
+      --parchment-aged:   #c9a84c;
+      --parchment-shadow: rgba(80, 40, 10, 0.25);
+      --wood-dark:        #1e0c02;
+      --wood-mid:         #4a2008;
+      --wood-grain:       #6b3a1a;
+      --wood-light:       #9c6030;
+      --wood-highlight:   #bf8040;
+      --leather:          #7a3e22;
+      --leather-light:    #a05030;
+      --amber:            #e8910c;
+      --amber-glow:       #ffc040;
+      --gold:             #c8902a;
+      --gold-light:       #f0c050;
+      --ink:              #1a0b03;
+      --ink-faded:        #4a2a10;
+      --ink-very-faded:   #8b6040;
+      --red-wax:          #aa2010;
+      --green-herb:       #4a8a30;
+      --blue-water:       #205880;
+      --ore-copper:       #a0500a;
+      --ore-iron:         #707080;
+      --skill-bg:         rgba(200, 160, 80, 0.15);
+      --tab-active-bg:    #8b5e30;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--wood-dark);
+      font-family: Georgia, 'Times New Roman', serif;
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 0;
+      overflow-x: hidden;
+    }
+
+    /* ── Parchment texture via layered gradients ── */
+    .parchment-texture {
+      background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"),
+        radial-gradient(ellipse at 20% 20%, rgba(255,220,120,0.3) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 80%, rgba(180,130,60,0.2) 0%, transparent 50%),
+        linear-gradient(160deg, #f5e8b8 0%, #ead898 30%, #f0dfa8 60%, #e8d090 100%);
+    }
+
+    /* ─────────────────────────────
+       APP SHELL
+    ───────────────────────────── */
+    .app-shell {
+      width: 100%;
+      max-width: 430px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: var(--wood-dark);
+      position: relative;
+      box-shadow: 0 0 80px rgba(0,0,0,0.8);
+    }
+
+    /* ── Wooden frame inset ── */
+    .app-shell::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      box-shadow:
+        inset 0 0 0 6px var(--wood-mid),
+        inset 0 0 0 8px var(--wood-grain),
+        inset 0 0 0 12px var(--wood-mid),
+        inset 0 0 20px rgba(0,0,0,0.6);
+      z-index: 100;
+    }
+
+    /* ─────────────────────────────
+       HEADER / TAVERN SIGN
+    ───────────────────────────── */
+    .header {
+      background: var(--wood-mid);
+      padding: 12px 16px 10px;
+      border-bottom: 3px solid var(--wood-grain);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg,
+        transparent 0%, var(--amber-glow) 20%,
+        var(--amber) 50%, var(--amber-glow) 80%, transparent 100%);
+      opacity: 0.8;
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .game-title {
+      font-size: 22px;
+      font-weight: bold;
+      color: var(--gold-light);
+      text-shadow:
+        0 1px 0 var(--wood-dark),
+        0 2px 8px rgba(200, 140, 40, 0.6),
+        0 0 20px rgba(200, 140, 40, 0.3);
+      letter-spacing: 1px;
+    }
+
+    .game-subtitle {
+      font-size: 10px;
+      color: var(--parchment-aged);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-top: 1px;
+      opacity: 0.8;
+    }
+
+    .player-stats {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+    }
+
+    .player-name {
+      font-size: 12px;
+      color: var(--parchment);
+      font-style: italic;
+    }
+
+    .gold-count {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 14px;
+      color: var(--gold-light);
+      font-weight: bold;
+    }
+
+    .gold-icon {
+      width: 16px; height: 16px;
+      background: radial-gradient(circle at 35% 35%, var(--amber-glow), var(--gold));
+      border-radius: 50%;
+      border: 1.5px solid var(--gold-light);
+      box-shadow: 0 0 6px rgba(200, 160, 40, 0.5);
+    }
+
+    /* ── Location banner ── */
+    .location-banner {
+      background: linear-gradient(135deg, var(--leather) 0%, var(--wood-grain) 100%);
+      padding: 5px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 2px solid var(--wood-dark);
+    }
+
+    .location-icon { font-size: 14px; }
+    .location-name {
+      font-size: 11px;
+      color: var(--parchment);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      opacity: 0.9;
+    }
+
+    .location-status {
+      margin-left: auto;
+      font-size: 10px;
+      color: var(--amber-glow);
+      font-style: italic;
+    }
+
+    /* ─────────────────────────────
+       MAIN CONTENT AREA
+    ───────────────────────────── */
+    .content-area {
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--wood-grain) var(--wood-dark);
+    }
+
+    .content-area::-webkit-scrollbar { width: 6px; }
+    .content-area::-webkit-scrollbar-track { background: var(--wood-dark); }
+    .content-area::-webkit-scrollbar-thumb {
+      background: var(--wood-grain);
+      border-radius: 3px;
+    }
+
+    /* ─────────────────────────────
+       SECTION PANELS
+    ───────────────────────────── */
+    .panel {
+      margin: 10px;
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow:
+        0 2px 8px rgba(0,0,0,0.5),
+        inset 0 1px 0 rgba(255,220,120,0.1);
+    }
+
+    .panel-header {
+      background: linear-gradient(180deg, var(--wood-grain) 0%, var(--wood-mid) 100%);
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 2px solid var(--wood-dark);
+    }
+
+    .panel-header-icon { font-size: 14px; }
+
+    .panel-title {
+      font-size: 13px;
+      color: var(--parchment);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      font-weight: bold;
+    }
+
+    .panel-body {
+      padding: 12px;
+    }
+    .panel-body.parchment-texture {
+      /* applied above */
+    }
+
+    /* ─────────────────────────────
+       EXPEDITION CTA
+    ───────────────────────────── */
+    .expedition-cta {
+      margin: 10px;
+      position: relative;
+      overflow: hidden;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .expedition-cta-inner {
+      background: linear-gradient(135deg,
+        #3a1a04 0%,
+        #5a2e08 30%,
+        #3a1a04 60%,
+        #6a3808 100%);
+      border: 2px solid var(--gold);
+      border-radius: 6px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.2s;
+      box-shadow:
+        0 4px 16px rgba(0,0,0,0.5),
+        inset 0 1px 0 rgba(200,160,60,0.2),
+        0 0 30px rgba(200, 120, 0, 0.15);
+    }
+
+    .expedition-cta-inner:hover {
+      box-shadow:
+        0 4px 20px rgba(0,0,0,0.6),
+        inset 0 1px 0 rgba(200,160,60,0.3),
+        0 0 40px rgba(200, 140, 0, 0.3);
+      border-color: var(--amber-glow);
+    }
+
+    /* Subtle map pattern overlay */
+    .expedition-cta-inner::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(circle at 30% 50%, rgba(200,160,60,0.06) 0%, transparent 50%),
+        radial-gradient(circle at 70% 30%, rgba(200,140,40,0.04) 0%, transparent 40%);
+      pointer-events: none;
+    }
+
+    .cta-text-area { flex: 1; }
+
+    .cta-label {
+      font-size: 10px;
+      color: var(--parchment-aged);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 3px;
+    }
+
+    .cta-title {
+      font-size: 18px;
+      color: var(--gold-light);
+      font-weight: bold;
+      text-shadow: 0 0 12px rgba(200, 160, 40, 0.5);
+    }
+
+    .cta-subtitle {
+      font-size: 11px;
+      color: var(--parchment);
+      font-style: italic;
+      margin-top: 3px;
+      opacity: 0.8;
+    }
+
+    .cta-arrow {
+      width: 44px; height: 44px;
+      background: radial-gradient(circle at 40% 40%,
+        rgba(200,160,60,0.3), rgba(100,60,10,0.5));
+      border: 2px solid var(--gold);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+      margin-left: 12px;
+      box-shadow: 0 0 12px rgba(200,160,40,0.3);
+    }
+
+    /* Wax seal decoration */
+    .cta-seal {
+      position: absolute;
+      top: -8px; right: 60px;
+      width: 28px; height: 28px;
+      background: radial-gradient(circle at 35% 30%, #d44030, var(--red-wax));
+      border-radius: 50%;
+      border: 2px solid #c03020;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+    }
+
+    /* ─────────────────────────────
+       SKILLS LIST
+    ───────────────────────────── */
+    .skills-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .skill-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      background: rgba(60, 30, 5, 0.4);
+      border-radius: 3px;
+      border: 1px solid rgba(160, 100, 30, 0.2);
+      border-left: 3px solid var(--gold);
+    }
+
+    .skill-row:nth-child(even) {
+      border-left-color: var(--leather-light);
+    }
+
+    .skill-icon {
+      width: 32px; height: 32px;
+      background: radial-gradient(circle at 35% 30%,
+        rgba(200,160,60,0.25), rgba(80,40,10,0.6));
+      border: 2px solid var(--wood-highlight);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .skill-info { flex: 1; min-width: 0; }
+
+    .skill-name {
+      font-size: 12px;
+      color: var(--parchment);
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+
+    .skill-xp-bar-track {
+      height: 5px;
+      background: rgba(0,0,0,0.4);
+      border-radius: 3px;
+      overflow: hidden;
+      border: 1px solid rgba(100,60,10,0.3);
+    }
+
+    .skill-xp-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--gold), var(--amber-glow));
+      box-shadow: 0 0 4px rgba(200,160,40,0.5);
+      transition: width 0.3s ease;
+    }
+
+    .skill-xp-text {
+      font-size: 9px;
+      color: var(--ink-very-faded);
+      margin-top: 2px;
+      font-style: italic;
+    }
+
+    .skill-level-badge {
+      width: 36px; height: 36px;
+      background: radial-gradient(circle at 35% 30%,
+        var(--amber-glow), var(--amber));
+      border: 2px solid var(--gold-light);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: bold;
+      color: var(--ink);
+      flex-shrink: 0;
+      box-shadow:
+        0 2px 6px rgba(0,0,0,0.4),
+        inset 0 1px 0 rgba(255,220,100,0.3);
+    }
+
+    .skill-level-badge.high { background: radial-gradient(circle at 35% 30%, #90c050, #508020); color: #fff; border-color: #a0e060; }
+    .skill-level-badge.mid  { background: radial-gradient(circle at 35% 30%, #70a0d8, #305090); color: #fff; border-color: #90c0f8; }
+
+    /* ─────────────────────────────
+       INVENTORY GRID (BANK)
+    ───────────────────────────── */
+    .inventory-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .inventory-capacity {
+      font-size: 10px;
+      color: var(--ink-very-faded);
+      font-style: italic;
+    }
+
+    .inventory-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 5px;
+    }
+
+    .inv-slot {
+      aspect-ratio: 1;
+      background: radial-gradient(circle at 30% 25%,
+        rgba(140, 90, 20, 0.3), rgba(40, 15, 0, 0.7));
+      border: 1.5px solid rgba(120, 80, 20, 0.4);
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.15s;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+    }
+
+    .inv-slot:hover {
+      border-color: var(--gold);
+      background: radial-gradient(circle at 30% 25%,
+        rgba(200, 140, 40, 0.3), rgba(80, 40, 5, 0.7));
+    }
+
+    .inv-slot.empty {
+      opacity: 0.3;
+    }
+
+    .inv-count {
+      position: absolute;
+      bottom: 1px; right: 3px;
+      font-size: 8px;
+      color: var(--parchment);
+      font-weight: bold;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+      font-family: Georgia, serif;
+    }
+
+    .inv-slot-tooltip {
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%; transform: translateX(-50%);
+      background: var(--wood-dark);
+      border: 1px solid var(--gold);
+      color: var(--parchment);
+      font-size: 9px;
+      padding: 3px 7px;
+      border-radius: 3px;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      z-index: 10;
+    }
+
+    .inv-slot:hover .inv-slot-tooltip { opacity: 1; }
+
+    /* ─────────────────────────────
+       BOTTOM NAV TABS
+    ───────────────────────────── */
+    .bottom-nav {
+      background: var(--wood-mid);
+      border-top: 3px solid var(--wood-dark);
+      display: flex;
+      position: relative;
+    }
+
+    .bottom-nav::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg,
+        transparent, var(--wood-highlight), transparent);
+    }
+
+    .nav-tab {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 4px 8px;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.2s;
+      border-right: 1px solid var(--wood-dark);
+    }
+
+    .nav-tab:last-child { border-right: none; }
+
+    .nav-tab.active {
+      background: linear-gradient(180deg,
+        rgba(200, 140, 40, 0.25) 0%,
+        rgba(200, 140, 40, 0.05) 100%);
+    }
+
+    .nav-tab.active::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 10%; right: 10%;
+      height: 3px;
+      background: var(--amber-glow);
+      border-radius: 2px 2px 0 0;
+      box-shadow: 0 0 8px var(--amber-glow);
+    }
+
+    .nav-tab-icon { font-size: 20px; margin-bottom: 3px; }
+
+    .nav-tab-label {
+      font-size: 9px;
+      color: var(--parchment);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      opacity: 0.7;
+    }
+
+    .nav-tab.active .nav-tab-label {
+      color: var(--amber-glow);
+      opacity: 1;
+    }
+
+    /* ─────────────────────────────
+       DIVIDER / ORNAMENT
+    ───────────────────────────── */
+    .section-divider {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 10px 0;
+    }
+
+    .divider-line {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg,
+        transparent, var(--parchment-aged), transparent);
+      opacity: 0.5;
+    }
+
+    .divider-ornament {
+      font-size: 10px;
+      color: var(--parchment-aged);
+      opacity: 0.7;
+    }
+
+    /* ─────────────────────────────
+       RESOURCE TICKER (quick stats)
+    ───────────────────────────── */
+    .resource-ticker {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .resource-chip {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(160,100,30,0.3);
+      border-radius: 20px;
+      padding: 3px 8px;
+      font-size: 10px;
+      color: var(--parchment);
+    }
+
+    .resource-chip-icon { font-size: 12px; }
+    .resource-chip-val { color: var(--parchment-dark); font-weight: bold; }
+
+    /* ─────────────────────────────
+       ACTIVE-MODE TOGGLE
+    ───────────────────────────── */
+    .mode-toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 3px;
+      border: 1px solid rgba(160,100,30,0.2);
+      margin-bottom: 8px;
+    }
+
+    .mode-label {
+      font-size: 11px;
+      color: var(--parchment);
+      font-style: italic;
+    }
+
+    .mode-badge {
+      background: linear-gradient(135deg, var(--amber), var(--gold));
+      color: var(--ink);
+      font-size: 10px;
+      font-weight: bold;
+      padding: 2px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.5px;
+    }
+
+    .mode-badge.passive {
+      background: linear-gradient(135deg, #507090, #304060);
+      color: var(--parchment);
+    }
+
+    /* ─────────────────────────────
+       LABEL FOR CONCEPT PREVIEW
+    ───────────────────────────── */
+    .concept-label {
+      position: fixed;
+      top: 12px; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.85);
+      border: 1px solid var(--gold);
+      color: var(--gold-light);
+      font-family: Georgia, serif;
+      font-size: 12px;
+      padding: 6px 14px;
+      border-radius: 3px;
+      letter-spacing: 1px;
+      z-index: 200;
+      pointer-events: none;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<div class="concept-label">Concept A — "Thornvale Tavern"</div>
+
+<div class="app-shell">
+
+  <!-- ── HEADER ── -->
+  <div class="header">
+    <div class="header-inner">
+      <div>
+        <div class="game-title">⚔ Idle Adventures</div>
+        <div class="game-subtitle">Thornvale Chronicles</div>
+      </div>
+      <div class="player-stats">
+        <div class="player-name">Aldric the Wanderer</div>
+        <div class="gold-count">
+          <div class="gold-icon"></div>
+          2,840
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── LOCATION BANNER ── -->
+  <div class="location-banner">
+    <span class="location-icon">🏰</span>
+    <span class="location-name">Thornvale — The Wanderer's Rest</span>
+    <span class="location-status">Safe · Resting</span>
+  </div>
+
+  <!-- ── CONTENT AREA ── -->
+  <div class="content-area">
+
+    <!-- Expedition CTA -->
+    <div class="expedition-cta">
+      <div class="expedition-cta-inner">
+        <div class="cta-seal">⚜</div>
+        <div class="cta-text-area">
+          <div class="cta-label">Next Adventure Awaits</div>
+          <div class="cta-title">Begin Expedition</div>
+          <div class="cta-subtitle">Pack your gear &amp; choose your map</div>
+        </div>
+        <div class="cta-arrow">🗺</div>
+      </div>
+    </div>
+
+    <!-- ── SKILLS PANEL ── -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-header-icon">📜</span>
+        <span class="panel-title">Skills &amp; Mastery</span>
+      </div>
+      <div class="panel-body parchment-texture">
+
+        <div class="skills-grid">
+
+          <div class="skill-row">
+            <div class="skill-icon">⛏</div>
+            <div class="skill-info">
+              <div class="skill-name">Mining</div>
+              <div class="skill-xp-bar-track">
+                <div class="skill-xp-bar-fill" style="width: 72%"></div>
+              </div>
+              <div class="skill-xp-text">14,320 / 19,850 XP</div>
+            </div>
+            <div class="skill-level-badge high">24</div>
+          </div>
+
+          <div class="skill-row">
+            <div class="skill-icon">🌿</div>
+            <div class="skill-info">
+              <div class="skill-name">Herbalism</div>
+              <div class="skill-xp-bar-track">
+                <div class="skill-xp-bar-fill" style="width: 45%"></div>
+              </div>
+              <div class="skill-xp-text">5,400 / 12,100 XP</div>
+            </div>
+            <div class="skill-level-badge mid">18</div>
+          </div>
+
+          <div class="skill-row">
+            <div class="skill-icon">🐟</div>
+            <div class="skill-info">
+              <div class="skill-name">Fishing</div>
+              <div class="skill-xp-bar-track">
+                <div class="skill-xp-bar-fill" style="width: 88%"></div>
+              </div>
+              <div class="skill-xp-text">9,200 / 10,450 XP</div>
+            </div>
+            <div class="skill-level-badge">22</div>
+          </div>
+
+          <div class="skill-row">
+            <div class="skill-icon">🪓</div>
+            <div class="skill-info">
+              <div class="skill-name">Woodcutting</div>
+              <div class="skill-xp-bar-track">
+                <div class="skill-xp-bar-fill" style="width: 30%"></div>
+              </div>
+              <div class="skill-xp-text">2,800 / 9,300 XP</div>
+            </div>
+            <div class="skill-level-badge mid">15</div>
+          </div>
+
+          <div class="skill-row">
+            <div class="skill-icon">⚔</div>
+            <div class="skill-info">
+              <div class="skill-name">Melee Combat</div>
+              <div class="skill-xp-bar-track">
+                <div class="skill-xp-bar-fill" style="width: 55%"></div>
+              </div>
+              <div class="skill-xp-text">6,600 / 12,000 XP</div>
+            </div>
+            <div class="skill-level-badge">19</div>
+          </div>
+
+          <div class="skill-row">
+            <div class="skill-icon">🏹</div>
+            <div class="skill-info">
+              <div class="skill-name">Ranged</div>
+              <div class="skill-xp-bar-track">
+                <div class="skill-xp-bar-fill" style="width: 20%"></div>
+              </div>
+              <div class="skill-xp-text">900 / 4,600 XP</div>
+            </div>
+            <div class="skill-level-badge mid">11</div>
+          </div>
+
+          <div class="skill-row">
+            <div class="skill-icon">🔨</div>
+            <div class="skill-info">
+              <div class="skill-name">Smithing</div>
+              <div class="skill-xp-bar-track">
+                <div class="skill-xp-bar-fill" style="width: 62%"></div>
+              </div>
+              <div class="skill-xp-text">8,100 / 13,000 XP</div>
+            </div>
+            <div class="skill-level-badge high">21</div>
+          </div>
+
+          <div class="skill-row">
+            <div class="skill-icon">🍲</div>
+            <div class="skill-info">
+              <div class="skill-name">Cooking</div>
+              <div class="skill-xp-bar-track">
+                <div class="skill-xp-bar-fill" style="width: 40%"></div>
+              </div>
+              <div class="skill-xp-text">4,200 / 10,500 XP</div>
+            </div>
+            <div class="skill-level-badge">17</div>
+          </div>
+
+          <div class="skill-row">
+            <div class="skill-icon">🧭</div>
+            <div class="skill-info">
+              <div class="skill-name">Cartography</div>
+              <div class="skill-xp-bar-track">
+                <div class="skill-xp-bar-fill" style="width: 10%"></div>
+              </div>
+              <div class="skill-xp-text">480 / 4,800 XP</div>
+            </div>
+            <div class="skill-level-badge mid">8</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ── BANK / INVENTORY ── -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-header-icon">🏦</span>
+        <span class="panel-title">The Bank — Stash</span>
+      </div>
+      <div class="panel-body parchment-texture">
+
+        <div class="inventory-header">
+          <div class="resource-ticker">
+            <div class="resource-chip"><span class="resource-chip-icon">🪨</span><span class="resource-chip-val">Iron</span> ×48</div>
+            <div class="resource-chip"><span class="resource-chip-icon">🌿</span><span class="resource-chip-val">Herbs</span> ×32</div>
+            <div class="resource-chip"><span class="resource-chip-icon">🐟</span><span class="resource-chip-val">Fish</span> ×19</div>
+          </div>
+          <div class="inventory-capacity">24 / 120 slots</div>
+        </div>
+
+        <div class="section-divider">
+          <div class="divider-line"></div>
+          <div class="divider-ornament">⁂</div>
+          <div class="divider-line"></div>
+        </div>
+
+        <div class="inventory-grid">
+          <!-- Filled slots -->
+          <div class="inv-slot">🪨<div class="inv-count">×48</div><div class="inv-slot-tooltip">Iron Ore ×48</div></div>
+          <div class="inv-slot">⛏<div class="inv-count">1</div><div class="inv-slot-tooltip">Iron Pickaxe</div></div>
+          <div class="inv-slot">🌿<div class="inv-count">×32</div><div class="inv-slot-tooltip">Curaweed ×32</div></div>
+          <div class="inv-slot">🐟<div class="inv-count">×19</div><div class="inv-slot-tooltip">Sardines ×19</div></div>
+          <div class="inv-slot">💎<div class="inv-count">×5</div><div class="inv-slot-tooltip">Quartz ×5</div></div>
+          <div class="inv-slot">🍞<div class="inv-count">×12</div><div class="inv-slot-tooltip">Bread ×12</div></div>
+          <div class="inv-slot">⚗️<div class="inv-count">×3</div><div class="inv-slot-tooltip">Health Potions ×3</div></div>
+          <div class="inv-slot">🪵<div class="inv-count">×27</div><div class="inv-slot-tooltip">Oak Logs ×27</div></div>
+          <div class="inv-slot">🥩<div class="inv-count">×8</div><div class="inv-slot-tooltip">Cooked Meat ×8</div></div>
+          <div class="inv-slot">🪨<div class="inv-count">×14</div><div class="inv-slot-tooltip">Copper Ore ×14</div></div>
+          <div class="inv-slot">🧱<div class="inv-count">×6</div><div class="inv-slot-tooltip">Iron Bar ×6</div></div>
+          <div class="inv-slot">🌱<div class="inv-count">×20</div><div class="inv-slot-tooltip">Vitalroot ×20</div></div>
+          <!-- Empty slots -->
+          <div class="inv-slot empty"></div>
+          <div class="inv-slot empty"></div>
+          <div class="inv-slot empty"></div>
+          <div class="inv-slot empty"></div>
+          <div class="inv-slot empty"></div>
+          <div class="inv-slot empty"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── QUICK MODE STATUS ── -->
+    <div style="padding: 0 10px 10px">
+      <div class="mode-toggle-row">
+        <div class="mode-label">⚡ Expedition Mode</div>
+        <div class="mode-badge">Active · 85-100%</div>
+      </div>
+    </div>
+
+  </div><!-- /content-area -->
+
+  <!-- ── BOTTOM NAV ── -->
+  <div class="bottom-nav">
+    <div class="nav-tab active">
+      <div class="nav-tab-icon">🏦</div>
+      <div class="nav-tab-label">Bank</div>
+    </div>
+    <div class="nav-tab">
+      <div class="nav-tab-icon">📜</div>
+      <div class="nav-tab-label">Skills</div>
+    </div>
+    <div class="nav-tab">
+      <div class="nav-tab-icon">🔨</div>
+      <div class="nav-tab-label">Smithy</div>
+    </div>
+    <div class="nav-tab">
+      <div class="nav-tab-icon">🍲</div>
+      <div class="nav-tab-label">Kitchen</div>
+    </div>
+    <div class="nav-tab">
+      <div class="nav-tab-icon">🗺</div>
+      <div class="nav-tab-label">Expedition</div>
+    </div>
+  </div>
+
+</div><!-- /app-shell -->
+
+</body>
+</html>
