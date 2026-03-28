@@ -9,7 +9,7 @@ import type { LucideIcon } from 'lucide-react';
 /**
  * Available activity types
  */
-export type ActivityType = 'mining' | 'herbs' | 'gems' | 'combat' | 'fishing';
+export type ActivityType = 'mining' | 'herbs' | 'gems' | 'combat' | 'fishing' | 'woodcutting';
 
 /**
  * UI definition for an activity (icon, name, action cost)

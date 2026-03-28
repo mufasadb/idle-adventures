@@ -34,6 +34,11 @@ export interface ItemDefinition {
   bagSlots?: number;       // For vehicles: extra misc slots provided
   speedBonus?: number;     // For vehicles: % bonus to travel (future)
   effect?: string;         // For potions: what buff it provides (future)
+
+  // Tier system — higher = rarer/better
+  tier?: number;           // 1 = lowest, 8 = highest (follows timber scale)
+  skillType?: string;      // Which skill this item belongs to (e.g. 'woodcutting', 'mining')
+  craftingComponents?: Array<{ itemId: string; count: number }>; // For tools: required crafting parts
 }
 
 /**

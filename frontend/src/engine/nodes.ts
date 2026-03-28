@@ -95,6 +95,12 @@ export const ACTIVITIES: Record<ActivityType, ActivityUIDefinition> = {
     icon: Fish,
     actionCost: 1,
   },
+  woodcutting: {
+    type: 'woodcutting',
+    name: 'Woodcutting',
+    icon: Trees,
+    actionCost: 1,
+  },
 };
 
 // ============================================
