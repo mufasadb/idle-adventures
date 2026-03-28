@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Idle Adventures — Dashboard (Concept B)</title>
+  <style>
+    /* =============================================
+       CLEAN DASHBOARD — Modern Minimalist
+       Dark / Neon / Data-forward
+       ============================================= */
+    :root {
+      --bg:           #0f0f13;
+      --bg-panel:     #16161e;
+      --bg-card:      #1c1c26;
+      --bg-card-hover:#22222e;
+      --border:       #2a2a38;
+      --border-light: #38384a;
+
+      --teal:         #22d4c8;
+      --teal-dim:     #1a9e96;
+      --teal-glow:    rgba(34, 212, 200, 0.15);
+      --teal-glow-strong: rgba(34, 212, 200, 0.35);
+      --amber:        #f59e0b;
+      --amber-dim:    #b87210;
+      --amber-glow:   rgba(245, 158, 11, 0.15);
+      --amber-glow-strong: rgba(245, 158, 11, 0.35);
+
+      --text-primary: #e8e8f0;
+      --text-secondary: #8888a0;
+      --text-dim:     #4a4a60;
+
+      --skill-1:  #22d4c8;  /* teal */
+      --skill-2:  #a78bfa;  /* violet */
+      --skill-3:  #34d399;  /* emerald */
+      --skill-4:  #fb923c;  /* orange */
+      --skill-5:  #f87171;  /* red */
+      --skill-6:  #60a5fa;  /* blue */
+      --skill-7:  #e879f9;  /* fuchsia */
+      --skill-8:  #fbbf24;  /* yellow */
+      --skill-9:  #94a3b8;  /* slate */
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #080810;
+      font-family: 'Courier New', 'Lucida Console', monospace;
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      overflow-x: hidden;
+    }
+
+    /* ─────────────────────────────
+       APP SHELL
+    ───────────────────────────── */
+    .app-shell {
+      width: 100%;
+      max-width: 430px;
+      min-height: 100vh;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      box-shadow:
+        0 0 0 1px var(--border),
+        0 0 80px rgba(34, 212, 200, 0.03),
+        0 0 120px rgba(0,0,0,0.8);
+      overflow: hidden;
+    }
+
+    /* Subtle grid overlay */
+    .app-shell::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(34,212,200,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(34,212,200,0.025) 1px, transparent 1px);
+      background-size: 32px 32px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Corner accents */
+    .app-shell::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 40px; height: 40px;
+      border-top: 2px solid var(--teal);
+      border-left: 2px solid var(--teal);
+      opacity: 0.6;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .corner-br {
+      position: absolute;
+      bottom: 60px; right: 0;
+      width: 30px; height: 30px;
+      border-bottom: 2px solid var(--teal);
+      border-right: 2px solid var(--teal);
+      opacity: 0.4;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    /* ─────────────────────────────
+       HEADER
+    ───────────────────────────── */
+    .header {
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+      position: relative;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header::after {
+      content: '';
+      position: absolute;
+      bottom: -1px; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg,
+        transparent 0%, var(--teal-dim) 30%,
+        var(--teal) 50%, var(--teal-dim) 70%, transparent 100%);
+      opacity: 0.8;
+    }
+
+    .logo-area { display: flex; flex-direction: column; }
+
+    .game-title {
+      font-size: 16px;
+      font-weight: bold;
+      color: var(--text-primary);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    .game-title span {
+      color: var(--teal);
+      text-shadow: 0 0 10px var(--teal), 0 0 20px var(--teal-dim);
+    }
+
+    .version-tag {
+      font-size: 9px;
+      color: var(--text-dim);
+      letter-spacing: 2px;
+      margin-top: 1px;
+    }
+
+    .header-stats {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .stat-pill {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .stat-label {
+      font-size: 8px;
+      color: var(--text-dim);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    .stat-value {
+      font-size: 14px;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+
+    .stat-value.gold { color: var(--amber); text-shadow: 0 0 8px var(--amber-dim); }
+    .stat-value.player { color: var(--teal); font-size: 11px; }
+
+    /* ─────────────────────────────
+       STATUS BAR
+    ───────────────────────────── */
+    .status-bar {
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      padding: 6px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: relative;
+      z-index: 5;
+    }
+
+    .status-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--teal);
+      box-shadow: 0 0 6px var(--teal);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--teal); }
+      50% { opacity: 0.5; box-shadow: 0 0 2px var(--teal); }
+    }
+
+    .status-text {
+      font-size: 10px;
+      color: var(--teal);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    .status-location {
+      margin-left: auto;
+      font-size: 10px;
+      color: var(--text-secondary);
+      letter-spacing: 0.5px;
+    }
+
+    /* ─────────────────────────────
+       CONTENT AREA
+    ───────────────────────────── */
+    .content-area {
+      flex: 1;
+      overflow-y: auto;
+      position: relative;
+      z-index: 2;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-light) var(--bg);
+      padding-bottom: 4px;
+    }
+
+    .content-area::-webkit-scrollbar { width: 4px; }
+    .content-area::-webkit-scrollbar-track { background: var(--bg); }
+    .content-area::-webkit-scrollbar-thumb {
+      background: var(--border-light);
+      border-radius: 2px;
+    }
+
+    /* ─────────────────────────────
+       EXPEDITION CTA
+    ───────────────────────────── */
+    .expedition-cta {
+      margin: 12px 12px 4px;
+      position: relative;
+    }
+
+    .expedition-cta-inner {
+      background: linear-gradient(135deg,
+        rgba(34,212,200,0.08) 0%,
+        rgba(34,212,200,0.04) 50%,
+        rgba(34,212,200,0.08) 100%);
+      border: 1px solid var(--teal-dim);
+      border-radius: 6px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.2s;
+      box-shadow:
+        0 0 20px rgba(34,212,200,0.06),
+        inset 0 1px 0 rgba(34,212,200,0.1);
+    }
+
+    .expedition-cta-inner:hover {
+      background: linear-gradient(135deg,
+        rgba(34,212,200,0.14) 0%,
+        rgba(34,212,200,0.08) 50%,
+        rgba(34,212,200,0.14) 100%);
+      box-shadow:
+        0 0 30px rgba(34,212,200,0.15),
+        inset 0 1px 0 rgba(34,212,200,0.2);
+    }
+
+    /* scanning line animation */
+    .expedition-cta-inner::before {
+      content: '';
+      position: absolute;
+      top: -100%; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg,
+        transparent, var(--teal), transparent);
+      opacity: 0.6;
+      animation: scan-line 3s ease-in-out infinite;
+    }
+
+    @keyframes scan-line {
+      0% { top: -2px; opacity: 0; }
+      10% { opacity: 0.6; }
+      90% { opacity: 0.6; }
+      100% { top: 100%; opacity: 0; }
+    }
+
+    .cta-text-area { flex: 1; }
+
+    .cta-sys-label {
+      font-size: 8px;
+      color: var(--teal-dim);
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .cta-title {
+      font-size: 20px;
+      font-weight: bold;
+      color: var(--text-primary);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .cta-title span { color: var(--teal); }
+
+    .cta-detail {
+      font-size: 10px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .cta-btn {
+      background: var(--teal);
+      color: var(--bg);
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      font-weight: bold;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      border: none;
+      border-radius: 3px;
+      padding: 10px 14px;
+      cursor: pointer;
+      flex-shrink: 0;
+      margin-left: 12px;
+      box-shadow: 0 0 16px var(--teal-dim);
+      transition: all 0.15s;
+    }
+
+    .cta-btn:hover {
+      box-shadow: 0 0 24px var(--teal);
+    }
+
+    /* ─────────────────────────────
+       SECTION HEADING
+    ───────────────────────────── */
+    .section-heading {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 12px 6px;
+    }
+
+    .section-heading-line {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg,
+        var(--border-light), transparent);
+    }
+
+    .section-heading-text {
+      font-size: 9px;
+      color: var(--text-dim);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    /* ─────────────────────────────
+       SKILLS LIST
+    ───────────────────────────── */
+    .skills-list {
+      padding: 0 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .skill-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.15s;
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    .skill-card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-light);
+    }
+
+    /* left accent bar */
+    .skill-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: var(--accent-color, var(--teal));
+      box-shadow: 0 0 8px var(--accent-color, var(--teal));
+    }
+
+    .skill-icon-box {
+      width: 28px; height: 28px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .skill-data { flex: 1; min-width: 0; }
+
+    .skill-name-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 5px;
+    }
+
+    .skill-name {
+      font-size: 11px;
+      color: var(--text-primary);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .skill-xp-fraction {
+      font-size: 8px;
+      color: var(--text-dim);
+      letter-spacing: 0.5px;
+    }
+
+    .skill-bar-track {
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .skill-bar-fill {
+      height: 100%;
+      background: var(--accent-color, var(--teal));
+      border-radius: 2px;
+      box-shadow: 0 0 6px var(--accent-color, var(--teal));
+      transition: width 0.4s ease;
+    }
+
+    .skill-level-box {
+      width: 32px; height: 32px;
+      border: 1px solid var(--accent-color, var(--teal));
+      border-radius: 3px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+      font-weight: bold;
+      color: var(--accent-color, var(--teal));
+      flex-shrink: 0;
+      box-shadow:
+        0 0 8px rgba(0,0,0,0.4),
+        inset 0 0 6px rgba(var(--accent-color, 34,212,200), 0.05);
+    }
+
+    /* ─────────────────────────────
+       BANK / INVENTORY
+    ───────────────────────────── */
+    .bank-panel {
+      margin: 0 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .bank-panel-header {
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .bank-panel-title {
+      font-size: 9px;
+      letter-spacing: 2.5px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+    }
+
+    .bank-capacity-chip {
+      font-size: 9px;
+      color: var(--amber);
+      letter-spacing: 1px;
+      border: 1px solid var(--amber-dim);
+      border-radius: 20px;
+      padding: 1px 8px;
+    }
+
+    .bank-summary-row {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .bank-stat {
+      flex: 1;
+      padding: 8px 10px;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .bank-stat:last-child { border-right: none; }
+
+    .bank-stat-label {
+      font-size: 8px;
+      color: var(--text-dim);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    .bank-stat-value {
+      font-size: 14px;
+      font-weight: bold;
+      color: var(--text-primary);
+    }
+
+    .bank-stat-value.teal { color: var(--teal); text-shadow: 0 0 8px var(--teal-dim); }
+    .bank-stat-value.amber { color: var(--amber); text-shadow: 0 0 6px var(--amber-dim); }
+
+    .inv-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 1px;
+      background: var(--border);
+      padding: 1px;
+    }
+
+    .inv-cell {
+      background: var(--bg);
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.1s;
+    }
+
+    .inv-cell:hover { background: var(--bg-card); }
+
+    .inv-cell.empty { opacity: 0.12; }
+    .inv-cell.empty::after {
+      content: '';
+      width: 14px; height: 14px;
+      border: 1px dashed var(--border-light);
+      border-radius: 2px;
+    }
+
+    .inv-qty {
+      position: absolute;
+      bottom: 2px; right: 3px;
+      font-size: 7px;
+      color: var(--text-secondary);
+      letter-spacing: 0;
+    }
+
+    .inv-cell-glow {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at center,
+        var(--cell-glow, transparent) 0%, transparent 70%);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+
+    .inv-cell:hover .inv-cell-glow { opacity: 1; }
+
+    /* ─────────────────────────────
+       MODE TOGGLE
+    ───────────────────────────── */
+    .mode-row {
+      display: flex;
+      gap: 4px;
+      margin: 8px 12px 0;
+    }
+
+    .mode-btn {
+      flex: 1;
+      padding: 8px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .mode-btn.active {
+      background: var(--teal-glow);
+      border-color: var(--teal-dim);
+      box-shadow: 0 0 10px var(--teal-glow-strong);
+    }
+
+    .mode-btn-label {
+      font-size: 9px;
+      color: var(--text-dim);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+
+    .mode-btn.active .mode-btn-label { color: var(--teal); }
+
+    .mode-btn-value {
+      font-size: 13px;
+      font-weight: bold;
+      color: var(--text-secondary);
+    }
+
+    .mode-btn.active .mode-btn-value { color: var(--text-primary); }
+
+    /* ─────────────────────────────
+       BOTTOM NAV
+    ───────────────────────────── */
+    .bottom-nav {
+      background: var(--bg-panel);
+      border-top: 1px solid var(--border);
+      display: flex;
+      position: relative;
+      z-index: 5;
+    }
+
+    .bottom-nav::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg,
+        transparent, var(--teal-dim), transparent);
+      opacity: 0.5;
+    }
+
+    .nav-tab {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 4px 8px;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.15s;
+    }
+
+    .nav-tab.active {
+      background: rgba(34,212,200,0.06);
+    }
+
+    .nav-tab.active::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 20%; right: 20%;
+      height: 2px;
+      background: var(--teal);
+      box-shadow: 0 0 8px var(--teal);
+    }
+
+    .nav-tab-icon { font-size: 18px; margin-bottom: 3px; }
+    .nav-tab-label {
+      font-size: 8px;
+      color: var(--text-dim);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+    .nav-tab.active .nav-tab-label { color: var(--teal); }
+
+    /* ─────────────────────────────
+       LABEL
+    ───────────────────────────── */
+    .concept-label {
+      position: fixed;
+      top: 12px; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.9);
+      border: 1px solid var(--teal-dim);
+      color: var(--teal);
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      padding: 5px 14px;
+      border-radius: 3px;
+      letter-spacing: 1.5px;
+      z-index: 200;
+      pointer-events: none;
+      text-align: center;
+      box-shadow: 0 0 14px var(--teal-glow);
+    }
+
+    /* Spacer after mode row */
+    .spacer { height: 12px; }
+  </style>
+</head>
+<body>
+
+<div class="concept-label">CONCEPT-B // DASHBOARD</div>
+<div class="corner-br"></div>
+
+<div class="app-shell">
+
+  <!-- ── HEADER ── -->
+  <div class="header">
+    <div class="logo-area">
+      <div class="game-title">IDLE <span>ADV</span></div>
+      <div class="version-tag">v0.4.2 // EARLY ACCESS</div>
+    </div>
+    <div class="header-stats">
+      <div class="stat-pill">
+        <div class="stat-label">Adventurer</div>
+        <div class="stat-value player">ALDRIC_W</div>
+      </div>
+      <div class="stat-pill">
+        <div class="stat-label">Gold</div>
+        <div class="stat-value gold">⬡ 2,840</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STATUS BAR ── -->
+  <div class="status-bar">
+    <div class="status-dot"></div>
+    <div class="status-text">Town · Safe</div>
+    <div class="status-location">📍 Thornvale · The Wanderer's Rest</div>
+  </div>
+
+  <!-- ── CONTENT ── -->
+  <div class="content-area">
+
+    <!-- Expedition CTA -->
+    <div class="expedition-cta">
+      <div class="expedition-cta-inner">
+        <div class="cta-text-area">
+          <div class="cta-sys-label">// ready to deploy</div>
+          <div class="cta-title">BEGIN <span>EXPEDITION</span></div>
+          <div class="cta-detail">Select map · Pack loadout · Choose mode</div>
+        </div>
+        <button class="cta-btn">DEPART →</button>
+      </div>
+    </div>
+
+    <!-- Mode row -->
+    <div class="mode-row">
+      <div class="mode-btn active">
+        <div class="mode-btn-label">Mode</div>
+        <div class="mode-btn-value">⚡ ACTIVE</div>
+      </div>
+      <div class="mode-btn">
+        <div class="mode-btn-label">Yield</div>
+        <div class="mode-btn-value">85–100%</div>
+      </div>
+      <div class="mode-btn">
+        <div class="mode-btn-label">Auto Yield</div>
+        <div class="mode-btn-value" style="color: #4a4a60">70%</div>
+      </div>
+    </div>
+
+    <!-- SKILLS -->
+    <div class="section-heading">
+      <div class="section-heading-text">Skills</div>
+      <div class="section-heading-line"></div>
+    </div>
+
+    <div class="skills-list">
+
+      <div class="skill-card" style="--accent-color: var(--skill-1)">
+        <div class="skill-icon-box">⛏</div>
+        <div class="skill-data">
+          <div class="skill-name-row">
+            <div class="skill-name">Mining</div>
+            <div class="skill-xp-fraction">14,320 / 19,850</div>
+          </div>
+          <div class="skill-bar-track">
+            <div class="skill-bar-fill" style="width:72%; --accent-color:var(--skill-1)"></div>
+          </div>
+        </div>
+        <div class="skill-level-box" style="--accent-color: var(--skill-1)">24</div>
+      </div>
+
+      <div class="skill-card" style="--accent-color: var(--skill-3)">
+        <div class="skill-icon-box">🌿</div>
+        <div class="skill-data">
+          <div class="skill-name-row">
+            <div class="skill-name">Herbalism</div>
+            <div class="skill-xp-fraction">5,400 / 12,100</div>
+          </div>
+          <div class="skill-bar-track">
+            <div class="skill-bar-fill" style="width:45%; --accent-color:var(--skill-3)"></div>
+          </div>
+        </div>
+        <div class="skill-level-box" style="--accent-color: var(--skill-3)">18</div>
+      </div>
+
+      <div class="skill-card" style="--accent-color: var(--skill-6)">
+        <div class="skill-icon-box">🐟</div>
+        <div class="skill-data">
+          <div class="skill-name-row">
+            <div class="skill-name">Fishing</div>
+            <div class="skill-xp-fraction">9,200 / 10,450</div>
+          </div>
+          <div class="skill-bar-track">
+            <div class="skill-bar-fill" style="width:88%; --accent-color:var(--skill-6)"></div>
+          </div>
+        </div>
+        <div class="skill-level-box" style="--accent-color: var(--skill-6)">22</div>
+      </div>
+
+      <div class="skill-card" style="--accent-color: var(--skill-4)">
+        <div class="skill-icon-box">🪓</div>
+        <div class="skill-data">
+          <div class="skill-name-row">
+            <div class="skill-name">Woodcutting</div>
+            <div class="skill-xp-fraction">2,800 / 9,300</div>
+          </div>
+          <div class="skill-bar-track">
+            <div class="skill-bar-fill" style="width:30%; --accent-color:var(--skill-4)"></div>
+          </div>
+        </div>
+        <div class="skill-level-box" style="--accent-color: var(--skill-4)">15</div>
+      </div>
+
+      <div class="skill-card" style="--accent-color: var(--skill-5)">
+        <div class="skill-icon-box">⚔️</div>
+        <div class="skill-data">
+          <div class="skill-name-row">
+            <div class="skill-name">Melee</div>
+            <div class="skill-xp-fraction">6,600 / 12,000</div>
+          </div>
+          <div class="skill-bar-track">
+            <div class="skill-bar-fill" style="width:55%; --accent-color:var(--skill-5)"></div>
+          </div>
+        </div>
+        <div class="skill-level-box" style="--accent-color: var(--skill-5)">19</div>
+      </div>
+
+      <div class="skill-card" style="--accent-color: var(--skill-2)">
+        <div class="skill-icon-box">🏹</div>
+        <div class="skill-data">
+          <div class="skill-name-row">
+            <div class="skill-name">Ranged</div>
+            <div class="skill-xp-fraction">900 / 4,600</div>
+          </div>
+          <div class="skill-bar-track">
+            <div class="skill-bar-fill" style="width:20%; --accent-color:var(--skill-2)"></div>
+          </div>
+        </div>
+        <div class="skill-level-box" style="--accent-color: var(--skill-2)">11</div>
+      </div>
+
+      <div class="skill-card" style="--accent-color: var(--skill-7)">
+        <div class="skill-icon-box">🔨</div>
+        <div class="skill-data">
+          <div class="skill-name-row">
+            <div class="skill-name">Smithing</div>
+            <div class="skill-xp-fraction">8,100 / 13,000</div>
+          </div>
+          <div class="skill-bar-track">
+            <div class="skill-bar-fill" style="width:62%; --accent-color:var(--skill-7)"></div>
+          </div>
+        </div>
+        <div class="skill-level-box" style="--accent-color: var(--skill-7)">21</div>
+      </div>
+
+      <div class="skill-card" style="--accent-color: var(--skill-8)">
+        <div class="skill-icon-box">🍲</div>
+        <div class="skill-data">
+          <div class="skill-name-row">
+            <div class="skill-name">Cooking</div>
+            <div class="skill-xp-fraction">4,200 / 10,500</div>
+          </div>
+          <div class="skill-bar-track">
+            <div class="skill-bar-fill" style="width:40%; --accent-color:var(--skill-8)"></div>
+          </div>
+        </div>
+        <div class="skill-level-box" style="--accent-color: var(--skill-8)">17</div>
+      </div>
+
+      <div class="skill-card" style="--accent-color: var(--skill-9)">
+        <div class="skill-icon-box">🧭</div>
+        <div class="skill-data">
+          <div class="skill-name-row">
+            <div class="skill-name">Cartography</div>
+            <div class="skill-xp-fraction">480 / 4,800</div>
+          </div>
+          <div class="skill-bar-track">
+            <div class="skill-bar-fill" style="width:10%; --accent-color:var(--skill-9)"></div>
+          </div>
+        </div>
+        <div class="skill-level-box" style="--accent-color: var(--skill-9)">8</div>
+      </div>
+
+    </div>
+
+    <!-- BANK -->
+    <div class="section-heading">
+      <div class="section-heading-text">Bank</div>
+      <div class="section-heading-line"></div>
+    </div>
+
+    <div class="bank-panel">
+      <div class="bank-panel-header">
+        <div class="bank-panel-title">// Stash · Thornvale Branch</div>
+        <div class="bank-capacity-chip">24 / 120</div>
+      </div>
+
+      <div class="bank-summary-row">
+        <div class="bank-stat">
+          <div class="bank-stat-label">Ores</div>
+          <div class="bank-stat-value teal">62</div>
+        </div>
+        <div class="bank-stat">
+          <div class="bank-stat-label">Herbs</div>
+          <div class="bank-stat-value" style="color: #34d399">52</div>
+        </div>
+        <div class="bank-stat">
+          <div class="bank-stat-label">Fish</div>
+          <div class="bank-stat-value" style="color: #60a5fa">19</div>
+        </div>
+        <div class="bank-stat">
+          <div class="bank-stat-label">Gold</div>
+          <div class="bank-stat-value amber">2,840</div>
+        </div>
+      </div>
+
+      <div class="inv-grid">
+        <!-- Row 1 -->
+        <div class="inv-cell" title="Iron Ore ×48">🪨<div class="inv-qty">48</div><div class="inv-cell-glow" style="--cell-glow:rgba(34,212,200,0.1)"></div></div>
+        <div class="inv-cell" title="Iron Pickaxe">⛏<div class="inv-qty">1</div><div class="inv-cell-glow" style="--cell-glow:rgba(34,212,200,0.1)"></div></div>
+        <div class="inv-cell" title="Curaweed ×32">🌿<div class="inv-qty">32</div><div class="inv-cell-glow" style="--cell-glow:rgba(52,211,153,0.1)"></div></div>
+        <div class="inv-cell" title="Sardines ×19">🐟<div class="inv-qty">19</div><div class="inv-cell-glow" style="--cell-glow:rgba(96,165,250,0.1)"></div></div>
+        <div class="inv-cell" title="Quartz ×5">💎<div class="inv-qty">5</div><div class="inv-cell-glow" style="--cell-glow:rgba(168,139,250,0.1)"></div></div>
+        <div class="inv-cell" title="Bread ×12">🍞<div class="inv-qty">12</div><div class="inv-cell-glow" style="--cell-glow:rgba(251,191,36,0.1)"></div></div>
+        <!-- Row 2 -->
+        <div class="inv-cell" title="Health Potions ×3">⚗️<div class="inv-qty">3</div><div class="inv-cell-glow"></div></div>
+        <div class="inv-cell" title="Oak Logs ×27">🪵<div class="inv-qty">27</div><div class="inv-cell-glow"></div></div>
+        <div class="inv-cell" title="Cooked Meat ×8">🥩<div class="inv-qty">8</div><div class="inv-cell-glow"></div></div>
+        <div class="inv-cell" title="Copper Ore ×14">🪨<div class="inv-qty">14</div><div class="inv-cell-glow"></div></div>
+        <div class="inv-cell" title="Iron Bar ×6">🧱<div class="inv-qty">6</div><div class="inv-cell-glow"></div></div>
+        <div class="inv-cell" title="Vitalroot ×20">🌱<div class="inv-qty">20</div><div class="inv-cell-glow"></div></div>
+        <!-- Empty row -->
+        <div class="inv-cell empty"></div>
+        <div class="inv-cell empty"></div>
+        <div class="inv-cell empty"></div>
+        <div class="inv-cell empty"></div>
+        <div class="inv-cell empty"></div>
+        <div class="inv-cell empty"></div>
+      </div>
+    </div>
+
+    <div class="spacer"></div>
+
+  </div><!-- /content-area -->
+
+  <!-- ── BOTTOM NAV ── -->
+  <div class="bottom-nav">
+    <div class="nav-tab active">
+      <div class="nav-tab-icon">🏦</div>
+      <div class="nav-tab-label">Bank</div>
+    </div>
+    <div class="nav-tab">
+      <div class="nav-tab-icon">📈</div>
+      <div class="nav-tab-label">Skills</div>
+    </div>
+    <div class="nav-tab">
+      <div class="nav-tab-icon">🔨</div>
+      <div class="nav-tab-label">Smithy</div>
+    </div>
+    <div class="nav-tab">
+      <div class="nav-tab-icon">🍲</div>
+      <div class="nav-tab-label">Kitchen</div>
+    </div>
+    <div class="nav-tab">
+      <div class="nav-tab-icon">🗺</div>
+      <div class="nav-tab-label">Expedition</div>
+    </div>
+  </div>
+
+</div><!-- /app-shell -->
+
+</body>
+</html>
