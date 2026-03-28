@@ -1,6 +1,6 @@
 import { observer } from 'mobx-react-lite';
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Flag, Pickaxe, Leaf, Gem, Swords, Mountain, Eraser, Play, CircleUser, Fish } from 'lucide-react';
+import { Flag, Pickaxe, Leaf, Gem, Swords, Mountain, Eraser, Play, CircleUser, Fish, Trees, Waves } from 'lucide-react';
 import { sessionStore } from '../../stores/sessionStore';
 import { expeditionPathStore } from '../../engine/expeditionStore';
 import { expeditionExecutionStore } from '../../engine/expeditionExecutionStore';
@@ -14,7 +14,7 @@ import {
 import { FloatingResource } from '../FloatingResource';
 import { ExpeditionResultsModal } from '../ExpeditionResultsModal';
 
-const CELL_SIZE = 50;
+const CELL_SIZE = 52;
 const LONG_PRESS_MS = 400;
 
 const ACTIVITY_ICONS: Record<ActivityType, typeof Pickaxe> = {
@@ -25,11 +25,32 @@ const ACTIVITY_ICONS: Record<ActivityType, typeof Pickaxe> = {
   fishing: Fish,
 };
 
-const TERRAIN_ICONS: Record<TerrainType, typeof Mountain | null> = {
-  ground: null,
-  water: null,
-  mountain: Mountain,
-  forest: null,
+/** Terrain-specific tile gradient + icon colour */
+const TERRAIN_STYLES: Record<TerrainType, {
+  bg: string;
+  iconColor: string;
+  Icon: typeof Mountain | null;
+}> = {
+  ground: {
+    bg: 'radial-gradient(circle at 30% 25%, rgba(100,65,20,0.45), rgba(40,20,5,0.75))',
+    iconColor: 'rgba(200,160,80,0.7)',
+    Icon: null,
+  },
+  water: {
+    bg: 'radial-gradient(circle at 30% 25%, rgba(20,80,160,0.6), rgba(10,30,80,0.85))',
+    iconColor: 'rgba(100,180,255,0.9)',
+    Icon: Waves,
+  },
+  mountain: {
+    bg: 'radial-gradient(circle at 30% 25%, rgba(90,85,80,0.7), rgba(35,30,25,0.85))',
+    iconColor: 'rgba(180,170,160,0.9)',
+    Icon: Mountain,
+  },
+  forest: {
+    bg: 'radial-gradient(circle at 30% 25%, rgba(30,80,30,0.6), rgba(10,35,10,0.85))',
+    iconColor: 'rgba(100,200,80,0.9)',
+    Icon: Trees,
+  },
 };
 
 export const ActiveExpeditionScreen = observer(() => {
@@ -55,11 +76,14 @@ export const ActiveExpeditionScreen = observer(() => {
       expeditionPathStore.initializeFromSession();
       const vw = viewportRef.current.offsetWidth;
       const vh = viewportRef.current.offsetHeight;
-      const px = expedition.position.x * CELL_SIZE + CELL_SIZE / 2;
-      const py = expedition.position.y * CELL_SIZE + CELL_SIZE / 2;
+      const stride = CELL_SIZE + 2;
+      const px = expedition.position.x * stride + CELL_SIZE / 2;
+      const py = expedition.position.y * stride + CELL_SIZE / 2;
       setOffset({ x: vw / 2 - px, y: vh / 2 - py });
     }
   }, [expedition?.map.id]);
+
+  const CELL_STRIDE = CELL_SIZE + 2; // cell + 2px gap
 
   // Update cell positions when offset/scale changes
   useEffect(() => {
@@ -69,20 +93,21 @@ export const ActiveExpeditionScreen = observer(() => {
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
         const key = coordKey({ x, y });
-        const screenX = offset.x + (x * CELL_SIZE + CELL_SIZE / 2) * scale;
-        const screenY = offset.y + (y * CELL_SIZE + CELL_SIZE / 2) * scale;
+        const screenX = offset.x + (x * CELL_STRIDE + CELL_SIZE / 2) * scale;
+        const screenY = offset.y + (y * CELL_STRIDE + CELL_SIZE / 2) * scale;
         positions.set(key, { x: screenX, y: screenY });
       }
     }
     setCellPositions(positions);
-  }, [offset, scale, map]);
+  }, [offset, scale, map, CELL_STRIDE]);
 
   const centerOnPlayer = useCallback(() => {
     if (!viewportRef.current || !expedition) return;
+    const stride = CELL_SIZE + 2;
     const vw = viewportRef.current.offsetWidth;
     const vh = viewportRef.current.offsetHeight;
-    const px = expedition.position.x * CELL_SIZE + CELL_SIZE / 2;
-    const py = expedition.position.y * CELL_SIZE + CELL_SIZE / 2;
+    const px = expedition.position.x * stride + CELL_SIZE / 2;
+    const py = expedition.position.y * stride + CELL_SIZE / 2;
     setOffset({ x: vw / 2 - px * scale, y: vh / 2 - py * scale });
   }, [scale, expedition]);
 
@@ -220,8 +245,8 @@ export const ActiveExpeditionScreen = observer(() => {
           {/* SVG Path Line */}
           <svg
             className="absolute top-0 left-0 pointer-events-none"
-            width={map.width * CELL_SIZE}
-            height={map.height * CELL_SIZE}
+            width={map.width * (CELL_SIZE + 2)}
+            height={map.height * (CELL_SIZE + 2)}
             style={{ zIndex: 5 }}
           >
             {isExecuting ? (
@@ -236,8 +261,11 @@ export const ActiveExpeditionScreen = observer(() => {
 
           {/* Grid */}
           <div
-            className="grid gap-0.5"
-            style={{ gridTemplateColumns: `repeat(${map.width}, 48px)` }}
+            className="grid"
+            style={{
+              gridTemplateColumns: `repeat(${map.width}, ${CELL_SIZE}px)`,
+              gap: 2,
+            }}
           >
             {map.nodes.map((node, i) => {
               const coord = node.coord;
@@ -251,29 +279,20 @@ export const ActiveExpeditionScreen = observer(() => {
                   ? expeditionExecutionStore.activeActivities.has(coordKey(coord))
                   : expeditionPathStore.isActivityActive(coord)
               );
-
-              // During execution, highlight current position
               const isCurrentExecution = !!(isExecuting &&
                 expeditionExecutionStore.currentPosition &&
                 coordsEqual(coord, expeditionExecutionStore.currentPosition));
-
-              let IconComponent: typeof Pickaxe | null = null;
-              if (hasActivity && node.activity) {
-                IconComponent = ACTIVITY_ICONS[node.activity];
-              } else if (node.terrain !== 'ground') {
-                IconComponent = TERRAIN_ICONS[node.terrain];
-              }
 
               return (
                 <GridCell
                   key={i}
                   coord={coord}
+                  terrain={node.terrain}
                   isPlayerHere={isPlayerHere}
                   isOnPath={isOnPath}
                   hasActivity={hasActivity}
                   isActivityActive={isActivityActive}
-                  isMountain={node.terrain === 'mountain'}
-                  IconComponent={IconComponent}
+                  activity={node.activity}
                   isExecuting={isExecuting}
                   isCurrentExecution={isCurrentExecution}
                 />
@@ -301,12 +320,15 @@ export const ActiveExpeditionScreen = observer(() => {
 
       {/* Legend */}
       <div className="bg-app-secondary p-2 border-t border-app flex-shrink-0">
-        <div className="flex justify-between items-center text-xs text-app-muted">
-          <span className="flex items-center gap-1"><Pickaxe size={12} /> Mine</span>
-          <span className="flex items-center gap-1"><Leaf size={12} /> Herb</span>
-          <span className="flex items-center gap-1"><Gem size={12} /> Gem</span>
-          <span className="flex items-center gap-1"><Swords size={12} /> Combat</span>
-          <span className="flex items-center gap-1"><Mountain size={12} /> Mtn</span>
+        <div className="flex justify-between items-center text-xs text-app-muted flex-wrap gap-1">
+          <span className="flex items-center gap-0.5"><Pickaxe size={11} /> Mine</span>
+          <span className="flex items-center gap-0.5"><Leaf size={11} /> Herb</span>
+          <span className="flex items-center gap-0.5"><Gem size={11} /> Gem</span>
+          <span className="flex items-center gap-0.5"><Swords size={11} /> Combat</span>
+          <span className="flex items-center gap-0.5"><Fish size={11} /> Fish</span>
+          <span className="flex items-center gap-0.5"><Mountain size={11} /> Mtn</span>
+          <span className="flex items-center gap-0.5"><Trees size={11} /> Forest</span>
+          <span className="flex items-center gap-0.5"><Waves size={11} /> Water</span>
         </div>
       </div>
 
@@ -355,37 +377,34 @@ export const ActiveExpeditionScreen = observer(() => {
 
 interface GridCellProps {
   coord: Coord;
+  terrain: TerrainType;
   isPlayerHere: boolean;
   isOnPath: boolean;
   hasActivity: boolean;
   isActivityActive: boolean;
-  isMountain: boolean;
-  IconComponent: typeof Pickaxe | null;
+  activity?: ActivityType;
   isExecuting?: boolean;
   isCurrentExecution?: boolean;
 }
 
 const GridCell = observer(({
   coord,
+  terrain,
   isPlayerHere,
   isOnPath,
   hasActivity,
   isActivityActive,
-  isMountain,
-  IconComponent,
+  activity,
   isExecuting = false,
   isCurrentExecution = false,
 }: GridCellProps) => {
-  const pressStart = useRef<number>(0);
   const pressTimer = useRef<number | null>(null);
   const didLongPress = useRef(false);
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    if (isExecuting) return; // Disable interaction during execution
-    e.stopPropagation(); // Prevent viewport pan
-    pressStart.current = Date.now();
+    if (isExecuting) return;
+    e.stopPropagation();
     didLongPress.current = false;
-
     pressTimer.current = window.setTimeout(() => {
       didLongPress.current = true;
       expeditionPathStore.toggleActivity(coord);
@@ -399,8 +418,6 @@ const GridCell = observer(({
       clearTimeout(pressTimer.current);
       pressTimer.current = null;
     }
-
-    // Only trigger tap if it wasn't a long press
     if (!didLongPress.current) {
       expeditionPathStore.handleTileTap(coord);
     }
@@ -413,16 +430,36 @@ const GridCell = observer(({
     }
   };
 
-  // Border styling for activities on path
-  let borderClass = 'border-2 border-transparent';
-  if (isOnPath && hasActivity) {
-    borderClass = isActivityActive
-      ? 'border-2 border-green-500'
-      : 'border-2 border-red-400';
+  const terrainStyle = TERRAIN_STYLES[terrain];
+
+  // Determine what to render inside the tile
+  let content: React.ReactNode = null;
+  if (isPlayerHere) {
+    content = <Flag size={18} color="rgba(56,189,248,1)" />;
+  } else if (hasActivity && activity) {
+    const ActivityIcon = ACTIVITY_ICONS[activity];
+    const iconColor = isActivityActive ? 'rgba(255,255,255,0.95)' : 'rgba(200,200,200,0.7)';
+    content = <ActivityIcon size={18} color={iconColor} />;
+  } else if (terrainStyle.Icon) {
+    // Show terrain icon (mountain, water, forest) only when no activity
+    const TerrainIcon = terrainStyle.Icon;
+    content = <TerrainIcon size={16} color={terrainStyle.iconColor} />;
   }
 
-  // Highlight current execution position
-  const executionHighlight = isCurrentExecution ? 'ring-4 ring-yellow-400 ring-opacity-80' : '';
+  // Overlay color when on path
+  const pathOverlay = isOnPath ? 'rgba(56,189,248,0.18)' : 'transparent';
+
+  // Border for activity state
+  let borderStyle = '1.5px solid rgba(80,50,15,0.5)';
+  if (isCurrentExecution) {
+    borderStyle = '2px solid rgba(250,204,21,0.9)';
+  } else if (isOnPath && hasActivity) {
+    borderStyle = isActivityActive
+      ? '2px solid rgba(34,197,94,0.9)'
+      : '2px solid rgba(239,68,68,0.8)';
+  } else if (isOnPath) {
+    borderStyle = '1.5px solid rgba(56,189,248,0.5)';
+  }
 
   return (
     <div
@@ -430,23 +467,33 @@ const GridCell = observer(({
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerLeave}
       onPointerCancel={handlePointerLeave}
-      className={`
-        w-12 h-12 flex items-center justify-center rounded select-none touch-none transition-all
-        ${isMountain ? 'bg-stone-700' : 'bg-app-tertiary'}
-        ${isOnPath ? 'ring-2 ring-sky-400/60' : ''}
-        ${borderClass}
-        ${executionHighlight}
-        ${isExecuting ? 'cursor-default' : 'cursor-pointer'}
-      `}
+      className="select-none touch-none transition-all"
+      style={{
+        width: CELL_SIZE,
+        height: CELL_SIZE,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 4,
+        background: terrainStyle.bg,
+        border: borderStyle,
+        boxShadow: isCurrentExecution
+          ? '0 0 0 3px rgba(250,204,21,0.4)'
+          : 'inset 0 1px 3px rgba(0,0,0,0.5)',
+        cursor: isExecuting ? 'default' : 'pointer',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
     >
-      {isPlayerHere ? (
-        <Flag size={20} className="text-accent" />
-      ) : IconComponent ? (
-        <IconComponent
-          size={20}
-          className={hasActivity ? 'text-app-primary' : 'text-app-muted/60'}
-        />
-      ) : null}
+      {/* Path overlay tint */}
+      {isOnPath && (
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: pathOverlay,
+          pointerEvents: 'none',
+        }} />
+      )}
+      {content}
     </div>
   );
 });
@@ -463,12 +510,13 @@ interface PathLineProps {
 const PathLine = ({ path, affordablePath }: PathLineProps) => {
   if (path.length < 2) return null;
 
+  const stride = CELL_SIZE + 2;
   const half = CELL_SIZE / 2;
 
   const toD = (coords: Coord[]) =>
     coords.map((c, i) => {
-      const x = c.x * CELL_SIZE + half;
-      const y = c.y * CELL_SIZE + half;
+      const x = c.x * stride + half;
+      const y = c.y * stride + half;
       return i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`;
     }).join(' ');
 
@@ -513,12 +561,13 @@ interface ExecutionPathLineProps {
 const ExecutionPathLine = ({ executionPath, currentIndex }: ExecutionPathLineProps) => {
   if (executionPath.length < 2) return null;
 
+  const stride = CELL_SIZE + 2;
   const half = CELL_SIZE / 2;
 
   const toD = (coords: Coord[]) =>
     coords.map((c, i) => {
-      const x = c.x * CELL_SIZE + half;
-      const y = c.y * CELL_SIZE + half;
+      const x = c.x * stride + half;
+      const y = c.y * stride + half;
       return i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`;
     }).join(' ');
 
