@@ -1,0 +1,1518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Idle Adventures — UX Prototype</title>
+  <style>
+    /* =========================================================
+       DESIGN TOKENS (mirrors the Tailwind CSS vars in the app)
+       ========================================================= */
+    :root {
+      --bg-primary:    #0f1117;
+      --bg-secondary:  #1a1d27;
+      --bg-tertiary:   #22263a;
+      --bg-hover:      #2a2f48;
+      --accent:        #3b82f6;     /* sky-500 */
+      --accent-subtle: #1e3a5f;
+      --accent-light:  #93c5fd;
+      --text-primary:  #f1f5f9;
+      --text-secondary:#94a3b8;
+      --text-muted:    #64748b;
+      --success:       #22c55e;
+      --warning:       #f59e0b;
+      --danger:        #ef4444;
+      --gold:          #fbbf24;
+      --radius:        12px;
+      --phone-w:       390px;
+      --phone-h:       844px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #070a12;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+      gap: 60px;
+    }
+
+    h1.page-title {
+      font-size: 24px;
+      color: var(--accent-light);
+      letter-spacing: 0.05em;
+      text-align: center;
+    }
+    .page-subtitle {
+      color: var(--text-muted);
+      font-size: 14px;
+      text-align: center;
+      margin-top: 6px;
+    }
+
+    /* ── Phone frame ────────────────────────────────────────── */
+    .screen-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    .screen-label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .phone {
+      width: var(--phone-w);
+      height: var(--phone-h);
+      background: var(--bg-primary);
+      border-radius: 44px;
+      border: 3px solid #2a2f48;
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 60px rgba(59,130,246,0.12), 0 30px 80px rgba(0,0,0,0.8);
+    }
+
+    /* ── Shared layout primitives ───────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 52px 20px 16px;
+      background: var(--bg-primary);
+    }
+    .header-back {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: var(--bg-tertiary);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; cursor: pointer; flex-shrink: 0;
+      color: var(--text-secondary);
+    }
+    .header-title {
+      font-size: 20px;
+      font-weight: 700;
+      flex: 1;
+    }
+    .header-badge {
+      background: var(--accent-subtle);
+      color: var(--accent-light);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 20px;
+    }
+
+    .scroll-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .scroll-body::-webkit-scrollbar { display: none; }
+
+    .card {
+      background: var(--bg-secondary);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .card-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    .bottom-nav {
+      display: flex;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--bg-hover);
+      padding: 8px 0 24px;
+    }
+    .nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 8px 0;
+      cursor: pointer;
+    }
+    .nav-icon { font-size: 20px; }
+    .nav-label { font-size: 10px; color: var(--text-muted); }
+    .nav-item.active .nav-label { color: var(--accent); }
+    .nav-item.active .nav-icon { filter: none; }
+
+    /* ── Stat chips ─────────────────────────────────────────── */
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .stat-chip {
+      background: var(--bg-tertiary);
+      border-radius: 10px;
+      padding: 10px 6px;
+      text-align: center;
+    }
+    .stat-value { font-size: 18px; font-weight: 700; color: var(--accent); }
+    .stat-gold { color: var(--gold); }
+    .stat-key { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+    /* ── Big CTA button ─────────────────────────────────────── */
+    .cta-btn {
+      width: 100%;
+      background: var(--accent);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      border: none;
+      text-align: left;
+    }
+    .cta-btn-icon { font-size: 26px; }
+    .cta-btn-title { font-size: 15px; font-weight: 700; color: #fff; }
+    .cta-btn-sub   { font-size: 12px; color: #bfdbfe; margin-top: 2px; }
+    .cta-btn-arrow { margin-left: auto; color: rgba(255,255,255,0.6); }
+
+    /* ── 2-column grid buttons ─────────────────────────────── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .tile-btn {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+      padding: 14px 12px;
+      cursor: pointer;
+      border: none;
+      text-align: left;
+      border: 1px solid transparent;
+    }
+    .tile-btn:hover { border-color: var(--bg-hover); }
+    .tile-icon { font-size: 20px; }
+    .tile-title { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 6px; }
+    .tile-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+    /* ── Player card ─────────────────────────────────────────── */
+    .player-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .avatar {
+      width: 52px; height: 52px;
+      background: var(--accent-subtle);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+    .player-name { font-size: 16px; font-weight: 700; }
+    .player-level { font-size: 12px; color: var(--text-secondary); }
+    .player-xp-bar {
+      height: 4px;
+      background: var(--bg-hover);
+      border-radius: 2px;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+    .player-xp-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      width: 42%;
+    }
+
+    /* ── SCREEN 2: Bank / Resources ─────────────────────────── */
+    .resource-category { margin-bottom: 8px; }
+    .resource-cat-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .resource-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .resource-item {
+      background: var(--bg-tertiary);
+      border-radius: 10px;
+      padding: 10px 6px;
+      text-align: center;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: border-color 0.15s;
+    }
+    .resource-item:hover { border-color: var(--accent-subtle); }
+    .resource-item.selected { border-color: var(--accent); background: var(--accent-subtle); }
+    .resource-icon { font-size: 22px; }
+    .resource-count { font-size: 11px; font-weight: 700; color: var(--text-primary); margin-top: 4px; }
+    .resource-name  { font-size: 9px; color: var(--text-muted); margin-top: 1px; }
+
+    /* Resource detail panel */
+    .detail-panel {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .detail-icon { font-size: 36px; }
+    .detail-name { font-size: 14px; font-weight: 700; }
+    .detail-desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .detail-meta { font-size: 11px; color: var(--accent-light); margin-top: 4px; }
+    .detail-actions { display: flex; gap: 8px; margin-left: auto; }
+    .detail-action-btn {
+      background: var(--accent);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      border: none;
+    }
+    .detail-action-btn.secondary {
+      background: var(--bg-hover);
+      color: var(--text-secondary);
+    }
+
+    /* Skill row */
+    .skill-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--bg-tertiary);
+    }
+    .skill-row:last-child { border-bottom: none; }
+    .skill-icon { font-size: 18px; width: 28px; text-align: center; }
+    .skill-info { flex: 1; }
+    .skill-name { font-size: 13px; font-weight: 600; }
+    .skill-level { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+    .skill-xp-bar { height: 3px; background: var(--bg-hover); border-radius: 2px; margin-top: 4px; overflow: hidden; }
+    .skill-xp-fill { height: 100%; background: var(--accent); border-radius: 2px; }
+    .skill-badge {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent);
+      min-width: 32px;
+      text-align: right;
+    }
+
+    /* ── SCREEN 3: Expedition Prep ───────────────────────────── */
+    .map-select-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+      padding: 12px;
+      cursor: pointer;
+      justify-content: space-between;
+    }
+    .map-info { flex: 1; }
+    .map-name { font-size: 14px; font-weight: 600; }
+    .map-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .map-tier-badge {
+      background: var(--warning);
+      color: #000;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 20px;
+    }
+
+    .loadout-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .loadout-slots-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    .slot {
+      width: 52px; height: 52px;
+      background: var(--bg-tertiary);
+      border-radius: 10px;
+      border: 1.5px dashed var(--bg-hover);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      cursor: pointer;
+      position: relative;
+    }
+    .slot.filled { border-style: solid; border-color: var(--accent-subtle); background: var(--accent-subtle); }
+    .slot-count {
+      position: absolute; bottom: 2px; right: 4px;
+      font-size: 9px; font-weight: 800; color: var(--accent-light);
+    }
+    .slot-vehicle { width: 56px; height: 56px; }
+
+    .mode-toggle {
+      display: flex;
+      background: var(--bg-tertiary);
+      border-radius: 10px;
+      padding: 3px;
+      gap: 3px;
+    }
+    .mode-option {
+      flex: 1;
+      text-align: center;
+      padding: 8px 4px;
+      border-radius: 8px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .mode-option.active {
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+    }
+    .mode-option:not(.active) { color: var(--text-muted); }
+    .mode-pct {
+      font-size: 10px;
+      margin-top: 1px;
+      opacity: 0.8;
+    }
+
+    .action-budget {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+    }
+    .budget-label { font-size: 12px; color: var(--text-muted); }
+    .budget-value { font-size: 20px; font-weight: 800; color: var(--success); }
+    .budget-sub { font-size: 10px; color: var(--text-muted); }
+
+    .start-btn {
+      width: 100%;
+      background: var(--accent);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 800;
+      padding: 18px;
+      border-radius: var(--radius);
+      border: none;
+      cursor: pointer;
+      text-align: center;
+      letter-spacing: 0.04em;
+    }
+    .start-btn:disabled {
+      background: var(--bg-hover);
+      color: var(--text-muted);
+      cursor: not-allowed;
+    }
+
+    /* ── SCREEN 4: Active Expedition (Grid) ─────────────────── */
+    .expedition-header {
+      padding: 48px 16px 10px;
+      background: var(--bg-primary);
+    }
+    .exp-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .exp-title { font-size: 16px; font-weight: 700; }
+    .exp-mode-pill {
+      font-size: 10px; font-weight: 700;
+      padding: 3px 9px; border-radius: 20px;
+      background: var(--accent-subtle);
+      color: var(--accent-light);
+    }
+    .exp-stats-row { display: flex; gap: 12px; }
+    .exp-stat { font-size: 11px; color: var(--text-muted); }
+    .exp-stat span { color: var(--text-primary); font-weight: 700; }
+
+    /* Budget bar */
+    .budget-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: var(--bg-primary);
+    }
+    .budget-bar-label { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+    .budget-bar-track {
+      flex: 1; height: 6px;
+      background: var(--bg-hover);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .budget-bar-fill {
+      height: 100%;
+      background: var(--success);
+      border-radius: 3px;
+      width: 62%;
+      transition: width 0.3s;
+    }
+    .budget-bar-val { font-size: 10px; color: var(--success); font-weight: 700; white-space: nowrap; }
+
+    /* Grid */
+    .grid-area {
+      flex: 1;
+      padding: 12px 14px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .map-grid {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 2px;
+    }
+    .cell {
+      aspect-ratio: 1;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      background: var(--bg-tertiary);
+      cursor: pointer;
+      position: relative;
+      border: 1px solid transparent;
+    }
+    .cell.empty  { background: var(--bg-secondary); }
+    .cell.mountain { background: #1e1e2e; }
+    .cell.path   { background: #1e3a5f; border-color: var(--accent); }
+    .cell.player { background: var(--accent); }
+    .cell.current { background: #15803d; }
+    .cell.node-mining   { background: #292524; }
+    .cell.node-herb     { background: #14532d; }
+    .cell.node-fishing  { background: #0c4a6e; }
+    .cell.node-combat   { background: #450a0a; }
+    .cell.node-gem      { background: #2e1065; }
+
+    /* Path dot overlay */
+    .cell.path::after {
+      content: '';
+      width: 4px; height: 4px;
+      background: var(--accent);
+      border-radius: 50%;
+      position: absolute;
+    }
+
+    /* Grid legend */
+    .legend {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 9px;
+      color: var(--text-muted);
+    }
+    .legend-dot {
+      width: 10px; height: 10px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    /* Bottom action bar for expedition */
+    .exp-actions {
+      padding: 10px 14px 26px;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--bg-hover);
+      display: flex;
+      gap: 8px;
+    }
+    .exp-action-btn {
+      flex: 1;
+      padding: 12px 8px;
+      border-radius: var(--radius);
+      border: none;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: center;
+    }
+    .exp-action-btn.primary { background: var(--accent); color: #fff; }
+    .exp-action-btn.secondary { background: var(--bg-tertiary); color: var(--text-secondary); }
+    .exp-action-btn.danger { background: #7f1d1d; color: #fca5a5; }
+
+    /* ── SCREEN 5: Minigame (Mining example) ─────────────────── */
+    .minigame-header {
+      padding: 48px 16px 12px;
+      background: var(--bg-primary);
+      text-align: center;
+    }
+    .mg-node-icon { font-size: 36px; margin-bottom: 8px; }
+    .mg-title { font-size: 18px; font-weight: 800; }
+    .mg-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+    .mg-body { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+    .rhythm-bar {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: center;
+    }
+    .rhythm-label { font-size: 11px; color: var(--text-muted); }
+    .rhythm-dots { display: flex; gap: 8px; }
+    .rhythm-dot {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: var(--bg-hover);
+      border: 2px solid var(--bg-hover);
+    }
+    .rhythm-dot.hit   { background: var(--success); border-color: var(--success); }
+    .rhythm-dot.miss  { background: var(--danger); border-color: var(--danger); }
+    .rhythm-dot.next  { border-color: var(--accent); animation: pulse-ring 0.8s ease infinite; }
+
+    @keyframes pulse-ring {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.6); }
+      50% { box-shadow: 0 0 0 6px rgba(59,130,246,0); }
+    }
+
+    .yield-meter {
+      background: var(--bg-secondary);
+      border-radius: var(--radius);
+      padding: 14px;
+    }
+    .yield-label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .yield-label { font-size: 12px; color: var(--text-muted); }
+    .yield-value { font-size: 22px; font-weight: 800; color: var(--success); }
+    .yield-track { height: 8px; background: var(--bg-hover); border-radius: 4px; overflow: hidden; }
+    .yield-fill  { height: 100%; background: var(--success); border-radius: 4px; width: 85%; }
+
+    .hit-button {
+      background: var(--bg-tertiary);
+      border: 2px solid var(--bg-hover);
+      border-radius: 20px;
+      padding: 20px;
+      cursor: pointer;
+      text-align: center;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .hit-button.active {
+      border-color: var(--accent);
+      background: var(--accent-subtle);
+      color: var(--accent-light);
+    }
+
+    .mg-footer {
+      padding: 10px 16px 26px;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--bg-hover);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .mg-hits { font-size: 20px; font-weight: 800; }
+    .mg-hits-label { font-size: 10px; color: var(--text-muted); }
+    .mg-skip {
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 8px 14px;
+      background: var(--bg-hover);
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    /* ── Page layout ─────────────────────────────────────────── */
+    .screens-row {
+      display: flex;
+      gap: 40px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .annotation {
+      max-width: var(--phone-w);
+      background: var(--bg-secondary);
+      border-radius: var(--radius);
+      padding: 14px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      border-left: 3px solid var(--accent);
+    }
+    .annotation strong { color: var(--text-primary); }
+
+    /* section divider */
+    .section-divider {
+      width: 100%;
+      max-width: 1600px;
+      border: none;
+      border-top: 1px solid var(--bg-secondary);
+    }
+
+    /* Tab bar inside bank */
+    .tab-bar {
+      display: flex;
+      gap: 0;
+      background: var(--bg-tertiary);
+      border-radius: 10px;
+      padding: 3px;
+      margin-bottom: 14px;
+    }
+    .tab { flex: 1; text-align: center; padding: 7px 4px; border-radius: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); cursor: pointer; }
+    .tab.active { background: var(--accent); color: #fff; }
+
+    /* Tooltip / floating loot */
+    .float-loot {
+      position: absolute;
+      top: 20px; left: 50%;
+      transform: translateX(-50%);
+      background: var(--success);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 20px;
+      white-space: nowrap;
+      opacity: 0.9;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+<h1 class="page-title">Idle Adventures — UX Prototype</h1>
+<p class="page-subtitle">Five core screens · Mobile-first · Google Stitch reference</p>
+
+<!-- ================================================================
+     ROW 1 — Town Hub + Bank/Resources
+     ================================================================ -->
+<div class="screens-row">
+
+  <!-- SCREEN 1: Town Hub -->
+  <div class="screen-group">
+    <span class="screen-label">01 · Town Hub (Home)</span>
+    <div class="phone">
+      <div class="header">
+        <div class="header-title">Thornvale</div>
+        <div class="header-badge">⚡ 3 ready</div>
+      </div>
+
+      <div class="scroll-body">
+        <!-- Player card -->
+        <div class="card">
+          <div class="player-card">
+            <div class="avatar">🧙</div>
+            <div style="flex:1">
+              <div class="player-name">Adventurer</div>
+              <div class="player-level">Level 12 · Ranger</div>
+              <div class="player-xp-bar"><div class="player-xp-fill"></div></div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:18px;font-weight:800;color:var(--gold)">2,450</div>
+              <div style="font-size:10px;color:var(--text-muted)">gold</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stat-row">
+          <div class="stat-chip">
+            <div class="stat-value" style="font-size:14px">🍞 14</div>
+            <div class="stat-key">Food</div>
+          </div>
+          <div class="stat-chip">
+            <div class="stat-value" style="font-size:14px">🎒 28</div>
+            <div class="stat-key">Items</div>
+          </div>
+          <div class="stat-chip">
+            <div class="stat-value" style="font-size:14px">🗺 3</div>
+            <div class="stat-key">Maps</div>
+          </div>
+        </div>
+
+        <!-- Primary CTA -->
+        <button class="cta-btn">
+          <span class="cta-btn-icon">🗺</span>
+          <div>
+            <div class="cta-btn-title">Start Expedition</div>
+            <div class="cta-btn-sub">Iron Hills · 2 days · Tier 1</div>
+          </div>
+          <span class="cta-btn-arrow">❯</span>
+        </button>
+
+        <!-- Secondary actions -->
+        <div class="card" style="padding:12px">
+          <div class="card-title">Town Actions</div>
+          <div class="grid-2">
+            <button class="tile-btn">
+              <div class="tile-icon">🏦</div>
+              <div class="tile-title">Bank</div>
+              <div class="tile-sub">28 item types</div>
+            </button>
+            <button class="tile-btn">
+              <div class="tile-icon">📊</div>
+              <div class="tile-title">Skills</div>
+              <div class="tile-sub">9 active</div>
+            </button>
+            <button class="tile-btn">
+              <div class="tile-icon">⚒</div>
+              <div class="tile-title">Smithing</div>
+              <div class="tile-sub">Lvl 8 · 3 recipes</div>
+            </button>
+            <button class="tile-btn">
+              <div class="tile-icon">🍳</div>
+              <div class="tile-title">Cooking</div>
+              <div class="tile-sub">Lvl 5 · 2 recipes</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Recent loot summary -->
+        <div class="card">
+          <div class="card-title">Last Expedition</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:4px;background:var(--bg-tertiary);padding:5px 9px;border-radius:8px;font-size:12px">
+              <span>⛏</span><span style="color:var(--text-primary);font-weight:700">14</span><span style="color:var(--text-muted)">Iron Ore</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;background:var(--bg-tertiary);padding:5px 9px;border-radius:8px;font-size:12px">
+              <span>🌿</span><span style="color:var(--text-primary);font-weight:700">6</span><span style="color:var(--text-muted)">Curaweed</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;background:var(--bg-tertiary);padding:5px 9px;border-radius:8px;font-size:12px">
+              <span>🐟</span><span style="color:var(--text-primary);font-weight:700">9</span><span style="color:var(--text-muted)">Sardines</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;background:var(--bg-tertiary);padding:5px 9px;border-radius:8px;font-size:12px">
+              <span>+342</span><span style="color:var(--gold);font-weight:700">xp</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bottom-nav">
+        <div class="nav-item active">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-label" style="color:var(--accent)">Town</span>
+        </div>
+        <div class="nav-item">
+          <span class="nav-icon">🗺</span>
+          <span class="nav-label">Expedition</span>
+        </div>
+        <div class="nav-item">
+          <span class="nav-icon">🎒</span>
+          <span class="nav-label">Bank</span>
+        </div>
+        <div class="nav-item">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Skills</span>
+        </div>
+      </div>
+    </div>
+    <div class="annotation">
+      <strong>Key UX decisions:</strong> Expedition CTA is always primary and persistent. Last expedition summary surfaces the reward loop immediately. Town actions are secondary grid — never competing with the main call-to-action.
+    </div>
+  </div>
+
+  <!-- SCREEN 2: Bank / Resources -->
+  <div class="screen-group">
+    <span class="screen-label">02 · Bank / Resource View</span>
+    <div class="phone">
+      <div class="header">
+        <div class="header-back">‹</div>
+        <div class="header-title">Bank</div>
+        <div style="font-size:12px;color:var(--text-muted)">28 items</div>
+      </div>
+
+      <div class="scroll-body" style="padding-top:10px">
+        <!-- Search / filter -->
+        <div style="display:flex;gap:8px">
+          <div style="flex:1;background:var(--bg-tertiary);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:6px">
+            <span>🔍</span> Search items…
+          </div>
+          <div style="background:var(--bg-tertiary);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--text-muted)">Filter</div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tab-bar">
+          <div class="tab active">All</div>
+          <div class="tab">Ores</div>
+          <div class="tab">Herbs</div>
+          <div class="tab">Fish</div>
+          <div class="tab">Gems</div>
+          <div class="tab">Food</div>
+        </div>
+
+        <!-- Ores section -->
+        <div class="resource-category">
+          <div class="resource-cat-label">⛏ Ores &amp; Bars</div>
+          <div class="resource-grid">
+            <div class="resource-item selected">
+              <div class="resource-icon">🪨</div>
+              <div class="resource-count">47</div>
+              <div class="resource-name">Copper</div>
+            </div>
+            <div class="resource-item">
+              <div class="resource-icon">⚙️</div>
+              <div class="resource-count">14</div>
+              <div class="resource-name">Iron Ore</div>
+            </div>
+            <div class="resource-item">
+              <div class="resource-icon">🔧</div>
+              <div class="resource-count">6</div>
+              <div class="resource-name">Iron Bar</div>
+            </div>
+            <div class="resource-item">
+              <div class="resource-icon">✨</div>
+              <div class="resource-count">2</div>
+              <div class="resource-name">Gold Ore</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Selected item detail -->
+        <div class="detail-panel">
+          <div class="detail-icon">🪨</div>
+          <div style="flex:1">
+            <div class="detail-name">Copper Ore</div>
+            <div class="detail-desc">Raw ore from shallow mines</div>
+            <div class="detail-meta">→ Smelt 3:1 into Copper Bar · Value: 2g each</div>
+          </div>
+          <div class="detail-actions">
+            <button class="detail-action-btn">Smelt</button>
+            <button class="detail-action-btn secondary">Sell</button>
+          </div>
+        </div>
+
+        <!-- Herbs section -->
+        <div class="resource-category">
+          <div class="resource-cat-label">🌿 Herbs</div>
+          <div class="resource-grid">
+            <div class="resource-item">
+              <div class="resource-icon">🌱</div>
+              <div class="resource-count">22</div>
+              <div class="resource-name">Curaweed</div>
+            </div>
+            <div class="resource-item">
+              <div class="resource-icon">🍀</div>
+              <div class="resource-count">8</div>
+              <div class="resource-name">Vitalroot</div>
+            </div>
+            <div class="resource-item">
+              <div class="resource-icon">🌺</div>
+              <div class="resource-count">1</div>
+              <div class="resource-name">Emberheart</div>
+            </div>
+            <div class="resource-item" style="opacity:0.3">
+              <div class="resource-icon">?</div>
+              <div class="resource-count">–</div>
+              <div class="resource-name">???</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fish section -->
+        <div class="resource-category">
+          <div class="resource-cat-label">🐟 Fish</div>
+          <div class="resource-grid">
+            <div class="resource-item">
+              <div class="resource-icon">🐟</div>
+              <div class="resource-count">9</div>
+              <div class="resource-name">Sardines</div>
+            </div>
+            <div class="resource-item">
+              <div class="resource-icon">🎣</div>
+              <div class="resource-count">4</div>
+              <div class="resource-name">Trout</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bottom-nav">
+        <div class="nav-item">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-label">Town</span>
+        </div>
+        <div class="nav-item">
+          <span class="nav-icon">🗺</span>
+          <span class="nav-label">Expedition</span>
+        </div>
+        <div class="nav-item active">
+          <span class="nav-icon">🎒</span>
+          <span class="nav-label" style="color:var(--accent)">Bank</span>
+        </div>
+        <div class="nav-item">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Skills</span>
+        </div>
+      </div>
+    </div>
+    <div class="annotation">
+      <strong>Key UX decisions:</strong> Category tabs + search prevents scroll fatigue as bank grows. Tapping an item shows inline actions (smelt / sell) without a modal — keeps context. Undiscovered items shown greyed-out (mystery unlocks curiosity).
+    </div>
+  </div>
+
+</div>
+
+<hr class="section-divider" />
+
+<!-- ================================================================
+     ROW 2 — Skills View + Expedition Prep
+     ================================================================ -->
+<div class="screens-row">
+
+  <!-- SCREEN 3: Skills / Progression -->
+  <div class="screen-group">
+    <span class="screen-label">03 · Skills / Progression</span>
+    <div class="phone">
+      <div class="header">
+        <div class="header-back">‹</div>
+        <div class="header-title">Skills</div>
+        <div class="header-badge">Lv 12</div>
+      </div>
+
+      <div class="scroll-body">
+        <!-- Combat level summary -->
+        <div class="card" style="display:flex;align-items:center;gap:14px">
+          <div style="font-size:36px">⚔️</div>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:700">Combat Level 14</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Melee 12 · Ranged 10</div>
+            <div class="player-xp-bar" style="margin-top:6px"><div class="player-xp-fill" style="width:62%"></div></div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:16px;font-weight:800;color:var(--success)">62%</div>
+            <div style="font-size:10px;color:var(--text-muted)">to Lv 15</div>
+          </div>
+        </div>
+
+        <!-- Gathering skills -->
+        <div class="card">
+          <div class="card-title">Gathering</div>
+          <div>
+            <div class="skill-row">
+              <div class="skill-icon">⛏</div>
+              <div class="skill-info">
+                <div class="skill-name">Mining</div>
+                <div class="skill-level">Tier 2 nodes unlocked</div>
+                <div class="skill-xp-bar"><div class="skill-xp-fill" style="width:75%"></div></div>
+              </div>
+              <div class="skill-badge">Lv 15</div>
+            </div>
+            <div class="skill-row">
+              <div class="skill-icon">🌿</div>
+              <div class="skill-info">
+                <div class="skill-name">Herbalism</div>
+                <div class="skill-level">Tier 2 herbs identifiable</div>
+                <div class="skill-xp-bar"><div class="skill-xp-fill" style="width:42%"></div></div>
+              </div>
+              <div class="skill-badge">Lv 11</div>
+            </div>
+            <div class="skill-row">
+              <div class="skill-icon">🐟</div>
+              <div class="skill-info">
+                <div class="skill-name">Fishing</div>
+                <div class="skill-level">Sardines, Trout unlocked</div>
+                <div class="skill-xp-bar"><div class="skill-xp-fill" style="width:28%"></div></div>
+              </div>
+              <div class="skill-badge">Lv 7</div>
+            </div>
+            <div class="skill-row" style="opacity:0.5">
+              <div class="skill-icon">🪵</div>
+              <div class="skill-info">
+                <div class="skill-name">Woodcutting</div>
+                <div class="skill-level">🔒 Requires Axe</div>
+                <div class="skill-xp-bar"><div class="skill-xp-fill" style="width:0%"></div></div>
+              </div>
+              <div class="skill-badge" style="color:var(--text-muted)">–</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Crafting skills -->
+        <div class="card">
+          <div class="card-title">Crafting</div>
+          <div>
+            <div class="skill-row">
+              <div class="skill-icon">⚒</div>
+              <div class="skill-info">
+                <div class="skill-name">Smithing</div>
+                <div class="skill-level">Copper, Iron · 3 recipes</div>
+                <div class="skill-xp-bar"><div class="skill-xp-fill" style="width:55%"></div></div>
+              </div>
+              <div class="skill-badge">Lv 8</div>
+            </div>
+            <div class="skill-row">
+              <div class="skill-icon">🍳</div>
+              <div class="skill-info">
+                <div class="skill-name">Cooking</div>
+                <div class="skill-level">Bread, Sardines · 2 recipes</div>
+                <div class="skill-xp-bar"><div class="skill-xp-fill" style="width:35%"></div></div>
+              </div>
+              <div class="skill-badge">Lv 5</div>
+            </div>
+            <div class="skill-row" style="opacity:0.4">
+              <div class="skill-icon">🧪</div>
+              <div class="skill-info">
+                <div class="skill-name">Alchemy</div>
+                <div class="skill-level">🔒 Herbalism Lv 15 req.</div>
+                <div class="skill-xp-bar"><div class="skill-xp-fill" style="width:0%"></div></div>
+              </div>
+              <div class="skill-badge" style="color:var(--text-muted)">–</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Exploration -->
+        <div class="card">
+          <div class="card-title">Exploration</div>
+          <div>
+            <div class="skill-row">
+              <div class="skill-icon">🗺</div>
+              <div class="skill-info">
+                <div class="skill-name">Cartography</div>
+                <div class="skill-level">Reveals quantities on maps</div>
+                <div class="skill-xp-bar"><div class="skill-xp-fill" style="width:20%"></div></div>
+              </div>
+              <div class="skill-badge">Lv 4</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bottom-nav">
+        <div class="nav-item">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-label">Town</span>
+        </div>
+        <div class="nav-item">
+          <span class="nav-icon">🗺</span>
+          <span class="nav-label">Expedition</span>
+        </div>
+        <div class="nav-item">
+          <span class="nav-icon">🎒</span>
+          <span class="nav-label">Bank</span>
+        </div>
+        <div class="nav-item active">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label" style="color:var(--accent)">Skills</span>
+        </div>
+      </div>
+    </div>
+    <div class="annotation">
+      <strong>Key UX decisions:</strong> Locked skills shown greyed (not hidden) to communicate the progression tree. XP bars on each row give constant micro-feedback. Unlock prerequisites stated inline — no tooltip hunting. Crafting skills grouped separately from gathering to signal different play loops.
+    </div>
+  </div>
+
+  <!-- SCREEN 4: Expedition Prep -->
+  <div class="screen-group">
+    <span class="screen-label">04 · Expedition Prep</span>
+    <div class="phone">
+      <div class="header">
+        <div class="header-back">‹</div>
+        <div class="header-title">Prepare Expedition</div>
+      </div>
+
+      <div class="scroll-body">
+        <!-- Map selection -->
+        <div class="card">
+          <div class="card-title">Destination</div>
+          <div class="map-select-card">
+            <span style="font-size:22px">📜</span>
+            <div class="map-info">
+              <div class="map-name">Iron Hills</div>
+              <div class="map-meta">2 days travel · Ore-heavy · 6×6 grid</div>
+            </div>
+            <span class="map-tier-badge">T1</span>
+            <span style="color:var(--text-muted);font-size:14px;margin-left:8px">❯</span>
+          </div>
+          <!-- Alternative map hint -->
+          <div style="margin-top:8px;padding:8px 10px;background:var(--bg-tertiary);border-radius:8px;font-size:11px;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center">
+            <span>🗺 Frostpeak Valley (T2) also available</span>
+            <span style="color:var(--accent);font-weight:700">Swap</span>
+          </div>
+        </div>
+
+        <!-- Loadout -->
+        <div class="card">
+          <div class="card-title">Loadout</div>
+
+          <div class="loadout-label">Vehicle</div>
+          <div class="loadout-slots-row">
+            <div class="slot slot-vehicle filled">🐴<span class="slot-count">+8</span></div>
+          </div>
+
+          <div class="loadout-label" style="display:flex;justify-content:space-between">
+            <span>Food (6 slots)</span>
+            <span style="color:var(--success);font-size:11px;font-weight:700">24 actions</span>
+          </div>
+          <div class="loadout-slots-row">
+            <div class="slot filled">🍞<span class="slot-count">x4</span></div>
+            <div class="slot filled">🍞<span class="slot-count">x4</span></div>
+            <div class="slot filled">🥩<span class="slot-count">x2</span></div>
+            <div class="slot filled">🥩<span class="slot-count">x2</span></div>
+            <div class="slot"></div>
+            <div class="slot"></div>
+          </div>
+
+          <div class="loadout-label">Misc (2 slots)</div>
+          <div class="loadout-slots-row">
+            <div class="slot filled">⚗️</div>
+            <div class="slot"></div>
+          </div>
+        </div>
+
+        <!-- Mode toggle -->
+        <div class="card">
+          <div class="card-title">Play Mode</div>
+          <div class="mode-toggle">
+            <div class="mode-option active">
+              <div>⚡ Active</div>
+              <div class="mode-pct">85–100% yield</div>
+            </div>
+            <div class="mode-option">
+              <div>💤 Passive</div>
+              <div class="mode-pct">70% yield</div>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:8px;padding:0 2px">
+            Active mode triggers minigames at each resource node for bonus yield.
+          </div>
+        </div>
+
+        <!-- Action budget -->
+        <div class="action-budget">
+          <div>
+            <div class="budget-label">Action Budget</div>
+            <div class="budget-sub">Based on food in loadout</div>
+          </div>
+          <div style="text-align:right">
+            <div class="budget-value">24</div>
+            <div class="budget-sub">≈ 14 min</div>
+          </div>
+        </div>
+
+        <!-- Start button -->
+        <button class="start-btn">Begin Expedition →</button>
+      </div>
+    </div>
+    <div class="annotation">
+      <strong>Key UX decisions:</strong> Action budget shown prominently so players understand the session length before committing. Mode toggle front-and-centre — this is a core identity choice. Map alt-suggestion prevents dead-end if preferred map is full.
+    </div>
+  </div>
+
+</div>
+
+<hr class="section-divider" />
+
+<!-- ================================================================
+     ROW 3 — Active Expedition Grid + Mining Minigame
+     ================================================================ -->
+<div class="screens-row">
+
+  <!-- SCREEN 5: Active Expedition Grid -->
+  <div class="screen-group">
+    <span class="screen-label">05 · Active Expedition (Grid)</span>
+    <div class="phone">
+      <div class="expedition-header">
+        <div class="exp-top-row">
+          <div class="exp-title">Iron Hills</div>
+          <div class="exp-mode-pill">⚡ Active</div>
+        </div>
+        <div class="exp-stats-row">
+          <div class="exp-stat">Actions: <span>24</span></div>
+          <div class="exp-stat">Remaining: <span style="color:var(--warning)">15</span></div>
+          <div class="exp-stat">Carry: <span>14/40</span></div>
+        </div>
+      </div>
+
+      <!-- Budget bar -->
+      <div class="budget-bar-row">
+        <span class="budget-bar-label">Budget</span>
+        <div class="budget-bar-track">
+          <div class="budget-bar-fill" style="width:62%"></div>
+        </div>
+        <span class="budget-bar-val">15 left</span>
+      </div>
+
+      <div class="grid-area">
+        <!-- 10×10 map grid (simplified 10×10) -->
+        <div class="map-grid">
+          <!-- Row 0 -->
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell node-mining">⛏</div>
+          <div class="cell empty"></div>
+          <div class="cell mountain">⛰</div>
+          <div class="cell mountain">⛰</div>
+          <div class="cell empty"></div>
+          <div class="cell node-gem">💎</div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <!-- Row 1 -->
+          <div class="cell empty"></div>
+          <div class="cell path"></div>
+          <div class="cell path"></div>
+          <div class="cell path"></div>
+          <div class="cell mountain">⛰</div>
+          <div class="cell empty"></div>
+          <div class="cell node-herb">🌿</div>
+          <div class="cell empty"></div>
+          <div class="cell node-combat">⚔️</div>
+          <div class="cell empty"></div>
+          <!-- Row 2 -->
+          <div class="cell player">🧙</div>
+          <div class="cell path"></div>
+          <div class="cell node-mining">⛏</div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell node-herb">🌿</div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <!-- Row 3 -->
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell path"></div>
+          <div class="cell path"></div>
+          <div class="cell node-fishing">🐟</div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell node-gem">💎</div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <!-- Row 4 -->
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell current">✓</div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell mountain">⛰</div>
+          <div class="cell mountain">⛰</div>
+          <div class="cell empty"></div>
+          <div class="cell node-mining">⛏</div>
+          <!-- Row 5 -->
+          <div class="cell empty"></div>
+          <div class="cell node-mining">⛏</div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell node-herb">🌿</div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell node-combat">⚔️</div>
+          <div class="cell empty"></div>
+          <!-- Row 6 -->
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell node-fishing">🐟</div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <!-- Row 7 -->
+          <div class="cell mountain">⛰</div>
+          <div class="cell mountain">⛰</div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell node-gem">💎</div>
+          <div class="cell empty"></div>
+          <div class="cell node-mining">⛏</div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <!-- Row 8 -->
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell node-herb">🌿</div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell node-fishing">🐟</div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <!-- Row 9 -->
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell node-mining">⛏</div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+        </div>
+
+        <!-- Legend -->
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#1e3a5f;border:1px solid var(--accent)"></div> Path</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div> You</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#292524"></div> Mining</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#14532d"></div> Herb</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#0c4a6e"></div> Fish</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#450a0a"></div> Combat</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#2e1065"></div> Gem</div>
+        </div>
+      </div>
+
+      <div class="exp-actions">
+        <button class="exp-action-btn secondary">✏️ Erase</button>
+        <button class="exp-action-btn primary">✓ Confirm Path</button>
+        <button class="exp-action-btn danger">⬅ Return</button>
+      </div>
+    </div>
+    <div class="annotation">
+      <strong>Key UX decisions:</strong> Path shown in blue highlight before confirming — player sees cost vs. budget before committing. Player character shown on grid for positional orientation. Erase + Return as secondary actions prevent accidental termination. Node type colours provide at-a-glance density read.
+    </div>
+  </div>
+
+  <!-- SCREEN 6: Mining Minigame -->
+  <div class="screen-group">
+    <span class="screen-label">06 · Mining Minigame (Active Mode)</span>
+    <div class="phone">
+      <div class="minigame-header">
+        <div class="mg-node-icon">⛏</div>
+        <div class="mg-title">Iron Ore Vein</div>
+        <div class="mg-subtitle">Hit on the beat to maximise yield</div>
+      </div>
+
+      <div class="mg-body">
+        <!-- Rhythm display -->
+        <div class="rhythm-bar">
+          <div class="rhythm-label">Hit rhythm — 10 strikes</div>
+          <div class="rhythm-dots">
+            <div class="rhythm-dot hit"></div>
+            <div class="rhythm-dot hit"></div>
+            <div class="rhythm-dot hit"></div>
+            <div class="rhythm-dot miss"></div>
+            <div class="rhythm-dot hit"></div>
+            <div class="rhythm-dot next"></div>
+            <div class="rhythm-dot"></div>
+            <div class="rhythm-dot"></div>
+            <div class="rhythm-dot"></div>
+            <div class="rhythm-dot"></div>
+          </div>
+          <div style="font-size:10px;color:var(--text-muted)">Strike 6 of 10</div>
+        </div>
+
+        <!-- Yield meter -->
+        <div class="yield-meter">
+          <div class="yield-label-row">
+            <div class="yield-label">Current Yield</div>
+            <div class="yield-value">+85%</div>
+          </div>
+          <div class="yield-track"><div class="yield-fill"></div></div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:6px;display:flex;justify-content:space-between">
+            <span>Min: 70%</span><span style="color:var(--success)">Perfect: 150%</span>
+          </div>
+        </div>
+
+        <!-- Timing indicator -->
+        <div style="background:var(--bg-tertiary);border-radius:var(--radius);padding:14px;text-align:center">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">Next beat in…</div>
+          <div style="font-size:28px;font-weight:800;color:var(--accent-light)">0.4s</div>
+          <div style="height:6px;background:var(--bg-hover);border-radius:3px;margin-top:8px;overflow:hidden">
+            <div style="height:100%;background:var(--accent);border-radius:3px;width:35%;"></div>
+          </div>
+        </div>
+
+        <!-- Hit zone button -->
+        <div class="hit-button active">TAP TO STRIKE</div>
+
+        <!-- Resource preview -->
+        <div style="display:flex;align-items:center;justify-content:center;gap:10px;font-size:12px;color:var(--text-muted)">
+          <span>Expected:</span>
+          <span style="color:var(--text-primary);font-weight:700">⛏ 3–5 Iron Ore</span>
+          <span>at current yield</span>
+        </div>
+      </div>
+
+      <div class="mg-footer">
+        <div>
+          <div class="mg-hits">4/10</div>
+          <div class="mg-hits-label">hits landed</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+          <div style="font-size:18px;font-weight:800;color:var(--warning)">1</div>
+          <div class="mg-hits-label">miss</div>
+        </div>
+        <div class="mg-skip">Skip (70%)</div>
+      </div>
+    </div>
+    <div class="annotation">
+      <strong>Key UX decisions:</strong> "Skip" always accessible so passive players never feel forced. Yield meter gives real-time feedback on performance. Dots show history so players can learn the pattern. Countdown timer frames the challenge without pressure — you can watch the beat, then hit.
+    </div>
+  </div>
+
+</div>
+
+<hr class="section-divider" />
+
+<!-- ================================================================
+     UX DECISIONS SUMMARY
+     ================================================================ -->
+<div style="max-width:900px;width:100%">
+  <h2 style="font-size:18px;color:var(--accent-light);margin-bottom:20px;text-align:center;letter-spacing:0.05em">
+    KEY UX DECISIONS SUMMARY
+  </h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+    <div class="annotation" style="border-left-color:var(--gold)">
+      <strong>1. Expedition CTA is always the hero.</strong><br>
+      Town screen is a launch pad, not a dashboard. The primary button is always "Start Expedition" — everything else is secondary grid. This ensures the core loop stays front-and-centre even as town features expand.
+    </div>
+
+    <div class="annotation" style="border-left-color:var(--success)">
+      <strong>2. Action budget makes sessions legible.</strong><br>
+      Players need to know before committing how long a session will be. Showing "24 actions ≈ 14 min" lets players fit the game into their real life. The budget bar during expedition gives ongoing progress feedback.
+    </div>
+
+    <div class="annotation" style="border-left-color:var(--warning)">
+      <strong>3. Active vs Passive is a first-class toggle.</strong><br>
+      This is the core identity trade-off. It's placed in Expedition Prep (not buried in settings) and shows both yield percentages. Players choose their engagement level on each trip, not once as a global preference.
+    </div>
+
+    <div class="annotation" style="border-left-color:var(--accent)">
+      <strong>4. Grid path preview before confirming.</strong><br>
+      Blue highlight shows the planned route, resource types along it, and remaining action budget. This "plan then commit" model reduces frustration and teaches the packing puzzle over time.
+    </div>
+
+    <div class="annotation" style="border-left-color:#a855f7">
+      <strong>5. Minigames have an escape hatch.</strong><br>
+      The "Skip (70%)" option on every minigame prevents any screen from feeling like a trap. Players who want auto yield never feel punished. Players who engage earn a bonus — not players who disengage get penalised.
+    </div>
+
+    <div class="annotation" style="border-left-color:#ec4899">
+      <strong>6. Bank shows undiscovered items greyed.</strong><br>
+      Locked items visible-but-greyed (not hidden) communicates there is more to discover without spoiling it. This creates curiosity loops: "what IS that 4th gem?" drives continued play.
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>
