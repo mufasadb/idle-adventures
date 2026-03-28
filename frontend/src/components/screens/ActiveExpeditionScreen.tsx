@@ -23,6 +23,7 @@ const ACTIVITY_ICONS: Record<ActivityType, typeof Pickaxe> = {
   gems: Gem,
   combat: Swords,
   fishing: Fish,
+  woodcutting: Trees,
 };
 
 /** Terrain-specific tile gradient + icon colour */

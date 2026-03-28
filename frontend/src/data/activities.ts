@@ -200,6 +200,44 @@ export const ACTIVITIES: Record<ActivityType, ActivityDataDefinition> = {
       },
     ],
   },
+
+  woodcutting: {
+    type: 'woodcutting',
+    name: 'Woodcutting',
+    icon: '🪓',
+    tiers: [
+      {
+        tier: 1,
+        rewards: [
+          { itemId: 'pine-log', baseCount: 10, weight: 70 },
+          { itemId: 'oak-log', baseCount: 8, weight: 30 },
+        ],
+      },
+      {
+        tier: 2,
+        rewards: [
+          { itemId: 'oak-log', baseCount: 10, weight: 60 },
+          { itemId: 'willow-log', baseCount: 8, weight: 40 },
+        ],
+      },
+      {
+        tier: 3,
+        rewards: [
+          { itemId: 'willow-log', baseCount: 10, weight: 50 },
+          { itemId: 'maple-log', baseCount: 8, weight: 30 },
+          { itemId: 'ironbark-log', baseCount: 6, weight: 20 },
+        ],
+      },
+      {
+        tier: 4,
+        rewards: [
+          { itemId: 'ironbark-log', baseCount: 10, weight: 50 },
+          { itemId: 'ebony-log', baseCount: 8, weight: 30 },
+          { itemId: 'yew-log', baseCount: 6, weight: 20 },
+        ],
+      },
+    ],
+  },
 };
 
 /**

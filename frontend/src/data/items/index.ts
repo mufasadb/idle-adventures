@@ -8,10 +8,11 @@
 import type { ItemDefinition, LoadoutSlotType, ItemCategory } from '../../types';
 import { FOOD_ITEMS } from './food';
 import { INGREDIENT_ITEMS } from './ingredients';
-import { EQUIPMENT_ITEMS, TOOL_ITEMS, POTION_ITEMS, VEHICLE_ITEMS } from './equipment';
+import { EQUIPMENT_ITEMS, TOOL_ITEMS, POTION_ITEMS, VEHICLE_ITEMS, AXE_ITEMS, PICKAXE_ITEMS, HERBALIST_ITEMS, FISHING_ROD_ITEMS } from './equipment';
 import { MATERIAL_ITEMS, ORE_ITEMS, HERB_ITEMS, COMBAT_DROP_ITEMS, BAR_ITEMS } from './materials';
 import { GEM_ITEMS } from './gems';
 import { CURRENCY_ITEMS } from './currency';
+import { TIMBER_ITEMS, HANDLE_ITEMS } from './timber';
 
 // Re-export ItemCategory for consumers that import from data/items
 export type { ItemCategory };
@@ -24,6 +25,10 @@ export {
   TOOL_ITEMS,
   POTION_ITEMS,
   VEHICLE_ITEMS,
+  AXE_ITEMS,
+  PICKAXE_ITEMS,
+  HERBALIST_ITEMS,
+  FISHING_ROD_ITEMS,
   MATERIAL_ITEMS,
   ORE_ITEMS,
   HERB_ITEMS,
@@ -31,6 +36,8 @@ export {
   BAR_ITEMS,
   GEM_ITEMS,
   CURRENCY_ITEMS,
+  TIMBER_ITEMS,
+  HANDLE_ITEMS,
 };
 
 /**
@@ -44,6 +51,8 @@ export const ITEMS: Record<string, ItemDefinition> = {
   ...MATERIAL_ITEMS,
   ...GEM_ITEMS,
   ...CURRENCY_ITEMS,
+  ...TIMBER_ITEMS,
+  ...HANDLE_ITEMS,
 };
 
 /**

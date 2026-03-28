@@ -6,7 +6,7 @@
 
 import type { ItemDefinition } from '../../types';
 
-// === Mining Ores ===
+// === Mining Ores (tiered: copper/tin T1, iron T2, gold/silver T3, mithril T4, adamant T5) ===
 export const ORE_ITEMS: Record<string, ItemDefinition> = {
   'copper-ore': {
     id: 'copper-ore',
@@ -14,6 +14,8 @@ export const ORE_ITEMS: Record<string, ItemDefinition> = {
     icon: '🟤',
     category: 'material',
     stackSize: 50,
+    tier: 1,
+    skillType: 'mining',
     description: 'Common ore, needs smelting.',
   },
   'tin-ore': {
@@ -22,6 +24,8 @@ export const ORE_ITEMS: Record<string, ItemDefinition> = {
     icon: '⚪',
     category: 'material',
     stackSize: 50,
+    tier: 1,
+    skillType: 'mining',
     description: 'Light ore, combines with copper.',
   },
   'iron-ore': {
@@ -30,6 +34,8 @@ export const ORE_ITEMS: Record<string, ItemDefinition> = {
     icon: '🪨',
     category: 'material',
     stackSize: 50,
+    tier: 2,
+    skillType: 'mining',
     description: 'Raw ore, needs smelting.',
   },
   'coal': {
@@ -38,6 +44,8 @@ export const ORE_ITEMS: Record<string, ItemDefinition> = {
     icon: '⬛',
     category: 'material',
     stackSize: 50,
+    tier: 2,
+    skillType: 'mining',
     description: 'Fuel for smelting.',
   },
   'gold-ore': {
@@ -46,6 +54,8 @@ export const ORE_ITEMS: Record<string, ItemDefinition> = {
     icon: '🟡',
     category: 'material',
     stackSize: 50,
+    tier: 3,
+    skillType: 'mining',
     description: 'Precious metal ore.',
   },
   'silver-ore': {
@@ -54,6 +64,8 @@ export const ORE_ITEMS: Record<string, ItemDefinition> = {
     icon: '🔘',
     category: 'material',
     stackSize: 50,
+    tier: 3,
+    skillType: 'mining',
     description: 'Shiny ore for jewelry.',
   },
   'mithril-ore': {
@@ -62,6 +74,8 @@ export const ORE_ITEMS: Record<string, ItemDefinition> = {
     icon: '💠',
     category: 'material',
     stackSize: 50,
+    tier: 4,
+    skillType: 'mining',
     description: 'Rare magical ore.',
   },
   'adamant-ore': {
@@ -70,6 +84,8 @@ export const ORE_ITEMS: Record<string, ItemDefinition> = {
     icon: '💚',
     category: 'material',
     stackSize: 50,
+    tier: 5,
+    skillType: 'mining',
     description: 'Extremely hard ore.',
   },
 };
@@ -215,14 +231,6 @@ export const COMBAT_DROP_ITEMS: Record<string, ItemDefinition> = {
     category: 'material',
     stackSize: 5,
     description: 'Pure magical essence.',
-  },
-  'oak-log': {
-    id: 'oak-log',
-    name: 'Oak Log',
-    icon: '🪵',
-    category: 'material',
-    stackSize: 30,
-    description: 'Sturdy wood for crafting.',
   },
 };
 
