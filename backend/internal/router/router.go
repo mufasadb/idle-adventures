@@ -61,6 +61,10 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			protected.GET("/player", playerHandler.GetPlayer)
 			protected.GET("/game-state", playerHandler.GetGameState)
 			protected.POST("/game-state", playerHandler.SaveGameState)
+
+			stashHandler := handlers.NewStashHandler(db)
+			protected.GET("/player/stash", stashHandler.GetStash)
+			protected.POST("/player/stash/move", stashHandler.MoveStashItem)
 		}
 	}
 
