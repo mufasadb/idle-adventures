@@ -88,6 +88,40 @@ class ApiClient {
     });
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async getStash(): Promise<{ items: any[] }> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return this.request<{ items: any[] }>('/player/stash');
+  }
+
+  async moveStashItem(itemId: string, newPosition: number | null): Promise<{ moved: boolean }> {
+    return this.request<{ moved: boolean }>('/player/stash/move', {
+      method: 'POST',
+      body: JSON.stringify({ item_id: itemId, new_position: newPosition }),
+    });
+  }
+
+  async swapStashItems(itemIdA: string, itemIdB: string): Promise<{ swapped: boolean }> {
+    return this.request<{ swapped: boolean }>('/player/stash/swap', {
+      method: 'POST',
+      body: JSON.stringify({ item_id_a: itemIdA, item_id_b: itemIdB }),
+    });
+  }
+
+  async destroyStashItem(itemId: string): Promise<{ destroyed: boolean }> {
+    return this.request<{ destroyed: boolean }>(`/player/stash/${itemId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async addRandomStashItem(): Promise<any> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return this.request<any>('/player/stash/add-random', {
+      method: 'POST',
+    });
+  }
+
   get hasToken(): boolean {
     return this.token !== null;
   }

@@ -95,6 +95,12 @@ export const TownScreen = observer(() => {
               sub="Lvl 1 · recipes"
               onClick={() => sessionStore.navigateTo('cooking')}
             />
+            <TownTile
+              icon="🎒"
+              label="Stash"
+              sub={`${bankItemCount} items`}
+              onClick={() => sessionStore.navigateTo('stash')}
+            />
           </div>
         </div>
       </div>

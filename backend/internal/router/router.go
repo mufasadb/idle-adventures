@@ -67,6 +67,9 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			stashHandler := handlers.NewStashHandler(db)
 			protected.GET("/player/stash", stashHandler.GetStash)
 			protected.POST("/player/stash/move", stashHandler.MoveStashItem)
+			protected.POST("/player/stash/swap", stashHandler.SwapStashItems)
+			protected.DELETE("/player/stash/:id", stashHandler.DestroyStashItem)
+			protected.POST("/player/stash/add-random", stashHandler.AddRandomStashItem)
 		}
 	}
 

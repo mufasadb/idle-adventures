@@ -18,4 +18,5 @@ export type GameScreen =
   | 'combat-minigame'
   | 'fishing-minigame'
   | 'cooking'
-  | 'smithing';
+  | 'smithing'
+  | 'stash';

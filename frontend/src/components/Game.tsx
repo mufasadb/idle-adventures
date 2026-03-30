@@ -13,6 +13,7 @@ import {
   FishingMinigameScreen,
   CookingScreen,
   SmithingScreen,
+  StashScreen,
 } from '../screens';
 import { SkillsSheet, MapDetailsSheet, BankSheet } from './sheets';
 
@@ -41,6 +42,8 @@ export const Game = observer(() => {
         return <CookingScreen />;
       case 'smithing':
         return <SmithingScreen />;
+      case 'stash':
+        return <StashScreen />;
       default:
         return <TownScreen />;
     }
