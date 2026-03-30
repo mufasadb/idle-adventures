@@ -13,7 +13,7 @@ import {
   FishingMinigameScreen,
   CookingScreen,
   SmithingScreen,
-} from './screens';
+} from '../screens';
 import { SkillsSheet, MapDetailsSheet, BankSheet } from './sheets';
 
 export const Game = observer(() => {
