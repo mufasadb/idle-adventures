@@ -190,25 +190,34 @@ class PlayerStore {
   // === Cloud Sync ===
 
   /**
-   * Save current state to server (fire and forget)
-   * Only syncs if user is authenticated
+   * Save current state to server (fire and forget).
+   * Skills are saved to the dedicated skills column; bank/unlocked to game_state.
    */
   syncToServer() {
     if (!api.hasToken) return;
 
-    const state = this.toJSON();
-    api.saveGameState(state).catch(err => {
-      console.warn('Failed to sync to server:', err);
+    // Save skills to dedicated column
+    api.saveSkills(this.skills).catch(err => {
+      console.warn('Failed to sync skills to server:', err);
+    });
+
+    // Save bank and unlocks to game_state blob
+    const gameState = {
+      bank: this.bank,
+      unlocked: Array.from(this.unlocked),
+    };
+    api.saveGameState(gameState).catch(err => {
+      console.warn('Failed to sync game state to server:', err);
     });
   }
 
   /**
-   * Load state from server
-   * Server returns defaults for new players, so we always load the response
+   * Load state from server.
+   * Skills come from GET /api/player (dedicated skills column).
+   * Bank and unlocks come from GET /api/game-state (game_state blob).
    */
   async loadFromServer(): Promise<boolean> {
     if (!api.hasToken) {
-      // No auth - use defaults for offline/unauthenticated play
       runInAction(() => {
         this.initializeDefaults();
       });
@@ -216,9 +225,33 @@ class PlayerStore {
     }
 
     try {
-      const state = await api.getGameState();
+      // Fetch in parallel — skills from dedicated column, bank/unlocked from game-state
+      const [playerFull, gameState] = await Promise.all([
+        api.getPlayerFull(),
+        api.getGameState(),
+      ]);
+
       runInAction(() => {
-        this.loadFromJSON(state);
+        // Skills from the structured column (authoritative)
+        if (playerFull.skills && Array.isArray(playerFull.skills)) {
+          this.skills = playerFull.skills as PlayerSkill[];
+        } else {
+          this.skills = DEFAULT_SKILLS.map(s => ({ ...s }));
+        }
+
+        // Bank and unlocks from game_state blob
+        if (gameState.bank && Array.isArray(gameState.bank)) {
+          this.bank = gameState.bank as ItemStack[];
+        } else {
+          this.bank = [...DEFAULT_BANK];
+        }
+        if (gameState.unlocked && Array.isArray(gameState.unlocked)) {
+          this.unlocked = new Set(gameState.unlocked as string[]);
+        } else {
+          this.unlocked = new Set(DEFAULT_UNLOCKS);
+        }
+
+        this.isLoaded = true;
       });
       return true;
     } catch (err) {

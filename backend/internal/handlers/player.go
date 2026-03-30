@@ -34,7 +34,7 @@ func (h *PlayerHandler) GetMe(c *gin.Context) {
 	})
 }
 
-// GetPlayer returns the full player record (for admin/debug)
+// GetPlayer returns the full player: profile + skills + stash contents
 func (h *PlayerHandler) GetPlayer(c *gin.Context) {
 	playerID := c.MustGet("player_id").(uuid.UUID)
 
@@ -44,7 +44,30 @@ func (h *PlayerHandler) GetPlayer(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, player)
+	// If skills column is empty (legacy player), seed defaults on-the-fly
+	skills := player.Skills
+	if len(skills) == 0 {
+		skills = models.PlayerSkills(models.DefaultSkills())
+		// Persist the seeded skills so subsequent calls return them
+		h.db.Model(&player).Update("skills", skills)
+	}
+
+	// Fetch stash items with their definitions
+	var items []models.Item
+	h.db.Preload("Definition").
+		Where("player_id = ?", playerID).
+		Order("stash_position ASC NULLS LAST, created_at ASC").
+		Find(&items)
+
+	c.JSON(http.StatusOK, gin.H{
+		"id":          player.ID,
+		"username":    player.Username,
+		"last_online": player.LastOnline,
+		"created_at":  player.CreatedAt,
+		"updated_at":  player.UpdatedAt,
+		"skills":      skills,
+		"stash":       items,
+	})
 }
 
 // GetGameState returns just the game state blob for the logged-in player
@@ -65,6 +88,25 @@ func (h *PlayerHandler) GetGameState(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, player.GameState)
+}
+
+// SaveSkills persists the player's skill array
+func (h *PlayerHandler) SaveSkills(c *gin.Context) {
+	playerID := c.MustGet("player_id").(uuid.UUID)
+
+	var skills models.PlayerSkills
+	if err := c.ShouldBindJSON(&skills); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid skills payload"})
+		return
+	}
+
+	result := h.db.Model(&models.Player{}).Where("id = ?", playerID).Update("skills", skills)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save skills"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"saved": true})
 }
 
 // SaveGameState stores the frontend's game state blob

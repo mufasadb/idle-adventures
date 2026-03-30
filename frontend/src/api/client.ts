@@ -1,4 +1,4 @@
-import type { AuthResponse, MeResponse, Player } from '../types';
+import type { AuthResponse, MeResponse, Player, PlayerFullResponse, PlayerSkill } from '../types';
 
 const BASE_URL = '/api';
 
@@ -63,6 +63,18 @@ class ApiClient {
 
   async getPlayer(): Promise<Player> {
     return this.request<Player>('/player');
+  }
+
+  /** GET /api/player — full player: profile + skills + stash */
+  async getPlayerFull(): Promise<PlayerFullResponse> {
+    return this.request<PlayerFullResponse>('/player');
+  }
+
+  async saveSkills(skills: PlayerSkill[]): Promise<{ saved: boolean }> {
+    return this.request<{ saved: boolean }>('/player/skills', {
+      method: 'POST',
+      body: JSON.stringify(skills),
+    });
   }
 
   async getGameState(): Promise<Record<string, unknown>> {
