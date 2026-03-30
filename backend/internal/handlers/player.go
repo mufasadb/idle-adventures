@@ -17,6 +17,23 @@ func NewPlayerHandler(db *gorm.DB) *PlayerHandler {
 	return &PlayerHandler{db: db}
 }
 
+// GetMe returns {id, username, created_at} for the authenticated player
+func (h *PlayerHandler) GetMe(c *gin.Context) {
+	playerID := c.MustGet("player_id").(uuid.UUID)
+
+	var player models.Player
+	if err := h.db.First(&player, playerID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Player not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"id":         player.ID,
+		"username":   player.Username,
+		"created_at": player.CreatedAt,
+	})
+}
+
 // GetPlayer returns the full player record (for admin/debug)
 func (h *PlayerHandler) GetPlayer(c *gin.Context) {
 	playerID := c.MustGet("player_id").(uuid.UUID)

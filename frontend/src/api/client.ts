@@ -1,4 +1,4 @@
-import type { AuthResponse, Player } from '../types';
+import type { AuthResponse, MeResponse, Player } from '../types';
 
 const BASE_URL = '/api';
 
@@ -43,18 +43,22 @@ class ApiClient {
     return response.json();
   }
 
-  async register(email: string, username: string, password: string): Promise<AuthResponse> {
+  async register(username: string, password: string): Promise<AuthResponse> {
     return this.request<AuthResponse>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, username, password }),
+      body: JSON.stringify({ username, password }),
     });
   }
 
-  async login(email: string, password: string): Promise<AuthResponse> {
+  async login(username: string, password: string): Promise<AuthResponse> {
     return this.request<AuthResponse>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, password }),
     });
+  }
+
+  async getMe(): Promise<MeResponse> {
+    return this.request<MeResponse>('/me');
   }
 
   async getPlayer(): Promise<Player> {

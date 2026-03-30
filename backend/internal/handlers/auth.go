@@ -22,13 +22,12 @@ func NewAuthHandler(db *gorm.DB, cfg *config.Config) *AuthHandler {
 }
 
 type RegisterRequest struct {
-	Email    string `json:"email" binding:"required,email"`
 	Username string `json:"username" binding:"required,min=3,max=50"`
 	Password string `json:"password" binding:"required,min=6"`
 }
 
 type LoginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
+	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
 }
 
@@ -44,14 +43,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// Check if email already exists
-	var existingPlayer models.Player
-	if err := h.db.Where("email = ?", req.Email).First(&existingPlayer).Error; err == nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "Email already registered"})
-		return
-	}
-
 	// Check if username already exists
+	var existingPlayer models.Player
 	if err := h.db.Where("username = ?", req.Username).First(&existingPlayer).Error; err == nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "Username already taken"})
 		return
@@ -64,9 +57,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// Create player with fresh game state
 	player := models.Player{
-		Email:        req.Email,
 		Username:     req.Username,
 		PasswordHash: string(hashedPassword),
 		GameState:    models.NewGameState(),
@@ -98,9 +89,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// Find player by email
+	// Find player by username
 	var player models.Player
-	if err := h.db.Where("email = ?", req.Email).First(&player).Error; err != nil {
+	if err := h.db.Where("username = ?", req.Username).First(&player).Error; err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
@@ -131,7 +122,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 func (h *AuthHandler) generateToken(player models.Player) (string, error) {
 	claims := jwt.MapClaims{
 		"player_id": player.ID.String(),
-		"email":     player.Email,
+		"username":  player.Username,
 		"exp":       time.Now().Add(time.Hour * time.Duration(h.cfg.JWT.ExpireHours)).Unix(),
 	}
 
