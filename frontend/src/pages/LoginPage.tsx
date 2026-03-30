@@ -6,7 +6,6 @@ import { authStore } from '../stores/authStore';
 export const LoginPage = observer(() => {
   const navigate = useNavigate();
   const [isRegister, setIsRegister] = useState(false);
-  const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
@@ -15,9 +14,9 @@ export const LoginPage = observer(() => {
 
     try {
       if (isRegister) {
-        await authStore.register(email, username, password);
+        await authStore.register(username, password);
       } else {
-        await authStore.login(email, password);
+        await authStore.login(username, password);
       }
       navigate('/');
     } catch {
@@ -37,29 +36,16 @@ export const LoginPage = observer(() => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-gray-300 mb-1">Email</label>
+            <label className="block text-gray-300 mb-1">Username</label>
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               className="w-full bg-gray-700 text-white rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-sky-400"
               required
+              minLength={3}
             />
           </div>
-
-          {isRegister && (
-            <div>
-              <label className="block text-gray-300 mb-1">Username</label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-gray-700 text-white rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-sky-400"
-                required
-                minLength={3}
-              />
-            </div>
-          )}
 
           <div>
             <label className="block text-gray-300 mb-1">Password</label>

@@ -13,9 +13,8 @@ type GameState map[string]interface{}
 // Player represents a user account
 type Player struct {
 	ID           uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
-	Email        string    `gorm:"uniqueIndex;not null" json:"email"`
-	PasswordHash string    `gorm:"not null" json:"-"`
 	Username     string    `gorm:"uniqueIndex;not null" json:"username"`
+	PasswordHash string    `gorm:"not null" json:"-"`
 	GameState    GameState `gorm:"type:jsonb;serializer:json" json:"game_state"`
 	LastOnline   time.Time `gorm:"default:now()" json:"last_online"`
 	CreatedAt    time.Time `json:"created_at"`

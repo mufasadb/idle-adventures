@@ -23,9 +23,15 @@ class AuthStore {
 
     this.isLoading = true;
     try {
-      const player = await api.getPlayer();
+      const me = await api.getMe();
       runInAction(() => {
-        this.player = player;
+        this.player = {
+          id: me.id,
+          username: me.username,
+          created_at: me.created_at,
+          last_online: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
       });
       // Try to load game state from server
       await playerStore.loadFromServer();
@@ -35,9 +41,7 @@ class AuthStore {
         runInAction(() => {
           this.player = {
             id: '1',
-            email: 'dev@dev.com',
             username: 'DevPlayer',
-            gold: 1234,
             last_online: new Date().toISOString(),
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -53,12 +57,12 @@ class AuthStore {
     }
   }
 
-  async register(email: string, username: string, password: string) {
+  async register(username: string, password: string) {
     this.isLoading = true;
     this.error = null;
 
     try {
-      const response = await api.register(email, username, password);
+      const response = await api.register(username, password);
       api.setToken(response.token);
       runInAction(() => {
         this.player = response.player;
@@ -69,9 +73,7 @@ class AuthStore {
         runInAction(() => {
           this.player = {
             id: '1',
-            email,
             username,
-            gold: 1234,
             last_online: new Date().toISOString(),
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -91,12 +93,12 @@ class AuthStore {
     }
   }
 
-  async login(email: string, password: string) {
+  async login(username: string, password: string) {
     this.isLoading = true;
     this.error = null;
 
     try {
-      const response = await api.login(email, password);
+      const response = await api.login(username, password);
       api.setToken(response.token);
       runInAction(() => {
         this.player = response.player;
@@ -109,9 +111,7 @@ class AuthStore {
         runInAction(() => {
           this.player = {
             id: '1',
-            email,
-            username: 'DevPlayer',
-            gold: 1234,
+            username,
             last_online: new Date().toISOString(),
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),

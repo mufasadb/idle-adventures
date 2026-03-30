@@ -6,12 +6,16 @@
 
 export interface Player {
   id: string;
-  email: string;
   username: string;
-  gold: number;
   last_online: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface MeResponse {
+  id: string;
+  username: string;
+  created_at: string;
 }
 
 export interface AuthResponse {

@@ -58,6 +58,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		protected.Use(middleware.AuthRequired(cfg))
 		{
 			playerHandler := handlers.NewPlayerHandler(db)
+			protected.GET("/me", playerHandler.GetMe)
 			protected.GET("/player", playerHandler.GetPlayer)
 			protected.GET("/game-state", playerHandler.GetGameState)
 			protected.POST("/game-state", playerHandler.SaveGameState)

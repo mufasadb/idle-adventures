@@ -6,7 +6,7 @@
  */
 
 // API types
-export type { Player, AuthResponse, ApiError } from './api';
+export type { Player, AuthResponse, MeResponse, ApiError } from './api';
 
 // Coordinate types and helpers
 export type { Coord } from './coordinates';
