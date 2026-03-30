@@ -5,7 +5,6 @@ import (
 
 	"github.com/danielbeach/idle-adventures/backend/internal/config"
 	"github.com/danielbeach/idle-adventures/backend/internal/database"
-	"github.com/danielbeach/idle-adventures/backend/internal/models"
 	"github.com/danielbeach/idle-adventures/backend/internal/router"
 )
 
@@ -22,9 +21,9 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	// Auto-migrate models (creates tables if they don't exist)
-	if err := db.AutoMigrate(&models.Player{}); err != nil {
-		log.Fatalf("Failed to migrate database: %v", err)
+	// Run golang-migrate migrations on startup
+	if err := database.RunMigrations(db, cfg.Server.MigrationsPath); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
 	// Setup and run router
