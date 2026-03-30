@@ -2,29 +2,37 @@
 
 /* ==================== THEME SYSTEM ==================== */
 :root {
-  /* Azure Blue accent */
-  --accent-50: #f0f9ff;
-  --accent-100: #e0f2fe;
-  --accent-200: #bae6fd;
-  --accent-300: #7dd3fc;
-  --accent-400: #38bdf8;
-  --accent-500: #0ea5e9;
-  --accent-600: #0284c7;
-  --accent-700: #0369a1;
-  --accent-800: #075985;
-  --accent-900: #0c4a6e;
+  /* Blue accent (matches mockup) */
+  --accent-50: #eff6ff;
+  --accent-100: #dbeafe;
+  --accent-200: #bfdbfe;
+  --accent-300: #93c5fd;
+  --accent-400: #60a5fa;
+  --accent-500: #3b82f6;
+  --accent-600: #2563eb;
+  --accent-700: #1d4ed8;
+  --accent-800: #1e3a5f;
+  --accent-900: #1e3a5f;
+  /* Gold */
+  --gold: #fbbf24;
 }
 
-/* Dark theme (default) */
+/* Dark theme (default) — colours extracted from docs/ux-prototype/prototype.html */
 [data-theme="dark"] {
-  --bg-primary: #111827;
-  --bg-secondary: #1f2937;
-  --bg-tertiary: #374151;
-  --bg-hover: #4b5563;
-  --text-primary: #ffffff;
-  --text-secondary: #9ca3af;
-  --text-muted: #6b7280;
-  --border-color: #374151;
+  --bg-primary: #0f1117;
+  --bg-secondary: #1a1d27;
+  --bg-tertiary: #22263a;
+  --bg-hover: #2a2f48;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border-color: #2a2f48;
+  --accent: #3b82f6;
+  --accent-subtle: #1e3a5f;
+  --accent-light: #93c5fd;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
 }
 
 /* Light theme */
@@ -62,11 +70,13 @@ body {
 .text-app-muted { color: var(--text-muted); }
 
 /* Accent */
-.text-accent { color: var(--accent-400); }
-.bg-accent { background-color: var(--accent-600); }
+.text-accent { color: var(--accent, #3b82f6); }
+.bg-accent { background-color: var(--accent, #3b82f6); }
 .bg-accent-hover:hover { background-color: var(--accent-500); }
-.bg-accent-subtle { background-color: var(--accent-900); }
-.border-accent { border-color: var(--accent-700); }
+.bg-accent-subtle { background-color: var(--accent-subtle, #1e3a5f); }
+.border-accent { border-color: var(--accent, #3b82f6); }
+.text-accent-light { color: var(--accent-light, #93c5fd); }
+.text-gold { color: var(--gold, #fbbf24); }
 
 /* Border */
 .border-app { border-color: var(--border-color); }
