@@ -40,3 +40,7 @@ screenshots/
 # Database
 *.db
 *.sqlite
+
+# Gas Town runtime
+.beads/
+.runtime/
