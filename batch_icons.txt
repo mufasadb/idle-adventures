@@ -1,0 +1,32 @@
+# Skills (20) - type: skill
+mining,skill,mining
+woodcutting,skill,woodcutting
+herbalism,skill,herbalism
+fishing,skill,fishing
+hunting,skill,hunting
+farming,skill,farming
+archaeology,skill,archaeology
+melee,skill,melee
+ranged,skill,ranged
+magic,skill,magic
+smithing,skill,smithing
+cooking,skill,cooking
+alchemy,skill,alchemy
+tailoring,skill,tailoring
+jewelcrafting,skill,jewelcrafting
+carpentry,skill,carpentry
+engineering,skill,engineering
+arcana,skill,arcana
+beastcraft,skill,beastcraft
+cartography,skill,cartography
+# Items (10) - type: item
+iron ore,item,iron-ore
+oak log,item,oak-log
+herb bundle,item,herb-bundle
+raw fish,item,raw-fish
+wolf pelt,item,wolf-pelt
+iron ingot,item,iron-ingot
+health potion,item,health-potion
+travel rations,item,travel-rations
+basic map,item,basic-map
+leather hide,item,leather-hide
