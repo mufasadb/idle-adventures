@@ -44,3 +44,4 @@ screenshots/
 # Gas Town runtime
 .beads/
 .runtime/
+.claude/
