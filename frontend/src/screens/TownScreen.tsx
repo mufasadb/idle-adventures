@@ -3,6 +3,7 @@ import { Header, BottomNav } from '../components/layout';
 import { sessionStore } from '../stores/sessionStore';
 import { playerStore } from '../stores/playerStore';
 import { authStore } from '../stores/authStore';
+import { stashStore } from '../stores/stashStore';
 
 export const TownScreen = observer(() => {
   const foodCount = playerStore.getItemsByCategory('food').reduce((sum, s) => sum + s.count, 0);
@@ -98,7 +99,7 @@ export const TownScreen = observer(() => {
             <TownTile
               icon="🎒"
               label="Stash"
-              sub={`${bankItemCount} items`}
+              sub={`${stashStore.itemCount} items`}
               onClick={() => sessionStore.navigateTo('stash')}
             />
           </div>
