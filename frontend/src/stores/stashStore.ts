@@ -8,6 +8,8 @@ export interface StashItemDef {
   category: string;
   stackable: boolean;
   tier?: number;
+  ap_value?: number;   // food: AP per filled slot
+  tags?: string[];     // e.g. ['desert-protection']
 }
 
 export interface StashItem {
@@ -39,17 +41,32 @@ const MOCK_STASH_ITEMS: StashItem[] = [
   // Food
   {
     id: 'mock-food-1',
-    itemDefId: 'sardines',
-    quantity: 3,
+    itemDefId: 'cooked-fish',
+    quantity: 15,
     stashPosition: null,
-    definition: { id: 'sardines', name: 'Cooked Sardines', icon: '🐟', category: 'food', stackable: true, tier: 1 },
+    definition: { id: 'cooked-fish', name: 'Cooked Fish', icon: '🐟', category: 'food', stackable: true, tier: 1, ap_value: 1 },
   },
   {
     id: 'mock-food-2',
-    itemDefId: 'dried-meat',
-    quantity: 2,
+    itemDefId: 'cooked-bread',
+    quantity: 10,
     stashPosition: null,
-    definition: { id: 'dried-meat', name: 'Dried Meat', icon: '🥩', category: 'food', stackable: true, tier: 0 },
+    definition: { id: 'cooked-bread', name: 'Cooked Bread', icon: '🍞', category: 'food', stackable: true, tier: 1, ap_value: 2 },
+  },
+  // Animals
+  {
+    id: 'mock-animal-1',
+    itemDefId: 'pack-horse',
+    quantity: 1,
+    stashPosition: null,
+    definition: { id: 'pack-horse', name: 'Pack Horse', icon: '🐴', category: 'animal', stackable: false, tier: 2 },
+  },
+  {
+    id: 'mock-animal-2',
+    itemDefId: 'mule',
+    quantity: 1,
+    stashPosition: null,
+    definition: { id: 'mule', name: 'Mule', icon: '🫏', category: 'animal', stackable: false, tier: 1 },
   },
   // Maps
   {
@@ -80,6 +97,13 @@ const MOCK_STASH_ITEMS: StashItem[] = [
     quantity: 1,
     stashPosition: null,
     definition: { id: 'rope', name: 'Rope', icon: '🪢', category: 'misc', stackable: false, tier: 0 },
+  },
+  {
+    id: 'mock-misc-3',
+    itemDefId: 'desert-cloak',
+    quantity: 1,
+    stashPosition: null,
+    definition: { id: 'desert-cloak', name: 'Desert Cloak', icon: '🧣', category: 'misc', stackable: false, tier: 1, tags: ['desert-protection'] },
   },
 ];
 
@@ -132,7 +156,7 @@ class StashStore {
 
   /** All distinct categories present in the stash, in display order. */
   get categories(): string[] {
-    const ORDER = ['tool', 'food', 'map', 'misc'];
+    const ORDER = ['tool', 'food', 'animal', 'map', 'misc'];
     const present = new Set(this.items.map((i) => i.definition.category));
     const ordered = ORDER.filter((c) => present.has(c));
     // Append any unknown categories not in the ordering list
@@ -155,6 +179,13 @@ class StashStore {
   removeItem(itemId: string) {
     runInAction(() => {
       this.items = this.items.filter((i) => i.id !== itemId);
+    });
+  }
+
+  /** Add an item to the stash (for reactivity testing). */
+  addItem(item: StashItem) {
+    runInAction(() => {
+      this.items.push(item);
     });
   }
 }

@@ -1,7 +1,8 @@
 import { makeAutoObservable } from 'mobx';
 import { ITEMS } from '../data/items';
 import { PLAYER_COMBAT } from '../data/combat';
-import { DEV_MAP } from '../data/devMap';
+import { DEV_MAP, DUSTPEAK_MAP } from '../data/devMap';
+import { calculateAPBreakdown } from '../engine/apBudget';
 import type {
   GameScreen,
   ExpeditionMode,
@@ -45,7 +46,7 @@ class SessionStore {
   loadout: ExpeditionLoadout = {
     vehicle: null,
     food: [null, null, null, null, null, null],  // 6 slots
-    misc: [null, null],
+    misc: [null, null, null, null],              // 4 slots
     mode: 'active',
   };
 
@@ -70,7 +71,7 @@ class SessionStore {
   }
 
   private initializeTestData() {
-    this.availableMaps = [DEV_MAP];
+    this.availableMaps = [DEV_MAP, DUSTPEAK_MAP];
     this.selectedMapId = DEV_MAP.id;
   }
 
@@ -123,11 +124,11 @@ class SessionStore {
    * Check if loadout is valid for starting expedition
    */
   get canStartExpedition(): boolean {
-    // Must have at least 1 food item
-    const hasFood = this.loadout.food.some(f => f !== null);
+    // Must have an animal
+    const hasAnimal = this.loadout.vehicle !== null;
     // Must have selected a map
     const hasMap = this.selectedMapId !== null;
-    return hasFood && hasMap;
+    return hasAnimal && hasMap;
   }
 
   // === Navigation Actions ===
@@ -165,7 +166,7 @@ class SessionStore {
     this.loadout = {
       vehicle: null,
       food: [null, null, null, null, null, null],  // 6 slots
-      misc: [null, null],
+      misc: [null, null, null, null],              // 4 slots
       mode: 'active',
     };
   }
@@ -231,14 +232,18 @@ class SessionStore {
   startExpedition() {
     if (!this.canStartExpedition || !this.selectedMap) return;
 
-    // Start at position (0,0) by default
-    const startPos: Coord = { x: 0, y: 0 };
+    const beastcraftLevel = playerStore.getSkill('beastcraft')?.level ?? 1;
+    const apBreakdown = calculateAPBreakdown(this.loadout, this.selectedMap, beastcraftLevel);
+    const totalAP = Math.max(0, apBreakdown.total);
+
+    // Start at map's startPos
+    const startPos: Coord = this.selectedMap.startPos ?? { x: 0, y: 0 };
 
     this.expedition = {
       map: this.selectedMap,
       position: startPos,
-      actionsRemaining: this.totalActions,
-      actionsTotal: this.totalActions,
+      actionsRemaining: totalAP,
+      actionsTotal: totalAP,
       bag: [],
       combatHp: PLAYER_COMBAT.maxHp,
     };
