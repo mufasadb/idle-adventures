@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Idle Adventures — Town Screen (Diablo II Style)</title>
+<style>
+  /* ─── Reset & Base ──────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:          #0a0a0a;
+    --stone-dark:  #111009;
+    --stone-mid:   #1a1710;
+    --stone-light: #24201a;
+    --amber:       #c97c12;
+    --amber-glow:  #e8920a;
+    --amber-hot:   #ff9f1a;
+    --amber-pale:  #7a4b0a;
+    --rust:        #8b3a0f;
+    --blood:       #4a1208;
+    --text-gold:   #d4a843;
+    --text-dim:    #7a6840;
+    --tooltip-bg:  rgba(8, 6, 4, 0.96);
+    --glow-radius: 180px;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    font-family: 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+    overflow: hidden;
+  }
+
+  /* ─── Scene Container ──────────────────────────────────────── */
+  .scene {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  /* ─── Ground / Cobblestone Plane ───────────────────────────── */
+  .ground {
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(
+        75deg,
+        transparent 0px, transparent 28px,
+        rgba(255,180,40,0.018) 28px, rgba(255,180,40,0.018) 30px
+      ),
+      repeating-linear-gradient(
+        -15deg,
+        transparent 0px, transparent 44px,
+        rgba(255,180,40,0.012) 44px, rgba(255,180,40,0.012) 46px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        transparent 0px, transparent 59px,
+        rgba(0,0,0,0.4) 59px, rgba(0,0,0,0.4) 62px
+      ),
+      repeating-linear-gradient(
+        0deg,
+        transparent 0px, transparent 34px,
+        rgba(0,0,0,0.35) 34px, rgba(0,0,0,0.35) 37px
+      ),
+      radial-gradient(ellipse 140% 70% at 50% 110%,
+        #1f1a0e 0%, #111009 35%, #0a0a0a 70%
+      );
+    transform-origin: bottom center;
+  }
+
+  /* ─── Ambient Fog Layers ────────────────────────────────────── */
+  .fog {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .fog::before, .fog::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(60px);
+    opacity: 0;
+    animation: fogDrift 12s ease-in-out infinite alternate;
+  }
+  .fog::before {
+    width: 60%; height: 30%;
+    bottom: 5%; left: -10%;
+    background: radial-gradient(ellipse, rgba(40,30,10,0.18) 0%, transparent 70%);
+    animation-duration: 18s;
+  }
+  .fog::after {
+    width: 50%; height: 25%;
+    bottom: 10%; right: -5%;
+    background: radial-gradient(ellipse, rgba(30,20,5,0.15) 0%, transparent 70%);
+    animation-duration: 14s;
+    animation-delay: -6s;
+  }
+  @keyframes fogDrift {
+    0%   { opacity: 0;    transform: translateX(0)   translateY(0); }
+    40%  { opacity: 1;    transform: translateX(30px) translateY(-8px); }
+    100% { opacity: 0.4;  transform: translateX(60px) translateY(-4px); }
+  }
+
+  /* ─── Central Torch Radiance ────────────────────────────────── */
+  .scene-light {
+    position: absolute;
+    top: 30%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 800px; height: 600px;
+    background: radial-gradient(ellipse,
+      rgba(201,124,18,0.12) 0%,
+      rgba(201,124,18,0.06) 30%,
+      transparent 65%
+    );
+    pointer-events: none;
+    z-index: 0;
+    animation: ambientPulse 5s ease-in-out infinite alternate;
+  }
+  @keyframes ambientPulse {
+    0%   { opacity: 0.7; transform: translate(-50%,-50%) scale(1); }
+    100% { opacity: 1.0; transform: translate(-50%,-50%) scale(1.08); }
+  }
+
+  /* ─── Path Lines (isometric ground paths between buildings) ── */
+  .paths {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    overflow: visible;
+  }
+  .paths line {
+    stroke: rgba(201,124,18,0.06);
+    stroke-width: 12;
+    stroke-linecap: round;
+  }
+
+  /* ─── Title / Logo Area ─────────────────────────────────────── */
+  .title-area {
+    position: absolute;
+    top: 3.5%;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    z-index: 20;
+    pointer-events: none;
+  }
+  .title-area h1 {
+    font-size: clamp(16px, 2vw, 26px);
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--text-gold);
+    text-shadow:
+      0 0 20px rgba(201,124,18,0.7),
+      0 0 60px rgba(201,124,18,0.3);
+    font-weight: 400;
+  }
+  .title-area .subtitle {
+    font-size: clamp(9px, 1vw, 13px);
+    letter-spacing: 0.2em;
+    color: var(--text-dim);
+    margin-top: 2px;
+    text-transform: uppercase;
+  }
+  .title-divider {
+    width: 200px;
+    height: 1px;
+    margin: 6px auto;
+    background: linear-gradient(90deg,
+      transparent, var(--amber-pale), var(--amber), var(--amber-pale), transparent
+    );
+    opacity: 0.6;
+  }
+
+  /* ─── Town Layout (isometric diamond grid) ──────────────────── */
+  .town {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+  }
+
+  /* ─── Building Hotspot ──────────────────────────────────────── */
+  .building {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+    z-index: 10;
+    /* Each building is a lit platform with an icon */
+  }
+
+  .building-platform {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    border-radius: 8px;
+    border: 1px solid rgba(201,124,18,0.15);
+    background: radial-gradient(ellipse at 50% 40%,
+      rgba(26,22,14,0.92) 0%, rgba(10,10,10,0.96) 80%
+    );
+    box-shadow:
+      0 0 0 1px rgba(0,0,0,0.8),
+      inset 0 1px 0 rgba(255,180,50,0.06),
+      inset 0 -1px 0 rgba(0,0,0,0.5),
+      0 8px 32px rgba(0,0,0,0.8),
+      0 2px 8px rgba(0,0,0,0.9);
+    transition:
+      box-shadow 0.25s ease,
+      border-color 0.25s ease,
+      transform 0.2s ease;
+    overflow: hidden;
+  }
+
+  /* Stone texture overlay */
+  .building-platform::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 20% 80%, rgba(255,200,80,0.04) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(255,200,80,0.03) 0%, transparent 40%);
+    border-radius: inherit;
+  }
+
+  /* Torchlight flicker at top */
+  .building-platform::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 60px; height: 2px;
+    background: linear-gradient(90deg,
+      transparent, rgba(232,146,10,0.4), transparent
+    );
+    animation: torchFlicker 3s ease-in-out infinite;
+    filter: blur(1px);
+  }
+  @keyframes torchFlicker {
+    0%, 100% { opacity: 0.3; width: 40px; }
+    25%       { opacity: 0.7; width: 55px; }
+    50%       { opacity: 0.5; width: 45px; }
+    75%       { opacity: 0.9; width: 60px; }
+  }
+
+  .building-icon {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -52%);
+    width: 70px; height: 70px;
+    object-fit: contain;
+    filter:
+      drop-shadow(0 2px 8px rgba(0,0,0,0.9))
+      brightness(0.85)
+      sepia(0.3)
+      saturate(1.2);
+    transition: filter 0.25s ease, transform 0.25s ease;
+    pointer-events: none;
+    image-rendering: pixelated;
+  }
+
+  .building-label {
+    position: absolute;
+    bottom: 8px;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    transition: color 0.25s ease;
+    pointer-events: none;
+    font-weight: 400;
+  }
+
+  /* ─── Hover State ───────────────────────────────────────────── */
+  .building:hover .building-platform {
+    border-color: rgba(232,146,10,0.55);
+    box-shadow:
+      0 0 0 1px rgba(201,124,18,0.3),
+      inset 0 1px 0 rgba(255,200,80,0.12),
+      inset 0 0 30px rgba(201,124,18,0.08),
+      0 0 30px rgba(201,124,18,0.25),
+      0 0 70px rgba(201,124,18,0.12),
+      0 8px 32px rgba(0,0,0,0.7);
+    transform: translateY(-3px);
+  }
+  .building:hover .building-icon {
+    filter:
+      drop-shadow(0 0 12px rgba(232,146,10,0.6))
+      drop-shadow(0 0 4px rgba(255,180,50,0.4))
+      brightness(1.1)
+      sepia(0.15)
+      saturate(1.4);
+    transform: translate(-50%, -55%);
+  }
+  .building:hover .building-label {
+    color: var(--text-gold);
+  }
+  .building:hover .building-torch {
+    animation-duration: 0.8s;
+  }
+
+  /* Ground glow under hovered building */
+  .building::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -20%);
+    width: 160px; height: 60px;
+    background: radial-gradient(ellipse,
+      rgba(201,124,18,0.18) 0%, transparent 70%
+    );
+    filter: blur(10px);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    z-index: -1;
+  }
+  .building:hover::before {
+    opacity: 1;
+  }
+
+  /* ─── Tooltip ───────────────────────────────────────────────── */
+  .building-tooltip {
+    position: absolute;
+    bottom: calc(100% + 14px);
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 180px;
+    max-width: 220px;
+    background: var(--tooltip-bg);
+    border: 1px solid rgba(201,124,18,0.3);
+    border-top: 1px solid rgba(201,124,18,0.5);
+    padding: 10px 14px 12px;
+    border-radius: 4px;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 100;
+    text-align: left;
+    box-shadow:
+      0 0 0 1px rgba(0,0,0,0.9),
+      0 8px 24px rgba(0,0,0,0.8),
+      0 0 20px rgba(201,124,18,0.08);
+  }
+  .building:hover .building-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .tooltip-name {
+    font-size: 13px;
+    color: var(--amber-hot);
+    letter-spacing: 0.05em;
+    margin-bottom: 5px;
+    text-shadow: 0 0 12px rgba(232,146,10,0.5);
+    font-variant: small-caps;
+  }
+  .tooltip-divider {
+    height: 1px;
+    background: linear-gradient(90deg,
+      transparent, rgba(201,124,18,0.4), transparent
+    );
+    margin: 5px 0;
+  }
+  .tooltip-desc {
+    font-size: 10.5px;
+    line-height: 1.55;
+    color: #7a7060;
+    font-family: 'Palatino Linotype', Palatino, Georgia, serif;
+    font-style: italic;
+  }
+  /* Arrow */
+  .building-tooltip::after {
+    content: '';
+    position: absolute;
+    bottom: -7px; left: 50%;
+    transform: translateX(-50%);
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-top: 7px solid rgba(201,124,18,0.3);
+  }
+  .building-tooltip::before {
+    content: '';
+    position: absolute;
+    bottom: -5px; left: 50%;
+    transform: translateX(-50%);
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid rgba(8,6,4,0.97);
+    z-index: 1;
+  }
+
+  /* ─── Corner Ornaments ──────────────────────────────────────── */
+  .corner {
+    position: absolute;
+    width: 60px; height: 60px;
+    pointer-events: none;
+    z-index: 20;
+    opacity: 0.35;
+  }
+  .corner-tl { top: 12px; left: 12px; }
+  .corner-tr { top: 12px; right: 12px; transform: scaleX(-1); }
+  .corner-bl { bottom: 12px; left: 12px; transform: scaleY(-1); }
+  .corner-br { bottom: 12px; right: 12px; transform: scale(-1,-1); }
+
+  /* ─── Status Bar ────────────────────────────────────────────── */
+  .status-bar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 36px;
+    background: linear-gradient(180deg,
+      transparent 0%, rgba(4,3,2,0.92) 40%
+    );
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 40px;
+    z-index: 20;
+    pointer-events: none;
+  }
+  .status-hint {
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: rgba(122,107,60,0.6);
+    text-transform: uppercase;
+  }
+  .status-dot {
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: rgba(201,124,18,0.3);
+  }
+
+  /* ─── Edge Vignette ─────────────────────────────────────────── */
+  .vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 90% 90% at 50% 50%,
+      transparent 40%,
+      rgba(0,0,0,0.5) 75%,
+      rgba(0,0,0,0.9) 100%
+    );
+    pointer-events: none;
+    z-index: 15;
+  }
+
+  /* ─── Particle Embers ───────────────────────────────────────── */
+  .embers {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 12;
+    overflow: hidden;
+  }
+  .ember {
+    position: absolute;
+    width: 2px; height: 2px;
+    border-radius: 50%;
+    background: var(--amber-glow);
+    opacity: 0;
+    animation: emberFloat linear infinite;
+  }
+  @keyframes emberFloat {
+    0%   { opacity: 0;    transform: translateY(0) translateX(0) scale(1); }
+    15%  { opacity: 0.8; }
+    85%  { opacity: 0.4; }
+    100% { opacity: 0;    transform: translateY(-120px) translateX(var(--drift)) scale(0.4); }
+  }
+</style>
+</head>
+<body>
+<div class="scene">
+
+  <!-- Ground plane -->
+  <div class="ground"></div>
+
+  <!-- Ambient light source -->
+  <div class="scene-light"></div>
+
+  <!-- Atmospheric fog -->
+  <div class="fog"></div>
+
+  <!-- Isometric path lines (SVG) -->
+  <svg class="paths" viewBox="0 0 1000 600" preserveAspectRatio="none"
+       xmlns="http://www.w3.org/2000/svg">
+    <!-- Paths connecting buildings: top → left/right mid → bottom -->
+    <!-- Top (Atlas) → Left Mid (Forge) -->
+    <line x1="500" y1="140" x2="280" y2="300" />
+    <!-- Top (Atlas) → Right Mid (Cooking) -->
+    <line x1="500" y1="140" x2="720" y2="300" />
+    <!-- Left Mid (Forge) → Bottom Left (Stash) -->
+    <line x1="280" y1="300" x2="340" y2="450" />
+    <!-- Left Mid (Forge) → Bottom Center (Iron Vault) -->
+    <line x1="280" y1="300" x2="500" y2="480" />
+    <!-- Right Mid (Cooking) → Bottom Right (Skill) -->
+    <line x1="720" y1="300" x2="660" y2="450" />
+    <!-- Right Mid (Cooking) → Bottom Center (Iron Vault) -->
+    <line x1="720" y1="300" x2="500" y2="480" />
+    <!-- Center connecting all mids horizontally -->
+    <line x1="280" y1="300" x2="720" y2="300" stroke-width="6" />
+  </svg>
+
+  <!-- ─── Town Buildings ──────────────────────────────── -->
+  <div class="town">
+
+    <!-- 1. Atlas / Map Table  — top center -->
+    <div class="building"
+         style="left:50%; top:22%"
+         role="button" tabindex="0"
+         aria-label="Atlas Table">
+      <div class="building-platform">
+        <img class="building-icon"
+             src="./assets/diablo/atlas-map-table.png"
+             alt="Atlas Table"
+             onerror="this.style.display='none'; this.parentElement.querySelector('.icon-fallback').style.display='block'">
+        <div class="icon-fallback" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-52%); font-size:36px; opacity:0.5;">🗺️</div>
+        <div class="building-label">Atlas</div>
+      </div>
+      <div class="building-tooltip">
+        <div class="tooltip-name">Atlas Table</div>
+        <div class="tooltip-divider"></div>
+        <div class="tooltip-desc">Embark on expeditions across cursed lands. Study ancient maps to unlock new territories and their hidden dangers.</div>
+      </div>
+    </div>
+
+    <!-- 2. Forge / Anvil — left mid -->
+    <div class="building"
+         style="left:28%; top:50%"
+         role="button" tabindex="0"
+         aria-label="Forge">
+      <div class="building-platform">
+        <img class="building-icon"
+             src="./assets/diablo/forge-anvil.png"
+             alt="Forge Anvil"
+             onerror="this.style.display='none'; this.parentElement.querySelector('.icon-fallback').style.display='block'">
+        <div class="icon-fallback" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-52%); font-size:36px; opacity:0.5;">⚒️</div>
+        <div class="building-label">Forge</div>
+      </div>
+      <div class="building-tooltip">
+        <div class="tooltip-name">The Forge</div>
+        <div class="tooltip-divider"></div>
+        <div class="tooltip-desc">Craft and temper equipment from raw ore. A skilled smith can reforge broken relics into weapons of terrible power.</div>
+      </div>
+    </div>
+
+    <!-- 3. Cooking / Cauldron — right mid -->
+    <div class="building"
+         style="left:72%; top:50%"
+         role="button" tabindex="0"
+         aria-label="Cooking Cauldron">
+      <div class="building-platform">
+        <img class="building-icon"
+             src="./assets/diablo/cooking-cauldron.png"
+             alt="Cooking Cauldron"
+             onerror="this.style.display='none'; this.parentElement.querySelector('.icon-fallback').style.display='block'">
+        <div class="icon-fallback" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-52%); font-size:36px; opacity:0.5;">🍲</div>
+        <div class="building-label">Cauldron</div>
+      </div>
+      <div class="building-tooltip">
+        <div class="tooltip-name">Cooking Cauldron</div>
+        <div class="tooltip-divider"></div>
+        <div class="tooltip-desc">Brew potions and prepare provisions. Sustenance prepared here restores vitality and grants fleeting strength.</div>
+      </div>
+    </div>
+
+    <!-- 4. Stash Chest — bottom left -->
+    <div class="building"
+         style="left:34%; top:75%"
+         role="button" tabindex="0"
+         aria-label="Stash">
+      <div class="building-platform">
+        <img class="building-icon"
+             src="./assets/diablo/stash-chest.png"
+             alt="Stash Chest"
+             onerror="this.style.display='none'; this.parentElement.querySelector('.icon-fallback').style.display='block'">
+        <div class="icon-fallback" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-52%); font-size:36px; opacity:0.5;">📦</div>
+        <div class="building-label">Stash</div>
+      </div>
+      <div class="building-tooltip" style="bottom:auto; top:calc(100% + 14px);">
+        <div class="tooltip-name">Stash</div>
+        <div class="tooltip-divider"></div>
+        <div class="tooltip-desc">Your personal vault of gathered spoils. Store items safely between expeditions — the chest never sleeps.</div>
+      </div>
+    </div>
+
+    <!-- 5. Iron Vault — bottom center -->
+    <div class="building"
+         style="left:50%; top:78%"
+         role="button" tabindex="0"
+         aria-label="Iron Vault">
+      <div class="building-platform">
+        <img class="building-icon"
+             src="./assets/diablo/iron-vault.png"
+             alt="Iron Vault"
+             onerror="this.style.display='none'; this.parentElement.querySelector('.icon-fallback').style.display='block'">
+        <div class="icon-fallback" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-52%); font-size:36px; opacity:0.5;">🏦</div>
+        <div class="building-label">Vault</div>
+      </div>
+      <div class="building-tooltip" style="bottom:auto; top:calc(100% + 14px);">
+        <div class="tooltip-name">Iron Vault</div>
+        <div class="tooltip-divider"></div>
+        <div class="tooltip-desc">Secure your most precious relics in iron-bound chests. The vault holds what others covet — at a price.</div>
+      </div>
+    </div>
+
+    <!-- 6. Skill Tome — bottom right -->
+    <div class="building"
+         style="left:66%; top:75%"
+         role="button" tabindex="0"
+         aria-label="Skills">
+      <div class="building-platform">
+        <img class="building-icon"
+             src="./assets/diablo/skill-tome.png"
+             alt="Skill Tome"
+             onerror="this.style.display='none'; this.parentElement.querySelector('.icon-fallback').style.display='block'">
+        <div class="icon-fallback" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-52%); font-size:36px; opacity:0.5;">📖</div>
+        <div class="building-label">Skills</div>
+      </div>
+      <div class="building-tooltip" style="bottom:auto; top:calc(100% + 14px);">
+        <div class="tooltip-name">Tome of Skills</div>
+        <div class="tooltip-divider"></div>
+        <div class="tooltip-desc">Inscribed with forbidden knowledge. Spend your hard-won experience to master new abilities and passive techniques.</div>
+      </div>
+    </div>
+
+  </div>
+  <!-- /town -->
+
+  <!-- Corner ornaments (SVG inline) -->
+  <svg class="corner corner-tl" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 56 L4 4 L56 4" stroke="#c97c12" stroke-width="1.5" fill="none"/>
+    <path d="M4 20 L12 12 L20 4" stroke="#c97c12" stroke-width="0.8" fill="none" opacity="0.5"/>
+    <circle cx="4" cy="4" r="3" fill="#c97c12" opacity="0.5"/>
+    <line x1="4" y1="4" x2="14" y2="4" stroke="#c97c12" stroke-width="2"/>
+    <line x1="4" y1="4" x2="4" y2="14" stroke="#c97c12" stroke-width="2"/>
+  </svg>
+  <svg class="corner corner-tr" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 56 L4 4 L56 4" stroke="#c97c12" stroke-width="1.5" fill="none"/>
+    <path d="M4 20 L12 12 L20 4" stroke="#c97c12" stroke-width="0.8" fill="none" opacity="0.5"/>
+    <circle cx="4" cy="4" r="3" fill="#c97c12" opacity="0.5"/>
+    <line x1="4" y1="4" x2="14" y2="4" stroke="#c97c12" stroke-width="2"/>
+    <line x1="4" y1="4" x2="4" y2="14" stroke="#c97c12" stroke-width="2"/>
+  </svg>
+  <svg class="corner corner-bl" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 56 L4 4 L56 4" stroke="#c97c12" stroke-width="1.5" fill="none"/>
+    <circle cx="4" cy="4" r="3" fill="#c97c12" opacity="0.5"/>
+    <line x1="4" y1="4" x2="14" y2="4" stroke="#c97c12" stroke-width="2"/>
+    <line x1="4" y1="4" x2="4" y2="14" stroke="#c97c12" stroke-width="2"/>
+  </svg>
+  <svg class="corner corner-br" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 56 L4 4 L56 4" stroke="#c97c12" stroke-width="1.5" fill="none"/>
+    <circle cx="4" cy="4" r="3" fill="#c97c12" opacity="0.5"/>
+    <line x1="4" y1="4" x2="14" y2="4" stroke="#c97c12" stroke-width="2"/>
+    <line x1="4" y1="4" x2="4" y2="14" stroke="#c97c12" stroke-width="2"/>
+  </svg>
+
+  <!-- Title -->
+  <div class="title-area">
+    <h1>Town</h1>
+    <div class="title-divider"></div>
+    <div class="subtitle">Idle Adventures</div>
+  </div>
+
+  <!-- Ember particles (JS-generated) -->
+  <div class="embers" id="embers"></div>
+
+  <!-- Vignette overlay -->
+  <div class="vignette"></div>
+
+  <!-- Status bar -->
+  <div class="status-bar">
+    <span class="status-hint">Hover to inspect</span>
+    <div class="status-dot"></div>
+    <span class="status-hint">Click to enter</span>
+  </div>
+
+</div>
+
+<script>
+  // ─── Ember particle system ─────────────────────────────────
+  (function spawnEmbers() {
+    const container = document.getElementById('embers');
+    if (!container) return;
+
+    // Spawn points roughly near buildings
+    const spawnZones = [
+      { x: 50, y: 22 },  // Atlas (top)
+      { x: 28, y: 50 },  // Forge
+      { x: 72, y: 50 },  // Cooking
+      { x: 34, y: 75 },  // Stash
+      { x: 50, y: 78 },  // Vault
+      { x: 66, y: 75 },  // Skills
+    ];
+
+    function createEmber() {
+      const zone = spawnZones[Math.floor(Math.random() * spawnZones.length)];
+      const el = document.createElement('div');
+      el.className = 'ember';
+      const spread = 8;
+      const x = zone.x + (Math.random() - 0.5) * spread;
+      const y = zone.y + (Math.random() - 0.5) * spread * 0.5;
+      el.style.left = x + 'vw';
+      el.style.top  = y + 'vh';
+      const drift   = ((Math.random() - 0.5) * 30).toFixed(1) + 'px';
+      const dur     = (2.5 + Math.random() * 3).toFixed(2) + 's';
+      const delay   = (Math.random() * 4).toFixed(2) + 's';
+      const size    = (1 + Math.random() * 1.5).toFixed(1) + 'px';
+      el.style.setProperty('--drift', drift);
+      el.style.animationDuration  = dur;
+      el.style.animationDelay    = '-' + delay;
+      el.style.width  = size;
+      el.style.height = size;
+      // Vary colour between amber and red
+      const amber = Math.random() > 0.3;
+      el.style.background = amber ? '#e8920a' : '#c43a10';
+      if (Math.random() > 0.7) el.style.boxShadow = '0 0 3px #e8920a';
+      container.appendChild(el);
+      // Remove after 8s to prevent DOM bloat
+      setTimeout(() => el.remove(), 8000);
+    }
+
+    // Initial burst
+    for (let i = 0; i < 18; i++) {
+      setTimeout(createEmber, Math.random() * 4000);
+    }
+    // Ongoing trickle
+    setInterval(createEmber, 400);
+  })();
+
+  // ─── Keyboard nav for accessibility ───────────────────────
+  document.querySelectorAll('.building').forEach(b => {
+    b.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        b.click();
+      }
+    });
+  });
+</script>
+</body>
+</html>
