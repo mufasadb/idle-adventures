@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Idle Adventures · Thornvale (Cartoon)</title>
+  <style>
+    /* ═══════════════════════════════════════════════
+       THORNVALE — Cartoony Dark Town Screen
+       Warm lantern-light palette, chunky SVG buildings
+       Mobile frame: 390×844
+    ═══════════════════════════════════════════════ */
+
+    :root {
+      /* ── Ground & Sky ── */
+      --sky-deep:        #06091a;
+      --sky-mid:         #0d1128;
+      --bg:              #1a1008;
+      --bg-darker:       #0e0905;
+      --ground:          #231508;
+      --ground-path:     #3d2210;
+      --cobble-fill:     #4a2e18;
+      --cobble-edge:     #5a3e28;
+      --cobble-shadow:   #2e1808;
+
+      /* ── Gold / Warm ── */
+      --gold:            #f59e0b;
+      --gold-dim:        #b87808;
+      --gold-bright:     #fbbf24;
+      --gold-pale:       #fde68a;
+      --gold-glow:       rgba(245, 158, 11, 0.35);
+      --amber:           #f97316;
+      --amber-glow:      rgba(249, 115, 22, 0.4);
+      --lantern-warm:    #ffc040;
+      --lantern-glow:    rgba(255, 192, 64, 0.3);
+
+      /* ── Wood ── */
+      --wood-vdark:      #1e0c04;
+      --wood-dark:       #4a2008;
+      --wood-mid:        #7a4020;
+      --wood-light:      #b06030;
+      --wood-highlight:  #d08050;
+
+      /* ── Stone ── */
+      --stone-dark:      #2e2820;
+      --stone-mid:       #4e4038;
+      --stone-light:     #7a6050;
+
+      /* ── Brick ── */
+      --brick-dark:      #5a1e15;
+      --brick-mid:       #8a3825;
+      --brick-light:     #c05540;
+
+      /* ── Teal (mystical / active) ── */
+      --teal:            #0d9488;
+      --teal-bright:     #2dd4bf;
+      --teal-glow:       rgba(13, 148, 136, 0.4);
+
+      /* ── Purple (arcane) ── */
+      --purple:          #7c3aed;
+      --purple-bright:   #c084fc;
+      --purple-glow:     rgba(124, 58, 237, 0.45);
+
+      /* ── Text ── */
+      --text:            #f5e6d0;
+      --text-dim:        #b09070;
+      --text-muted:      #705040;
+      --outline:         #1a0800;
+
+      /* ── UI chrome ── */
+      --border:          rgba(245, 158, 11, 0.22);
+      --border-strong:   rgba(245, 158, 11, 0.5);
+      --header-bg:       #1e1208;
+      --tooltip-bg:      #1c1208;
+      --tooltip-border:  rgba(245, 158, 11, 0.65);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: radial-gradient(ellipse at 50% 30%, #1a1008 0%, #080604 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 28px 16px 48px;
+      font-family: 'Georgia', 'Palatino Linotype', 'Book Antiqua', serif;
+      overflow-x: hidden;
+    }
+
+    /* ════════════════════════════════
+       DEVICE FRAME
+    ════════════════════════════════ */
+    .device-frame {
+      width: 390px;
+      background: #000;
+      border-radius: 52px;
+      box-shadow:
+        0 0 0 1px #555,
+        0 0 0 7px #1c1c1e,
+        0 0 0 8px #3a3a3c,
+        0 50px 120px rgba(0,0,0,0.95),
+        inset 0 0 0 1px rgba(255,255,255,0.03);
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Dynamic island */
+    .dynamic-island {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 126px;
+      height: 36px;
+      background: #000;
+      border-radius: 18px;
+      z-index: 200;
+      box-shadow: 0 0 0 1px #222;
+    }
+
+    /* ════════════════════════════════
+       APP SHELL
+    ════════════════════════════════ */
+    .app-shell {
+      width: 100%;
+      min-height: 844px;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ════════════════════════════════
+       STATUS BAR
+    ════════════════════════════════ */
+    .status-bar {
+      height: 52px;
+      padding: 0 28px 0 26px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      padding-bottom: 4px;
+      z-index: 10;
+    }
+    .status-bar .time {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+      letter-spacing: -0.3px;
+    }
+    .status-icons {
+      display: flex;
+      gap: 7px;
+      align-items: center;
+    }
+    .status-icons svg {
+      display: block;
+    }
+
+    /* ════════════════════════════════
+       APP HEADER
+    ════════════════════════════════ */
+    .app-header {
+      padding: 6px 18px 10px;
+      background: linear-gradient(180deg, #201508 0%, var(--bg) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+    }
+    .app-header::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg,
+        transparent 0%, var(--gold-dim) 30%, var(--gold) 50%, var(--gold-dim) 70%, transparent 100%);
+      opacity: 0.6;
+    }
+
+    .town-name-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .town-name-text {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--gold);
+      letter-spacing: 1.5px;
+      text-shadow:
+        0 0 24px var(--gold-glow),
+        0 0 48px rgba(245, 158, 11, 0.15),
+        0 1px 3px rgba(0,0,0,0.8);
+    }
+    .town-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+      margin-top: 2px;
+      text-transform: uppercase;
+    }
+
+    .header-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+    .level-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(245, 158, 11, 0.14);
+      border: 1px solid var(--border-strong);
+      border-radius: 20px;
+      padding: 4px 12px 4px 8px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--gold-pale);
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    .prestige-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      letter-spacing: 0.3px;
+    }
+
+    /* ════════════════════════════════
+       RESOURCE BAR
+    ════════════════════════════════ */
+    .resource-bar {
+      display: flex;
+      background: #191008;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .resource {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 7px 6px;
+      position: relative;
+    }
+    .resource + .resource {
+      border-left: 1px solid var(--border);
+    }
+    .resource-icon { font-size: 17px; line-height: 1; }
+    .resource-text { display: flex; flex-direction: column; }
+    .resource-val {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.2;
+    }
+    .resource-label {
+      font-size: 9px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    /* ════════════════════════════════
+       TOWN VIEW
+    ════════════════════════════════ */
+    .town-view {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      min-height: 598px;
+    }
+
+    .town-bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ════════════════════════════════
+       BUILDING BASE
+    ════════════════════════════════ */
+    .building {
+      position: absolute;
+      cursor: pointer;
+      z-index: 10;
+    }
+
+    .building-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      transform-origin: bottom center;
+      animation: idle-float 3.5s ease-in-out infinite;
+      position: relative;
+    }
+
+    /* Stagger idle float */
+    .bld-tavern  .building-inner { animation-delay: 0.0s; }
+    .bld-forge   .building-inner { animation-delay: 0.6s; }
+    .bld-guild   .building-inner { animation-delay: 1.2s; }
+    .bld-vault   .building-inner { animation-delay: 0.3s; }
+    .bld-library .building-inner { animation-delay: 0.9s; }
+    .bld-stash   .building-inner { animation-delay: 1.5s; }
+
+    .building:hover .building-inner {
+      animation: building-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    .building-icon {
+      display: block;
+      filter: drop-shadow(0 6px 10px rgba(0,0,0,0.65));
+      transition: filter 0.2s ease;
+    }
+    .building:hover .building-icon {
+      filter:
+        drop-shadow(0 10px 18px rgba(0,0,0,0.8))
+        drop-shadow(0 0 16px var(--gold-glow));
+    }
+
+    .building-label {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--text);
+      text-align: center;
+      white-space: nowrap;
+      letter-spacing: 0.5px;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.95), 0 0 8px rgba(0,0,0,0.7);
+      background: rgba(0,0,0,0.55);
+      padding: 2px 9px 3px;
+      border-radius: 8px;
+      border: 1px solid rgba(245, 158, 11, 0.18);
+    }
+
+    /* Active indicator dot */
+    .active-dot {
+      position: absolute;
+      top: 4px; right: 2px;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--teal-bright);
+      border: 2px solid var(--bg);
+      animation: badge-pulse 2.2s ease-in-out infinite;
+      z-index: 5;
+    }
+    .active-dot.arcane {
+      background: var(--purple-bright);
+      animation-name: badge-pulse-purple;
+    }
+
+    /* ════════════════════════════════
+       TOOLTIPS
+    ════════════════════════════════ */
+    .building-tooltip {
+      position: absolute;
+      bottom: calc(100% + 14px);
+      left: 50%;
+      transform: translateX(-50%) translateY(8px);
+      background: var(--tooltip-bg);
+      border: 1.5px solid var(--tooltip-border);
+      border-radius: 12px;
+      padding: 10px 14px 11px;
+      min-width: 168px;
+      max-width: 210px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      z-index: 100;
+      box-shadow:
+        0 10px 28px rgba(0,0,0,0.85),
+        0 0 14px var(--gold-glow),
+        inset 0 1px 0 rgba(245,158,11,0.1);
+    }
+    .building-tooltip::after {
+      content: '';
+      position: absolute;
+      top: 100%; left: 50%;
+      transform: translateX(-50%);
+      border: 7px solid transparent;
+      border-top-color: var(--tooltip-border);
+    }
+    .building-tooltip::before {
+      content: '';
+      position: absolute;
+      top: calc(100% + 2px); left: 50%;
+      transform: translateX(-50%);
+      border: 5px solid transparent;
+      border-top-color: var(--tooltip-bg);
+      z-index: 1;
+    }
+    .building:hover .building-tooltip {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Adjust tooltip position for buildings near the top */
+    .bld-tavern .building-tooltip,
+    .bld-forge .building-tooltip,
+    .bld-guild .building-tooltip {
+      bottom: auto;
+      top: calc(100% + 12px);
+      transform: translateX(-50%) translateY(-8px);
+    }
+    .bld-tavern:hover .building-tooltip,
+    .bld-forge:hover .building-tooltip,
+    .bld-guild:hover .building-tooltip {
+      transform: translateX(-50%) translateY(0);
+    }
+    .bld-tavern .building-tooltip::after,
+    .bld-forge .building-tooltip::after,
+    .bld-guild .building-tooltip::after {
+      top: auto;
+      bottom: 100%;
+      border-top-color: transparent;
+      border-bottom-color: var(--tooltip-border);
+    }
+    .bld-tavern .building-tooltip::before,
+    .bld-forge .building-tooltip::before,
+    .bld-guild .building-tooltip::before {
+      top: auto;
+      bottom: calc(100% + 2px);
+      border-top-color: transparent;
+      border-bottom-color: var(--tooltip-bg);
+    }
+
+    .tooltip-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--gold);
+      margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tooltip-desc {
+      font-size: 11px;
+      color: var(--text-dim);
+      line-height: 1.5;
+      margin-bottom: 7px;
+      font-style: italic;
+    }
+    .tooltip-status {
+      font-size: 11px;
+      color: var(--teal-bright);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      font-weight: 600;
+      font-style: normal;
+    }
+    .tooltip-status::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--teal-bright);
+      box-shadow: 0 0 6px var(--teal);
+      flex-shrink: 0;
+    }
+    .tooltip-status.arcane {
+      color: var(--purple-bright);
+    }
+    .tooltip-status.arcane::before {
+      background: var(--purple-bright);
+      box-shadow: 0 0 6px var(--purple);
+    }
+    .tooltip-status.idle {
+      color: var(--text-muted);
+    }
+    .tooltip-status.idle::before {
+      background: var(--text-muted);
+      box-shadow: none;
+    }
+
+    /* ════════════════════════════════
+       BOTTOM NAVIGATION
+    ════════════════════════════════ */
+    .bottom-nav {
+      background: var(--header-bg);
+      border-top: 1px solid var(--border);
+      display: flex;
+      padding: 4px 8px 28px;
+      position: relative;
+    }
+    .bottom-nav::before {
+      content: '';
+      position: absolute;
+      top: -1px; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg,
+        transparent, var(--gold-dim) 25%, var(--gold) 50%, var(--gold-dim) 75%, transparent);
+      opacity: 0.5;
+    }
+    .nav-tab {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 8px 4px 6px;
+      border-radius: 12px;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.15s;
+    }
+    .nav-tab:hover { background: rgba(245,158,11,0.08); }
+    .nav-tab.active { background: rgba(245,158,11,0.14); }
+    .nav-icon { font-size: 23px; line-height: 1; }
+    .nav-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      letter-spacing: 0.2px;
+    }
+    .nav-tab.active .nav-label { color: var(--gold); }
+    .nav-notif {
+      position: absolute;
+      top: 6px; right: calc(50% - 16px);
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #ef4444;
+      border: 1.5px solid var(--header-bg);
+    }
+
+    /* ════════════════════════════════
+       KEYFRAME ANIMATIONS
+    ════════════════════════════════ */
+
+    @keyframes building-pop {
+      0%   { transform: scale(1)    translateY(0);    }
+      28%  { transform: scale(1.14) translateY(-11px); }
+      52%  { transform: scale(1.08) translateY(-5px);  }
+      72%  { transform: scale(1.12) translateY(-9px);  }
+      88%  { transform: scale(1.09) translateY(-6px);  }
+      100% { transform: scale(1.11) translateY(-8px);  }
+    }
+
+    @keyframes idle-float {
+      0%, 100% { transform: translateY(0);   }
+      50%       { transform: translateY(-5px); }
+    }
+
+    @keyframes smoke-a {
+      0%   { opacity: 0;   transform: translate(0, 0)      scale(0.6); }
+      25%  { opacity: 0.5; transform: translate(-1px, -14px) scale(0.9); }
+      65%  { opacity: 0.3; transform: translate(2px, -28px)  scale(1.3); }
+      100% { opacity: 0;   transform: translate(-1px, -42px) scale(1.7); }
+    }
+    @keyframes smoke-b {
+      0%   { opacity: 0;   transform: translate(0, 0)      scale(0.5); }
+      25%  { opacity: 0.4; transform: translate(1px, -12px) scale(0.8); }
+      65%  { opacity: 0.25; transform: translate(-2px, -24px) scale(1.2); }
+      100% { opacity: 0;   transform: translate(1px, -36px)  scale(1.6); }
+    }
+
+    @keyframes flame-flicker {
+      0%, 100% { transform: scaleY(1)   scaleX(1);   opacity: 0.92; }
+      20%       { transform: scaleY(1.15) scaleX(0.88); opacity: 1;    }
+      45%       { transform: scaleY(0.88) scaleX(1.1);  opacity: 0.85; }
+      70%       { transform: scaleY(1.1)  scaleX(0.92); opacity: 0.95; }
+    }
+
+    @keyframes arcane-spin {
+      from { transform: rotate(0deg);   }
+      to   { transform: rotate(360deg); }
+    }
+    @keyframes arcane-spin-rev {
+      from { transform: rotate(0deg);    }
+      to   { transform: rotate(-360deg); }
+    }
+
+    @keyframes star-twinkle {
+      0%, 100% { opacity: 0.25; }
+      50%       { opacity: 1;    }
+    }
+
+    @keyframes lantern-sway {
+      0%, 100% { transform: rotate(-4deg); }
+      50%       { transform: rotate(4deg);  }
+    }
+
+    @keyframes badge-pulse {
+      0%, 100% { box-shadow: 0 0 0 0   rgba(45, 212, 191, 0.7); }
+      60%       { box-shadow: 0 0 0 5px rgba(45, 212, 191, 0);   }
+    }
+    @keyframes badge-pulse-purple {
+      0%, 100% { box-shadow: 0 0 0 0   rgba(192, 132, 252, 0.7); }
+      60%       { box-shadow: 0 0 0 5px rgba(192, 132, 252, 0);   }
+    }
+
+    @keyframes glow-breathe {
+      0%, 100% { opacity: 0.55; }
+      50%       { opacity: 0.95; }
+    }
+
+    @keyframes orb-float {
+      0%, 100% { transform: translateY(0)   rotate(0deg);   }
+      50%       { transform: translateY(-6px) rotate(180deg); }
+    }
+
+    /* Apply animation classes */
+    .smoke-1 { animation: smoke-a 2.8s ease-out infinite;       }
+    .smoke-2 { animation: smoke-b 2.8s ease-out infinite 0.95s; }
+    .smoke-3 { animation: smoke-a 2.8s ease-out infinite 1.9s;  }
+
+    .flame   { animation: flame-flicker 0.45s ease-in-out infinite; transform-origin: bottom center; }
+
+    .star-a { animation: star-twinkle 2.2s ease-in-out infinite 0.0s; }
+    .star-b { animation: star-twinkle 1.8s ease-in-out infinite 0.4s; }
+    .star-c { animation: star-twinkle 2.6s ease-in-out infinite 0.8s; }
+    .star-d { animation: star-twinkle 1.6s ease-in-out infinite 1.2s; }
+    .star-e { animation: star-twinkle 2.4s ease-in-out infinite 0.6s; }
+    .star-f { animation: star-twinkle 3.0s ease-in-out infinite 1.5s; }
+
+    .ring-cw  { animation: arcane-spin     10s linear infinite; transform-origin: 48px 48px; }
+    .ring-ccw { animation: arcane-spin-rev  7s linear infinite; transform-origin: 48px 48px; }
+
+    .lantern { animation: lantern-sway 3.2s ease-in-out infinite; transform-origin: top center; }
+    .lantern-b { animation: lantern-sway 2.8s ease-in-out infinite 1.4s; transform-origin: top center; }
+
+    .glow-orb { animation: glow-breathe 2.4s ease-in-out infinite; }
+    .glow-orb-b { animation: glow-breathe 1.9s ease-in-out infinite 0.7s; }
+
+    .arcane-orb { animation: orb-float 4s ease-in-out infinite; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════ DEVICE FRAME ═══════════════════ -->
+<div class="device-frame">
+  <div class="dynamic-island"></div>
+
+  <!-- ═══════════════════ APP SHELL ═══════════════════ -->
+  <div class="app-shell">
+
+    <!-- STATUS BAR -->
+    <div class="status-bar">
+      <span class="time">10:42</span>
+      <div class="status-icons">
+        <!-- Cellular -->
+        <svg width="18" height="12" viewBox="0 0 18 12">
+          <rect x="0"  y="6"  width="3" height="6" rx="1" fill="white"/>
+          <rect x="5"  y="4"  width="3" height="8" rx="1" fill="white"/>
+          <rect x="10" y="2"  width="3" height="10" rx="1" fill="white"/>
+          <rect x="15" y="0"  width="3" height="12" rx="1" fill="white" opacity="0.35"/>
+        </svg>
+        <!-- WiFi -->
+        <svg width="16" height="12" viewBox="0 0 16 12">
+          <circle cx="8" cy="10.5" r="1.5" fill="white"/>
+          <path d="M4.2 7.2a5.5 5.5 0 0 1 7.6 0" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <path d="M1.5 4.5a9 9 0 0 1 13 0" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.45"/>
+        </svg>
+        <!-- Battery -->
+        <svg width="26" height="13" viewBox="0 0 26 13">
+          <rect x="0.5" y="0.5" width="22" height="12" rx="3.5" stroke="white" stroke-width="1" fill="none"/>
+          <rect x="2" y="2"    width="18" height="9"  rx="2"   fill="white"/>
+          <path d="M24 4.5 v4 a2 2 0 0 0 0-4z" fill="white" opacity="0.4"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- APP HEADER -->
+    <div class="app-header">
+      <div class="town-name-wrap">
+        <!-- Castle icon -->
+        <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+          <rect x="3"  y="14" width="26" height="15" rx="2.5" fill="#7a4020" stroke="#1a0800" stroke-width="2.5"/>
+          <rect x="3"  y="10" width="8"  height="9"  rx="1.5" fill="#5a2e0a" stroke="#1a0800" stroke-width="2.5"/>
+          <rect x="12" y="7"  width="8"  height="12" rx="1.5" fill="#5a2e0a" stroke="#1a0800" stroke-width="2.5"/>
+          <rect x="21" y="10" width="8"  height="9"  rx="1.5" fill="#5a2e0a" stroke="#1a0800" stroke-width="2.5"/>
+          <!-- Crenel cutouts left tower -->
+          <rect x="3"  y="7"  width="3"  height="4"  rx="1" fill="#5a2e0a" stroke="#1a0800" stroke-width="1.5"/>
+          <rect x="7"  y="7"  width="3"  height="4"  rx="1" fill="#5a2e0a" stroke="#1a0800" stroke-width="1.5"/>
+          <!-- Crenel cutouts right tower -->
+          <rect x="21" y="7"  width="3"  height="4"  rx="1" fill="#5a2e0a" stroke="#1a0800" stroke-width="1.5"/>
+          <rect x="25" y="7"  width="3"  height="4"  rx="1" fill="#5a2e0a" stroke="#1a0800" stroke-width="1.5"/>
+          <!-- Door arch -->
+          <path d="M13.5 29 L13.5 21 Q16 17.5 18.5 21 L18.5 29 Z" fill="#1a0800" stroke="#1a0800" stroke-width="1.5"/>
+          <!-- Windows -->
+          <rect x="5"  y="18" width="5" height="6" rx="1.5" fill="#ffc040" stroke="#1a0800" stroke-width="1.5"/>
+          <rect x="22" y="18" width="5" height="6" rx="1.5" fill="#ffc040" stroke="#1a0800" stroke-width="1.5"/>
+          <!-- Flag -->
+          <line x1="16" y1="1" x2="16" y2="8" stroke="#1a0800" stroke-width="2"/>
+          <polygon points="16,1 23,4 16,7" fill="#f59e0b" stroke="#1a0800" stroke-width="1"/>
+        </svg>
+        <div>
+          <div class="town-name-text">Thornvale</div>
+          <div class="town-subtitle">Your Stronghold</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="level-badge">
+          <svg width="14" height="14" viewBox="0 0 14 14">
+            <polygon points="7,0 8.8,5 14,5 9.8,8.1 11.5,13.5 7,10.5 2.5,13.5 4.2,8.1 0,5 5.2,5"
+              fill="#f59e0b" stroke="none"/>
+          </svg>
+          Lv 12
+        </div>
+        <div class="prestige-label">★★★ Iron Rank</div>
+      </div>
+    </div>
+
+    <!-- RESOURCE BAR -->
+    <div class="resource-bar">
+      <div class="resource">
+        <span class="resource-icon">🪙</span>
+        <div class="resource-text">
+          <div class="resource-val">12,840</div>
+          <div class="resource-label">Gold</div>
+        </div>
+      </div>
+      <div class="resource">
+        <span class="resource-icon">💎</span>
+        <div class="resource-text">
+          <div class="resource-val">48</div>
+          <div class="resource-label">Gems</div>
+        </div>
+      </div>
+      <div class="resource">
+        <span class="resource-icon">⚡</span>
+        <div class="resource-text">
+          <div class="resource-val">8/10</div>
+          <div class="resource-label">Energy</div>
+        </div>
+      </div>
+      <div class="resource">
+        <span class="resource-icon">🧪</span>
+        <div class="resource-text">
+          <div class="resource-val">×24</div>
+          <div class="resource-label">Potions</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         TOWN VIEW — Background + Buildings
+    ══════════════════════════════════════ -->
+    <main class="town-view">
+
+      <!-- TOWN BACKGROUND SVG -->
+      <svg class="town-bg" viewBox="0 0 390 598" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <!-- Filters -->
+          <filter id="f-blur1"><feGaussianBlur stdDeviation="1.5"/></filter>
+          <filter id="f-blur3"><feGaussianBlur stdDeviation="3"/></filter>
+          <filter id="f-glow5">
+            <feGaussianBlur stdDeviation="5" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="f-glow10">
+            <feGaussianBlur stdDeviation="10" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+
+          <!-- Sky gradient -->
+          <linearGradient id="sky-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="#06091a"/>
+            <stop offset="60%"  stop-color="#0d1128"/>
+            <stop offset="100%" stop-color="#1a1008"/>
+          </linearGradient>
+
+          <!-- Horizon gradient -->
+          <linearGradient id="horizon-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="#1a1008"/>
+            <stop offset="100%" stop-color="#231508"/>
+          </linearGradient>
+
+          <!-- Ground pattern: dirt texture -->
+          <pattern id="ground-tex" width="48" height="48" patternUnits="userSpaceOnUse">
+            <rect width="48" height="48" fill="#231508"/>
+            <circle cx="8"  cy="10" r="1.2" fill="#2c1a08" opacity="0.6"/>
+            <circle cx="32" cy="6"  r="0.8" fill="#2e1c08" opacity="0.4"/>
+            <circle cx="18" cy="28" r="1.5" fill="#291508" opacity="0.5"/>
+            <circle cx="40" cy="36" r="1.0" fill="#2a1608" opacity="0.4"/>
+            <circle cx="6"  cy="40" r="0.9" fill="#2c1a08" opacity="0.5"/>
+            <circle cx="44" cy="20" r="1.1" fill="#2b1808" opacity="0.4"/>
+            <circle cx="24" cy="44" r="0.8" fill="#2a1608" opacity="0.3"/>
+          </pattern>
+
+          <!-- Cobblestone path pattern -->
+          <pattern id="cobble" width="28" height="22" patternUnits="userSpaceOnUse">
+            <rect width="28" height="22" fill="#3d2210"/>
+            <rect x="1.5" y="1.5" width="11" height="9"  rx="2.5" fill="#4e3020" stroke="#2e1808" stroke-width="0.7"/>
+            <rect x="15"  y="1.5" width="11" height="9"  rx="2.5" fill="#4a2c1c" stroke="#2e1808" stroke-width="0.7"/>
+            <rect x="1.5" y="12"  width="11" height="9"  rx="2.5" fill="#4a2c1c" stroke="#2e1808" stroke-width="0.7"/>
+            <rect x="15"  y="12"  width="11" height="9"  rx="2.5" fill="#4e3020" stroke="#2e1808" stroke-width="0.7"/>
+          </pattern>
+
+          <!-- Cobble path clipping -->
+          <clipPath id="clip-path-top">
+            <ellipse cx="195" cy="175" rx="28" ry="120"/>
+          </clipPath>
+        </defs>
+
+        <!-- ── SKY ── -->
+        <rect width="390" height="598" fill="url(#sky-grad)"/>
+
+        <!-- Moon -->
+        <circle cx="338" cy="52" r="28" fill="#fffde7" filter="url(#f-blur3)" opacity="0.18"/>
+        <circle cx="338" cy="52" r="20" fill="#fffde7"/>
+        <circle cx="329" cy="47" r="15" fill="#0d1128"/><!-- crescent cutout -->
+        <!-- Faint moon glow ring -->
+        <circle cx="338" cy="52" r="32" fill="none" stroke="#fffde7" stroke-width="1.5" opacity="0.12"/>
+
+        <!-- Stars -->
+        <circle class="star-a" cx="22"  cy="28"  r="1.4" fill="#fff"/>
+        <circle class="star-b" cx="62"  cy="14"  r="0.9" fill="#fff"/>
+        <circle class="star-c" cx="110" cy="38"  r="1.6" fill="#fffde7" filter="url(#f-blur1)"/>
+        <circle class="star-d" cx="160" cy="12"  r="0.8" fill="#fff"/>
+        <circle class="star-e" cx="200" cy="30"  r="1.2" fill="#fff"/>
+        <circle class="star-f" cx="250" cy="20"  r="0.9" fill="#fff"/>
+        <circle class="star-a" cx="285" cy="40"  r="1.5" fill="#fffde7" filter="url(#f-blur1)"/>
+        <circle class="star-b" cx="310" cy="16"  r="0.8" fill="#fff"/>
+        <circle class="star-c" cx="370" cy="55"  r="1.0" fill="#fff"/>
+        <circle class="star-d" cx="52"  cy="55"  r="0.7" fill="#fff" opacity="0.8"/>
+        <circle class="star-e" cx="144" cy="60"  r="1.0" fill="#fff" opacity="0.7"/>
+        <circle class="star-f" cx="225" cy="55"  r="0.7" fill="#fff" opacity="0.8"/>
+        <circle class="star-a" cx="296" cy="62"  r="0.9" fill="#fff" opacity="0.7"/>
+        <circle class="star-b" cx="38"  cy="78"  r="0.7" fill="#fff" opacity="0.5"/>
+        <circle class="star-c" cx="358" cy="78"  r="0.9" fill="#fff" opacity="0.6"/>
+
+        <!-- ── GROUND ── -->
+        <!-- Horizon blend -->
+        <rect y="108" width="390" height="40" fill="url(#horizon-grad)"/>
+        <!-- Main ground -->
+        <rect y="130" width="390" height="468" fill="url(#ground-tex)"/>
+
+        <!-- ── AMBIENT GLOW POOLS (warmth under buildings) ── -->
+        <!-- Tavern warm glow (center-top) -->
+        <ellipse cx="195" cy="180" rx="65" ry="35" fill="#f59e0b" opacity="0.06" filter="url(#f-glow10)"/>
+        <!-- Forge fire glow (left) -->
+        <ellipse cx="70"  cy="308" rx="55" ry="30" fill="#f97316" opacity="0.07" filter="url(#f-glow10)"/>
+        <!-- Guild light (right) -->
+        <ellipse cx="318" cy="308" rx="55" ry="30" fill="#f59e0b" opacity="0.06" filter="url(#f-glow10)"/>
+        <!-- Vault dim glow (lower-left) -->
+        <ellipse cx="78"  cy="468" rx="48" ry="26" fill="#b8780a" opacity="0.05" filter="url(#f-glow10)"/>
+        <!-- Library arcane glow (lower-center) -->
+        <ellipse cx="195" cy="480" rx="58" ry="32" fill="#7c3aed" opacity="0.08" filter="url(#f-glow10)"/>
+        <!-- Stash glow (lower-right) -->
+        <ellipse cx="316" cy="465" rx="48" ry="26" fill="#f59e0b" opacity="0.06" filter="url(#f-glow10)"/>
+
+        <!-- ── COBBLESTONE PATHS ── -->
+        <!-- Vertical main road (center) -->
+        <rect x="178" y="130" width="34" height="340" rx="14" fill="url(#cobble)" opacity="0.75"/>
+        <!-- Horizontal cross-road -->
+        <rect x="50"  y="283" width="290" height="30" rx="14" fill="url(#cobble)" opacity="0.75"/>
+        <!-- Diagonal path to Forge (upper-left) -->
+        <rect x="48"  y="178" width="26" height="142" rx="12" fill="url(#cobble)" opacity="0.65"
+          transform="rotate(-34 61 249)"/>
+        <!-- Diagonal path to Guild Hall (upper-right) -->
+        <rect x="244" y="178" width="26" height="142" rx="12" fill="url(#cobble)" opacity="0.65"
+          transform="rotate(34 257 249)"/>
+        <!-- Diagonal path to Vault (lower-left) -->
+        <rect x="52"  y="295" width="26" height="140" rx="12" fill="url(#cobble)" opacity="0.65"
+          transform="rotate(34 65 365)"/>
+        <!-- Diagonal path to Stash (lower-right) -->
+        <rect x="250" y="295" width="26" height="140" rx="12" fill="url(#cobble)" opacity="0.65"
+          transform="rotate(-34 263 365)"/>
+
+        <!-- ── CENTRAL PLAZA ── -->
+        <ellipse cx="195" cy="298" rx="58" ry="42" fill="#3d2210"/>
+        <ellipse cx="195" cy="298" rx="52" ry="36" fill="url(#cobble)" opacity="0.9"/>
+        <!-- Plaza stone ring -->
+        <ellipse cx="195" cy="298" rx="52" ry="36" fill="none" stroke="#5a3a22" stroke-width="2"/>
+
+        <!-- ── CENTRAL WELL ── -->
+        <!-- Stone base -->
+        <ellipse cx="195" cy="310" rx="18" ry="10" fill="#3a2810" stroke="#5a3e28" stroke-width="2"/>
+        <rect x="177" y="290" width="36" height="18" rx="5" fill="#4a3018" stroke="#5a3e28" stroke-width="2"/>
+        <!-- Rope-beam structure -->
+        <rect x="187" y="276" width="4"  height="16" rx="1.5" fill="#3a2010" stroke="#5a3e28" stroke-width="1.5"/>
+        <rect x="199" y="276" width="4"  height="16" rx="1.5" fill="#3a2010" stroke="#5a3e28" stroke-width="1.5"/>
+        <rect x="184" y="273" width="22" height="6"  rx="3"   fill="#4a2e18" stroke="#5a3e28" stroke-width="2"/>
+        <!-- Rope lines -->
+        <line x1="189" y1="274" x2="189" y2="290" stroke="#6a4a2a" stroke-width="1.5" stroke-dasharray="2 2"/>
+        <line x1="201" y1="274" x2="201" y2="290" stroke="#6a4a2a" stroke-width="1.5" stroke-dasharray="2 2"/>
+        <!-- Water bucket -->
+        <rect x="192" y="292" width="7" height="8" rx="2" fill="#3a5a7a" stroke="#2a4060" stroke-width="1.5"/>
+        <!-- Small highlight on water -->
+        <ellipse cx="192" cy="298" rx="6" ry="2" fill="#4a8aaa" opacity="0.5"/>
+
+        <!-- ── LANTERN POSTS ── -->
+        <!-- Left lantern post -->
+        <g transform="translate(142, 278)">
+          <rect x="-3" y="-38" width="5" height="38" rx="2" fill="#3a2010" stroke="#5a3e28" stroke-width="1.5"/>
+          <!-- Arm bracket -->
+          <path d="M-1 -30 Q8 -30 8 -40" stroke="#3a2010" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <!-- Lantern body -->
+          <g class="lantern" style="transform-origin: 8px -40px;">
+            <rect x="1" y="-50" width="14" height="18" rx="4" fill="#f59e0b" stroke="#2a1408" stroke-width="1.8" opacity="0.88"/>
+            <line x1="4"  y1="-50" x2="4"  y2="-32" stroke="#2a1408" stroke-width="1.2"/>
+            <line x1="8"  y1="-50" x2="8"  y2="-32" stroke="#2a1408" stroke-width="1.2"/>
+            <line x1="12" y1="-50" x2="12" y2="-32" stroke="#2a1408" stroke-width="1.2"/>
+          </g>
+          <!-- Glow -->
+          <ellipse class="glow-orb" cx="8" cy="-41" rx="22" ry="22" fill="#f59e0b" opacity="0.12" filter="url(#f-glow10)"/>
+        </g>
+        <!-- Right lantern post -->
+        <g transform="translate(248, 278)">
+          <rect x="-2" y="-38" width="5" height="38" rx="2" fill="#3a2010" stroke="#5a3e28" stroke-width="1.5"/>
+          <path d="M2 -30 Q-7 -30 -7 -40" stroke="#3a2010" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <g class="lantern-b" style="transform-origin: -7px -40px;">
+            <rect x="-14" y="-50" width="14" height="18" rx="4" fill="#f59e0b" stroke="#2a1408" stroke-width="1.8" opacity="0.88"/>
+            <line x1="-11" y1="-50" x2="-11" y2="-32" stroke="#2a1408" stroke-width="1.2"/>
+            <line x1="-7"  y1="-50" x2="-7"  y2="-32" stroke="#2a1408" stroke-width="1.2"/>
+            <line x1="-3"  y1="-50" x2="-3"  y2="-32" stroke="#2a1408" stroke-width="1.2"/>
+          </g>
+          <ellipse class="glow-orb-b" cx="-7" cy="-41" rx="22" ry="22" fill="#f59e0b" opacity="0.12" filter="url(#f-glow10)"/>
+        </g>
+
+        <!-- ── DECORATIVE GRASS TUFTS ── -->
+        <g fill="#3a5018" stroke="#263410" stroke-width="0.8" opacity="0.55">
+          <ellipse cx="26"  cy="155" rx="14" ry="5"/>
+          <ellipse cx="365" cy="168" rx="12" ry="4.5"/>
+          <ellipse cx="20"  cy="380" rx="13" ry="4.5"/>
+          <ellipse cx="372" cy="395" rx="11" ry="4"/>
+          <ellipse cx="170" cy="558" rx="12" ry="4"/>
+          <ellipse cx="220" cy="570" rx="10" ry="3.5"/>
+          <ellipse cx="355" cy="548" rx="11" ry="4"/>
+          <ellipse cx="35"  cy="540" rx="10" ry="3.5"/>
+        </g>
+
+        <!-- ── FLOWER DETAILS ── -->
+        <g opacity="0.6">
+          <circle cx="30"  cy="148" r="3.5" fill="#f59e0b" stroke="#3a2010" stroke-width="1"/>
+          <circle cx="368" cy="160" r="3"   fill="#2dd4bf" stroke="#1a4030" stroke-width="1"/>
+          <circle cx="22"  cy="372" r="3"   fill="#f59e0b" stroke="#3a2010" stroke-width="1"/>
+          <circle cx="374" cy="388" r="2.5" fill="#fbbf24" stroke="#3a2010" stroke-width="1"/>
+        </g>
+
+        <!-- ── SUBTLE VIGNETTE ── -->
+        <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
+          <stop offset="0%"   stop-color="transparent"/>
+          <stop offset="100%" stop-color="rgba(0,0,0,0.55)"/>
+        </radialGradient>
+        <rect width="390" height="598" fill="url(#vignette)" pointer-events="none"/>
+      </svg>
+
+      <!-- ════════════════════════════════════════
+           BUILDINGS (absolutely positioned)
+      ════════════════════════════════════════ -->
+
+      <!-- ── TAVERN (top center) ── -->
+      <div class="building bld-tavern" style="left:140px; top:50px;">
+        <div class="building-inner">
+          <div class="active-dot"></div>
+          <div class="building-icon">
+            <svg width="106" height="116" viewBox="0 0 106 116" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <filter id="wglow">
+                  <feGaussianBlur stdDeviation="5" result="b"/>
+                  <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+              </defs>
+              <!-- Ground shadow -->
+              <ellipse cx="53" cy="113" rx="40" ry="6.5" fill="rgba(0,0,0,0.55)"/>
+              <!-- Building body -->
+              <rect x="10" y="50" width="86" height="58" rx="5" fill="#8a4a22" stroke="#1a0800" stroke-width="3.5"/>
+              <!-- Half-timber cross beams -->
+              <line x1="10" y1="72" x2="96" y2="72" stroke="#3a1a06" stroke-width="2.5"/>
+              <line x1="30" y1="50" x2="30" y2="108" stroke="#3a1a06" stroke-width="2"/>
+              <line x1="76" y1="50" x2="76" y2="108" stroke="#3a1a06" stroke-width="2"/>
+              <!-- Stone base -->
+              <rect x="10" y="86" width="86" height="22" rx="0" fill="#6a3818" stroke="#1a0800" stroke-width="2"/>
+              <!-- Stone seam lines -->
+              <line x1="10"  y1="94" x2="96"  y2="94" stroke="#3a2010" stroke-width="1.2"/>
+              <line x1="28"  y1="86" x2="28"  y2="108" stroke="#3a2010" stroke-width="1.2"/>
+              <line x1="52"  y1="86" x2="52"  y2="108" stroke="#3a2010" stroke-width="1.2"/>
+              <line x1="76"  y1="86" x2="76"  y2="108" stroke="#3a2010" stroke-width="1.2"/>
+              <!-- Roof -->
+              <polygon points="4,54 53,8 102,54" fill="#5a2e08" stroke="#1a0800" stroke-width="3.5" stroke-linejoin="round"/>
+              <!-- Thatch ridge -->
+              <line x1="53" y1="8" x2="53" y2="54" stroke="#3a1e05" stroke-width="2" opacity="0.5"/>
+              <!-- Thatch texture lines (left side) -->
+              <line x1="14" y1="48" x2="36" y2="22" stroke="#3a1e05" stroke-width="1.8" opacity="0.4"/>
+              <line x1="24" y1="52" x2="44" y2="30" stroke="#3a1e05" stroke-width="1.5" opacity="0.4"/>
+              <line x1="36" y1="54" x2="50" y2="38" stroke="#3a1e05" stroke-width="1.2" opacity="0.35"/>
+              <!-- Thatch texture lines (right side) -->
+              <line x1="92" y1="48" x2="70" y2="22" stroke="#3a1e05" stroke-width="1.8" opacity="0.4"/>
+              <line x1="82" y1="52" x2="62" y2="30" stroke="#3a1e05" stroke-width="1.5" opacity="0.4"/>
+              <line x1="70" y1="54" x2="56" y2="38" stroke="#3a1e05" stroke-width="1.2" opacity="0.35"/>
+              <!-- Chimney -->
+              <rect x="66" y="14" width="14" height="34" rx="3.5" fill="#3a2010" stroke="#1a0800" stroke-width="3"/>
+              <rect x="63" y="10" width="20" height="7"  rx="2"   fill="#4a2e18" stroke="#1a0800" stroke-width="2"/>
+              <!-- Smoke -->
+              <circle class="smoke-1" cx="73" cy="11" r="6"   fill="#504040" opacity="0"/>
+              <circle class="smoke-2" cx="75" cy="11" r="5"   fill="#605050" opacity="0"/>
+              <circle class="smoke-3" cx="71" cy="11" r="5.5" fill="#403838" opacity="0"/>
+              <!-- Window warm glow -->
+              <ellipse class="glow-orb" cx="53" cy="63" rx="18" ry="14" fill="#ffc040" opacity="0.22" filter="url(#wglow)"/>
+              <!-- Round window frame -->
+              <circle cx="53" cy="63" r="14.5" fill="#1a0800" stroke="#1a0800" stroke-width="3.5"/>
+              <circle cx="53" cy="63" r="12"   fill="#ffcf70"/>
+              <circle cx="53" cy="63" r="10.5" fill="#ffc040"/>
+              <!-- Window pane cross -->
+              <line x1="53" y1="50.5" x2="53" y2="75.5" stroke="#1a0800" stroke-width="2.5"/>
+              <line x1="40.5" y1="63" x2="65.5" y2="63"  stroke="#1a0800" stroke-width="2.5"/>
+              <circle cx="53" cy="63" r="12" fill="none" stroke="#1a0800" stroke-width="2"/>
+              <!-- Side windows -->
+              <rect x="14" y="56" width="11" height="11" rx="2.5" fill="#ffc040" stroke="#1a0800" stroke-width="2"/>
+              <line x1="19.5" y1="56" x2="19.5" y2="67" stroke="#1a0800" stroke-width="1.5"/>
+              <line x1="14" y1="61.5" x2="25" y2="61.5"  stroke="#1a0800" stroke-width="1.5"/>
+              <rect x="81" y="56" width="11" height="11" rx="2.5" fill="#ffc040" stroke="#1a0800" stroke-width="2"/>
+              <line x1="86.5" y1="56" x2="86.5" y2="67" stroke="#1a0800" stroke-width="1.5"/>
+              <line x1="81" y1="61.5" x2="92" y2="61.5"  stroke="#1a0800" stroke-width="1.5"/>
+              <!-- Door arch -->
+              <path d="M38 108 L38 88 Q53 78 68 88 L68 108 Z" fill="#2a1005" stroke="#1a0800" stroke-width="3"/>
+              <path d="M40 108 L40 89.5 Q53 81 66 89.5 L66 108" fill="#1a0800" stroke="none"/>
+              <!-- Door handle -->
+              <circle cx="63" cy="98" r="3" fill="#f59e0b" stroke="#1a0800" stroke-width="1.5"/>
+              <!-- Steps -->
+              <rect x="32" y="106" width="42" height="5"   rx="2.5" fill="#4e3018" stroke="#1a0800" stroke-width="2"/>
+              <rect x="28" y="110" width="50" height="4.5" rx="2"   fill="#5a3820" stroke="#1a0800" stroke-width="1.5"/>
+              <!-- Hanging sign -->
+              <line x1="78" y1="52" x2="78" y2="68" stroke="#1a0800" stroke-width="2.5"/>
+              <line x1="78" y1="52" x2="96" y2="52" stroke="#1a0800" stroke-width="2.5"/>
+              <!-- Sign board -->
+              <rect x="80" y="44" width="24" height="18" rx="5" fill="#c8902a" stroke="#1a0800" stroke-width="2.5"/>
+              <rect x="82" y="46" width="20" height="14" rx="3" fill="#d4a040" stroke="#1a0800" stroke-width="1.5"/>
+              <!-- Mug on sign -->
+              <rect x="85" y="49" width="8"  height="9"  rx="1.5" fill="#ffc040" stroke="#1a0800" stroke-width="1.5"/>
+              <path d="M93 52 Q98 52 98 55.5 Q98 59 93 59" stroke="#1a0800" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+              <ellipse cx="89" cy="49" rx="4" ry="1.5" fill="#fff" opacity="0.55"/>
+              <!-- Roof peak flag -->
+              <line x1="53" y1="7"  x2="53" y2="1"   stroke="#1a0800" stroke-width="2.5"/>
+              <polygon points="53,1 62,4 53,7" fill="#f59e0b" stroke="#1a0800" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <div class="building-label">Tavern</div>
+        </div>
+        <div class="building-tooltip">
+          <div class="tooltip-title">🍺 Tavern</div>
+          <div class="tooltip-desc">A warm hearth and cold ale. Recruit companions & gather whispered rumors.</div>
+          <div class="tooltip-status">3 heroes resting</div>
+        </div>
+      </div>
+
+      <!-- ── FORGE (left) ── -->
+      <div class="building bld-forge" style="left:14px; top:172px;">
+        <div class="building-inner">
+          <div class="active-dot"></div>
+          <div class="building-icon">
+            <svg width="96" height="106" viewBox="0 0 96 106" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <radialGradient id="fire-grad" cx="50%" cy="80%" r="60%">
+                  <stop offset="0%"   stop-color="#ff6b00"/>
+                  <stop offset="50%"  stop-color="#ff3800" stop-opacity="0.8"/>
+                  <stop offset="100%" stop-color="#ff0000" stop-opacity="0"/>
+                </radialGradient>
+                <filter id="fire-glow">
+                  <feGaussianBlur stdDeviation="6" result="b"/>
+                  <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+              </defs>
+              <!-- Ground shadow -->
+              <ellipse cx="48" cy="103" rx="38" ry="6" fill="rgba(0,0,0,0.55)"/>
+              <!-- Fire glow on ground -->
+              <ellipse class="glow-orb" cx="56" cy="90" rx="30" ry="18" fill="#ff6b00" opacity="0.18" filter="url(#fire-glow)"/>
+              <!-- Building body (brick) -->
+              <rect x="8"  y="44" width="80" height="52" rx="4" fill="#8a3825" stroke="#1a0800" stroke-width="3.5"/>
+              <!-- Brick courses -->
+              <line x1="8"  y1="58" x2="88" y2="58" stroke="#5a1e15" stroke-width="1.5"/>
+              <line x1="8"  y1="72" x2="88" y2="72" stroke="#5a1e15" stroke-width="1.5"/>
+              <line x1="8"  y1="86" x2="88" y2="86" stroke="#5a1e15" stroke-width="1.5"/>
+              <!-- Brick offset joints -->
+              <line x1="22" y1="44" x2="22" y2="58" stroke="#5a1e15" stroke-width="1"/>
+              <line x1="44" y1="44" x2="44" y2="58" stroke="#5a1e15" stroke-width="1"/>
+              <line x1="66" y1="44" x2="66" y2="58" stroke="#5a1e15" stroke-width="1"/>
+              <line x1="11" y1="58" x2="11" y2="72" stroke="#5a1e15" stroke-width="1"/>
+              <line x1="33" y1="58" x2="33" y2="72" stroke="#5a1e15" stroke-width="1"/>
+              <line x1="55" y1="58" x2="55" y2="72" stroke="#5a1e15" stroke-width="1"/>
+              <line x1="77" y1="58" x2="77" y2="72" stroke="#5a1e15" stroke-width="1"/>
+              <!-- Chimney (wide) -->
+              <rect x="56" y="6"  width="18" height="42" rx="3"   fill="#2e1808" stroke="#1a0800" stroke-width="3"/>
+              <rect x="52" y="2"  width="26" height="8"  rx="3.5" fill="#3a2010" stroke="#1a0800" stroke-width="2.5"/>
+              <!-- Chimney smoke -->
+              <circle class="smoke-1" cx="65" cy="4" r="7"   fill="#5a4a3a" opacity="0"/>
+              <circle class="smoke-2" cx="67" cy="4" r="6"   fill="#6a5a4a" opacity="0"/>
+              <circle class="smoke-3" cx="63" cy="4" r="6.5" fill="#4a3a2a" opacity="0"/>
+              <!-- Forge entrance arch -->
+              <path d="M24 96 L24 70 Q40 58 56 70 L56 96 Z" fill="#1a0c04" stroke="#1a0800" stroke-width="3"/>
+              <!-- Fire inside arch -->
+              <ellipse class="glow-orb" cx="40" cy="88" rx="18" ry="10" fill="#ff6b00" opacity="0.35" filter="url(#fire-glow)"/>
+              <!-- Flame shapes -->
+              <g class="flame" style="transform-origin: 40px 90px;">
+                <path d="M32 90 Q36 78 40 72 Q44 78 48 90 Z" fill="#ff8c00" stroke="none"/>
+              </g>
+              <g class="flame" style="animation-delay:0.15s; transform-origin: 38px 88px;">
+                <path d="M33 88 Q36 80 39 75 Q42 80 45 88 Z" fill="#ffb800" stroke="none" opacity="0.8"/>
+              </g>
+              <g class="flame" style="animation-delay:0.3s; transform-origin: 42px 88px;">
+                <path d="M36 88 Q39 82 42 78 Q45 82 47 88 Z" fill="#ff6b00" stroke="none" opacity="0.7"/>
+              </g>
+              <!-- Anvil shape -->
+              <rect x="60" y="74" width="24" height="10" rx="3" fill="#4a4858" stroke="#1a0800" stroke-width="2"/>
+              <rect x="63" y="84" width="18" height="6"  rx="2" fill="#3a3848" stroke="#1a0800" stroke-width="2"/>
+              <rect x="66" y="90" width="12" height="4"  rx="1.5" fill="#2a2838" stroke="#1a0800" stroke-width="1.5"/>
+              <!-- Hammer -->
+              <rect x="60" y="68" width="12" height="8"  rx="2" fill="#5a5060" stroke="#1a0800" stroke-width="2" transform="rotate(-25 66 72)"/>
+              <rect x="65" y="62" width="4"  height="18" rx="1.5" fill="#7a5030" stroke="#1a0800" stroke-width="1.5" transform="rotate(-25 67 71)"/>
+              <!-- Small window -->
+              <rect x="68" y="50" width="14" height="14" rx="3" fill="#ffc040" stroke="#1a0800" stroke-width="2"/>
+              <line x1="75" y1="50" x2="75" y2="64" stroke="#1a0800" stroke-width="1.5"/>
+              <line x1="68" y1="57" x2="82" y2="57" stroke="#1a0800" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <div class="building-label">Forge</div>
+        </div>
+        <div class="building-tooltip">
+          <div class="tooltip-title">⚒ Forge</div>
+          <div class="tooltip-desc">Craft weapons, smelt ore & temper steel in the eternal fire.</div>
+          <div class="tooltip-status">Smelting iron ore…</div>
+        </div>
+      </div>
+
+      <!-- ── GUILD HALL (right) ── -->
+      <div class="building bld-guild" style="left:264px; top:166px;">
+        <div class="building-inner">
+          <div class="active-dot"></div>
+          <div class="building-icon">
+            <svg width="100" height="116" viewBox="0 0 100 116" xmlns="http://www.w3.org/2000/svg">
+              <!-- Ground shadow -->
+              <ellipse cx="50" cy="113" rx="40" ry="6" fill="rgba(0,0,0,0.55)"/>
+              <!-- Main tower body -->
+              <rect x="14" y="36" width="72" height="70" rx="3" fill="#5a4838" stroke="#1a0800" stroke-width="3.5"/>
+              <!-- Stone texture lines -->
+              <line x1="14" y1="56" x2="86" y2="56" stroke="#3a3028" stroke-width="1.5"/>
+              <line x1="14" y1="76" x2="86" y2="76" stroke="#3a3028" stroke-width="1.5"/>
+              <line x1="14" y1="96" x2="86" y2="96" stroke="#3a3028" stroke-width="1.5"/>
+              <!-- Stone vertical joints -->
+              <line x1="30" y1="36" x2="30" y2="56" stroke="#3a3028" stroke-width="1"/>
+              <line x1="50" y1="36" x2="50" y2="56" stroke="#3a3028" stroke-width="1"/>
+              <line x1="70" y1="36" x2="70" y2="56" stroke="#3a3028" stroke-width="1"/>
+              <line x1="22" y1="56" x2="22" y2="76" stroke="#3a3028" stroke-width="1"/>
+              <line x1="44" y1="56" x2="44" y2="76" stroke="#3a3028" stroke-width="1"/>
+              <line x1="66" y1="56" x2="66" y2="76" stroke="#3a3028" stroke-width="1"/>
+              <!-- Crenellations (top battlements) -->
+              <rect x="14" y="24" width="72" height="16" rx="2" fill="#4e4030" stroke="#1a0800" stroke-width="3"/>
+              <!-- Crenel gaps (the open parts) -->
+              <rect x="20" y="20" width="12" height="14" rx="2" fill="#4e4030" stroke="#1a0800" stroke-width="2.5"/>
+              <rect x="38" y="20" width="12" height="14" rx="2" fill="#4e4030" stroke="#1a0800" stroke-width="2.5"/>
+              <rect x="56" y="20" width="12" height="14" rx="2" fill="#4e4030" stroke="#1a0800" stroke-width="2.5"/>
+              <rect x="74" y="20" width="12" height="14" rx="2" fill="#4e4030" stroke="#1a0800" stroke-width="2.5"/>
+              <!-- Merlons (filled parts) between gaps -->
+              <rect x="14" y="20" width="8"  height="14" rx="2" fill="#6a5848" stroke="#1a0800" stroke-width="2.5"/>
+              <rect x="30" y="20" width="10" height="14" rx="2" fill="#6a5848" stroke="#1a0800" stroke-width="2.5"/>
+              <rect x="48" y="20" width="10" height="14" rx="2" fill="#6a5848" stroke="#1a0800" stroke-width="2.5"/>
+              <rect x="66" y="20" width="10" height="14" rx="2" fill="#6a5848" stroke="#1a0800" stroke-width="2.5"/>
+              <rect x="78" y="20" width="8"  height="14" rx="2" fill="#6a5848" stroke="#1a0800" stroke-width="2.5"/>
+              <!-- Guild banner (hanging) -->
+              <rect x="42" y="4" width="3" height="20" rx="1" fill="#3a2010" stroke="#1a0800" stroke-width="1.5"/>
+              <polygon points="45,4 86,12 45,20" fill="#0d9488" stroke="#1a0800" stroke-width="2"/>
+              <!-- Banner emblem -->
+              <polygon points="68,10 70,16 66,13 72,13 68,16" fill="#f59e0b" stroke="none" transform="rotate(0 68 12)"/>
+              <!-- Torch left -->
+              <rect x="17" y="56" width="5" height="14" rx="2" fill="#5a3010" stroke="#1a0800" stroke-width="1.5"/>
+              <g class="flame" style="transform-origin: 19.5px 56px;">
+                <ellipse cx="19.5" cy="52" rx="5" ry="8" fill="#ff8c00" stroke="none" opacity="0.9"/>
+                <ellipse cx="19.5" cy="52" rx="3" ry="6" fill="#ffcc00" stroke="none" opacity="0.7"/>
+              </g>
+              <!-- Torch right -->
+              <rect x="78" y="56" width="5" height="14" rx="2" fill="#5a3010" stroke="#1a0800" stroke-width="1.5"/>
+              <g class="flame" style="animation-delay:0.2s; transform-origin: 80.5px 56px;">
+                <ellipse cx="80.5" cy="52" rx="5" ry="8" fill="#ff8c00" stroke="none" opacity="0.9"/>
+                <ellipse cx="80.5" cy="52" rx="3" ry="6" fill="#ffcc00" stroke="none" opacity="0.7"/>
+              </g>
+              <!-- Windows (tall arched) -->
+              <path d="M22 78 L22 64 Q29 58 36 64 L36 78 Z" fill="#ffc040" stroke="#1a0800" stroke-width="2"/>
+              <path d="M64 78 L64 64 Q71 58 78 64 L78 78 Z" fill="#ffc040" stroke="#1a0800" stroke-width="2"/>
+              <!-- Shield emblem on wall -->
+              <path d="M44 60 L56 60 L56 68 Q50 74 44 68 Z" fill="#7a6050" stroke="#1a0800" stroke-width="2"/>
+              <path d="M46 62 L54 62 L54 68 Q50 72 46 68 Z" fill="#c8902a" stroke="#1a0800" stroke-width="1.5"/>
+              <!-- Cross on shield -->
+              <line x1="50" y1="62" x2="50" y2="71" stroke="#1a0800" stroke-width="1.5"/>
+              <line x1="46" y1="65" x2="54" y2="65" stroke="#1a0800" stroke-width="1.5"/>
+              <!-- Double door -->
+              <path d="M38 106 L38 88 Q44 84 50 86 L50 106 Z" fill="#2a1805" stroke="#1a0800" stroke-width="2.5"/>
+              <path d="M62 106 L62 88 Q56 84 50 86 L50 106 Z" fill="#2a1805" stroke="#1a0800" stroke-width="2.5"/>
+              <!-- Door handles -->
+              <circle cx="47" cy="96" r="2.5" fill="#f59e0b" stroke="#1a0800" stroke-width="1.2"/>
+              <circle cx="53" cy="96" r="2.5" fill="#f59e0b" stroke="#1a0800" stroke-width="1.2"/>
+              <!-- Steps -->
+              <rect x="30" y="104" width="40" height="5"   rx="2.5" fill="#4a3820" stroke="#1a0800" stroke-width="2"/>
+              <rect x="26" y="108" width="48" height="4.5" rx="2"   fill="#5a4830" stroke="#1a0800" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <div class="building-label">Guild Hall</div>
+        </div>
+        <div class="building-tooltip">
+          <div class="tooltip-title">⚔️ Guild Hall</div>
+          <div class="tooltip-desc">Accept contracts, claim bounties & advance your guild rank.</div>
+          <div class="tooltip-status">2 contracts available</div>
+        </div>
+      </div>
+
+      <!-- ── VAULT (lower-left) ── -->
+      <div class="building bld-vault" style="left:18px; top:358px;">
+        <div class="building-inner">
+          <div class="building-icon">
+            <svg width="92" height="100" viewBox="0 0 92 100" xmlns="http://www.w3.org/2000/svg">
+              <!-- Ground shadow -->
+              <ellipse cx="46" cy="97" rx="36" ry="5.5" fill="rgba(0,0,0,0.55)"/>
+              <!-- Heavy stone base / plinth -->
+              <rect x="6"  y="72" width="80" height="20" rx="3" fill="#3a3228" stroke="#1a0800" stroke-width="3"/>
+              <!-- Base stone seams -->
+              <line x1="6"  y1="80" x2="86" y2="80" stroke="#2a2220" stroke-width="1.5"/>
+              <line x1="26" y1="72" x2="26" y2="92" stroke="#2a2220" stroke-width="1"/>
+              <line x1="46" y1="72" x2="46" y2="92" stroke="#2a2220" stroke-width="1"/>
+              <line x1="66" y1="72" x2="66" y2="92" stroke="#2a2220" stroke-width="1"/>
+              <!-- Main building body -->
+              <rect x="12" y="28" width="68" height="48" rx="3" fill="#4a4038" stroke="#1a0800" stroke-width="3.5"/>
+              <!-- Stone texture -->
+              <line x1="12" y1="44" x2="80" y2="44" stroke="#3a3028" stroke-width="1.5"/>
+              <line x1="12" y1="60" x2="80" y2="60" stroke="#3a3028" stroke-width="1.5"/>
+              <line x1="28" y1="28" x2="28" y2="44" stroke="#3a3028" stroke-width="1"/>
+              <line x1="48" y1="28" x2="48" y2="44" stroke="#3a3028" stroke-width="1"/>
+              <line x1="68" y1="28" x2="68" y2="44" stroke="#3a3028" stroke-width="1"/>
+              <line x1="20" y1="44" x2="20" y2="60" stroke="#3a3028" stroke-width="1"/>
+              <line x1="40" y1="44" x2="40" y2="60" stroke="#3a3028" stroke-width="1"/>
+              <line x1="60" y1="44" x2="60" y2="60" stroke="#3a3028" stroke-width="1"/>
+              <!-- Arched top (rounded parapet) -->
+              <path d="M12 32 L12 28 Q46 10 80 28 L80 32 Z" fill="#5a5040" stroke="#1a0800" stroke-width="3"/>
+              <!-- Roof ornaments / battlements small -->
+              <rect x="12" y="20" width="10" height="12" rx="2" fill="#6a6050" stroke="#1a0800" stroke-width="2.5"/>
+              <rect x="26" y="16" width="10" height="16" rx="2" fill="#6a6050" stroke="#1a0800" stroke-width="2.5"/>
+              <rect x="41" y="12" width="10" height="20" rx="2" fill="#6a6050" stroke="#1a0800" stroke-width="2.5"/>
+              <rect x="56" y="16" width="10" height="16" rx="2" fill="#6a6050" stroke="#1a0800" stroke-width="2.5"/>
+              <rect x="70" y="20" width="10" height="12" rx="2" fill="#6a6050" stroke="#1a0800" stroke-width="2.5"/>
+              <!-- Vault door (round) -->
+              <circle cx="46" cy="60" r="18" fill="#2a2018" stroke="#1a0800" stroke-width="3.5"/>
+              <circle cx="46" cy="60" r="15" fill="#1a1810" stroke="#3a3028" stroke-width="2"/>
+              <!-- Lock mechanism wheel spokes -->
+              <line x1="46" y1="45" x2="46" y2="75" stroke="#5a4838" stroke-width="2.5"/>
+              <line x1="31" y1="60" x2="61" y2="60" stroke="#5a4838" stroke-width="2.5"/>
+              <line x1="35" y1="49" x2="57" y2="71" stroke="#5a4838" stroke-width="2"/>
+              <line x1="35" y1="71" x2="57" y2="49" stroke="#5a4838" stroke-width="2"/>
+              <!-- Lock hub -->
+              <circle cx="46" cy="60" r="5.5" fill="#c8902a" stroke="#1a0800" stroke-width="2"/>
+              <circle cx="46" cy="60" r="3"   fill="#f59e0b" stroke="#1a0800" stroke-width="1.5"/>
+              <!-- Gold coin symbol above door -->
+              <circle cx="46" cy="36" r="8" fill="#c8902a" stroke="#1a0800" stroke-width="2"/>
+              <circle cx="46" cy="36" r="6" fill="#f59e0b"/>
+              <text x="46" y="40" text-anchor="middle" font-size="8" font-weight="bold" fill="#1a0800">G</text>
+              <!-- Small barred side windows -->
+              <rect x="15" y="52" width="10" height="10" rx="2" fill="#0a0c14" stroke="#1a0800" stroke-width="2"/>
+              <line x1="18" y1="52" x2="18" y2="62" stroke="#4a4050" stroke-width="1.5"/>
+              <line x1="21" y1="52" x2="21" y2="62" stroke="#4a4050" stroke-width="1.5"/>
+              <rect x="67" y="52" width="10" height="10" rx="2" fill="#0a0c14" stroke="#1a0800" stroke-width="2"/>
+              <line x1="70" y1="52" x2="70" y2="62" stroke="#4a4050" stroke-width="1.5"/>
+              <line x1="73" y1="52" x2="73" y2="62" stroke="#4a4050" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <div class="building-label">Vault</div>
+        </div>
+        <div class="building-tooltip">
+          <div class="tooltip-title">🔒 Vault</div>
+          <div class="tooltip-desc">Store valuables, exchange currency & keep your treasury safe.</div>
+          <div class="tooltip-status idle">Secured · No activity</div>
+        </div>
+      </div>
+
+      <!-- ── ARCANE LIBRARY (lower-center) ── -->
+      <div class="building bld-library" style="left:144px; top:365px;">
+        <div class="building-inner">
+          <div class="active-dot arcane"></div>
+          <div class="building-icon">
+            <svg width="100" height="118" viewBox="0 0 100 118" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <radialGradient id="arcane-win" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%"   stop-color="#c084fc"/>
+                  <stop offset="60%"  stop-color="#7c3aed"/>
+                  <stop offset="100%" stop-color="#4c1d95"/>
+                </radialGradient>
+                <filter id="arcane-glow">
+                  <feGaussianBlur stdDeviation="5" result="b"/>
+                  <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+              </defs>
+              <!-- Ground shadow -->
+              <ellipse cx="50" cy="115" rx="36" ry="5.5" fill="rgba(0,0,0,0.55)"/>
+              <!-- Arcane aura glow -->
+              <ellipse class="glow-orb-b" cx="50" cy="60" rx="40" ry="50" fill="#7c3aed" opacity="0.08" filter="url(#arcane-glow)"/>
+              <!-- Tower body (rounded) -->
+              <rect x="18" y="38" width="64" height="70" rx="6" fill="#2a2040" stroke="#1a0800" stroke-width="3.5"/>
+              <!-- Stone texture on tower -->
+              <line x1="18" y1="58" x2="82" y2="58" stroke="#1e1838" stroke-width="1.5"/>
+              <line x1="18" y1="78" x2="82" y2="78" stroke="#1e1838" stroke-width="1.5"/>
+              <line x1="18" y1="98" x2="82" y2="98" stroke="#1e1838" stroke-width="1.5"/>
+              <!-- Arcane rune markings on wall -->
+              <text x="20" y="70" font-size="9" fill="#7c3aed" opacity="0.5">✦</text>
+              <text x="72" y="70" font-size="9" fill="#7c3aed" opacity="0.5">✦</text>
+              <text x="46" y="98" font-size="8" fill="#0d9488" opacity="0.6">⟡</text>
+              <!-- Conical roof -->
+              <polygon points="10,42 50,2 90,42" fill="#1e1838" stroke="#1a0800" stroke-width="3.5" stroke-linejoin="round"/>
+              <!-- Spiral lines on roof -->
+              <line x1="50" y1="2"  x2="28" y2="36" stroke="#7c3aed" stroke-width="1.2" opacity="0.45"/>
+              <line x1="50" y1="2"  x2="72" y2="36" stroke="#7c3aed" stroke-width="1.2" opacity="0.45"/>
+              <line x1="50" y1="2"  x2="38" y2="40" stroke="#7c3aed" stroke-width="1"   opacity="0.3"/>
+              <line x1="50" y1="2"  x2="62" y2="40" stroke="#7c3aed" stroke-width="1"   opacity="0.3"/>
+              <!-- Rotating arcane rings -->
+              <g class="ring-cw">
+                <circle cx="50" cy="22" r="14" fill="none" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.6"/>
+              </g>
+              <g class="ring-ccw">
+                <circle cx="50" cy="22" r="10" fill="none" stroke="#0d9488" stroke-width="1.2" stroke-dasharray="3 4" opacity="0.55"/>
+              </g>
+              <!-- Orbiting star -->
+              <g class="arcane-orb">
+                <circle cx="50" cy="10" r="3" fill="#c084fc" filter="url(#arcane-glow)"/>
+              </g>
+              <!-- Roof peak star -->
+              <circle cx="50" cy="2" r="4" fill="#fbbf24" stroke="#1a0800" stroke-width="1.5"/>
+              <!-- Floating stars around tower -->
+              <circle class="star-a" cx="12" cy="25" r="1.8" fill="#c084fc" filter="url(#arcane-glow)"/>
+              <circle class="star-b" cx="88" cy="30" r="1.5" fill="#2dd4bf" filter="url(#arcane-glow)"/>
+              <circle class="star-c" cx="10" cy="50" r="1.3" fill="#c084fc" opacity="0.7"/>
+              <circle class="star-d" cx="90" cy="55" r="1.2" fill="#2dd4bf" opacity="0.7"/>
+              <circle class="star-e" cx="8"  cy="75" r="1.0" fill="#c084fc" opacity="0.5"/>
+              <circle class="star-f" cx="92" cy="80" r="1.1" fill="#2dd4bf" opacity="0.5"/>
+              <!-- Arched window (large, arcane glow) -->
+              <path d="M34 80 L34 56 Q50 46 66 56 L66 80 Z" fill="#1a0800" stroke="#1a0800" stroke-width="2.5"/>
+              <!-- Arcane light inside window -->
+              <path d="M36 80 L36 57.5 Q50 49 64 57.5 L64 80 Z" fill="url(#arcane-win)"/>
+              <!-- Window glow -->
+              <path d="M34 80 L34 56 Q50 46 66 56 L66 80 Z" fill="#c084fc" opacity="0.15" filter="url(#arcane-glow)"/>
+              <!-- Window cross frame -->
+              <line x1="50" y1="50" x2="50" y2="80" stroke="#1a0800" stroke-width="2"/>
+              <line x1="34" y1="66" x2="66" y2="66" stroke="#1a0800" stroke-width="2"/>
+              <!-- Book visible in window -->
+              <rect x="42" y="68" width="7" height="9" rx="1" fill="#c8902a" stroke="#1a0800" stroke-width="1.2"/>
+              <rect x="51" y="68" width="7" height="9" rx="1" fill="#6a3818" stroke="#1a0800" stroke-width="1.2"/>
+              <!-- Entry door -->
+              <path d="M40 108 L40 96 Q50 90 60 96 L60 108 Z" fill="#1a1030" stroke="#1a0800" stroke-width="2.5"/>
+              <!-- Door arcane seal -->
+              <circle cx="50" cy="99" r="4" fill="none" stroke="#7c3aed" stroke-width="1.5" opacity="0.8"/>
+              <line x1="50" y1="95" x2="50" y2="103" stroke="#7c3aed" stroke-width="1" opacity="0.8"/>
+              <line x1="46" y1="99" x2="54" y2="99" stroke="#7c3aed" stroke-width="1" opacity="0.8"/>
+              <!-- Steps -->
+              <rect x="34" y="106" width="32" height="5"   rx="2.5" fill="#3a3028" stroke="#1a0800" stroke-width="2"/>
+              <rect x="30" y="110" width="40" height="4.5" rx="2"   fill="#4a4038" stroke="#1a0800" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <div class="building-label">Arcane Library</div>
+        </div>
+        <div class="building-tooltip">
+          <div class="tooltip-title">📚 Arcane Library</div>
+          <div class="tooltip-desc">Unlock forbidden knowledge, enchant gear & master ancient spells.</div>
+          <div class="tooltip-status arcane">Studying: Ice Bolt III</div>
+        </div>
+      </div>
+
+      <!-- ── STASH (lower-right) ── -->
+      <div class="building bld-stash" style="left:262px; top:365px;">
+        <div class="building-inner">
+          <div class="building-icon">
+            <svg width="94" height="100" viewBox="0 0 94 100" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <filter id="chest-glow">
+                  <feGaussianBlur stdDeviation="4" result="b"/>
+                  <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+              </defs>
+              <!-- Ground shadow -->
+              <ellipse cx="47" cy="97" rx="36" ry="5.5" fill="rgba(0,0,0,0.55)"/>
+              <!-- Shed body -->
+              <rect x="10" y="42" width="74" height="50" rx="4" fill="#7a4020" stroke="#1a0800" stroke-width="3.5"/>
+              <!-- Wood plank lines vertical -->
+              <line x1="24" y1="42" x2="24" y2="92" stroke="#3a1a08" stroke-width="2"/>
+              <line x1="38" y1="42" x2="38" y2="92" stroke="#3a1a08" stroke-width="2"/>
+              <line x1="52" y1="42" x2="52" y2="92" stroke="#3a1a08" stroke-width="2"/>
+              <line x1="66" y1="42" x2="66" y2="92" stroke="#3a1a08" stroke-width="2"/>
+              <!-- Roof (simple peaked) -->
+              <polygon points="6,46 47,8 88,46" fill="#5a2e08" stroke="#1a0800" stroke-width="3.5" stroke-linejoin="round"/>
+              <!-- Roof plank texture -->
+              <line x1="16" y1="40" x2="32" y2="20" stroke="#3a1e05" stroke-width="1.8" opacity="0.4"/>
+              <line x1="28" y1="44" x2="42" y2="28" stroke="#3a1e05" stroke-width="1.5" opacity="0.4"/>
+              <line x1="78" y1="40" x2="62" y2="20" stroke="#3a1e05" stroke-width="1.8" opacity="0.4"/>
+              <line x1="66" y1="44" x2="52" y2="28" stroke="#3a1e05" stroke-width="1.5" opacity="0.4"/>
+              <!-- Ridge beam -->
+              <line x1="47" y1="8" x2="47" y2="46" stroke="#3a1e05" stroke-width="2" opacity="0.5"/>
+              <!-- Small side window -->
+              <rect x="14" y="50" width="12" height="12" rx="2.5" fill="#ffc040" stroke="#1a0800" stroke-width="2"/>
+              <line x1="20" y1="50" x2="20" y2="62" stroke="#1a0800" stroke-width="1.5"/>
+              <line x1="14" y1="56" x2="26" y2="56" stroke="#1a0800" stroke-width="1.5"/>
+              <!-- Chest (open) against wall -->
+              <rect x="28" y="76" width="38" height="18" rx="3" fill="#8a5028" stroke="#1a0800" stroke-width="2.5"/>
+              <!-- Chest lid (open at angle) -->
+              <path d="M28 76 L28 68 Q47 62 66 68 L66 76 Z" fill="#a06030" stroke="#1a0800" stroke-width="2.5" transform="rotate(-10 47 76)"/>
+              <!-- Gold glow from chest -->
+              <ellipse class="glow-orb" cx="47" cy="82" rx="22" ry="10" fill="#f59e0b" opacity="0.2" filter="url(#chest-glow)"/>
+              <!-- Chest metal bands -->
+              <rect x="28" y="76" width="38" height="4" rx="0" fill="#6a3010" stroke="#1a0800" stroke-width="1.5"/>
+              <line x1="47" y1="76" x2="47" y2="94" stroke="#6a3010" stroke-width="2"/>
+              <!-- Chest clasp -->
+              <rect x="43" y="81" width="8" height="6" rx="2" fill="#c8902a" stroke="#1a0800" stroke-width="1.5"/>
+              <!-- Gold coins peeking from chest -->
+              <circle cx="38" cy="82" r="4" fill="#f59e0b" stroke="#1a0800" stroke-width="1.5"/>
+              <circle cx="47" cy="80" r="4" fill="#fbbf24" stroke="#1a0800" stroke-width="1.5"/>
+              <circle cx="56" cy="82" r="4" fill="#f59e0b" stroke="#1a0800" stroke-width="1.5"/>
+              <!-- Bags/crates to side -->
+              <rect x="70" y="76" width="14" height="14" rx="2" fill="#5a3818" stroke="#1a0800" stroke-width="2"/>
+              <line x1="70" y1="83" x2="84" y2="83" stroke="#1a0800" stroke-width="1.5"/>
+              <line x1="77" y1="76" x2="77" y2="90" stroke="#1a0800" stroke-width="1.5"/>
+              <!-- Sack -->
+              <ellipse cx="18" cy="80" rx="7" ry="10" fill="#6a4a28" stroke="#1a0800" stroke-width="2"/>
+              <line x1="18" y1="70" x2="18" y2="74" stroke="#1a0800" stroke-width="1.5"/>
+              <ellipse cx="18" cy="73" rx="3" ry="2" fill="#4a3018" stroke="#1a0800" stroke-width="1.5"/>
+              <!-- Door -->
+              <rect x="44" y="80" width="22" height="12" rx="2" fill="#2a1005" stroke="#1a0800" stroke-width="2"/>
+            </svg>
+          </div>
+          <div class="building-label">Stash</div>
+        </div>
+        <div class="building-tooltip">
+          <div class="tooltip-title">🎒 Stash</div>
+          <div class="tooltip-desc">Organise your loot, manage inventory & view your collected hoard.</div>
+          <div class="tooltip-status idle">47 items stored</div>
+        </div>
+      </div>
+
+    </main><!-- end .town-view -->
+
+    <!-- ════════════════════════════════
+         BOTTOM NAVIGATION
+    ════════════════════════════════ -->
+    <nav class="bottom-nav">
+      <div class="nav-tab active">
+        <span class="nav-icon">🏰</span>
+        <span class="nav-label">Town</span>
+      </div>
+      <div class="nav-tab">
+        <span class="nav-icon">⚔️</span>
+        <span class="nav-label">Expeditions</span>
+        <div class="nav-notif"></div>
+      </div>
+      <div class="nav-tab">
+        <span class="nav-icon">🧙</span>
+        <span class="nav-label">Heroes</span>
+      </div>
+      <div class="nav-tab">
+        <span class="nav-icon">🎒</span>
+        <span class="nav-label">Stash</span>
+      </div>
+      <div class="nav-tab">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">Settings</span>
+      </div>
+    </nav>
+
+  </div><!-- end .app-shell -->
+</div><!-- end .device-frame -->
+
+</body>
+</html>
