@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Idle Adventures — Town Atlas</title>
+  <style>
+    /* =============================================
+       ATLAS TOWN SCREEN — PoE-style overhead map
+       Dark void bg · parchment-gold node accents
+       Glowing arcane connection paths
+       ============================================= */
+    :root {
+      --void:            #0d0d0d;
+      --parchment:       #c4a35a;
+      --parchment-dim:   #8a6d2f;
+      --parchment-pale:  #e8c87a;
+      --parchment-glow:  rgba(196, 163, 90, 0.35);
+      --text-main:       #e2d4b8;
+      --text-dim:        #7a6840;
+      --text-faint:      #2e2818;
+      --tooltip-bg:      rgba(8, 6, 3, 0.97);
+
+      /* Zone colour system */
+      --forge-c:   #c06030; --forge-g:   rgba(192, 96,  48,  0.55);
+      --tavern-c:  #c09040; --tavern-g:  rgba(192, 144, 64,  0.55);
+      --vault-c:   #4a7aaa; --vault-g:   rgba(74,  122, 170, 0.55);
+      --guild-c:   #60aa60; --guild-g:   rgba(96,  170, 96,  0.55);
+      --stash-c:   #8a6aaa; --stash-g:   rgba(138, 106, 170, 0.55);
+      --arcane-c:  #7060c0; --arcane-g:  rgba(112, 96,  192, 0.55);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #050504;
+      font-family: Georgia, 'Times New Roman', serif;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      overflow-x: hidden;
+    }
+
+    /* ─────────────────────────────
+       PHONE FRAME  390 × 844
+    ───────────────────────────── */
+    .phone {
+      width: 390px;
+      height: 844px;
+      background: var(--void);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      box-shadow:
+        0 0 0 1px #191919,
+        0 0 0 3px #0a0a0a,
+        0 0 60px rgba(196, 163, 90, 0.06),
+        0 24px 80px rgba(0, 0, 0, 0.95);
+      overflow: hidden;
+    }
+
+    /* ─────────────────────────────
+       HEADER  ~68px
+    ───────────────────────────── */
+    .header {
+      flex: 0 0 auto;
+      padding: 14px 20px 12px;
+      background: linear-gradient(180deg, #1e1508 0%, rgba(13,13,13,0) 100%);
+      border-bottom: 1px solid rgba(196, 163, 90, 0.12);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 10;
+    }
+
+    .header-eyebrow {
+      font-size: 9px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--parchment-dim);
+      margin-bottom: 3px;
+    }
+
+    .header-town {
+      font-size: 20px;
+      letter-spacing: 0.08em;
+      color: var(--parchment);
+      font-weight: normal;
+      text-shadow: 0 0 14px var(--parchment-glow);
+    }
+
+    .header-meta {
+      text-align: right;
+    }
+
+    .header-level {
+      font-size: 18px;
+      color: var(--parchment-pale);
+      text-shadow: 0 0 10px var(--parchment-glow);
+    }
+
+    .header-class {
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    /* ─────────────────────────────
+       ATLAS MAP  flex: 1  (~720px)
+    ───────────────────────────── */
+    .atlas {
+      flex: 1 1 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ── Deep space background ── */
+    .atlas-bg {
+      position: absolute;
+      inset: 0;
+      /* Faint nebula blobs */
+      background:
+        radial-gradient(ellipse 240px 180px at 52% 38%, rgba(196, 163, 90, 0.022) 0%, transparent 70%),
+        radial-gradient(ellipse 200px 260px at 22% 62%, rgba(96, 170, 96,  0.016) 0%, transparent 70%),
+        radial-gradient(ellipse 180px 220px at 78% 22%, rgba(74, 122, 170, 0.016) 0%, transparent 70%),
+        radial-gradient(ellipse 220px 180px at 50% 78%, rgba(112,96, 192, 0.018) 0%, transparent 70%),
+        #0d0d0d;
+    }
+
+    /* Aged map micro-grid */
+    .atlas-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(196,163,90,0.022) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(196,163,90,0.022) 1px, transparent 1px);
+      background-size: 44px 44px;
+    }
+
+    /* Subtle noise grain */
+    .atlas-grain {
+      position: absolute;
+      inset: 0;
+      background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='250'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='250' height='250' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Vignette edges */
+    .atlas-vignette {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 100% 100% at 50% 50%, transparent 55%, rgba(0,0,0,0.55) 100%);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* ── SVG path + ring layer ── */
+    .atlas-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 3;
+    }
+
+    /* ─────────────────────────────
+       ZONE NODES
+    ───────────────────────────── */
+    .node {
+      position: absolute;
+      z-index: 8;
+      cursor: pointer;
+      transform: translate(-50%, -50%);
+      transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .node:hover {
+      transform: translate(-50%, -50%) scale(1.1);
+      z-index: 20;
+    }
+
+    /* Outer pulsing ring */
+    .node-pulse {
+      position: absolute;
+      inset: -10px;
+      border-radius: 50%;
+      border: 1px solid var(--nc, var(--parchment));
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .node:hover .node-pulse {
+      animation: pulse 1.8s ease-out infinite;
+    }
+
+    @keyframes pulse {
+      0%   { transform: scale(0.85); opacity: 0.6; }
+      100% { transform: scale(1.5);  opacity: 0; }
+    }
+
+    /* Hover ring */
+    .node-ring {
+      position: absolute;
+      inset: -5px;
+      border-radius: 50%;
+      border: 1px solid transparent;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      pointer-events: none;
+    }
+
+    .node:hover .node-ring {
+      border-color: var(--nc, var(--parchment));
+      box-shadow: 0 0 12px var(--ng, var(--parchment-glow));
+    }
+
+    /* Main circle body */
+    .node-body {
+      width: 62px;
+      height: 62px;
+      border-radius: 50%;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(circle at 38% 35%, rgba(255,255,255,0.07) 0%, transparent 52%),
+        radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 40%, rgba(0,0,0,0.6) 100%),
+        #12100a;
+      border: 2px solid var(--nc, var(--parchment));
+      box-shadow:
+        0 0 0 1px rgba(0,0,0,0.9),
+        inset 0 0 14px rgba(0,0,0,0.65),
+        0 0 10px var(--ng, var(--parchment-glow));
+      transition: box-shadow 0.2s, border-color 0.2s;
+    }
+
+    .node:hover .node-body {
+      box-shadow:
+        0 0 0 1px rgba(0,0,0,0.9),
+        inset 0 0 10px rgba(0,0,0,0.4),
+        0 0 28px var(--ng, var(--parchment-glow)),
+        0 0 56px rgba(196,163,90,0.1);
+    }
+
+    .node-icon {
+      font-size: 23px;
+      line-height: 1;
+      filter: drop-shadow(0 0 5px var(--ng, var(--parchment-glow)));
+      transition: filter 0.2s;
+      user-select: none;
+    }
+
+    .node:hover .node-icon {
+      filter: drop-shadow(0 0 10px var(--ng, var(--parchment-glow)));
+    }
+
+    /* Zone label below node */
+    .node-label {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      font-size: 8.5px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--nc, var(--parchment-dim));
+      text-shadow: 0 0 8px rgba(0,0,0,1), 0 1px 3px rgba(0,0,0,0.9);
+      opacity: 0.75;
+      transition: opacity 0.2s, color 0.2s;
+    }
+
+    .node:hover .node-label {
+      opacity: 1;
+      color: var(--parchment-pale);
+    }
+
+    /* ─────────────────────────────
+       TOOLTIP
+    ───────────────────────────── */
+    .node-tip {
+      position: absolute;
+      bottom: calc(100% + 16px);
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      background: var(--tooltip-bg);
+      border: 1px solid rgba(196,163,90,0.25);
+      border-radius: 2px;
+      padding: 7px 13px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.18s;
+      z-index: 40;
+      box-shadow:
+        0 6px 24px rgba(0,0,0,0.9),
+        0 0 0 1px rgba(0,0,0,0.9),
+        inset 0 1px 0 rgba(196,163,90,0.08);
+    }
+
+    /* Caret */
+    .node-tip::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 5px solid transparent;
+      border-top-color: rgba(196,163,90,0.25);
+    }
+
+    .node:hover .node-tip {
+      opacity: 1;
+    }
+
+    /* Keep tooltip on-screen for edge nodes */
+    .node-forge   .node-tip,
+    .node-guild   .node-tip { left: 10px; transform: none; }
+    .node-forge   .node-tip::after,
+    .node-guild   .node-tip::after { left: 24px; }
+
+    .node-vault   .node-tip,
+    .node-stash   .node-tip { left: auto; right: 10px; transform: none; }
+    .node-vault   .node-tip::after,
+    .node-stash   .node-tip::after { left: auto; right: 20px; transform: none; }
+
+    .tip-name {
+      font-size: 10.5px;
+      font-weight: normal;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--nc, var(--parchment));
+      margin-bottom: 3px;
+    }
+
+    .tip-desc {
+      font-size: 9.5px;
+      color: var(--text-dim);
+      font-family: 'Courier New', monospace;
+      letter-spacing: 0.02em;
+      line-height: 1.4;
+    }
+
+    /* ─────────────────────────────
+       NODE POSITIONS
+       Atlas-wrap is flex:1 ≈ 720px tall
+       SVG viewBox & node % positions
+       reference a 390 × 720 canvas.
+
+       Node centres (px):
+         Forge:  x= 86, y=126
+         Tavern: x=195, y= 87
+         Vault:  x=304, y=126
+         Guild:  x= 70, y=352
+         Stash:  x=320, y=352
+         Arcane: x=195, y=558
+    ───────────────────────────── */
+    .node-forge  { left:22.05%; top:17.5%; --nc:var(--forge-c);  --ng:var(--forge-g);  }
+    .node-tavern { left:50%;    top:12.1%; --nc:var(--tavern-c); --ng:var(--tavern-g); }
+    .node-vault  { left:77.95%; top:17.5%; --nc:var(--vault-c);  --ng:var(--vault-g);  }
+    .node-guild  { left:17.95%; top:48.9%; --nc:var(--guild-c);  --ng:var(--guild-g);  }
+    .node-stash  { left:82.05%; top:48.9%; --nc:var(--stash-c);  --ng:var(--stash-g);  }
+    .node-arcane { left:50%;    top:77.5%; --nc:var(--arcane-c); --ng:var(--arcane-g); }
+
+    /* ─────────────────────────────
+       BOTTOM NAV  ~56px
+    ───────────────────────────── */
+    .bottom-nav {
+      flex: 0 0 56px;
+      background: linear-gradient(0deg, #0d0c08 0%, rgba(13,13,13,0.92) 100%);
+      border-top: 1px solid rgba(196,163,90,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      padding: 0 8px;
+      z-index: 10;
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      opacity: 0.4;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      padding: 4px 8px;
+    }
+
+    .nav-item.active {
+      opacity: 1;
+    }
+
+    .nav-item:hover { opacity: 0.7; }
+    .nav-item.active:hover { opacity: 1; }
+
+    .nav-icon { font-size: 18px; line-height: 1; }
+
+    .nav-label {
+      font-size: 7.5px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      font-family: 'Courier New', monospace;
+    }
+
+    .nav-item.active .nav-label {
+      color: var(--parchment-dim);
+    }
+
+    /* Active indicator dot */
+    .nav-item.active::after {
+      content: '';
+      display: block;
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: var(--parchment);
+      box-shadow: 0 0 6px var(--parchment-glow);
+      margin-top: 1px;
+    }
+
+  </style>
+</head>
+<body>
+
+<div class="phone">
+
+  <!-- ══ HEADER ══ -->
+  <div class="header">
+    <div>
+      <div class="header-eyebrow">Town</div>
+      <div class="header-town">Thornvale</div>
+    </div>
+    <div class="header-meta">
+      <div class="header-level">Lv 12</div>
+      <div class="header-class">Wanderer</div>
+    </div>
+  </div>
+
+  <!-- ══ ATLAS MAP ══ -->
+  <div class="atlas">
+
+    <div class="atlas-bg"></div>
+    <div class="atlas-grid"></div>
+    <div class="atlas-grain"></div>
+    <div class="atlas-vignette"></div>
+
+    <!--
+      SVG layer — viewBox 390×720 (matches atlas flex-1 height for ~718px)
+      All path endpoints calculated from node centres above.
+
+      Node radii = 31px (62px ÷ 2), so path endpoints are offset 31px from centre.
+
+      Node centres (px in 390×720 space):
+        Forge:  ( 86, 126)   22.05% × 390 = 85.99,  17.5% × 720 = 126
+        Tavern: (195,  87)   50%    × 390 = 195,     12.1% × 720 =  87
+        Vault:  (304, 126)   77.95% × 390 = 304.01,  17.5% × 720 = 126
+        Guild:  ( 70, 352)   17.95% × 390 =  70.01,  48.9% × 720 = 352
+        Stash:  (320, 352)   82.05% × 390 = 319.99,  48.9% × 720 = 352
+        Arcane: (195, 558)   50%    × 390 = 195,     77.5% × 720 = 558
+
+      Path endpoint offset convention:
+        Find unit vector between two node centres, multiply by 31 for edge point.
+    -->
+    <svg class="atlas-svg" viewBox="0 0 390 720" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+      <defs>
+        <!-- Glow blur for paths -->
+        <filter id="pglow" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="2.5" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+
+        <!-- Node halo gradients -->
+        <radialGradient id="h-forge"  cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#c06030" stop-opacity="0.22"/><stop offset="100%" stop-color="#c06030" stop-opacity="0"/></radialGradient>
+        <radialGradient id="h-tavern" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#c09040" stop-opacity="0.22"/><stop offset="100%" stop-color="#c09040" stop-opacity="0"/></radialGradient>
+        <radialGradient id="h-vault"  cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#4a7aaa" stop-opacity="0.22"/><stop offset="100%" stop-color="#4a7aaa" stop-opacity="0"/></radialGradient>
+        <radialGradient id="h-guild"  cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#60aa60" stop-opacity="0.22"/><stop offset="100%" stop-color="#60aa60" stop-opacity="0"/></radialGradient>
+        <radialGradient id="h-stash"  cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#8a6aaa" stop-opacity="0.22"/><stop offset="100%" stop-color="#8a6aaa" stop-opacity="0"/></radialGradient>
+        <radialGradient id="h-arcane" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#7060c0" stop-opacity="0.22"/><stop offset="100%" stop-color="#7060c0" stop-opacity="0"/></radialGradient>
+      </defs>
+
+      <!-- ── Concentric orientation rings ── -->
+      <g stroke="#c4a35a" fill="none" opacity="0.055">
+        <circle cx="195" cy="322" r="75"  stroke-dasharray="2 9"/>
+        <circle cx="195" cy="322" r="135" stroke-dasharray="2 13"/>
+        <circle cx="195" cy="322" r="198" stroke-dasharray="1 18"/>
+        <circle cx="195" cy="322" r="264" stroke-dasharray="1 24"/>
+      </g>
+
+      <!-- ── Node glow halos ── -->
+      <ellipse cx="86"  cy="126" rx="52" ry="52" fill="url(#h-forge)"/>
+      <ellipse cx="195" cy="87"  rx="52" ry="52" fill="url(#h-tavern)"/>
+      <ellipse cx="304" cy="126" rx="52" ry="52" fill="url(#h-vault)"/>
+      <ellipse cx="70"  cy="352" rx="52" ry="52" fill="url(#h-guild)"/>
+      <ellipse cx="320" cy="352" rx="52" ry="52" fill="url(#h-stash)"/>
+      <ellipse cx="195" cy="558" rx="52" ry="52" fill="url(#h-arcane)"/>
+
+      <!--
+        ── CONNECTION PATHS ──
+        Each drawn twice: thick blur-glow (opacity ~0.07) + thin dashed line (opacity ~0.45)
+
+        Connections:
+          Forge   ↔ Tavern   (top arch)
+          Tavern  ↔ Vault    (top arch)
+          Forge   ↔ Guild    (left side)
+          Vault   ↔ Stash    (right side)
+          Guild   ↔ Arcane   (bottom-left)
+          Stash   ↔ Arcane   (bottom-right)
+          Tavern  ↔ Arcane   (centre spine — primary axis)
+          Forge   ↔ Stash    (long diagonal cross)
+          Vault   ↔ Guild    (long diagonal cross)
+      -->
+
+      <!-- Forge ↔ Tavern
+           Forge edge (toward Tavern): dir=(109,-39), len=117, unit=(0.943,-0.337) → +29,-10  →  (115, 116)
+           Tavern edge (toward Forge): unit=(-0.943,+0.337) → -29,+10 → (166, 97)
+      -->
+      <path d="M 115,116 C 142,102 162,97 166,97" stroke="#c4a35a" stroke-width="8" fill="none" opacity="0.06" filter="url(#pglow)"/>
+      <path d="M 115,116 C 142,102 162,97 166,97" stroke="#c4a35a" stroke-width="1.2" fill="none" opacity="0.5" stroke-dasharray="5 4"/>
+
+      <!-- Tavern ↔ Vault
+           Tavern edge (toward Vault): dir=(109,39), len=117, unit=(0.943,0.337) → +29,+10 → (224, 97)
+           Vault  edge (toward Tavern): unit=(-0.943,-0.337) → -29,-10 → (275, 116)
+      -->
+      <path d="M 224,97 C 248,97 268,106 275,116" stroke="#c4a35a" stroke-width="8" fill="none" opacity="0.06" filter="url(#pglow)"/>
+      <path d="M 224,97 C 248,97 268,106 275,116" stroke="#c4a35a" stroke-width="1.2" fill="none" opacity="0.5" stroke-dasharray="5 4"/>
+
+      <!-- Forge ↔ Guild
+           Forge edge (toward Guild): dir=(-16,226), len=226.5, unit=(-0.071,0.998) → -2,+31 → (84, 157)
+           Guild  edge (toward Forge): unit=(+0.071,-0.998) → +2,-31 → (72, 321)
+      -->
+      <path d="M 84,157 C 80,220 73,280 72,321" stroke="#c4a35a" stroke-width="8" fill="none" opacity="0.06" filter="url(#pglow)"/>
+      <path d="M 84,157 C 80,220 73,280 72,321" stroke="#c4a35a" stroke-width="1.2" fill="none" opacity="0.5" stroke-dasharray="5 4"/>
+
+      <!-- Vault ↔ Stash
+           Vault  edge (toward Stash): dir=(16,226), len=226.5, unit=(0.071,0.998) → +2,+31 → (306, 157)
+           Stash  edge (toward Vault): unit=(-0.071,-0.998) → -2,-31 → (318, 321)
+      -->
+      <path d="M 306,157 C 310,220 317,280 318,321" stroke="#c4a35a" stroke-width="8" fill="none" opacity="0.06" filter="url(#pglow)"/>
+      <path d="M 306,157 C 310,220 317,280 318,321" stroke="#c4a35a" stroke-width="1.2" fill="none" opacity="0.5" stroke-dasharray="5 4"/>
+
+      <!-- Guild ↔ Arcane
+           Guild  edge (toward Arcane): dir=(125,206), len=241, unit=(0.519,0.855) → +16,+26 → (86, 378)
+           Arcane edge (toward Guild):  unit=(-0.519,-0.855) → -16,-26 → (179, 532)
+      -->
+      <path d="M 86,378 C 118,430 158,506 179,532" stroke="#c4a35a" stroke-width="8" fill="none" opacity="0.06" filter="url(#pglow)"/>
+      <path d="M 86,378 C 118,430 158,506 179,532" stroke="#c4a35a" stroke-width="1.2" fill="none" opacity="0.5" stroke-dasharray="5 4"/>
+
+      <!-- Stash ↔ Arcane
+           Stash  edge (toward Arcane): dir=(-125,206), len=241, unit=(-0.519,0.855) → -16,+26 → (304, 378)
+           Arcane edge (toward Stash):  unit=(+0.519,-0.855) → +16,-26 → (211, 532)
+      -->
+      <path d="M 304,378 C 272,430 232,506 211,532" stroke="#c4a35a" stroke-width="8" fill="none" opacity="0.06" filter="url(#pglow)"/>
+      <path d="M 304,378 C 272,430 232,506 211,532" stroke="#c4a35a" stroke-width="1.2" fill="none" opacity="0.5" stroke-dasharray="5 4"/>
+
+      <!-- Tavern ↔ Arcane  (centre spine — primary axis, straighter, slightly brighter)
+           Tavern edge (toward Arcane): dir=(0,471), unit=(0,1) → +0,+31 → (195, 118)
+           Arcane edge (toward Tavern): unit=(0,-1) → 0,-31 → (195, 527)
+      -->
+      <path d="M 195,118 C 195,230 195,400 195,527" stroke="#c4a35a" stroke-width="10" fill="none" opacity="0.05" filter="url(#pglow)"/>
+      <path d="M 195,118 C 195,230 195,400 195,527" stroke="#c4a35a" stroke-width="1"   fill="none" opacity="0.35" stroke-dasharray="6 5"/>
+
+      <!-- Forge ↔ Stash  (long diagonal — secondary, fainter)
+           Forge  (86,126) → Stash  (320,352): dir=(234,226), len=325, unit=(0.720,0.695)  → +22,+21 → (108,147)
+           Stash  edge: unit=(-0.720,-0.695) → -22,-21 → (298, 331)
+      -->
+      <path d="M 108,147 C 180,220 248,280 298,331" stroke="#c4a35a" stroke-width="5" fill="none" opacity="0.035"/>
+      <path d="M 108,147 C 180,220 248,280 298,331" stroke="#c4a35a" stroke-width="0.8" fill="none" opacity="0.2" stroke-dasharray="3 8"/>
+
+      <!-- Vault ↔ Guild  (long diagonal — secondary, fainter)
+           Vault (304,126) → Guild (70,352): dir=(-234,226), len=325, unit=(-0.720,0.695) → -22,+21 → (282,147)
+           Guild edge: unit=(+0.720,-0.695) → +22,-21 → (92, 331)
+      -->
+      <path d="M 282,147 C 210,220 142,280 92,331" stroke="#c4a35a" stroke-width="5" fill="none" opacity="0.035"/>
+      <path d="M 282,147 C 210,220 142,280 92,331" stroke="#c4a35a" stroke-width="0.8" fill="none" opacity="0.2" stroke-dasharray="3 8"/>
+
+      <!-- ── Path waypoint diamonds ── -->
+      <!-- Midpoints along each primary path (approx) -->
+      <!-- Forge-Tavern mid ~(140, 107) -->
+      <polygon points="140,103 144,107 140,111 136,107" fill="#c4a35a" opacity="0.45"/>
+      <!-- Tavern-Vault mid ~(250, 107) -->
+      <polygon points="250,103 254,107 250,111 246,107" fill="#c4a35a" opacity="0.45"/>
+      <!-- Forge-Guild mid ~(78, 239) -->
+      <polygon points="78,235 82,239 78,243 74,239"   fill="#c4a35a" opacity="0.45"/>
+      <!-- Vault-Stash mid ~(312, 239) -->
+      <polygon points="312,235 316,239 312,243 308,239" fill="#c4a35a" opacity="0.45"/>
+      <!-- Guild-Arcane mid ~(132, 455) -->
+      <polygon points="132,451 136,455 132,459 128,455" fill="#c4a35a" opacity="0.45"/>
+      <!-- Stash-Arcane mid ~(258, 455) -->
+      <polygon points="258,451 262,455 258,459 254,455" fill="#c4a35a" opacity="0.45"/>
+      <!-- Tavern-Arcane mid ~(195, 323) — slightly larger -->
+      <polygon points="195,318 201,323 195,328 189,323" fill="#c4a35a" opacity="0.35"/>
+
+      <!-- ── Decorative corner runes ── -->
+      <g stroke="#c4a35a" fill="none" opacity="0.22">
+        <!-- TL -->
+        <polyline points="12,20 12,12 20,12" stroke-width="1.5"/>
+        <line x1="14" y1="14" x2="19" y2="19" stroke-width="0.8" opacity="0.5"/>
+        <!-- TR -->
+        <polyline points="378,20 378,12 370,12" stroke-width="1.5"/>
+        <line x1="376" y1="14" x2="371" y2="19" stroke-width="0.8" opacity="0.5"/>
+        <!-- BL -->
+        <polyline points="12,700 12,708 20,708" stroke-width="1.5"/>
+        <line x1="14" y1="706" x2="19" y2="701" stroke-width="0.8" opacity="0.5"/>
+        <!-- BR -->
+        <polyline points="378,700 378,708 370,708" stroke-width="1.5"/>
+        <line x1="376" y1="706" x2="371" y2="701" stroke-width="0.8" opacity="0.5"/>
+      </g>
+
+      <!-- Bottom caption text -->
+      <text x="195" y="670" text-anchor="middle"
+            font-family="'Courier New', monospace" font-size="8.5"
+            letter-spacing="5" fill="#c4a35a" opacity="0.2"
+            text-decoration="none">SELECT A DISTRICT</text>
+    </svg>
+
+    <!-- ══ ZONE NODES ══ -->
+
+    <!-- FORGE -->
+    <div class="node node-forge">
+      <div class="node-pulse"></div>
+      <div class="node-ring"></div>
+      <div class="node-body"><span class="node-icon">⚒️</span></div>
+      <div class="node-label">Forge</div>
+      <div class="node-tip">
+        <div class="tip-name">The Forge</div>
+        <div class="tip-desc">Craft and upgrade equipment</div>
+      </div>
+    </div>
+
+    <!-- TAVERN -->
+    <div class="node node-tavern">
+      <div class="node-pulse"></div>
+      <div class="node-ring"></div>
+      <div class="node-body"><span class="node-icon">🍺</span></div>
+      <div class="node-label">Tavern</div>
+      <div class="node-tip">
+        <div class="tip-name">The Tavern</div>
+        <div class="tip-desc">Rest, recruit companions &amp; gather rumours</div>
+      </div>
+    </div>
+
+    <!-- VAULT -->
+    <div class="node node-vault">
+      <div class="node-pulse"></div>
+      <div class="node-ring"></div>
+      <div class="node-body"><span class="node-icon">🏦</span></div>
+      <div class="node-label">Vault</div>
+      <div class="node-tip">
+        <div class="tip-name">The Vault</div>
+        <div class="tip-desc">Manage gold, trade &amp; investments</div>
+      </div>
+    </div>
+
+    <!-- GUILD HALL -->
+    <div class="node node-guild">
+      <div class="node-pulse"></div>
+      <div class="node-ring"></div>
+      <div class="node-body"><span class="node-icon">🛡️</span></div>
+      <div class="node-label">Guild Hall</div>
+      <div class="node-tip">
+        <div class="tip-name">Guild Hall</div>
+        <div class="tip-desc">Train skills, rank up &amp; accept contracts</div>
+      </div>
+    </div>
+
+    <!-- STASH -->
+    <div class="node node-stash">
+      <div class="node-pulse"></div>
+      <div class="node-ring"></div>
+      <div class="node-body"><span class="node-icon">📦</span></div>
+      <div class="node-label">Stash</div>
+      <div class="node-tip">
+        <div class="tip-name">The Stash</div>
+        <div class="tip-desc">Unlimited item storage, sorted by type</div>
+      </div>
+    </div>
+
+    <!-- ARCANE LIBRARY -->
+    <div class="node node-arcane">
+      <div class="node-pulse"></div>
+      <div class="node-ring"></div>
+      <div class="node-body"><span class="node-icon">📚</span></div>
+      <div class="node-label">Arcane Library</div>
+      <div class="node-tip">
+        <div class="tip-name">Arcane Library</div>
+        <div class="tip-desc">Research lore &amp; unlock passive abilities</div>
+      </div>
+    </div>
+
+  </div><!-- /atlas -->
+
+  <!-- ══ BOTTOM NAV ══ -->
+  <div class="bottom-nav">
+    <div class="nav-item">
+      <span class="nav-icon">⚔️</span>
+      <span class="nav-label">Expedition</span>
+    </div>
+    <div class="nav-item active">
+      <span class="nav-icon">🏘️</span>
+      <span class="nav-label">Town</span>
+    </div>
+    <div class="nav-item">
+      <span class="nav-icon">📜</span>
+      <span class="nav-label">Journal</span>
+    </div>
+    <div class="nav-item">
+      <span class="nav-icon">⚗️</span>
+      <span class="nav-label">Skills</span>
+    </div>
+  </div>
+
+</div><!-- /phone -->
+
+</body>
+</html>
