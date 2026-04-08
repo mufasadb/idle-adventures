@@ -248,8 +248,10 @@
     }
 
     .node-icon {
-      font-size: 23px;
-      line-height: 1;
+      display: block;
+      width: 36px;
+      height: 36px;
+      object-fit: contain;
       filter: drop-shadow(0 0 5px var(--ng, var(--parchment-glow)));
       transition: filter 0.2s;
       user-select: none;
@@ -626,7 +628,7 @@
     <div class="node node-forge">
       <div class="node-pulse"></div>
       <div class="node-ring"></div>
-      <div class="node-body"><span class="node-icon">⚒️</span></div>
+      <div class="node-body"><img class="node-icon" src="./assets/atlas/forge.png" alt="Forge" width="36" height="36"></div>
       <div class="node-label">Forge</div>
       <div class="node-tip">
         <div class="tip-name">The Forge</div>
@@ -638,7 +640,7 @@
     <div class="node node-tavern">
       <div class="node-pulse"></div>
       <div class="node-ring"></div>
-      <div class="node-body"><span class="node-icon">🍺</span></div>
+      <div class="node-body"><img class="node-icon" src="./assets/atlas/tavern.png" alt="Tavern" width="36" height="36"></div>
       <div class="node-label">Tavern</div>
       <div class="node-tip">
         <div class="tip-name">The Tavern</div>
@@ -650,7 +652,7 @@
     <div class="node node-vault">
       <div class="node-pulse"></div>
       <div class="node-ring"></div>
-      <div class="node-body"><span class="node-icon">🏦</span></div>
+      <div class="node-body"><img class="node-icon" src="./assets/atlas/vault.png" alt="Vault" width="36" height="36"></div>
       <div class="node-label">Vault</div>
       <div class="node-tip">
         <div class="tip-name">The Vault</div>
@@ -662,7 +664,7 @@
     <div class="node node-guild">
       <div class="node-pulse"></div>
       <div class="node-ring"></div>
-      <div class="node-body"><span class="node-icon">🛡️</span></div>
+      <div class="node-body"><img class="node-icon" src="./assets/atlas/guild-hall.png" alt="Guild Hall" width="36" height="36"></div>
       <div class="node-label">Guild Hall</div>
       <div class="node-tip">
         <div class="tip-name">Guild Hall</div>
@@ -674,7 +676,7 @@
     <div class="node node-stash">
       <div class="node-pulse"></div>
       <div class="node-ring"></div>
-      <div class="node-body"><span class="node-icon">📦</span></div>
+      <div class="node-body"><img class="node-icon" src="./assets/atlas/stash.png" alt="Stash" width="36" height="36"></div>
       <div class="node-label">Stash</div>
       <div class="node-tip">
         <div class="tip-name">The Stash</div>
@@ -686,7 +688,7 @@
     <div class="node node-arcane">
       <div class="node-pulse"></div>
       <div class="node-ring"></div>
-      <div class="node-body"><span class="node-icon">📚</span></div>
+      <div class="node-body"><img class="node-icon" src="./assets/atlas/arcane-library.png" alt="Arcane Library" width="36" height="36"></div>
       <div class="node-label">Arcane Library</div>
       <div class="node-tip">
         <div class="tip-name">Arcane Library</div>
