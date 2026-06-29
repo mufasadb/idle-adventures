@@ -1,0 +1,83 @@
+# Idle Adventure — POC Core Loop Design
+
+**Date:** 2026-06-30
+**Status:** Design approved, ready for planning.
+**Source notes:** Obsidian vault `Project Ideas/idle adventures/` (start at `Game Vision & Core Loop`, current focus in `POC — Core Loop Scope`).
+
+---
+
+## 1. Purpose
+
+A deliberately stripped vertical slice built to answer **one question**:
+
+> Is choosing a loadout for a given map, then making routing / gather / fight / turn-back calls under tight budgets, fun — enough that you want to craft up and go again?
+
+Fun gates everything else. If this slice is fun, the game is fun. If not, we learn it in days, not months. Everything in §8 is deferred, not cancelled.
+
+## 2. The Loop
+
+Read map preview → craft & pack a loadout → expedition (navigate · gather · fight, under budgets) → return with haul → craft upgrades → better loadout → richer / harder maps → repeat.
+
+The POC is a *loop*, not a *run*: the between-run crafting step is in scope precisely so the "one more run" pull can be tested.
+
+## 3. Two Budgets (core tension)
+
+| Budget | Spent on | Refilled by |
+|--------|----------|-------------|
+| **Energy** | Movement + gathering (shaped by terrain & gear) | Food |
+| **HP** | Combat — always drains, even well-geared | Potions |
+
+Refill items compete for the same **carry slots** as outbound loot. Every potion packed is a slot of loot you can't bring home. This is the deliberate adders/subtractors squeeze.
+
+## 4. Items — all crafted
+
+food · potions · weapons (melee / ranged / magic) · armour (plate / light / robe) · pick · backpack · transport/animal · spyglass.
+
+- Crafting is **direct and instant**: `materials → item`. No skill levels, no processing chains, no craft-time for v1. (Those return later with the idle/skill systems that justify them.)
+- All gear comes from crafting. No found loot in v1.
+
+## 5. Combat — deterministic
+
+`resolveCombat(loadout, monster, seed) → { hpLost, consumablesUsed, loot }`. No minigame; the decision lives entirely in preparation.
+
+- **Visible type matrix** — damage-type × armour-type, learnable:
+
+  | dmg ↓ / armour → | Plate | Light | Robe |
+  |---|---|---|---|
+  | Melee | 1.0 | 1.25 | 1.5 |
+  | Ranged | 0.5 | 1.0 | 1.5 |
+  | Magic | 1.5 | 1.0 | 0.5 |
+
+- **Hidden affinities** — discoverable `(monsterTag, itemTag) → effect` quirks: `werewolf+silver ×2`, `fae+iron ×2`, `vampire+garlic-coated ×2`, `goblin+gold → distracted`. Anti-wiki flavour layer.
+- **Spyglass** packs *information*: pre-compute the exact outcome, or gamble on a gut read.
+- **Soft fail:** die early → run ends, keep what was already gathered. Hard-counter monsters are a tunable dial, not a fixed rule.
+
+## 6. Map
+
+- 20×20 grid, rudimentary Perlin terrain (seeded).
+- Terrain (ice / river / mountain / mud) = energy modifiers or gear-gated tiles.
+- POIs 3–4 tiles apart so routing has real choices.
+- A small amount of "what's likely out here" forecasting so packing-for-the-map is testable.
+
+## 7. Architecture — the one discipline we keep
+
+- Pure **`reduce(state, action, seed)`** engine — no DOM, no leaked randomness (seeded PRNG / Perlin).
+- Renderer is a dumb **`render(state)`** — ASCII / rudimentary first, enough to see and test by hand.
+- Same engine drives a **headless JSON-action harness** → unit-testable *and* AI-playable with zero UI.
+- **No** server, DB, accounts, or monorepo ceremony yet.
+
+## 8. Explicitly out (deferred)
+
+minigames · skills / XP · fast-forward / idle catch-up · map enhancement (runewords) · town · shop / gold economy · real-time ticks.
+
+## 9. Success criteria
+
+The POC succeeds when a person (or the AI harness) can:
+1. Generate a seeded 20×20 map and read a rough preview of it.
+2. Craft items from materials and assemble a loadout within carry limits.
+3. Play a full expedition via discrete actions — move, gather, fight, return — watching Energy and HP deplete.
+4. Have a fight resolve deterministically through the type matrix + at least one hidden affinity, with the spyglass changing available information.
+5. Return, craft an upgrade from the haul, and visibly improve the next run.
+6. Do all of the above headlessly via JSON actions, with the rudimentary renderer as an optional view.
+
+And — the real test — after playing it, we can give an honest read on whether the decisions felt fun.
