@@ -78,13 +78,16 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 
 ## Build & Test
 
-_Add your build and test commands here_
+Toolchain settled in **D20**: **bun** (package manager + runtime), **`bun test`** (native runner, jest-compatible snapshots), **ESLint flat config** for the engine-purity boundary. These scripts are established by **M0** (`idle-adventure-868.1`); they won't exist until M0 lands.
 
 ```bash
-# Example:
-# npm install
-# npm test
+bun install        # install deps
+bun test           # run the test suite (native runner)
+bun run typecheck  # tsc --noEmit
+bun run lint       # eslint . — enforces the engine-purity boundary
 ```
+
+The engine-purity boundary (no `render`/`sim`/`web` imports, no `Math.random`/`Date.now`/DOM under `src/engine/**`) is lint-enforced and verified by `test/boundary.test.ts` via the ESLint Node API.
 
 ## Architecture Overview
 

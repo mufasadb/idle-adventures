@@ -30,6 +30,7 @@ Repo-local decision log. Mirrors the Obsidian vault `Project Ideas/idle adventur
 | D17 | Tech: all-TS, single flat-but-disciplined package (folders mirror future `packages/`), engine purity enforced by lint; Vite + Vitest; HTML/CSS grid; both drivers over one `reduce` | Boundaries (not package splits) are what help longevity + LLM traversal; monorepo tax doesn't pay off yet |
 | D18 | Every tunable is a named, documented lever in `src/data/`; no magic numbers | Feel-pass values now, principled tuning later. See `balance-levers.md` |
 | D19 | Work tracked as beads in-repo; plan/spec/decisions in `docs/` | Future Claude boots with `bd ready` + these docs |
+| D20 | Tooling: **bun** (package manager + runtime) + **`bun test`** (native runner); **ESLint flat config** for the engine-purity boundary | pnpm absent on the machine, bun already installed + fast. Native `bun test` gives jest-compatible snapshots with zero extra deps. Supersedes the spec's "Vitest"/`pnpm` wording for the POC; the boundary discipline (D17) is unchanged. M0 plan: `docs/superpowers/plans/2026-06-30-m0-skeleton-guardrails.md` |
 
 ## Still open
 
