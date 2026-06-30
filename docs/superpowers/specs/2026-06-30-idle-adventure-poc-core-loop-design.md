@@ -81,3 +81,70 @@ The POC succeeds when a person (or the AI harness) can:
 6. Do all of the above headlessly via JSON actions, with the rudimentary renderer as an optional view.
 
 And — the real test — after playing it, we can give an honest read on whether the decisions felt fun.
+
+---
+
+## 10. Engine contract (settled 2026-06-30)
+
+`reduce(state: GameState, action: Action): { state: GameState; events: Event[] }` — pure, seed in state, RNG = `hash(state.seed, context)`. `events` are a render byproduct; the action list lives in the driver.
+
+```ts
+type ItemStack = { defId: string; qty: number }       // fungible; gear referenced by defId too (no per-instance state)
+
+type GameState = {
+  seed: string
+  phase: 'town' | 'expedition'
+  bank: ItemStack[]                                    // materials + crafted gear (persists across runs)
+  expedition: Expedition | null
+}
+type Expedition = {
+  mapSeed: string
+  pos: { x: number; y: number }
+  energy: number                                       // from packed food; spent on move/gather
+  hp: number                                           // drained by combat, refilled by potions
+  loadout: Loadout
+  carry: ItemStack[]                                   // capped by backpack slots
+  // grid regenerated from mapSeed on demand, not stored
+}
+type Equipment = {
+  weapon: string | null                                // { dmgType: melee|ranged|magic, tags:[silver|...] }
+  helmet: string | null; chest: string | null; legs: string | null
+  boots: string | null; gloves: string | null         // each: { armourType: plate|light|robe, defense }
+  tools: string[]                                      // pick, axe, fishing rod, spyglass — capabilities
+  transport: string | null; backpack: string | null
+}
+type Loadout = { equipment: Equipment; food: ItemStack[]; potions: ItemStack[] }
+
+type Action =
+  | { type: 'craft';  recipeId: string }
+  | { type: 'pack';   slot: LoadoutSlot; itemId: string }
+  | { type: 'embark'; mapSeed: string }
+  | { type: 'move';   to: { x: number; y: number } }   // steps ONE tile toward target
+  | { type: 'gather' } | { type: 'scout' } | { type: 'fight' }
+  | { type: 'drop';   itemId: string } | { type: 'return' }
+```
+
+**Action cost is an output of reduction, not uniform:**
+
+| Action | Energy | HP | Shaped by |
+|--------|--------|----|-----------|
+| `move` | base × terrain ÷ transport | — | terrain, transport, gating gear |
+| `gather` | node hardness ÷ tool quality | — | tool in `tools`, node type |
+| `scout` | small / 0 | — | requires spyglass tool |
+| `fight` | — | `resolveCombat(...)` | matrix + affinity + armour + potions |
+| `drop`/`craft`/`pack`/`embark`/`return` | 0 | 0 | town & transitions |
+
+Combat defense aggregates per-piece: `Σ piece.defense × matrix[dmgType][piece.armourType]`.
+
+## 11. Map entry & defaults
+
+- Town offers **3 seeded candidate maps**, each with a **rough preview** (dominant terrain + node-type hints, layout hidden). Pick → pack → embark; **full grid on arrival (no fog in v1)**.
+- Carry = **slots** (not weight). Combat **resolves fully**, **auto-potions** at a threshold, **static monsters** (avoid = routing). Persistence **in-memory across runs**. A `legalActions(state)` helper feeds both UI and AI.
+
+## 12. Tech & layout
+
+All-TS, **single flat-but-disciplined package** — folders `engine`/`data`/`sim`/`render` mirror future `packages/`; an eslint boundary rule forbids `engine` importing from `render`/`sim`/`web`. **Vite + Vitest**, seeded Perlin, vanilla-TS CSS grid (React deferred). Two drivers over one `reduce`: headless `play(seed, actions[])` and the interactive web view.
+
+## 13. Balance levers
+
+Feel-pass values now; every tunable is a named lever in `src/data/`. See `docs/balance-levers.md`.
