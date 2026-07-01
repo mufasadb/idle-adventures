@@ -20,7 +20,7 @@
 
 ## M0 — Skeleton & guardrails
 TS single package; Vite + Vitest; eslint with the engine-purity boundary rule; `src/data/constants.ts` lever-file scaffold; empty typed `reduce` and `render`.
-**Acceptance:** `pnpm test` runs green on a trivial test; an import from `engine` → `render` fails lint; `GameState`/`Action` types compile.
+**Acceptance:** `bun test` runs green on a trivial test; an import from `engine` → `render` fails lint; `GameState`/`Action` types compile.
 
 ## M1 — Deterministic map generation + render
 Seeded Perlin → terrain via thresholds; seeded POI placement with a min-distance rule (POIs 3–4 tiles apart); `render(state)` paints a 20×20 CSS grid; a text serialization exists for snapshot tests.
