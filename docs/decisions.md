@@ -34,6 +34,6 @@ Repo-local decision log. Mirrors the Obsidian vault `Project Ideas/idle adventur
 
 ## Still open
 
-- **Q4 (vault):** salvage vs rebuild the old prototype — blocked on locating the source (not on this machine).
+- ~~**Q4 (vault):** salvage vs rebuild the old prototype — blocked on locating the source (not on this machine).~~ **Resolved 2026-07-02 (rebuild):** source located at `github.com/mufasadb/idle-adventures` (HTML/frontend+backend prototype, town-screen mockups, design docs). Decided to rebuild from the M0 POC skeleton rather than salvage code. Old history preserved on the remote as branch `archive/prototype` and tag `prototype-final`; `main` force-updated to the POC. Design docs (`idle-rpg-game-design.md`, UX flows, prior `design-decisions-log.md`) remain recoverable there if we want to mine them later.
 - **Art direction / renderer upgrade path** (vault Q2/Q3): POC uses a rudimentary HTML grid; full art direction unpinned.
 - **Real-time / minigame combat layer:** D11 settles combat *for the POC* as deterministic; a real-time minigame remains a possible optional later layer feeding the same resolution function.
