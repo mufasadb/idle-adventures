@@ -1,0 +1,69 @@
+// The engine contract — single source of truth for state, actions, events.
+// Lifted from the design spec §10. Pure data; no behaviour here.
+
+export type ItemStack = { defId: string; qty: number }; // fungible; gear referenced by defId too
+
+export type Equipment = {
+  weapon: string | null; // defId → { dmgType: melee|ranged|magic, tags:[silver|...] } in the catalog
+  helmet: string | null;
+  chest: string | null;
+  legs: string | null;
+  boots: string | null;
+  gloves: string | null; // each piece's defId → { armourType: plate|light|robe, defense }
+  tools: string[]; // pick, axe, fishing rod, spyglass — capabilities
+  transport: string | null;
+  backpack: string | null;
+};
+
+export type Loadout = {
+  equipment: Equipment;
+  food: ItemStack[];
+  potions: ItemStack[];
+};
+
+export type Expedition = {
+  mapSeed: string;
+  pos: { x: number; y: number };
+  energy: number; // from packed food; spent on move/gather
+  hp: number; // drained by combat, refilled by potions
+  loadout: Loadout;
+  carry: ItemStack[]; // capped by backpack slots
+  // grid regenerated from mapSeed on demand, not stored
+};
+
+export type GameState = {
+  seed: string;
+  phase: "town" | "expedition";
+  bank: ItemStack[]; // materials + crafted gear (persists across runs)
+  expedition: Expedition | null;
+};
+
+// Loadout slots an action can target when packing.
+export type LoadoutSlot =
+  | "weapon"
+  | "helmet"
+  | "chest"
+  | "legs"
+  | "boots"
+  | "gloves"
+  | "tool"
+  | "transport"
+  | "backpack"
+  | "food"
+  | "potion";
+
+export type Action =
+  | { type: "craft"; recipeId: string }
+  | { type: "pack"; slot: LoadoutSlot; itemId: string }
+  | { type: "embark"; mapSeed: string }
+  | { type: "move"; to: { x: number; y: number } } // steps ONE tile toward target
+  | { type: "gather" }
+  | { type: "scout" }
+  | { type: "fight" }
+  | { type: "drop"; itemId: string }
+  | { type: "return" };
+
+// Events are a render byproduct emitted by reduce. Named GameEvent (not Event)
+// to avoid colliding with the DOM Event global, which engine code must not use.
+// Concrete variants are added per-milestone as systems land (see notes in beads).
+export type GameEvent = { type: string; [key: string]: unknown };
