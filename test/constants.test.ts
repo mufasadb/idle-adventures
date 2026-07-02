@@ -11,6 +11,9 @@ import {
   POI_DENSITY,
   POI_MIN_SPACING,
   NOISE_FREQUENCY,
+  ENERGY_PER_FOOD,
+  MOVE_BASE_COST,
+  TRANSPORT_MULTIPLIER,
 } from "../src/data/constants";
 
 test("constants: lever groups exist with the documented shape", () => {
@@ -53,4 +56,12 @@ test("constants: biomes are visibly distinct profiles", () => {
   expect(BIOMES.desert.nodeTypeWeights.mining ?? 0).toBeGreaterThan(
     BIOMES.woodland.nodeTypeWeights.mining ?? 0,
   );
+});
+
+test("constants: M2 energy levers are filled", () => {
+  expect(ENERGY_PER_FOOD).toBeGreaterThan(0);
+  expect(MOVE_BASE_COST).toBeGreaterThan(0);
+  expect(TERRAIN_COST.ice).toBeGreaterThan(TERRAIN_COST.plains); // bead acceptance: ice > plains
+  expect(Number.isFinite(TERRAIN_COST.mountain)).toBe(false); // impassable without gear
+  expect(TRANSPORT_MULTIPLIER.horse).toBeGreaterThan(1); // horse cheapens movement (divisor)
 });

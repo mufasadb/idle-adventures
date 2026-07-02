@@ -55,16 +55,19 @@ export const BIOMES: Record<BiomeId, Biome> = {
 };
 
 // --- Energy economy (filled in M2) ---
-export const ENERGY_PER_FOOD = 0; // energy per packed food item (placeholder — M2)
-export const MOVE_BASE_COST = 0; // energy per tile on neutral ground (placeholder — M2)
+export const ENERGY_PER_FOOD = 10; // energy per packed food item
+export const MOVE_BASE_COST = 1; // energy per tile on neutral ground, on foot
 export const TERRAIN_COST: Record<Terrain, number> = {
-  plains: 0,
-  mud: 0,
-  ice: 0,
-  river: 0,
-  mountain: 0,
-}; // per-terrain multiplier (values — M2)
-export const TRANSPORT_MULTIPLIER = {} as Record<string, number>; // move-cost reduction (placeholder — M2)
+  plains: 1,
+  mud: 1.5,
+  ice: 2,
+  river: 3, // fordable but expensive
+  mountain: Infinity, // impassable (gating gear may cheapen this later)
+}; // cost multiplier per terrain stepped ONTO
+export const TRANSPORT_MULTIPLIER: Record<string, number> = {
+  horse: 1.5, // fast — divides move cost (spec §10: base × terrain ÷ transport)
+  mule: 0.8, // slow — will pay for it in carry capacity (M3/M5)
+}; // keyed by transport defId; absent/on-foot = 1
 
 // --- Carry (filled in M3) ---
 export const BACKPACK_SLOTS = { starter: 0 } as Record<string, number>; // slots per backpack tier (placeholder — M3)
