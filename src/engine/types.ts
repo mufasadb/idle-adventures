@@ -35,6 +35,7 @@ export type GameState = {
   seed: string;
   phase: "town" | "expedition";
   bank: ItemStack[]; // materials + crafted gear (persists across runs)
+  loadout: Loadout; // town-side staging (D22): pack (M5) edits it, embark consumes it
   expedition: Expedition | null;
 };
 

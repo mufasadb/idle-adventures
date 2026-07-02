@@ -3,11 +3,13 @@ import { render, renderGridText, renderGridHtml } from "../src/render/render";
 import { generateGrid } from "../src/engine/grid";
 import { GRID_SIZE, POI_DENSITY } from "../src/data/constants";
 import type { GameState } from "../src/engine/types";
+import { emptyLoadout } from "../src/engine/loadout";
 
 const expeditionState = (mapSeed: string): GameState => ({
   seed: "game-seed",
   phase: "expedition",
   bank: [],
+  loadout: emptyLoadout(),
   expedition: {
     mapSeed,
     pos: { x: 5, y: 5 },
@@ -26,7 +28,7 @@ const expeditionState = (mapSeed: string): GameState => ({
 });
 
 test("render: town state renders the town placeholder", () => {
-  const state: GameState = { seed: "s", phase: "town", bank: [], expedition: null };
+  const state: GameState = { seed: "s", phase: "town", bank: [], loadout: emptyLoadout(), expedition: null };
   expect(render(state)).toBe("(town)");
 });
 
