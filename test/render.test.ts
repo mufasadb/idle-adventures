@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { render, renderGridText } from "../src/render/render";
+import { render, renderGridText, renderGridHtml } from "../src/render/render";
 import { generateGrid } from "../src/engine/grid";
 import { GRID_SIZE, POI_DENSITY } from "../src/data/constants";
 import type { GameState } from "../src/engine/types";
@@ -60,4 +60,14 @@ test("render: expedition renders the grid with the player at pos", () => {
   const rows = text.split("\n");
   expect(rows.length).toBe(GRID_SIZE);
   expect(rows[5]![5]).toBe("@");
+});
+
+test("renderGridHtml: emits a CSS grid with one tile per cell", () => {
+  const grid = generateGrid("snap-1", "woodland");
+  const html = renderGridHtml(grid, grid.entry);
+  expect(html).toContain(`grid-template-columns: repeat(${GRID_SIZE}`);
+  expect(html.match(/class="tile /g)?.length).toBe(GRID_SIZE * GRID_SIZE);
+  expect(html).toContain("player");
+  expect(html.match(/ poi /g)?.length).toBe(POI_DENSITY);
+  expect(html).toBe(renderGridHtml(generateGrid("snap-1", "woodland"), grid.entry));
 });

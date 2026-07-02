@@ -5,7 +5,8 @@
   "scripts": {
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "web": "bun ./src/web/index.html"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Idle Adventure — map viewer</title>
+    <style>
+      body { font-family: ui-monospace, monospace; background: #1c1c22; color: #ddd; padding: 1.5rem; }
+      .tile { width: 1.5rem; height: 1.5rem; display: flex; align-items: center; justify-content: center; }
+      .terrain-plains { background: #4a6b3a; }
+      .terrain-mud { background: #5c4a33; }
+      .terrain-river { background: #2e5a8f; }
+      .terrain-ice { background: #9fc4d8; color: #333; }
+      .terrain-mountain { background: #6b6b70; }
+      .poi { font-weight: bold; color: #ffd75e; }
+      .player { color: #fff; background: #b03030; }
+      a { color: #8ab4ff; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

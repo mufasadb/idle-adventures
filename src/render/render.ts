@@ -45,3 +45,24 @@ export function renderGridText(grid: Grid, pos?: { x: number; y: number }): stri
     )
     .join("\n");
 }
+
+// HTML twin of renderGridText: same tile walk, CSS classes instead of chars.
+// Styling lives in the web page; this stays a pure string serialization.
+export function renderGridHtml(grid: Grid, pos?: { x: number; y: number }): string {
+  const poiAt = new Map(grid.pois.map((p) => [`${p.x},${p.y}`, p.kind]));
+  const cols = grid.terrain[0]?.length ?? 0;
+  const tiles = grid.terrain
+    .map((row, y) =>
+      row
+        .map((terrain, x) => {
+          const kind = poiAt.get(`${x},${y}`);
+          const isPlayer = pos !== undefined && pos.x === x && pos.y === y;
+          const classes = `tile terrain-${terrain}${kind ? ` poi poi-${kind}` : ""}${isPlayer ? " player" : ""}`;
+          const char = isPlayer ? PLAYER_CHAR : kind ? POI_CHAR[kind] : TERRAIN_CHAR[terrain];
+          return `<div class="${classes}">${char}</div>`;
+        })
+        .join(""),
+    )
+    .join("");
+  return `<div class="grid" style="display: grid; grid-template-columns: repeat(${cols}, 1.5rem);">${tiles}</div>`;
+}
