@@ -109,3 +109,30 @@ test("generateGrid: biome nodeTypeWeights shape the POI kind mix", () => {
   expect(count("desert", "mining")).toBeGreaterThan(count("woodland", "mining"));
   expect(count("woodland", "wood")).toBeGreaterThan(count("desert", "wood"));
 });
+
+test("generateGrid: never places a POI on the entry tile", () => {
+  for (let i = 0; i < 25; i++) {
+    const seed = `entry-clash-${i}`;
+    const grid = generateGrid(seed, rollBiome(seed));
+    for (const poi of grid.pois) {
+      expect(`${poi.x},${poi.y}`).not.toBe(`${grid.entry.x},${grid.entry.y}`);
+    }
+  }
+});
+
+test("generateGrid: desert maps contain terrain variety, not monoterrain (M1 review follow-up)", () => {
+  // Aggregate across seeds: desert must generate at least SOME non-plains
+  // terrain so terrain-cost routing has something to bite on.
+  let mountain = 0;
+  let river = 0;
+  for (let i = 0; i < 10; i++) {
+    for (const row of generateGrid(`desert-variety-${i}`, "desert").terrain) {
+      for (const t of row) {
+        if (t === "mountain") mountain++;
+        if (t === "river") river++;
+      }
+    }
+  }
+  expect(mountain).toBeGreaterThan(0);
+  expect(river).toBeGreaterThan(0);
+});

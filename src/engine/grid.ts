@@ -46,9 +46,13 @@ export function generateGrid(mapSeed: string, biomeId: BiomeId): Grid {
     }
     terrain.push(row);
   }
+  const entry = { x: Math.floor(rand(mapSeed, "entry") * GRID_SIZE), y: GRID_SIZE - 1 };
   // Seeded rejection sampling: walk a deterministic candidate stream, keep
   // candidates that clear POI_MIN_SPACING (Chebyshev — 8-dir movement) from
   // every accepted POI. Kind is drawn per accepted candidate from the biome.
+  // NOTE: if the attempt budget exhausts, the grid returns FEWER than
+  // POI_DENSITY POIs (astronomically unlikely at current levers) — callers
+  // must not assume pois.length === POI_DENSITY.
   const pois: Poi[] = [];
   for (
     let attempt = 0;
@@ -57,6 +61,7 @@ export function generateGrid(mapSeed: string, biomeId: BiomeId): Grid {
   ) {
     const x = Math.floor(rand(mapSeed, "poi-x", attempt) * GRID_SIZE);
     const y = Math.floor(rand(mapSeed, "poi-y", attempt) * GRID_SIZE);
+    if (x === entry.x && y === entry.y) continue; // entry tile stays clear (M2: embark lands here)
     const clear = pois.every(
       (p) => Math.max(Math.abs(p.x - x), Math.abs(p.y - y)) >= POI_MIN_SPACING,
     );
@@ -68,6 +73,5 @@ export function generateGrid(mapSeed: string, biomeId: BiomeId): Grid {
     );
     pois.push({ x, y, kind });
   }
-  const entry = { x: Math.floor(rand(mapSeed, "entry") * GRID_SIZE), y: GRID_SIZE - 1 };
   return { biomeId, terrain, pois, entry };
 }

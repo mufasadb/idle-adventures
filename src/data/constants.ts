@@ -41,7 +41,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
     materialTable: {},
   },
   desert: {
-    terrainWeights: { plains: 0.75, mountain: 0.2, river: 0.05 },
+    terrainWeights: { plains: 0.55, mountain: 0.3, river: 0.15 },
     nodeTypeWeights: { mining: 0.4, monster: 0.25, herb: 0.15, wood: 0.1, animal: 0.1 },
     creatureTable: [],
     materialTable: {},
