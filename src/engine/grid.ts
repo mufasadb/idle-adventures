@@ -6,6 +6,10 @@ import {
   BIOMES,
   BIOME_IDS,
   TERRAINS,
+  POI_DENSITY,
+  POI_MIN_SPACING,
+  POI_PLACEMENT_ATTEMPTS,
+  NODE_TYPES,
 } from "../data/constants";
 import type { Terrain, NodeType, BiomeId } from "../data/constants";
 import { rand, weightedPick } from "./rng";
@@ -42,6 +46,28 @@ export function generateGrid(mapSeed: string, biomeId: BiomeId): Grid {
     }
     terrain.push(row);
   }
+  // Seeded rejection sampling: walk a deterministic candidate stream, keep
+  // candidates that clear POI_MIN_SPACING (Chebyshev — 8-dir movement) from
+  // every accepted POI. Kind is drawn per accepted candidate from the biome.
+  const pois: Poi[] = [];
+  for (
+    let attempt = 0;
+    attempt < POI_PLACEMENT_ATTEMPTS && pois.length < POI_DENSITY;
+    attempt++
+  ) {
+    const x = Math.floor(rand(mapSeed, "poi-x", attempt) * GRID_SIZE);
+    const y = Math.floor(rand(mapSeed, "poi-y", attempt) * GRID_SIZE);
+    const clear = pois.every(
+      (p) => Math.max(Math.abs(p.x - x), Math.abs(p.y - y)) >= POI_MIN_SPACING,
+    );
+    if (!clear) continue;
+    const kind = weightedPick(
+      biome.nodeTypeWeights,
+      NODE_TYPES,
+      rand(mapSeed, "poi-kind", attempt),
+    );
+    pois.push({ x, y, kind });
+  }
   const entry = { x: Math.floor(rand(mapSeed, "entry") * GRID_SIZE), y: GRID_SIZE - 1 };
-  return { biomeId, terrain, pois: [], entry };
+  return { biomeId, terrain, pois, entry };
 }

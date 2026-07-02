@@ -1,7 +1,10 @@
 import { test, expect } from "bun:test";
 import { generateGrid, rollBiome } from "../src/engine/grid";
-import { GRID_SIZE, BIOME_IDS, TERRAINS } from "../src/data/constants";
+import { GRID_SIZE, BIOME_IDS, TERRAINS, POI_DENSITY, POI_MIN_SPACING, NODE_TYPES } from "../src/data/constants";
 import type { Terrain } from "../src/data/constants";
+
+const chebyshev = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+  Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 
 function terrainCounts(seed: string, biome: "woodland" | "desert" | "tundra") {
   const grid = generateGrid(seed, biome);
@@ -65,4 +68,44 @@ test("rollBiome: different seeds can roll different biomes", () => {
     Array.from({ length: 30 }, (_, i) => rollBiome(`candidate-${i}`)),
   );
   expect(rolled.size).toBe(BIOME_IDS.length); // 30 seeds should hit all 3
+});
+
+test("generateGrid: places POI_DENSITY POIs, in bounds, with valid kinds", () => {
+  for (const seed of ["poi-a", "poi-b", "poi-c"]) {
+    const grid = generateGrid(seed, "woodland");
+    expect(grid.pois.length).toBe(POI_DENSITY);
+    for (const poi of grid.pois) {
+      expect(poi.x).toBeGreaterThanOrEqual(0);
+      expect(poi.x).toBeLessThan(GRID_SIZE);
+      expect(poi.y).toBeGreaterThanOrEqual(0);
+      expect(poi.y).toBeLessThan(GRID_SIZE);
+      expect(NODE_TYPES).toContain(poi.kind);
+    }
+  }
+});
+
+test("generateGrid: POIs respect min spacing (pairwise Chebyshev)", () => {
+  for (const seed of ["poi-a", "poi-b", "poi-c"]) {
+    const { pois } = generateGrid(seed, "desert");
+    for (let i = 0; i < pois.length; i++) {
+      for (let j = i + 1; j < pois.length; j++) {
+        expect(chebyshev(pois[i]!, pois[j]!)).toBeGreaterThanOrEqual(POI_MIN_SPACING);
+      }
+    }
+  }
+});
+
+test("generateGrid: biome nodeTypeWeights shape the POI kind mix", () => {
+  // Aggregate across seeds: desert (mining 0.4) must out-mine woodland (0.05).
+  const count = (biome: "woodland" | "desert", kind: string) => {
+    let n = 0;
+    for (let i = 0; i < 10; i++) {
+      for (const poi of generateGrid(`kind-mix-${i}`, biome).pois) {
+        if (poi.kind === kind) n++;
+      }
+    }
+    return n;
+  };
+  expect(count("desert", "mining")).toBeGreaterThan(count("woodland", "mining"));
+  expect(count("woodland", "wood")).toBeGreaterThan(count("desert", "wood"));
 });
