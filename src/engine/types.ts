@@ -1,5 +1,6 @@
 // The engine contract — single source of truth for state, actions, events.
 // Lifted from the design spec §10. Pure data; no behaviour here.
+import type { BiomeId, Terrain } from "../data/constants";
 
 export type ItemStack = { defId: string; qty: number }; // fungible; gear referenced by defId too
 
@@ -66,5 +67,25 @@ export type Action =
 
 // Events are a render byproduct emitted by reduce. Named GameEvent (not Event)
 // to avoid colliding with the DOM Event global, which engine code must not use.
-// Concrete variants are added per-milestone as systems land (see notes in beads).
-export type GameEvent = { type: string; [key: string]: unknown };
+// A closed discriminated union, extended per-milestone as systems land.
+export type GameEvent =
+  | {
+      type: "embarked";
+      mapSeed: string;
+      biomeId: BiomeId;
+      pos: { x: number; y: number };
+      energy: number;
+    }
+  | {
+      type: "moved";
+      from: { x: number; y: number };
+      to: { x: number; y: number };
+      terrain: Terrain;
+      cost: number;
+      energy: number; // remaining after the step
+    }
+  | {
+      type: "action-rejected";
+      action: Action["type"];
+      reason: string; // tightened to a closed union when M6's legalActions lands
+    };

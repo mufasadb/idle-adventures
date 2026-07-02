@@ -198,3 +198,14 @@ test("move: does not mutate the input state", () => {
   reduce(input, { type: "move", to });
   expect(input).toEqual(before);
 });
+
+test("move: energy exactly equal to the step cost is allowed and lands on 0", () => {
+  const seed = seedFor("woodland");
+  const grid = generateGrid(seed, rollBiome(seed));
+  const { from, to } = findStep(grid, "plains");
+  const cost = moveCost("plains", null);
+  const { state, events } = reduce(expeditionState(seed, from, cost), { type: "move", to });
+  expect(state.expedition!.pos).toEqual(to);
+  expect(state.expedition!.energy).toBe(0);
+  expect(events[0]!.type).toBe("moved");
+});

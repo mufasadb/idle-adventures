@@ -46,6 +46,9 @@ export function generateGrid(mapSeed: string, biomeId: BiomeId): Grid {
     }
     terrain.push(row);
   }
+  // NOTE: entry passability isn't guaranteed — the bottom-row roll can land
+  // on mountain. Harmless while move cost reads the DESTINATION tile only;
+  // revisit when M5's candidate-map previews pick embark targets.
   const entry = { x: Math.floor(rand(mapSeed, "entry") * GRID_SIZE), y: GRID_SIZE - 1 };
   // Seeded rejection sampling: walk a deterministic candidate stream, keep
   // candidates that clear POI_MIN_SPACING (Chebyshev — 8-dir movement) from
