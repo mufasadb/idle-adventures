@@ -1,7 +1,8 @@
 import type { GameState, Action, GameEvent } from "./types";
 import { generateGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
-import { ENERGY_PER_FOOD, PLAYER_BASE_HP } from "../data/constants";
+import { stepToward, moveCost } from "./move";
+import { ENERGY_PER_FOOD, PLAYER_BASE_HP, GRID_SIZE } from "../data/constants";
 
 // Pure reducer. M2 fills embark/move; remaining cases are no-op stubs:
 //   gather/scout/fight            → M3–M4
@@ -14,9 +15,10 @@ export function reduce(
   switch (action.type) {
     case "embark":
       return embark(state, action.mapSeed);
+    case "move":
+      return move(state, action.to);
     case "craft":
     case "pack":
-    case "move":
     case "gather":
     case "scout":
     case "fight":
@@ -61,6 +63,37 @@ function embark(
     events: [
       { type: "embarked", mapSeed, biomeId: grid.biomeId, pos: grid.entry, energy },
     ],
+  };
+}
+
+function move(
+  state: GameState,
+  to: { x: number; y: number },
+): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) {
+    return rejected(state, "move", "not-on-expedition");
+  }
+  const from = expedition.pos;
+  const step = stepToward(from, to);
+  if (step.x === from.x && step.y === from.y) {
+    return rejected(state, "move", "no-step");
+  }
+  if (step.x < 0 || step.x >= GRID_SIZE || step.y < 0 || step.y >= GRID_SIZE) {
+    return rejected(state, "move", "out-of-bounds");
+  }
+  const grid = generateGrid(expedition.mapSeed, rollBiome(expedition.mapSeed));
+  const terrain = grid.terrain[step.y]![step.x]!;
+  const cost = moveCost(terrain, expedition.loadout.equipment.transport);
+  if (!Number.isFinite(cost)) return rejected(state, "move", "impassable");
+  if (cost > expedition.energy) return rejected(state, "move", "exhausted");
+  const energy = expedition.energy - cost;
+  return {
+    state: {
+      ...state,
+      expedition: { ...expedition, pos: step, energy },
+    },
+    events: [{ type: "moved", from, to: step, terrain, cost, energy }],
   };
 }
 
