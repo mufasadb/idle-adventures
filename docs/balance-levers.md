@@ -25,9 +25,11 @@ The POC ships with *feel-pass* values, not balanced ones. The discipline that ke
 - `RECIPE{itemDefId} → {inputs, output}`
 
 **Map & forecast** — where prep skill lives
-- `GRID_SIZE` · `POI_DENSITY` · `POI_MIN_SPACING` · `NOISE_THRESHOLDS`
-- `CANDIDATE_MAP_COUNT` (3) · `PREVIEW_FIDELITY` — how much the map preview reveals (the master dial for how much preparation matters)
+- `GRID_SIZE` · `POI_DENSITY` · `POI_MIN_SPACING` · `POI_PLACEMENT_ATTEMPTS`
+- `NOISE_FREQUENCY` — Perlin sample step per tile; lower = larger, chunkier terrain regions
+- `BIOMES{id} → {terrainWeights, nodeTypeWeights, creatureTable, materialTable}` — a biome is a **generation profile only** (D21): consumed by `generateGrid(mapSeed, biomeId)`, never consulted at runtime. Biomes shift likelihoods, not rules. Start: woodland / desert / tundra; adding a biome = one data entry. (Subsumes the earlier flat `NOISE_THRESHOLDS` — thresholds now live per-biome in `terrainWeights`.)
+- `CANDIDATE_MAP_COUNT` (3) · `PREVIEW_FIDELITY` — how much the map preview reveals beyond the biome-name headline (the master dial for how much preparation matters)
 
 ## Levers we most expect to tune long-term
 
-`TERRAIN_COST` · `ENERGY_PER_FOOD` · `MONSTER_TIER_*_CURVE` · `AFFINITY_MULTIPLIER` · `BACKPACK_SLOTS` · `POI_DENSITY` · `PREVIEW_FIDELITY`. These are the dials that most change *feel* and *difficulty*; keep them especially well-labelled and easy to find.
+`TERRAIN_COST` · `ENERGY_PER_FOOD` · `MONSTER_TIER_*_CURVE` · `AFFINITY_MULTIPLIER` · `BACKPACK_SLOTS` · `POI_DENSITY` · `PREVIEW_FIDELITY` · `BIOMES[*]` weights. These are the dials that most change *feel* and *difficulty*; keep them especially well-labelled and easy to find.
