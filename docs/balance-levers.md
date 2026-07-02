@@ -7,8 +7,8 @@ The POC ships with *feel-pass* values, not balanced ones. The discipline that ke
 **Energy economy** — how far/long a trip lasts
 - `ENERGY_PER_FOOD` — energy granted per food item packed
 - `MOVE_BASE_COST` — energy per tile on neutral ground
-- `TERRAIN_COST{plains, mud, ice, river, mountain}` — per-terrain multiplier (or "impassable without gear")
-- `TRANSPORT_MULTIPLIER{horse, mule, …}` — move-cost reduction + carry bonus
+- `TERRAIN_COST{plains, mud, ice, river, mountain}` — per-terrain multiplier; `Infinity` = impassable without gear (mountain, until gating gear exists)
+- `TRANSPORT_MULTIPLIER{horse, mule, …}` — move-cost **divisor** (spec §10: base × terrain ÷ transport): >1 faster than foot (horse), <1 slower (mule — pays for future carry bonus); carry bonuses arrive with M3/M5
 
 **Carry** — loot vs supplies tension
 - `BACKPACK_SLOTS{tier}` · `STACK_CAP`
