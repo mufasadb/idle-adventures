@@ -36,7 +36,7 @@ export function reduce(
     case "pack":
       return packAction(state, action.slot, action.itemId);
     case "return":
-      return { state, events: [] };
+      return returnHome(state);
     default:
       return assertNever(action);
   }
@@ -94,6 +94,17 @@ function craftAction(
   return {
     state: { ...state, bank: result.bank },
     events: [{ type: "crafted", recipeId, output: result.output }],
+  };
+}
+
+function returnHome(state: GameState): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) {
+    return rejected(state, "return", "not-on-expedition");
+  }
+  return {
+    state: endExpedition(state, expedition),
+    events: [{ type: "run-ended", reason: "returned" }],
   };
 }
 
