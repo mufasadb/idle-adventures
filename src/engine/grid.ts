@@ -20,6 +20,7 @@ export type Poi = {
   y: number;
   kind: NodeType;
   material: string | null; // yield defId, stamped from the biome at generation (D25) — gather never consults the biome
+  creature: string | null; // monster defId, stamped from the biome at generation (M4, mirrors D25) — combat never consults the biome
 };
 
 export type Grid = {
@@ -79,7 +80,13 @@ export function generateGrid(mapSeed: string, biomeId: BiomeId): Grid {
       NODE_TYPES,
       rand(mapSeed, "poi-kind", attempt),
     );
-    pois.push({ x, y, kind, material: biome.materialTable[kind] ?? null });
+    const creature =
+      kind === "monster" && biome.creatureTable.length > 0
+        ? biome.creatureTable[
+            Math.floor(rand(mapSeed, "poi-creature", attempt) * biome.creatureTable.length)
+          ]!
+        : null;
+    pois.push({ x, y, kind, material: biome.materialTable[kind] ?? null, creature });
   }
   return { biomeId, terrain, pois, entry };
 }

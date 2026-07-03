@@ -149,3 +149,20 @@ test("generateGrid: POIs carry their material stamped from the biome table (D25)
     }
   }
 });
+
+test("generateGrid: monster POIs carry a creature from the biome's table (M4)", () => {
+  for (const biome of BIOME_IDS) {
+    const grid = generateGrid(`creature-stamp-${biome}`, biome);
+    for (const poi of grid.pois) {
+      if (poi.kind === "monster") {
+        expect(BIOMES[biome].creatureTable).toContain(poi.creature!);
+      } else {
+        expect(poi.creature).toBeNull();
+      }
+    }
+  }
+});
+
+test("generateGrid: creature stamping is deterministic", () => {
+  expect(generateGrid("creature-det", "desert")).toEqual(generateGrid("creature-det", "desert"));
+});
