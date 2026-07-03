@@ -27,13 +27,13 @@ The POC ships with *feel-pass* values, not balanced ones. The discipline that ke
 - `SCOUT_ENERGY_COST` · `SCOUT_RADIUS` · `SCOUT_TOOL`
 
 **Crafting**
-- `RECIPE{itemDefId} → {inputs, output}`
+- `RECIPE{itemDefId} → {inputs, output}` — the shared tree (M5, filled): tiered tools (`iron-pick` halves mining cost — the "cheaper second run" demonstrator), backpacks, weapons incl. affinity gear (`silver-sword`), armour pieces, transport, food, potions. Cross-biome inputs are a **soft pull** (D27: silver best-farmed in tundra, obtainable anywhere), not a hard gate. `FOOD`/`POTION` catalogs list which defIds `pack`/`slotOf` accept in the consumable slots.
 
 **Map & forecast** — where prep skill lives
 - `GRID_SIZE` · `POI_DENSITY` · `POI_MIN_SPACING` · `POI_PLACEMENT_ATTEMPTS`
 - `NOISE_FREQUENCY` — Perlin sample step per tile; lower = larger, chunkier terrain regions
 - `BIOMES{id} → {terrainWeights, nodeTypeWeights, creatureTable, materialTable}` — a biome is a **generation profile only** (D21): consumed by `generateGrid(mapSeed, biomeId)`, never consulted at runtime. Biomes shift likelihoods, not rules. Start: woodland / desert / tundra; adding a biome = one data entry. (Subsumes the earlier flat `NOISE_THRESHOLDS` — thresholds now live per-biome in `terrainWeights`.)
-- `CANDIDATE_MAP_COUNT` (3) · `PREVIEW_FIDELITY` — how much the map preview reveals beyond the biome-name headline (the master dial for how much preparation matters)
+- `CANDIDATE_MAP_COUNT` (3) · `PREVIEW_FIDELITY` — how much the map preview reveals beyond the biome-name headline (the master dial for how much preparation matters). Ships at **0** (biome-name headline only; `candidateMaps` returns empty `hints`); `town.previewHints` is structured so higher tiers — and a later **cartography** system (craftable/editable maps) — plug in without reshaping the preview.
 
 ## Levers we most expect to tune long-term
 
