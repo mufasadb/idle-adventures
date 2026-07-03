@@ -6,6 +6,7 @@ import { addToCarry, freeCarryStacks } from "./carry";
 import { toolQualityFor } from "./tools";
 import { resolveCombat } from "./combat";
 import { endExpedition } from "./bank";
+import { craft as applyRecipe } from "./craft";
 import { ENERGY_PER_FOOD, PLAYER_BASE_HP, GRID_SIZE, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, LOOT_TABLE, MONSTERS, MONSTER_TIER_HP_CURVE, MONSTER_TIER_DMG_CURVE, SCOUT_ENERGY_COST, SCOUT_RADIUS, SCOUT_TOOL } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 
@@ -30,6 +31,7 @@ export function reduce(
     case "scout":
       return scout(state);
     case "craft":
+      return craftAction(state, action.recipeId);
     case "pack":
     case "return":
       return { state, events: [] };
@@ -72,6 +74,19 @@ function embark(
     events: [
       { type: "embarked", mapSeed, biomeId: grid.biomeId, pos: grid.entry, energy },
     ],
+  };
+}
+
+function craftAction(
+  state: GameState,
+  recipeId: string,
+): { state: GameState; events: GameEvent[] } {
+  if (state.phase !== "town") return rejected(state, "craft", "not-in-town");
+  const result = applyRecipe(state.bank, recipeId);
+  if (!result.ok) return rejected(state, "craft", result.reason);
+  return {
+    state: { ...state, bank: result.bank },
+    events: [{ type: "crafted", recipeId, output: result.output }],
   };
 }
 
