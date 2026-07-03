@@ -137,14 +137,14 @@ test("generateGrid: desert maps contain terrain variety, not monoterrain (M1 rev
   expect(river).toBeGreaterThan(0);
 });
 
-test("generateGrid: POIs carry their material stamped from the biome table (D25)", () => {
+test("generateGrid: POIs carry a material rolled from the biome's weighted table (D25/D27)", () => {
   for (const biome of BIOME_IDS) {
     const grid = generateGrid(`material-stamp-${biome}`, biome);
     for (const poi of grid.pois) {
       if (poi.kind === "monster") {
         expect(poi.material).toBeNull();
       } else {
-        expect(poi.material).toBe(BIOMES[biome].materialTable[poi.kind]!);
+        expect(Object.keys(BIOMES[biome].materialTable[poi.kind]!)).toContain(poi.material!);
       }
     }
   }
@@ -165,4 +165,17 @@ test("generateGrid: monster POIs carry a creature from the biome's table (M4)", 
 
 test("generateGrid: creature stamping is deterministic", () => {
   expect(generateGrid("creature-det", "desert")).toEqual(generateGrid("creature-det", "desert"));
+});
+
+test("generateGrid: POI materials are deterministic and drawn from the biome table (D27)", () => {
+  const seed = "d27-seed";
+  const biomeId = rollBiome(seed);
+  const g1 = generateGrid(seed, biomeId);
+  const g2 = generateGrid(seed, biomeId);
+  expect(g1.pois).toEqual(g2.pois); // byte-identical
+  for (const poi of g1.pois) {
+    if (poi.kind === "monster") continue;
+    const table = BIOMES[biomeId].materialTable[poi.kind]!;
+    expect(Object.keys(table)).toContain(poi.material!);
+  }
 });

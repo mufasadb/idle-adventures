@@ -19,7 +19,7 @@ export type Poi = {
   x: number;
   y: number;
   kind: NodeType;
-  material: string | null; // yield defId, stamped from the biome at generation (D25) — gather never consults the biome
+  material: string | null; // yield defId, rolled from the biome's weighted table at generation (D25/D27) — gather never consults the biome
   creature: string | null; // monster defId, stamped from the biome at generation (M4, mirrors D25) — combat never consults the biome
 };
 
@@ -35,6 +35,18 @@ export type Grid = {
 export function rollBiome(mapSeed: string): BiomeId {
   const i = Math.floor(rand(mapSeed, "biome") * BIOME_IDS.length);
   return BIOME_IDS[i] ?? BIOME_IDS[0]!;
+}
+
+// Roll a POI's material from the biome's weighted table (D27). Keys are sorted
+// for a deterministic order independent of literal insertion order.
+function rollMaterial(
+  table: Record<string, number> | undefined,
+  roll: number,
+): string | null {
+  if (!table) return null;
+  const order = Object.keys(table).sort();
+  if (order.length === 0) return null;
+  return weightedPick(table, order, roll);
 }
 
 export function generateGrid(mapSeed: string, biomeId: BiomeId): Grid {
@@ -86,7 +98,11 @@ export function generateGrid(mapSeed: string, biomeId: BiomeId): Grid {
             Math.floor(rand(mapSeed, "poi-creature", attempt) * biome.creatureTable.length)
           ]!
         : null;
-    pois.push({ x, y, kind, material: biome.materialTable[kind] ?? null, creature });
+    const material =
+      kind === "monster"
+        ? null
+        : rollMaterial(biome.materialTable[kind], rand(mapSeed, "poi-material", attempt));
+    pois.push({ x, y, kind, material, creature });
   }
   return { biomeId, terrain, pois, entry };
 }

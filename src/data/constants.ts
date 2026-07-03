@@ -33,7 +33,7 @@ export type Biome = {
   terrainWeights: Partial<Record<Terrain, number>>; // relative mix; zero/absent = never generates
   nodeTypeWeights: Partial<Record<NodeType, number>>; // relative POI kind mix
   creatureTable: string[]; // biome-flavoured monster defIds (filled M4)
-  materialTable: Partial<Record<NodeType, string>>; // node kind → material defId (filled M3/M5)
+  materialTable: Partial<Record<NodeType, Record<string, number>>>; // node kind → weighted material defIds (D27)
 };
 
 export const BIOMES: Record<BiomeId, Biome> = {
@@ -41,19 +41,34 @@ export const BIOMES: Record<BiomeId, Biome> = {
     terrainWeights: { plains: 0.4, mud: 0.25, river: 0.15, mountain: 0.2 },
     nodeTypeWeights: { wood: 0.35, herb: 0.25, animal: 0.2, monster: 0.15, mining: 0.05 },
     creatureTable: ["werewolf", "fae-sprite", "forest-boar"],
-    materialTable: { mining: "iron-ore", wood: "oak-log", herb: "forest-herb", animal: "deer-hide" },
+    materialTable: {
+      mining: { "iron-ore": 7, "copper-ore": 2, "silver-ore": 1 },
+      wood: { "oak-log": 7, "pine-log": 2, "cactus-wood": 1 },
+      herb: { "forest-herb": 7, "desert-sage": 2, "ice-moss": 1 },
+      animal: { "deer-hide": 7, "wolf-pelt": 2, "lizard-hide": 1 },
+    },
   },
   desert: {
     terrainWeights: { plains: 0.55, mountain: 0.3, river: 0.15 },
     nodeTypeWeights: { mining: 0.4, monster: 0.25, herb: 0.15, wood: 0.1, animal: 0.1 },
     creatureTable: ["giant-scorpion", "dust-vampire", "sand-raider"],
-    materialTable: { mining: "copper-ore", wood: "cactus-wood", herb: "desert-sage", animal: "lizard-hide" },
+    materialTable: {
+      mining: { "copper-ore": 7, "iron-ore": 2, "silver-ore": 1 },
+      wood: { "cactus-wood": 7, "oak-log": 2, "pine-log": 1 },
+      herb: { "desert-sage": 7, "forest-herb": 2, "ice-moss": 1 },
+      animal: { "lizard-hide": 7, "deer-hide": 2, "wolf-pelt": 1 },
+    },
   },
   tundra: {
     terrainWeights: { ice: 0.5, mountain: 0.25, plains: 0.15, river: 0.1 },
     nodeTypeWeights: { animal: 0.35, monster: 0.25, mining: 0.2, wood: 0.1, herb: 0.1 },
     creatureTable: ["frost-fae", "snow-wolf", "ice-troll"],
-    materialTable: { mining: "silver-ore", wood: "pine-log", herb: "ice-moss", animal: "wolf-pelt" },
+    materialTable: {
+      mining: { "silver-ore": 7, "iron-ore": 2, "copper-ore": 1 },
+      wood: { "pine-log": 7, "oak-log": 2, "cactus-wood": 1 },
+      herb: { "ice-moss": 7, "desert-sage": 2, "forest-herb": 1 },
+      animal: { "wolf-pelt": 7, "deer-hide": 2, "lizard-hide": 1 },
+    },
   },
 };
 

@@ -107,21 +107,34 @@ test("constants: M3 carry + gathering levers are filled", () => {
   }
 });
 
-test("constants: every biome yields a material for every gatherable node type", () => {
+test("constants: every biome yields a non-empty weighted material table per gatherable node type", () => {
   for (const id of BIOME_IDS) {
     for (const kind of ["mining", "wood", "herb", "animal"] as const) {
-      expect(BIOMES[id].materialTable[kind]).toBeTruthy();
+      const table = BIOMES[id].materialTable[kind];
+      expect(table).toBeTruthy();
+      const weights = Object.values(table!);
+      expect(weights.length).toBeGreaterThan(0);
+      for (const w of weights) expect(w).toBeGreaterThan(0);
     }
   }
 });
 
-test("constants: biome materials are distinct so cross-biome recipes have pulls", () => {
-  const all = BIOME_IDS.flatMap((id) =>
-    (["mining", "wood", "herb", "animal"] as const).map(
-      (kind) => BIOMES[id].materialTable[kind],
+test("constants: each biome's DOMINANT material per node type is distinct (D27 soft pulls)", () => {
+  const dominant = (table: Record<string, number>) =>
+    Object.entries(table).sort((a, b) => b[1] - a[1])[0]![0];
+  const dominants = BIOME_IDS.flatMap((id) =>
+    (["mining", "wood", "herb", "animal"] as const).map((kind) =>
+      dominant(BIOMES[id].materialTable[kind]!),
     ),
   );
-  expect(new Set(all).size).toBe(all.length); // 12 unique material defIds
+  expect(new Set(dominants).size).toBe(dominants.length); // 12 distinct dominants
+});
+
+test("constants: silver is dominant in tundra mining but present elsewhere (D27)", () => {
+  expect(BIOMES.tundra.materialTable.mining!["silver-ore"]).toBeGreaterThan(
+    BIOMES.woodland.materialTable.mining!["silver-ore"] ?? 0,
+  );
+  expect(BIOMES.woodland.materialTable.mining!["silver-ore"]).toBeGreaterThan(0);
 });
 
 test("constants: M4 combat levers are filled", () => {
