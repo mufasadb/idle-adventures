@@ -86,6 +86,9 @@ test("constants: M3 carry + gathering levers are filled", () => {
   for (const tool of Object.keys(TOOL_QUALITY)) {
     expect(TOOL_CAPABILITY[tool]).toBeDefined(); // every tool declares its capability
   }
+  for (const tool of Object.keys(TOOL_CAPABILITY)) {
+    expect(TOOL_QUALITY[tool]).toBeDefined(); // every capable tool has a quality
+  }
 });
 
 test("constants: every biome yields a material for every gatherable node type", () => {

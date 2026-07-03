@@ -13,7 +13,8 @@ export function toolQualityFor(
   let best: number | null = null;
   for (const defId of tools) {
     if (TOOL_CAPABILITY[defId] !== capability) continue;
-    const quality = TOOL_QUALITY[defId] ?? 1;
+    const quality = TOOL_QUALITY[defId];
+    if (quality === undefined) continue; // no quality entry = unusable; catalog consistency is enforced by constants.test
     if (best === null || quality > best) best = quality;
   }
   return best;
