@@ -21,6 +21,21 @@ import {
   TOOL_QUALITY,
   TOOL_CAPABILITY,
   GATHER_YIELD,
+  PLAYER_BASE_HP,
+  CHIP_DAMAGE_MIN,
+  POTION_HEAL,
+  AUTO_POTION_THRESHOLD,
+  UNARMED_DAMAGE,
+  AFFINITY_MULTIPLIER,
+  SCOUT_ENERGY_COST,
+  SCOUT_RADIUS,
+  MONSTER_TIER_HP_CURVE,
+  MONSTER_TIER_DMG_CURVE,
+  MONSTERS,
+  WEAPONS,
+  ARMOUR,
+  LOOT_TABLE,
+  AFFINITIES,
 } from "../src/data/constants";
 
 test("constants: lever groups exist with the documented shape", () => {
@@ -107,4 +122,50 @@ test("constants: biome materials are distinct so cross-biome recipes have pulls"
     ),
   );
   expect(new Set(all).size).toBe(all.length); // 12 unique material defIds
+});
+
+test("constants: M4 combat levers are filled", () => {
+  expect(PLAYER_BASE_HP).toBeGreaterThan(0);
+  expect(CHIP_DAMAGE_MIN).toBeGreaterThan(0); // HP always drains; fights always terminate
+  expect(POTION_HEAL).toBeGreaterThan(0);
+  expect(AUTO_POTION_THRESHOLD).toBeGreaterThan(0);
+  expect(AUTO_POTION_THRESHOLD).toBeLessThanOrEqual(1);
+  expect(UNARMED_DAMAGE).toBeGreaterThan(0);
+  expect(AFFINITY_MULTIPLIER).toBeGreaterThan(1);
+  expect(SCOUT_ENERGY_COST).toBeGreaterThanOrEqual(0);
+  expect(SCOUT_RADIUS).toBeGreaterThan(0);
+});
+
+test("constants: monster catalog is internally consistent", () => {
+  for (const [id, monster] of Object.entries(MONSTERS)) {
+    expect(MONSTER_TIER_HP_CURVE[monster.tier]).toBeGreaterThan(0);
+    expect(MONSTER_TIER_DMG_CURVE[monster.tier]).toBeGreaterThan(0);
+    expect(["melee", "ranged", "magic"]).toContain(monster.dmgType);
+    expect(["plate", "light", "robe"]).toContain(monster.armourType);
+    expect(LOOT_TABLE[id]).toBeDefined(); // every monster drops something
+    for (const stack of LOOT_TABLE[id]!) expect(stack.qty).toBeGreaterThan(0);
+  }
+  for (const [, weapon] of Object.entries(WEAPONS)) {
+    expect(weapon.damage).toBeGreaterThan(0);
+  }
+  for (const [, piece] of Object.entries(ARMOUR)) {
+    expect(piece.defense).toBeGreaterThan(0);
+  }
+});
+
+test("constants: every biome's creatureTable is 2-3 real monsters", () => {
+  for (const id of BIOME_IDS) {
+    const table = BIOMES[id].creatureTable;
+    expect(table.length).toBeGreaterThanOrEqual(2);
+    expect(table.length).toBeLessThanOrEqual(3);
+    for (const creature of table) expect(MONSTERS[creature]).toBeDefined();
+  }
+});
+
+test("constants: the acceptance affinity pairing exists (silver ↔ werewolf)", () => {
+  expect(WEAPONS["silver-sword"]!.tags).toContain("silver");
+  expect(MONSTERS.werewolf!.tags).toContain("werewolf");
+  expect(
+    AFFINITIES.some((a) => a.monsterTag === "werewolf" && a.itemTag === "silver"),
+  ).toBe(true);
 });
