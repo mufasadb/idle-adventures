@@ -1,4 +1,4 @@
-import type { GameState, Action, GameEvent } from "./types";
+import type { GameState, Action, GameEvent, LoadoutSlot } from "./types";
 import { generateGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
@@ -7,6 +7,7 @@ import { toolQualityFor } from "./tools";
 import { resolveCombat } from "./combat";
 import { endExpedition } from "./bank";
 import { craft as applyRecipe } from "./craft";
+import { packItem } from "./pack";
 import { ENERGY_PER_FOOD, PLAYER_BASE_HP, GRID_SIZE, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, LOOT_TABLE, MONSTERS, MONSTER_TIER_HP_CURVE, MONSTER_TIER_DMG_CURVE, SCOUT_ENERGY_COST, SCOUT_RADIUS, SCOUT_TOOL } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 
@@ -33,6 +34,7 @@ export function reduce(
     case "craft":
       return craftAction(state, action.recipeId);
     case "pack":
+      return packAction(state, action.slot, action.itemId);
     case "return":
       return { state, events: [] };
     default:
@@ -87,6 +89,20 @@ function craftAction(
   return {
     state: { ...state, bank: result.bank },
     events: [{ type: "crafted", recipeId, output: result.output }],
+  };
+}
+
+function packAction(
+  state: GameState,
+  slot: LoadoutSlot,
+  itemId: string,
+): { state: GameState; events: GameEvent[] } {
+  if (state.phase !== "town") return rejected(state, "pack", "not-in-town");
+  const result = packItem(state.loadout, state.bank, slot, itemId);
+  if (!result.ok) return rejected(state, "pack", result.reason);
+  return {
+    state: { ...state, loadout: result.loadout },
+    events: [{ type: "packed", slot, defId: itemId }],
   };
 }
 
