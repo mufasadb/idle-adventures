@@ -2,7 +2,10 @@ import type { GameState, Action, GameEvent } from "./types";
 import { generateGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
-import { ENERGY_PER_FOOD, PLAYER_BASE_HP, GRID_SIZE } from "../data/constants";
+import { slotCap, addToCarry } from "./carry";
+import { toolQualityFor } from "./tools";
+import { ENERGY_PER_FOOD, PLAYER_BASE_HP, GRID_SIZE, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD } from "../data/constants";
+import type { GatherableNodeType } from "../data/constants";
 
 // Pure reducer. M2 fills embark/move; remaining cases are no-op stubs:
 //   gather/scout/fight            → M3–M4
@@ -17,9 +20,10 @@ export function reduce(
       return embark(state, action.mapSeed);
     case "move":
       return move(state, action.to);
+    case "gather":
+      return gather(state);
     case "craft":
     case "pack":
-    case "gather":
     case "scout":
     case "fight":
     case "drop":
@@ -95,6 +99,59 @@ function move(
       expedition: { ...expedition, pos: step, energy },
     },
     events: [{ type: "moved", from, to: step, terrain, cost, energy }],
+  };
+}
+
+function gather(state: GameState): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) {
+    return rejected(state, "gather", "not-on-expedition");
+  }
+  const { pos } = expedition;
+  const grid = generateGrid(expedition.mapSeed, rollBiome(expedition.mapSeed));
+  const poi = grid.pois.find((p) => p.x === pos.x && p.y === pos.y);
+  const alreadyCleared = expedition.cleared.some(
+    (c) => c.x === pos.x && c.y === pos.y,
+  );
+  if (!poi || alreadyCleared) return rejected(state, "gather", "no-node");
+  if (poi.kind === "monster" || poi.material === null) {
+    return rejected(state, "gather", "not-gatherable");
+  }
+  const kind = poi.kind as GatherableNodeType;
+  const quality = toolQualityFor(expedition.loadout.equipment.tools, NODE_TOOL[kind]);
+  if (quality === null) return rejected(state, "gather", "missing-tool");
+  const cost = NODE_HARDNESS[kind] / quality;
+  if (cost > expedition.energy) return rejected(state, "gather", "exhausted");
+  // D23: packed food/potion stacks are ballast against the same slot cap.
+  const maxStacks =
+    slotCap(expedition.loadout.equipment.backpack) -
+    expedition.loadout.food.length -
+    expedition.loadout.potions.length;
+  const qty = GATHER_YIELD[kind];
+  const carry = addToCarry(expedition.carry, poi.material, qty, maxStacks);
+  if (carry === null) return rejected(state, "gather", "carry-full");
+  const energy = expedition.energy - cost;
+  return {
+    state: {
+      ...state,
+      expedition: {
+        ...expedition,
+        energy,
+        carry,
+        cleared: [...expedition.cleared, { x: pos.x, y: pos.y }],
+      },
+    },
+    events: [
+      {
+        type: "gathered",
+        at: { x: pos.x, y: pos.y },
+        kind: poi.kind,
+        material: poi.material,
+        qty,
+        cost,
+        energy,
+      },
+    ],
   };
 }
 

@@ -1,6 +1,6 @@
 // The engine contract — single source of truth for state, actions, events.
 // Lifted from the design spec §10. Pure data; no behaviour here.
-import type { BiomeId, Terrain } from "../data/constants";
+import type { BiomeId, Terrain, NodeType } from "../data/constants";
 
 export type ItemStack = { defId: string; qty: number }; // fungible; gear referenced by defId too
 
@@ -84,6 +84,15 @@ export type GameEvent =
       terrain: Terrain;
       cost: number;
       energy: number; // remaining after the step
+    }
+  | {
+      type: "gathered";
+      at: { x: number; y: number };
+      kind: NodeType;
+      material: string;
+      qty: number;
+      cost: number;
+      energy: number; // remaining after the gather
     }
   | {
       type: "action-rejected";
