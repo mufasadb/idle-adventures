@@ -52,12 +52,13 @@ food · potions · weapons (melee / ranged / magic) · armour (plate / light / r
 - **Spyglass** packs *information*: pre-compute the exact outcome, or gamble on a gut read.
 - **Soft fail:** die early → run ends, keep what was already gathered. Hard-counter monsters are a tunable dial, not a fixed rule.
 
-## 6. Map
+## 6. Map & biomes
 
 - 20×20 grid, rudimentary Perlin terrain (seeded).
-- Terrain (ice / river / mountain / mud) = energy modifiers or gear-gated tiles.
+- **One biome per map** (D21, 2026-07-02): a biome is a named generation profile — `generateGrid(mapSeed, biomeId)` reads terrain weights, node-type weights, and creature/material tables from `BIOMES[id]`; the engine never consults the biome after generation. Biomes shift likelihoods, not rules — no biome-wide drains or counter-item taxes. Start with 3 biomes (woodland / desert / tundra) as pure data entries; adding one is data-only. See `2026-07-02-biomes-generation-profiles-design.md`.
+- Terrain (ice / river / mountain / mud) = energy modifiers or gear-gated tiles. Transport/tool advantages per biome emerge statistically from its terrain/node mix (no transport×biome rules).
 - POIs 3–4 tiles apart so routing has real choices.
-- A small amount of "what's likely out here" forecasting so packing-for-the-map is testable.
+- Forecasting: the preview headline is the biome name; `PREVIEW_FIDELITY` scales extra hints (see §11).
 
 ## 7. Architecture — the one discipline we keep
 
@@ -138,7 +139,7 @@ Combat defense aggregates per-piece: `Σ piece.defense × matrix[dmgType][piece.
 
 ## 11. Map entry & defaults
 
-- Town offers **3 seeded candidate maps**, each with a **rough preview** (dominant terrain + node-type hints, layout hidden). Pick → pack → embark; **full grid on arrival (no fog in v1)**.
+- Town offers **3 seeded candidate maps**, each rolling a biome from its seed; the **rough preview** headline is the biome name, with `PREVIEW_FIDELITY`-scaled hints on top (layout hidden). Pick → pack → embark; **full grid on arrival (no fog in v1)**.
 - Carry = **slots** (not weight). Combat **resolves fully**, **auto-potions** at a threshold, **static monsters** (avoid = routing). Persistence **in-memory across runs**. A `legalActions(state)` helper feeds both UI and AI.
 
 ## 12. Tech & layout

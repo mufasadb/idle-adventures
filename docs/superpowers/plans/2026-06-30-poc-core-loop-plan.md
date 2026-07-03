@@ -23,8 +23,8 @@ TS single package; Vite + Vitest; eslint with the engine-purity boundary rule; `
 **Acceptance:** `bun test` runs green on a trivial test; an import from `engine` → `render` fails lint; `GameState`/`Action` types compile.
 
 ## M1 — Deterministic map generation + render
-Seeded Perlin → terrain via thresholds; seeded POI placement with a min-distance rule (POIs 3–4 tiles apart); `render(state)` paints a 20×20 CSS grid; a text serialization exists for snapshot tests.
-**Acceptance:** same seed → byte-identical grid (snapshot); 20×20 renders; POIs respect min spacing. *Levers:* grid size, noise thresholds, POI density & spacing.
+`generateGrid(mapSeed, biomeId)` — seeded Perlin → terrain via **biome-supplied** thresholds/weights; seeded POI placement with a min-distance rule (POIs 3–4 tiles apart) and **biome-weighted** node types; `render(state)` paints a 20×20 CSS grid; a text serialization exists for snapshot tests. Biomes are generation profiles only (D21) — 3 to start (woodland/desert/tundra), data-only to extend.
+**Acceptance:** same seed+biome → byte-identical grid (snapshot); different biomes → visibly different terrain/node mixes; 20×20 renders; POIs respect min spacing. *Levers:* grid size, `BIOMES[*]` (terrain weights, node-type weights), POI density & spacing.
 
 ## M2 — Player, movement, energy budget
 `embark` sets energy from packed food; `move` steps one tile (8-dir) toward a target; terrain cost multiplier; transport reduces cost; gated/impassable tiles; energy depletes and bottoms out.
@@ -39,8 +39,8 @@ Seeded Perlin → terrain via thresholds; seeded POI placement with a min-distan
 **Acceptance:** silver vs werewolf ×2; plate cuts ranged more than magic; HP→0 soft-fails and keeps carry; scout changes available info; same seed → same outcome. *Levers:* `PLAYER_BASE_HP`, the matrix, per-piece defense, `AFFINITY_MULTIPLIER`, potion heal, auto-potion threshold, monster tier curves, loot tables.
 
 ## M5 — Return, crafting, loadout, map entry (close the loop)
-`return` hauls carry → bank; `craft` consumes materials → item (instant, recipe from catalog); `pack` builds a loadout within slot limits; town offers 3 seeded candidate maps with rough previews (hints, hidden layout); pick → embark.
-**Acceptance:** craft consumes inputs & yields output; can't pack beyond slots; preview shows hints not layout; a second run with a crafted upgrade is measurably cheaper. *Levers:* recipe costs, candidate-map count, preview fidelity.
+`return` hauls carry → bank; `craft` consumes materials → item (instant, recipe from catalog); `pack` builds a loadout within slot limits; town offers 3 seeded candidate maps, each rolling a biome from its seed, with rough previews (headline = biome name, `PREVIEW_FIDELITY`-scaled hints, hidden layout); pick → embark.
+**Acceptance:** craft consumes inputs & yields output; can't pack beyond slots; preview shows biome name + hints, not layout; a second run with a crafted upgrade is measurably cheaper. *Levers:* recipe costs, candidate-map count, preview fidelity.
 
 ## M6 — Headless harness + AI-drivable
 `play(seed, actions[]) → {state, events}`; `legalActions(state)`; a scripted full-loop test; an AI plays a complete town→expedition→return→craft loop via JSON actions, no UI.
