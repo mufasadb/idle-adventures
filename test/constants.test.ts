@@ -14,6 +14,13 @@ import {
   ENERGY_PER_FOOD,
   MOVE_BASE_COST,
   TRANSPORT_MULTIPLIER,
+  BASE_CARRY_SLOTS,
+  STACK_CAP,
+  NODE_HARDNESS,
+  NODE_TOOL,
+  TOOL_QUALITY,
+  TOOL_CAPABILITY,
+  GATHER_YIELD,
 } from "../src/data/constants";
 
 test("constants: lever groups exist with the documented shape", () => {
@@ -64,4 +71,36 @@ test("constants: M2 energy levers are filled", () => {
   expect(TERRAIN_COST.ice).toBeGreaterThan(TERRAIN_COST.plains); // bead acceptance: ice > plains
   expect(Number.isFinite(TERRAIN_COST.mountain)).toBe(false); // impassable without gear
   expect(TRANSPORT_MULTIPLIER.horse).toBeGreaterThan(1); // horse cheapens movement (divisor)
+});
+
+test("constants: M3 carry + gathering levers are filled", () => {
+  expect(BASE_CARRY_SLOTS).toBeGreaterThan(0);
+  expect(BACKPACK_SLOTS.starter).toBeGreaterThan(BASE_CARRY_SLOTS);
+  expect(STACK_CAP).toBeGreaterThan(0);
+  expect(NODE_TOOL.mining).toBe("pick"); // bead acceptance hinges on this gate
+  expect(NODE_TOOL.herb).toBeNull(); // herbs gather bare-handed
+  for (const kind of ["mining", "wood", "herb", "animal"] as const) {
+    expect(NODE_HARDNESS[kind]).toBeGreaterThan(0);
+    expect(GATHER_YIELD[kind]).toBeGreaterThan(0);
+  }
+  for (const tool of Object.keys(TOOL_QUALITY)) {
+    expect(TOOL_CAPABILITY[tool]).toBeDefined(); // every tool declares its capability
+  }
+});
+
+test("constants: every biome yields a material for every gatherable node type", () => {
+  for (const id of BIOME_IDS) {
+    for (const kind of ["mining", "wood", "herb", "animal"] as const) {
+      expect(BIOMES[id].materialTable[kind]).toBeTruthy();
+    }
+  }
+});
+
+test("constants: biome materials are distinct so cross-biome recipes have pulls", () => {
+  const all = BIOME_IDS.flatMap((id) =>
+    (["mining", "wood", "herb", "animal"] as const).map(
+      (kind) => BIOMES[id].materialTable[kind],
+    ),
+  );
+  expect(new Set(all).size).toBe(all.length); // 12 unique material defIds
 });

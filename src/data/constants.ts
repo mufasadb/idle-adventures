@@ -21,6 +21,9 @@ export type Terrain = (typeof TERRAINS)[number];
 export const NODE_TYPES = ["mining", "wood", "herb", "animal", "monster"] as const;
 export type NodeType = (typeof NODE_TYPES)[number];
 
+// Node types the player can gather (monster nodes resolve via fight, M4).
+export type GatherableNodeType = Exclude<NodeType, "monster">;
+
 // --- Biomes (D21): generation profiles ONLY, consumed by generateGrid and
 // never consulted after generation. Adding a biome = adding one entry here.
 export const BIOME_IDS = ["woodland", "desert", "tundra"] as const;
@@ -38,19 +41,19 @@ export const BIOMES: Record<BiomeId, Biome> = {
     terrainWeights: { plains: 0.4, mud: 0.25, river: 0.15, mountain: 0.2 },
     nodeTypeWeights: { wood: 0.35, herb: 0.25, animal: 0.2, monster: 0.15, mining: 0.05 },
     creatureTable: [],
-    materialTable: {},
+    materialTable: { mining: "iron-ore", wood: "oak-log", herb: "forest-herb", animal: "deer-hide" },
   },
   desert: {
     terrainWeights: { plains: 0.55, mountain: 0.3, river: 0.15 },
     nodeTypeWeights: { mining: 0.4, monster: 0.25, herb: 0.15, wood: 0.1, animal: 0.1 },
     creatureTable: [],
-    materialTable: {},
+    materialTable: { mining: "copper-ore", wood: "cactus-wood", herb: "desert-sage", animal: "lizard-hide" },
   },
   tundra: {
     terrainWeights: { ice: 0.5, mountain: 0.25, plains: 0.15, river: 0.1 },
     nodeTypeWeights: { animal: 0.35, monster: 0.25, mining: 0.2, wood: 0.1, herb: 0.1 },
     creatureTable: [],
-    materialTable: {},
+    materialTable: { mining: "silver-ore", wood: "pine-log", herb: "ice-moss", animal: "wolf-pelt" },
   },
 };
 
@@ -70,13 +73,44 @@ export const TRANSPORT_MULTIPLIER: Record<string, number> = {
 }; // keyed by transport defId; absent/on-foot = 1
 
 // --- Carry (filled in M3) ---
-export const BACKPACK_SLOTS = { starter: 0 } as Record<string, number>; // slots per backpack tier (placeholder — M3)
-export const STACK_CAP = 0; // max qty per stack (placeholder — M3)
+export const BASE_CARRY_SLOTS = 2; // carry stacks with no backpack equipped
+export const BACKPACK_SLOTS: Record<string, number> = {
+  starter: 4,
+  leather: 6,
+}; // TOTAL carry stacks by backpack defId (replaces the base, not added to it)
+export const STACK_CAP = 10; // max qty per stack; overflow starts a new stack (new slot)
 
 // --- Gathering (filled in M3) ---
-export const NODE_HARDNESS = {} as Record<string, number>; // by node type/tier (placeholder — M3)
-export const TOOL_QUALITY = {} as Record<string, number>; // by tool (placeholder — M3)
-export const GATHER_YIELD = {} as Record<string, number>; // by node (placeholder — M3)
+// D21: hardness/tool/yield are per NODE TYPE, never per biome. The biome only
+// flavours WHICH material a node yields — stamped at generation (D25).
+export const NODE_HARDNESS: Record<GatherableNodeType, number> = {
+  mining: 6,
+  wood: 4,
+  herb: 2,
+  animal: 4,
+}; // energy cost numerator: cost = hardness ÷ tool quality
+export const NODE_TOOL: Record<GatherableNodeType, string | null> = {
+  mining: "pick",
+  wood: "axe",
+  herb: null, // bare hands
+  animal: "knife",
+}; // required tool CAPABILITY per node type
+export const TOOL_CAPABILITY: Record<string, string> = {
+  pick: "pick",
+  axe: "axe",
+  knife: "knife",
+}; // tool defId → capability; tiered tools (M5: "iron-pick": "pick") are data-only
+export const TOOL_QUALITY: Record<string, number> = {
+  pick: 1,
+  axe: 1,
+  knife: 1,
+}; // gather-cost divisor by tool defId
+export const GATHER_YIELD: Record<GatherableNodeType, number> = {
+  mining: 3,
+  wood: 3,
+  herb: 2,
+  animal: 2,
+}; // qty gathered per (one-shot) node
 
 // --- Combat (filled in M4) ---
 export const PLAYER_BASE_HP = 0; // (placeholder — M4)
