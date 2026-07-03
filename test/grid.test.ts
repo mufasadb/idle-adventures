@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { generateGrid, rollBiome } from "../src/engine/grid";
-import { GRID_SIZE, BIOME_IDS, TERRAINS, POI_DENSITY, POI_MIN_SPACING, NODE_TYPES } from "../src/data/constants";
+import { GRID_SIZE, BIOME_IDS, TERRAINS, POI_DENSITY, POI_MIN_SPACING, NODE_TYPES, BIOMES } from "../src/data/constants";
 import type { Terrain } from "../src/data/constants";
 
 const chebyshev = (a: { x: number; y: number }, b: { x: number; y: number }) =>
@@ -135,4 +135,17 @@ test("generateGrid: desert maps contain terrain variety, not monoterrain (M1 rev
   }
   expect(mountain).toBeGreaterThan(0);
   expect(river).toBeGreaterThan(0);
+});
+
+test("generateGrid: POIs carry their material stamped from the biome table (D25)", () => {
+  for (const biome of BIOME_IDS) {
+    const grid = generateGrid(`material-stamp-${biome}`, biome);
+    for (const poi of grid.pois) {
+      if (poi.kind === "monster") {
+        expect(poi.material).toBeNull();
+      } else {
+        expect(poi.material).toBe(BIOMES[biome].materialTable[poi.kind]!);
+      }
+    }
+  }
 });

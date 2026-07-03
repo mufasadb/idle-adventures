@@ -24,6 +24,7 @@ test("embark: enters expedition at the map's entry with energy from packed food"
   expect(state.expedition!.pos).toEqual(grid.entry);
   expect(state.expedition!.energy).toBe(4 * ENERGY_PER_FOOD); // 3 bread + 1 jerky
   expect(state.expedition!.carry).toEqual([]);
+  expect(state.expedition!.cleared).toEqual([]);
   expect(events).toEqual([
     {
       type: "embarked",

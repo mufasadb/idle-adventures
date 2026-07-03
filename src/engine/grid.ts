@@ -15,7 +15,12 @@ import type { Terrain, NodeType, BiomeId } from "../data/constants";
 import { rand, weightedPick } from "./rng";
 import { perlin2 } from "./noise";
 
-export type Poi = { x: number; y: number; kind: NodeType };
+export type Poi = {
+  x: number;
+  y: number;
+  kind: NodeType;
+  material: string | null; // yield defId, stamped from the biome at generation (D25) — gather never consults the biome
+};
 
 export type Grid = {
   biomeId: BiomeId;
@@ -74,7 +79,7 @@ export function generateGrid(mapSeed: string, biomeId: BiomeId): Grid {
       NODE_TYPES,
       rand(mapSeed, "poi-kind", attempt),
     );
-    pois.push({ x, y, kind });
+    pois.push({ x, y, kind, material: biome.materialTable[kind] ?? null });
   }
   return { biomeId, terrain, pois, entry };
 }

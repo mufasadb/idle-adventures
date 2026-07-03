@@ -29,6 +29,7 @@ export type Expedition = {
   hp: number; // drained by combat, refilled by potions
   loadout: Loadout;
   carry: ItemStack[]; // capped by backpack slots
+  cleared: { x: number; y: number }[]; // POIs consumed this run (D24): gathered nodes; M4 adds defeated monsters
   // grid regenerated from mapSeed on demand, not stored
 };
 

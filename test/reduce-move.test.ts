@@ -47,7 +47,7 @@ function expeditionState(
     phase: "expedition",
     bank: [],
     loadout: emptyLoadout(),
-    expedition: { mapSeed, pos, energy, hp: 0, loadout, carry: [] },
+    expedition: { mapSeed, pos, energy, hp: 0, loadout, carry: [], cleared: [] },
   };
 }
 

@@ -58,6 +58,7 @@ function embark(
         hp: PLAYER_BASE_HP, // placeholder 0 until M4 fills the lever
         loadout: state.loadout,
         carry: [],
+        cleared: [],
       },
     },
     events: [

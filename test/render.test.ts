@@ -24,6 +24,7 @@ const expeditionState = (mapSeed: string): GameState => ({
       potions: [],
     },
     carry: [],
+    cleared: [],
   },
 });
 
