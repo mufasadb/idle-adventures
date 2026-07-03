@@ -11,10 +11,13 @@ The POC ships with *feel-pass* values, not balanced ones. The discipline that ke
 - `TRANSPORT_MULTIPLIER{horse, mule, …}` — move-cost **divisor** (spec §10: base × terrain ÷ transport): >1 faster than foot (horse), <1 slower (mule — pays for future carry bonus); carry bonuses arrive with M3/M5
 
 **Carry** — loot vs supplies tension
-- `BACKPACK_SLOTS{tier}` · `STACK_CAP`
+- `BASE_CARRY_SLOTS` — carry stacks with no backpack · `BACKPACK_SLOTS{tier}` — total stacks per backpack (replaces the base) · `STACK_CAP` — max qty per stack
+- D23: packed food/potion stacks count against the same cap (ballast) — every ration packed is a loot slot spent
 
 **Gathering**
-- `NODE_HARDNESS{type, tier}` · `TOOL_QUALITY{pick, …}` · `GATHER_YIELD{node}`
+- `NODE_HARDNESS{nodeType}` — energy cost numerator · `TOOL_QUALITY{toolDefId}` — cost divisor · `GATHER_YIELD{nodeType}` — qty per (one-shot) node
+- `NODE_TOOL{nodeType}` — required capability (herb = bare hands) · `TOOL_CAPABILITY{toolDefId}` — tiered tools are data-only (D21: all per node type, never per biome)
+- Yield defIds come from `BIOMES{id}.materialTable`, stamped onto POIs at generation (D25) — 12 distinct materials across 3 biomes feed one shared recipe tree (M5)
 
 **Combat**
 - `PLAYER_BASE_HP` · `DMG_ARMOUR_MATRIX[dmgType][armourType]` · `ARMOUR_DEFENSE{piece, tier}`
