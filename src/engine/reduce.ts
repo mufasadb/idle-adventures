@@ -5,9 +5,9 @@ import { stepToward, moveCost } from "./move";
 import { addToCarry, freeCarryStacks } from "./carry";
 import { toolQualityFor } from "./tools";
 import { resolveCombat } from "./combat";
-import { endExpedition } from "./bank";
+import { endExpedition, subtractStacks } from "./bank";
 import { craft as applyRecipe } from "./craft";
-import { packItem } from "./pack";
+import { packItem, reserveLoadout } from "./pack";
 import { ENERGY_PER_FOOD, PLAYER_BASE_HP, GRID_SIZE, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, LOOT_TABLE, MONSTERS, MONSTER_TIER_HP_CURVE, MONSTER_TIER_DMG_CURVE, SCOUT_ENERGY_COST, SCOUT_RADIUS, SCOUT_TOOL } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 
@@ -55,6 +55,10 @@ function embark(
   mapSeed: string,
 ): { state: GameState; events: GameEvent[] } {
   if (state.phase !== "town") return rejected(state, "embark", "not-in-town");
+  // D28: settle the plan against the bank — debit everything the loadout pulls.
+  const reserved = reserveLoadout(state.loadout);
+  const bank = subtractStacks(state.bank, reserved);
+  if (bank === null) return rejected(state, "embark", "unaffordable");
   const grid = generateGrid(mapSeed, rollBiome(mapSeed));
   const foodQty = state.loadout.food.reduce((sum, stack) => sum + stack.qty, 0);
   const energy = foodQty * ENERGY_PER_FOOD;
@@ -62,6 +66,7 @@ function embark(
     state: {
       ...state,
       phase: "expedition",
+      bank,
       loadout: emptyLoadout(),
       expedition: {
         mapSeed,

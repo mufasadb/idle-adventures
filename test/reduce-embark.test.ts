@@ -12,7 +12,13 @@ function townState(): GameState {
     { defId: "jerky", qty: 1 },
   ];
   loadout.equipment.transport = "horse";
-  return { seed: "g", phase: "town", bank: [], loadout, expedition: null };
+  // D28: embark debits the plan from the bank, so it must hold the packed items.
+  const bank = [
+    { defId: "bread", qty: 3 },
+    { defId: "jerky", qty: 1 },
+    { defId: "horse", qty: 1 },
+  ];
+  return { seed: "g", phase: "town", bank, loadout, expedition: null };
 }
 
 test("embark: enters expedition at the map's entry with energy from packed food", () => {
@@ -66,4 +72,40 @@ test("embark: does not mutate the input state", () => {
   const before = structuredClone(input);
   reduce(input, { type: "embark", mapSeed: "m2-map" });
   expect(input).toEqual(before);
+});
+
+test("embark: debits the packed loadout from the bank (D28)", () => {
+  const loadout = emptyLoadout();
+  loadout.equipment.weapon = "sword";
+  loadout.food = [{ defId: "ration", qty: 3 }];
+  const state: GameState = {
+    seed: "e", phase: "town",
+    bank: [{ defId: "sword", qty: 1 }, { defId: "ration", qty: 5 }, { defId: "iron-ore", qty: 9 }],
+    loadout, expedition: null,
+  };
+  const { state: next } = reduce(state, { type: "embark", mapSeed: "map-1" });
+  // sword + 3 rations removed; the untouched iron-ore and 2 leftover rations remain
+  expect(next.bank).toEqual([{ defId: "ration", qty: 2 }, { defId: "iron-ore", qty: 9 }]);
+  expect(next.expedition!.energy).toBe(3 * ENERGY_PER_FOOD);
+  expect(next.expedition!.loadout.equipment.weapon).toBe("sword");
+});
+
+test("embark: unaffordable plan is rejected (safety net)", () => {
+  const loadout = emptyLoadout();
+  loadout.food = [{ defId: "ration", qty: 3 }];
+  const state: GameState = {
+    seed: "e", phase: "town", bank: [{ defId: "ration", qty: 1 }], loadout, expedition: null,
+  };
+  const { events } = reduce(state, { type: "embark", mapSeed: "map-1" });
+  expect(events).toEqual([{ type: "action-rejected", action: "embark", reason: "unaffordable" }]);
+});
+
+test("embark: zero-food is allowed (0 energy expedition)", () => {
+  const state: GameState = {
+    seed: "e", phase: "town", bank: [], loadout: emptyLoadout(), expedition: null,
+  };
+  const { state: next, events } = reduce(state, { type: "embark", mapSeed: "map-1" });
+  expect(next.phase).toBe("expedition");
+  expect(next.expedition!.energy).toBe(0);
+  expect(events[0]!.type).toBe("embarked");
 });
