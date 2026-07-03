@@ -68,7 +68,7 @@ test("scout: with a spyglass, nearby monsters come back with stats + exact forec
   const reported = event.monsters.find((m) => m.at.x === poi.x && m.at.y === poi.y)!;
   expect(reported.creature).toBe(poi.creature!);
   expect(reported.hp).toBe(MONSTER_TIER_HP_CURVE[MONSTERS[poi.creature!]!.tier]!);
-  const expected = resolveCombat(before.expedition!.loadout, PLAYER_BASE_HP, poi.creature!);
+  const expected = resolveCombat(before.expedition!.loadout, before.expedition!.hp, poi.creature!);
   expect(reported.forecast).toEqual({
     victory: expected.victory,
     hpLost: expected.hpLost,

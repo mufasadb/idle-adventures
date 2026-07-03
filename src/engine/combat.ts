@@ -37,6 +37,9 @@ export function playerDamage(loadout: Loadout, monsterId: string): number {
   const monster = MONSTERS[monsterId];
   if (!monster) throw new Error(`unknown monster: ${monsterId}`);
   const weaponId = loadout.equipment.weapon;
+  // An equipped defId missing from WEAPONS (e.g. stale after catalog changes)
+  // degrades to bare hands rather than throwing — same spirit as unknown
+  // armour pieces contributing 0 mitigation.
   const weapon = weaponId === null ? undefined : WEAPONS[weaponId];
   const base = weapon
     ? weapon.damage * DMG_ARMOUR_MATRIX[weapon.dmgType][monster.armourType]

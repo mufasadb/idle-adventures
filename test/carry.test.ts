@@ -1,6 +1,7 @@
 import { test, expect } from "bun:test";
-import { slotCap, addToCarry } from "../src/engine/carry";
+import { slotCap, addToCarry, freeCarryStacks } from "../src/engine/carry";
 import { BASE_CARRY_SLOTS, BACKPACK_SLOTS, STACK_CAP } from "../src/data/constants";
+import { emptyLoadout } from "../src/engine/loadout";
 
 test("slotCap: no backpack gives base slots; backpack defines the cap", () => {
   expect(slotCap(null)).toBe(BASE_CARRY_SLOTS);
@@ -35,4 +36,13 @@ test("addToCarry: rejects when the result needs more than maxStacks", () => {
 test("addToCarry: zero free stacks still allows a pure merge", () => {
   const carry = [{ defId: "iron-ore", qty: 2 }];
   expect(addToCarry(carry, "iron-ore", 3, 1)).toEqual([{ defId: "iron-ore", qty: 5 }]);
+});
+
+test("freeCarryStacks: subtracts D23 ballast from the backpack cap", () => {
+  const loadout = emptyLoadout();
+  expect(freeCarryStacks(loadout)).toBe(BASE_CARRY_SLOTS);
+  loadout.equipment.backpack = "starter";
+  loadout.food = [{ defId: "bread", qty: 3 }];
+  loadout.potions = [{ defId: "healing-potion", qty: 2 }];
+  expect(freeCarryStacks(loadout)).toBe(BACKPACK_SLOTS.starter! - 2);
 });

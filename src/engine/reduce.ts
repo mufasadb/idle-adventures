@@ -2,7 +2,7 @@ import type { GameState, Action, GameEvent } from "./types";
 import { generateGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
-import { slotCap, addToCarry } from "./carry";
+import { addToCarry, freeCarryStacks } from "./carry";
 import { toolQualityFor } from "./tools";
 import { resolveCombat } from "./combat";
 import { endExpedition } from "./bank";
@@ -63,7 +63,7 @@ function embark(
         mapSeed,
         pos: grid.entry,
         energy,
-        hp: PLAYER_BASE_HP, // placeholder 0 until M4 fills the lever
+        hp: PLAYER_BASE_HP,
         loadout: state.loadout,
         carry: [],
         cleared: [],
@@ -127,10 +127,7 @@ function gather(state: GameState): { state: GameState; events: GameEvent[] } {
   const cost = NODE_HARDNESS[kind] / quality;
   if (cost > expedition.energy) return rejected(state, "gather", "exhausted");
   // D23: packed food/potion stacks are ballast against the same slot cap.
-  const maxStacks =
-    slotCap(expedition.loadout.equipment.backpack) -
-    expedition.loadout.food.length -
-    expedition.loadout.potions.length;
+  const maxStacks = freeCarryStacks(expedition.loadout);
   const qty = GATHER_YIELD[kind];
   const carry = addToCarry(expedition.carry, poi.material, qty, maxStacks);
   if (carry === null) return rejected(state, "gather", "carry-full");
@@ -193,10 +190,7 @@ function fight(state: GameState): { state: GameState; events: GameEvent[] } {
   const creature = poi.creature;
   // Pre-fight fit check: rejecting is free, so the player can drop and retry
   // instead of losing loot (or HP) to a full pack.
-  const maxStacks =
-    slotCap(expedition.loadout.equipment.backpack) -
-    expedition.loadout.food.length -
-    expedition.loadout.potions.length;
+  const maxStacks = freeCarryStacks(expedition.loadout);
   let carryWithLoot: typeof expedition.carry | null = expedition.carry;
   for (const stack of LOOT_TABLE[creature] ?? []) {
     carryWithLoot = addToCarry(carryWithLoot, stack.defId, stack.qty, maxStacks);

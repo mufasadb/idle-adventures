@@ -1,7 +1,17 @@
 // Carry-slot accounting (M3). A slot holds ONE stack; STACK_CAP bounds qty
 // per stack. D23: callers count packed food/potion stacks against the cap.
 import { BASE_CARRY_SLOTS, BACKPACK_SLOTS, STACK_CAP } from "../data/constants";
-import type { ItemStack } from "./types";
+import type { ItemStack, Loadout } from "./types";
+
+// Free carry stacks after D23 ballast: packed food/potion stacks occupy the
+// same slots as loot. Single source for gather/fight (M3/M4) and pack (M5).
+export function freeCarryStacks(loadout: Loadout): number {
+  return (
+    slotCap(loadout.equipment.backpack) -
+    loadout.food.length -
+    loadout.potions.length
+  );
+}
 
 // Total carry stacks available. The backpack REPLACES the base (it IS your
 // storage), it doesn't add to it.

@@ -123,6 +123,21 @@ test("fight: rejected in town", () => {
   ]);
 });
 
+test("fight: defeat banks only the UNSPENT potions (quaffed ones are gone)", () => {
+  const { seed, poi } = mapWithMonster("ice-troll"); // lethal without gear
+  const before = atMonster(seed, poi, (l) => {
+    l.equipment.weapon = null; // unarmed → guaranteed defeat
+    l.potions = [{ defId: "healing-potion", qty: 3 }];
+  }, 12); // low start so the auto-quaff threshold triggers
+  const expected = resolveCombat(before.expedition!.loadout, 12, "ice-troll");
+  expect(expected.victory).toBe(false);
+  expect(expected.potionsUsed).toBeGreaterThan(0);
+  const { state } = reduce(before, { type: "fight" });
+  expect(state.phase).toBe("town");
+  const banked = state.bank.find((s) => s.defId === "healing-potion");
+  expect(banked?.qty ?? 0).toBe(3 - expected.potionsUsed);
+});
+
 test("fight: same seed same outcome; input not mutated (bead acceptance)", () => {
   const { seed, poi } = mapWithMonster();
   const a = atMonster(seed, poi);
