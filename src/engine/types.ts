@@ -96,6 +96,17 @@ export type GameEvent =
     }
   | { type: "dropped"; defId: string; qty: number }
   | {
+      type: "fought";
+      at: { x: number; y: number };
+      creature: string;
+      victory: boolean;
+      hpLost: number;
+      potionsUsed: number;
+      loot: ItemStack[];
+      hp: number;
+    }
+  | { type: "run-ended"; reason: string }
+  | {
       type: "action-rejected";
       action: Action["type"];
       reason: string; // tightened to a closed union when M6's legalActions lands

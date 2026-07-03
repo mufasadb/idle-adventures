@@ -4,7 +4,9 @@ import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
 import { slotCap, addToCarry } from "./carry";
 import { toolQualityFor } from "./tools";
-import { ENERGY_PER_FOOD, PLAYER_BASE_HP, GRID_SIZE, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD } from "../data/constants";
+import { resolveCombat } from "./combat";
+import { endExpedition } from "./bank";
+import { ENERGY_PER_FOOD, PLAYER_BASE_HP, GRID_SIZE, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, LOOT_TABLE } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 
 // Pure reducer. M2 fills embark/move; M3 fills gather/drop; remaining cases are no-op stubs:
@@ -24,10 +26,11 @@ export function reduce(
       return gather(state);
     case "drop":
       return drop(state, action.itemId);
+    case "fight":
+      return fight(state);
     case "craft":
     case "pack":
     case "scout":
-    case "fight":
     case "return":
       return { state, events: [] };
     default:
@@ -172,6 +175,64 @@ function drop(
   return {
     state: { ...state, expedition: { ...expedition, carry } },
     events: [{ type: "dropped", defId: dropped.defId, qty: dropped.qty }],
+  };
+}
+
+function fight(state: GameState): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) {
+    return rejected(state, "fight", "not-on-expedition");
+  }
+  const { pos } = expedition;
+  const grid = generateGrid(expedition.mapSeed, rollBiome(expedition.mapSeed));
+  const poi = grid.pois.find((p) => p.x === pos.x && p.y === pos.y);
+  const alreadyCleared = expedition.cleared.some((c) => c.x === pos.x && c.y === pos.y);
+  if (!poi || poi.kind !== "monster" || alreadyCleared || poi.creature === null) {
+    return rejected(state, "fight", "no-monster");
+  }
+  const creature = poi.creature;
+  // Pre-fight fit check: rejecting is free, so the player can drop and retry
+  // instead of losing loot (or HP) to a full pack.
+  const maxStacks =
+    slotCap(expedition.loadout.equipment.backpack) -
+    expedition.loadout.food.length -
+    expedition.loadout.potions.length;
+  let carryWithLoot: typeof expedition.carry | null = expedition.carry;
+  for (const stack of LOOT_TABLE[creature] ?? []) {
+    carryWithLoot = addToCarry(carryWithLoot, stack.defId, stack.qty, maxStacks);
+    if (carryWithLoot === null) return rejected(state, "fight", "carry-full");
+  }
+  const result = resolveCombat(expedition.loadout, expedition.hp, creature);
+  const fought: GameEvent = {
+    type: "fought",
+    at: { x: pos.x, y: pos.y },
+    creature,
+    victory: result.victory,
+    hpLost: result.hpLost,
+    potionsUsed: result.potionsUsed,
+    loot: result.loot,
+    hp: result.hpAfter,
+  };
+  if (!result.victory) {
+    // Soft fail (D26): run ends, carry is kept — banked with the durables.
+    const ended = endExpedition(state, {
+      ...expedition,
+      loadout: { ...expedition.loadout, potions: result.potionsAfter },
+    });
+    return { state: ended, events: [fought, { type: "run-ended", reason: "defeated" }] };
+  }
+  return {
+    state: {
+      ...state,
+      expedition: {
+        ...expedition,
+        hp: result.hpAfter,
+        loadout: { ...expedition.loadout, potions: result.potionsAfter },
+        carry: carryWithLoot,
+        cleared: [...expedition.cleared, { x: pos.x, y: pos.y }],
+      },
+    },
+    events: [fought],
   };
 }
 

@@ -1,0 +1,133 @@
+import { test, expect } from "bun:test";
+import { reduce } from "../src/engine/reduce";
+import { emptyLoadout } from "../src/engine/loadout";
+import { generateGrid, rollBiome } from "../src/engine/grid";
+import type { Grid, Poi } from "../src/engine/grid";
+import { resolveCombat } from "../src/engine/combat";
+import { PLAYER_BASE_HP, BASE_CARRY_SLOTS } from "../src/data/constants";
+import type { GameState, Loadout } from "../src/engine/types";
+
+function mapWithMonster(creature?: string): { seed: string; grid: Grid; poi: Poi } {
+  for (let i = 0; i < 500; i++) {
+    const seed = `m4-scan-${i}`;
+    const grid = generateGrid(seed, rollBiome(seed));
+    const poi = grid.pois.find(
+      (p) => p.kind === "monster" && (creature === undefined || p.creature === creature),
+    );
+    if (poi) return { seed, grid, poi };
+  }
+  throw new Error(`no map with monster ${creature ?? "(any)"} in scan range`);
+}
+
+function atMonster(seed: string, poi: Poi, mutate?: (loadout: Loadout) => void, hp = PLAYER_BASE_HP): GameState {
+  const loadout = emptyLoadout();
+  loadout.equipment.weapon = "sword";
+  mutate?.(loadout);
+  return {
+    seed: "g",
+    phase: "expedition",
+    bank: [],
+    loadout: emptyLoadout(),
+    expedition: {
+      mapSeed: seed,
+      pos: { x: poi.x, y: poi.y },
+      energy: 50,
+      hp,
+      loadout,
+      carry: [],
+      cleared: [],
+    },
+  };
+}
+
+test("fight: victory drains HP, consumes the monster, loots into carry", () => {
+  const { seed, poi } = mapWithMonster("forest-boar"); // tier 1 — a sword wins this
+  const before = atMonster(seed, poi);
+  const expected = resolveCombat(before.expedition!.loadout, PLAYER_BASE_HP, poi.creature!);
+  expect(expected.victory).toBe(true);
+  const { state, events } = reduce(before, { type: "fight" });
+  expect(state.phase).toBe("expedition");
+  expect(state.expedition!.hp).toBe(expected.hpAfter);
+  expect(state.expedition!.carry).toEqual(expected.loot);
+  expect(state.expedition!.cleared).toEqual([{ x: poi.x, y: poi.y }]);
+  expect(state.expedition!.energy).toBe(50); // fight costs no energy
+  expect(events).toEqual([
+    {
+      type: "fought",
+      at: { x: poi.x, y: poi.y },
+      creature: poi.creature!,
+      victory: true,
+      hpLost: expected.hpLost,
+      potionsUsed: 0,
+      loot: expected.loot,
+      hp: expected.hpAfter,
+    },
+  ]);
+});
+
+test("fight: a cleared monster is gone", () => {
+  const { seed, poi } = mapWithMonster("forest-boar"); // must WIN the first fight to test re-fighting
+  const won = reduce(atMonster(seed, poi), { type: "fight" }).state;
+  const { events } = reduce(won, { type: "fight" });
+  expect(events).toEqual([
+    { type: "action-rejected", action: "fight", reason: "no-monster" },
+  ]);
+});
+
+test("fight: HP 0 soft-fails — run ends, carry is KEPT in the bank (bead acceptance)", () => {
+  const { seed, poi } = mapWithMonster("ice-troll"); // tier 3
+  const before = atMonster(seed, poi, (l) => { l.equipment.weapon = null; }, 3); // naked, 3 hp
+  before.expedition!.carry = [{ defId: "silver-ore", qty: 3 }];
+  const { state, events } = reduce(before, { type: "fight" });
+  expect(state.phase).toBe("town");
+  expect(state.expedition).toBeNull();
+  expect(state.bank.some((s) => s.defId === "silver-ore" && s.qty === 3)).toBe(true);
+  expect(events.map((e) => e.type)).toEqual(["fought", "run-ended"]);
+  expect(events[0]).toMatchObject({ victory: false, loot: [] });
+  expect(events[1]).toEqual({ type: "run-ended", reason: "defeated" });
+});
+
+test("fight: pre-fight carry check — full slots reject before any HP is spent", () => {
+  const { seed, poi } = mapWithMonster();
+  const before = atMonster(seed, poi, (l) => {
+    l.food = Array.from({ length: BASE_CARRY_SLOTS }, (_, i) => ({ defId: `r-${i}`, qty: 1 }));
+  });
+  const { state, events } = reduce(before, { type: "fight" });
+  expect(state).toEqual(before);
+  expect(events).toEqual([
+    { type: "action-rejected", action: "fight", reason: "carry-full" },
+  ]);
+});
+
+test("fight: empty tile / non-monster tile rejects", () => {
+  const { seed, grid, poi } = mapWithMonster();
+  const state = atMonster(seed, poi);
+  let empty: { x: number; y: number } | null = null;
+  outer: for (let y = 0; y < grid.terrain.length; y++) {
+    for (let x = 0; x < grid.terrain.length; x++) {
+      if (!grid.pois.some((p) => p.x === x && p.y === y)) { empty = { x, y }; break outer; }
+    }
+  }
+  state.expedition!.pos = empty!;
+  const { events } = reduce(state, { type: "fight" });
+  expect(events).toEqual([
+    { type: "action-rejected", action: "fight", reason: "no-monster" },
+  ]);
+});
+
+test("fight: rejected in town", () => {
+  const town: GameState = { seed: "g", phase: "town", bank: [], loadout: emptyLoadout(), expedition: null };
+  const { events } = reduce(town, { type: "fight" });
+  expect(events).toEqual([
+    { type: "action-rejected", action: "fight", reason: "not-on-expedition" },
+  ]);
+});
+
+test("fight: same seed same outcome; input not mutated (bead acceptance)", () => {
+  const { seed, poi } = mapWithMonster();
+  const a = atMonster(seed, poi);
+  const before = structuredClone(a);
+  const r1 = reduce(a, { type: "fight" });
+  expect(a).toEqual(before);
+  expect(r1).toEqual(reduce(atMonster(seed, poi), { type: "fight" }));
+});
