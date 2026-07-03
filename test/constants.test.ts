@@ -85,6 +85,7 @@ test("constants: M3 carry + gathering levers are filled", () => {
   }
   for (const tool of Object.keys(TOOL_QUALITY)) {
     expect(TOOL_CAPABILITY[tool]).toBeDefined(); // every tool declares its capability
+    expect(TOOL_QUALITY[tool]).toBeGreaterThan(0); // 0 → Infinity cost; negative → energy-GAINING gather
   }
   for (const tool of Object.keys(TOOL_CAPABILITY)) {
     expect(TOOL_QUALITY[tool]).toBeDefined(); // every capable tool has a quality
