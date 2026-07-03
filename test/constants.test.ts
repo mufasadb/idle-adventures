@@ -36,6 +36,8 @@ import {
   ARMOUR,
   LOOT_TABLE,
   AFFINITIES,
+  FOOD,
+  POTION,
 } from "../src/data/constants";
 
 test("constants: lever groups exist with the documented shape", () => {
@@ -173,6 +175,18 @@ test("constants: every biome's creatureTable is 2-3 real monsters", () => {
     expect(table.length).toBeLessThanOrEqual(3);
     for (const creature of table) expect(MONSTERS[creature]).toBeDefined();
   }
+});
+
+test("constants: armour pieces declare a valid body slot", () => {
+  const slots = ["helmet", "chest", "legs", "boots", "gloves"];
+  for (const [, piece] of Object.entries(ARMOUR)) {
+    expect(slots).toContain(piece.slot);
+  }
+});
+
+test("constants: consumable catalogs are non-empty", () => {
+  expect(FOOD.length).toBeGreaterThan(0);
+  expect(POTION.length).toBeGreaterThan(0);
 });
 
 test("constants: the acceptance affinity pairing exists (silver ↔ werewolf)", () => {

@@ -114,11 +114,19 @@ export const TOOL_CAPABILITY: Record<string, string> = {
   pick: "pick",
   axe: "axe",
   knife: "knife",
+  "iron-pick": "pick",
+  "iron-axe": "axe",
+  "steel-knife": "knife",
+  spyglass: "scout", // scouting capability; NODE_TOOL never asks for "scout", so no gather impact
 }; // tool defId → capability; tiered tools (M5: "iron-pick": "pick") are data-only
 export const TOOL_QUALITY: Record<string, number> = {
   pick: 1,
   axe: 1,
   knife: 1,
+  "iron-pick": 2, // halves mining cost vs the basic pick — the "cheaper second run" demonstrator
+  "iron-axe": 2,
+  "steel-knife": 2,
+  spyglass: 1, // quality irrelevant to scouting; present to satisfy the catalog invariant
 }; // gather-cost divisor by tool defId
 export const GATHER_YIELD: Record<GatherableNodeType, number> = {
   mining: 3,
@@ -184,23 +192,24 @@ export const WEAPONS: Record<string, Weapon> = {
   "fire-staff": { dmgType: "magic", damage: 3, tags: [] },
 }; // weapon damage type and affinity tags
 
-export const ARMOUR: Record<string, { armourType: ArmourType; defense: number }> = {
-  "plate-helmet": { armourType: "plate", defense: 2 },
-  "plate-chest": { armourType: "plate", defense: 3 },
-  "plate-legs": { armourType: "plate", defense: 2 },
-  "plate-boots": { armourType: "plate", defense: 1 },
-  "plate-gloves": { armourType: "plate", defense: 1 },
-  "light-helmet": { armourType: "light", defense: 1 },
-  "light-chest": { armourType: "light", defense: 2 },
-  "light-legs": { armourType: "light", defense: 1 },
-  "light-boots": { armourType: "light", defense: 1 },
-  "light-gloves": { armourType: "light", defense: 1 },
-  "robe-hood": { armourType: "robe", defense: 1 },
-  "robe-chest": { armourType: "robe", defense: 1 },
-  "robe-legs": { armourType: "robe", defense: 1 },
-  "robe-boots": { armourType: "robe", defense: 1 },
-  "robe-gloves": { armourType: "robe", defense: 1 },
-}; // armour pieces by type and defense contribution
+export type ArmourSlot = "helmet" | "chest" | "legs" | "boots" | "gloves";
+export const ARMOUR: Record<string, { armourType: ArmourType; defense: number; slot: ArmourSlot }> = {
+  "plate-helmet": { armourType: "plate", defense: 2, slot: "helmet" },
+  "plate-chest": { armourType: "plate", defense: 3, slot: "chest" },
+  "plate-legs": { armourType: "plate", defense: 2, slot: "legs" },
+  "plate-boots": { armourType: "plate", defense: 1, slot: "boots" },
+  "plate-gloves": { armourType: "plate", defense: 1, slot: "gloves" },
+  "light-helmet": { armourType: "light", defense: 1, slot: "helmet" },
+  "light-chest": { armourType: "light", defense: 2, slot: "chest" },
+  "light-legs": { armourType: "light", defense: 1, slot: "legs" },
+  "light-boots": { armourType: "light", defense: 1, slot: "boots" },
+  "light-gloves": { armourType: "light", defense: 1, slot: "gloves" },
+  "robe-hood": { armourType: "robe", defense: 1, slot: "helmet" },
+  "robe-chest": { armourType: "robe", defense: 1, slot: "chest" },
+  "robe-legs": { armourType: "robe", defense: 1, slot: "legs" },
+  "robe-boots": { armourType: "robe", defense: 1, slot: "boots" },
+  "robe-gloves": { armourType: "robe", defense: 1, slot: "gloves" },
+}; // armour pieces by type, defense contribution, and body slot (slot: M5 pack validation)
 
 export const LOOT_TABLE: Record<string, ItemStackSpec[]> = {
   werewolf: [{ defId: "werewolf-pelt", qty: 2 }],
@@ -217,6 +226,12 @@ export const LOOT_TABLE: Record<string, ItemStackSpec[]> = {
 export const SCOUT_ENERGY_COST = 1; // energy per scout activation
 export const SCOUT_RADIUS = 3; // Chebyshev radius of scout reveal
 export const SCOUT_TOOL = "spyglass"; // required tool defId for scouting
+
+// --- Consumable item catalogs (M5) ---
+// ENERGY_PER_FOOD / POTION_HEAL are flat, so these are single-item catalogs for
+// the POC; the list is what `pack`/`slotOf` validate a food/potion defId against.
+export const FOOD: string[] = ["ration"];
+export const POTION: string[] = ["potion"];
 
 // --- Crafting (filled in M5) ---
 export const RECIPE = {} as Record<string, { inputs: ItemStackSpec[]; output: ItemStackSpec }>; // (placeholder — M5)
