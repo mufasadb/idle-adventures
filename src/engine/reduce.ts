@@ -6,11 +6,10 @@ import { slotCap, addToCarry } from "./carry";
 import { toolQualityFor } from "./tools";
 import { resolveCombat } from "./combat";
 import { endExpedition } from "./bank";
-import { ENERGY_PER_FOOD, PLAYER_BASE_HP, GRID_SIZE, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, LOOT_TABLE } from "../data/constants";
+import { ENERGY_PER_FOOD, PLAYER_BASE_HP, GRID_SIZE, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, LOOT_TABLE, MONSTERS, MONSTER_TIER_HP_CURVE, MONSTER_TIER_DMG_CURVE, SCOUT_ENERGY_COST, SCOUT_RADIUS, SCOUT_TOOL } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 
-// Pure reducer. M2 fills embark/move; M3 fills gather/drop; remaining cases are no-op stubs:
-//   scout/fight                   → M4
+// Pure reducer. M2 fills embark/move; M3 fills gather/drop; M4 fills scout/fight; remaining cases are no-op stubs:
 //   craft/pack/return             → M5
 // Adding a new Action variant without a case here is a compile error (assertNever).
 export function reduce(
@@ -28,9 +27,10 @@ export function reduce(
       return drop(state, action.itemId);
     case "fight":
       return fight(state);
+    case "scout":
+      return scout(state);
     case "craft":
     case "pack":
-    case "scout":
     case "return":
       return { state, events: [] };
     default:
@@ -233,6 +233,55 @@ function fight(state: GameState): { state: GameState; events: GameEvent[] } {
       },
     },
     events: [fought],
+  };
+}
+
+function scout(state: GameState): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) {
+    return rejected(state, "scout", "not-on-expedition");
+  }
+  if (!expedition.loadout.equipment.tools.includes(SCOUT_TOOL)) {
+    return rejected(state, "scout", "missing-tool");
+  }
+  if (SCOUT_ENERGY_COST > expedition.energy) {
+    return rejected(state, "scout", "exhausted");
+  }
+  const { pos } = expedition;
+  const grid = generateGrid(expedition.mapSeed, rollBiome(expedition.mapSeed));
+  const monsters = grid.pois
+    .filter(
+      (p) =>
+        p.kind === "monster" &&
+        p.creature !== null &&
+        Math.max(Math.abs(p.x - pos.x), Math.abs(p.y - pos.y)) <= SCOUT_RADIUS &&
+        !expedition.cleared.some((c) => c.x === p.x && c.y === p.y),
+    )
+    .map((p) => {
+      const monster = MONSTERS[p.creature!]!;
+      const forecast = resolveCombat(expedition.loadout, expedition.hp, p.creature!);
+      return {
+        at: { x: p.x, y: p.y },
+        creature: p.creature!,
+        tier: monster.tier,
+        hp: MONSTER_TIER_HP_CURVE[monster.tier]!,
+        dmg: MONSTER_TIER_DMG_CURVE[monster.tier]!,
+        dmgType: monster.dmgType,
+        // tags deliberately withheld: affinities are discoverable, and the
+        // forecast already prices them in without naming them.
+        forecast: {
+          victory: forecast.victory,
+          hpLost: forecast.hpLost,
+          potionsUsed: forecast.potionsUsed,
+        },
+      };
+    });
+  const energy = expedition.energy - SCOUT_ENERGY_COST;
+  return {
+    state: { ...state, expedition: { ...expedition, energy } },
+    events: [
+      { type: "scouted", at: { x: pos.x, y: pos.y }, cost: SCOUT_ENERGY_COST, energy, monsters },
+    ],
   };
 }
 
