@@ -20,9 +20,11 @@ The POC ships with *feel-pass* values, not balanced ones. The discipline that ke
 - Yield defIds come from `BIOMES{id}.materialTable`, stamped onto POIs at generation (D25) — 12 distinct materials across 3 biomes feed one shared recipe tree (M5)
 
 **Combat**
-- `PLAYER_BASE_HP` · `DMG_ARMOUR_MATRIX[dmgType][armourType]` · `ARMOUR_DEFENSE{piece, tier}`
-- `AFFINITY_MULTIPLIER` (e.g. silver↔werewolf) · `POTION_HEAL` · `AUTO_POTION_THRESHOLD`
-- `MONSTER_TIER_HP_CURVE` · `MONSTER_TIER_DMG_CURVE` · `LOOT_TABLE{monster}`
+- `PLAYER_BASE_HP` · `DMG_ARMOUR_MATRIX[dmgType][armourType]` — read BOTH ways: damage multiplier vs the monster's hide class going out, mitigation divisor per armour piece coming in (`defense ÷ matrix`) · `ARMOUR{pieceDefId} → {armourType, defense}` · `WEAPONS{defId} → {dmgType, damage, tags}` · `UNARMED_DAMAGE`
+- `AFFINITIES[{monsterTag, itemTag}]` + `AFFINITY_MULTIPLIER` — the hidden discoverable layer (silver↔werewolf, iron↔fae, garlic↔vampire); scout forecasts price it in without naming it
+- `POTION_HEAL` · `AUTO_POTION_THRESHOLD` (fraction of base HP) · `CHIP_DAMAGE_MIN` — the "HP always drains" floor, both directions
+- `MONSTER_TIER_HP_CURVE` / `MONSTER_TIER_DMG_CURVE` · `MONSTERS{defId} → {tier, dmgType, armourType, tags}` · `LOOT_TABLE{monster}` (fixed drops — determinism needs no RNG) · `BIOMES{id}.creatureTable` (uniform pick, stamped at generation)
+- `SCOUT_ENERGY_COST` · `SCOUT_RADIUS` · `SCOUT_TOOL`
 
 **Crafting**
 - `RECIPE{itemDefId} → {inputs, output}`
