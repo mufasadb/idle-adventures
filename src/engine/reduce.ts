@@ -7,9 +7,9 @@ import { toolQualityFor } from "./tools";
 import { ENERGY_PER_FOOD, PLAYER_BASE_HP, GRID_SIZE, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 
-// Pure reducer. M2 fills embark/move; remaining cases are no-op stubs:
-//   gather/scout/fight            → M3–M4
-//   craft/pack/return/drop        → M5
+// Pure reducer. M2 fills embark/move; M3 fills gather/drop; remaining cases are no-op stubs:
+//   scout/fight                   → M4
+//   craft/pack/return             → M5
 // Adding a new Action variant without a case here is a compile error (assertNever).
 export function reduce(
   state: GameState,
@@ -22,11 +22,12 @@ export function reduce(
       return move(state, action.to);
     case "gather":
       return gather(state);
+    case "drop":
+      return drop(state, action.itemId);
     case "craft":
     case "pack":
     case "scout":
     case "fight":
-    case "drop":
     case "return":
       return { state, events: [] };
     default:
@@ -152,6 +153,25 @@ function gather(state: GameState): { state: GameState; events: GameEvent[] } {
         energy,
       },
     ],
+  };
+}
+
+function drop(
+  state: GameState,
+  itemId: string,
+): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) {
+    return rejected(state, "drop", "not-on-expedition");
+  }
+  // Only carry is droppable — packed food/potions are slot ballast (D23).
+  const index = expedition.carry.findIndex((stack) => stack.defId === itemId);
+  if (index === -1) return rejected(state, "drop", "not-carried");
+  const dropped = expedition.carry[index]!;
+  const carry = expedition.carry.filter((_, i) => i !== index);
+  return {
+    state: { ...state, expedition: { ...expedition, carry } },
+    events: [{ type: "dropped", defId: dropped.defId, qty: dropped.qty }],
   };
 }
 

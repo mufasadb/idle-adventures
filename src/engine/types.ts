@@ -94,6 +94,7 @@ export type GameEvent =
       cost: number;
       energy: number; // remaining after the gather
     }
+  | { type: "dropped"; defId: string; qty: number }
   | {
       type: "action-rejected";
       action: Action["type"];
