@@ -42,8 +42,8 @@ export const BIOMES: Record<BiomeId, Biome> = {
     nodeTypeWeights: { wood: 0.35, herb: 0.25, animal: 0.2, monster: 0.15, mining: 0.05 },
     creatureTable: ["werewolf", "fae-sprite", "forest-boar"],
     materialTable: {
-      mining: { "iron-ore": 7, "copper-ore": 2, "silver-ore": 1 },
-      wood: { "oak-log": 7, "pine-log": 2, "cactus-wood": 1 },
+      mining: { "iron-ore": 7, "copper-ore": 2, "silver-ore": 1 }, // silver present (D27) but T2-gated
+      wood: { "oak-log": 7, "pine-log": 2, "ironwood-log": 1 }, // ironwood T2 (iron-axe)
       herb: { "forest-herb": 7, "desert-sage": 2, "ice-moss": 1 },
       animal: { "deer-hide": 7, "wolf-pelt": 2, "lizard-hide": 1 },
     },
@@ -53,10 +53,10 @@ export const BIOMES: Record<BiomeId, Biome> = {
     nodeTypeWeights: { mining: 0.4, monster: 0.25, herb: 0.15, wood: 0.1, animal: 0.1 },
     creatureTable: ["giant-scorpion", "dust-vampire", "sand-raider"],
     materialTable: {
-      mining: { "copper-ore": 7, "iron-ore": 2, "silver-ore": 1 },
+      mining: { "copper-ore": 7, "iron-ore": 2, "coal": 1 }, // coal T2 (iron-pick) — desert is a fuel source
       wood: { "cactus-wood": 7, "oak-log": 2, "pine-log": 1 },
       herb: { "desert-sage": 7, "forest-herb": 2, "ice-moss": 1 },
-      animal: { "lizard-hide": 7, "deer-hide": 2, "wolf-pelt": 1 },
+      animal: { "lizard-hide": 7, "deer-hide": 2, "drake-hide": 1 }, // drake T2 (steel-knife)
     },
   },
   tundra: {
@@ -64,12 +64,25 @@ export const BIOMES: Record<BiomeId, Biome> = {
     nodeTypeWeights: { animal: 0.35, monster: 0.25, mining: 0.2, wood: 0.1, herb: 0.1 },
     creatureTable: ["frost-fae", "snow-wolf", "ice-troll"],
     materialTable: {
-      mining: { "silver-ore": 7, "iron-ore": 2, "copper-ore": 1 },
-      wood: { "pine-log": 7, "oak-log": 2, "cactus-wood": 1 },
+      mining: { "silver-ore": 5, "coal": 2, "iron-ore": 2, "mithril-ore": 1 }, // silver T2 + coal T2 + mithril T3: tundra is the deep-tier mine
+      wood: { "pine-log": 7, "oak-log": 2, "ironwood-log": 1 },
       herb: { "ice-moss": 7, "desert-sage": 2, "forest-herb": 1 },
-      animal: { "wolf-pelt": 7, "deer-hide": 2, "lizard-hide": 1 },
+      animal: { "wolf-pelt": 7, "deer-hide": 2, "drake-hide": 1 },
     },
   },
+};
+
+// Gather tier gate (2026-07-04): a material's tier; a POI is workable only when
+// the player's best tool for that node's capability has quality >= this tier
+// (see reduce.gather / tools.toolQualityFor). Absent = tier 1. This one lever
+// gates the entire tech tree — no smelting step. Design:
+// docs/superpowers/specs/2026-07-04-tiered-progression-carry-squeeze-design.md
+export const MATERIAL_TIER: Record<string, number> = {
+  coal: 2,
+  "silver-ore": 2,
+  "ironwood-log": 2,
+  "drake-hide": 2,
+  "mithril-ore": 3,
 };
 
 // --- Energy economy (filled in M2) ---
@@ -117,6 +130,8 @@ export const TOOL_CAPABILITY: Record<string, string> = {
   knife: "knife",
   "iron-pick": "pick",
   "iron-axe": "axe",
+  "steel-pick": "pick",
+  "steel-axe": "axe",
   "steel-knife": "knife",
   spyglass: "scout", // scouting capability; NODE_TOOL never asks for "scout", so no gather impact
 }; // tool defId → capability; tiered tools (M5: "iron-pick": "pick") are data-only
@@ -126,9 +141,11 @@ export const TOOL_QUALITY: Record<string, number> = {
   knife: 1,
   "iron-pick": 2, // halves mining cost vs the basic pick — the "cheaper second run" demonstrator
   "iron-axe": 2,
+  "steel-pick": 3, // tier 3: unlocks mithril; also cheapest mining
+  "steel-axe": 3,
   "steel-knife": 2,
   spyglass: 1, // quality irrelevant to scouting; present to satisfy the catalog invariant
-}; // gather-cost divisor by tool defId
+}; // gather-cost divisor AND tier gate (quality == max MATERIAL_TIER gatherable)
 export const GATHER_YIELD: Record<GatherableNodeType, number> = {
   mining: 3,
   wood: 3,
@@ -244,7 +261,10 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   // Tools — tiered upgrades (iron-pick is the "cheaper second run" demonstrator)
   "iron-pick": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "iron-pick", qty: 1 } },
   "iron-axe": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "iron-axe", qty: 1 } },
-  "steel-knife": { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "silver-ore", qty: 1 }], output: { defId: "steel-knife", qty: 1 } },
+  // T3 tools need coal (T2, iron-pick-gated) → you must climb pick→iron-pick→mine coal before steel exists
+  "steel-pick": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "coal", qty: 2 }], output: { defId: "steel-pick", qty: 1 } },
+  "steel-axe": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "steel-axe", qty: 1 } },
+  "steel-knife": { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "silver-ore", qty: 1 }], output: { defId: "steel-knife", qty: 1 } }, // silver T2 → iron-pick-gated
   spyglass: { inputs: [{ defId: "copper-ore", qty: 2 }, { defId: "ice-moss", qty: 1 }], output: { defId: "spyglass", qty: 1 } }, // cross-biome: desert copper + tundra moss
   // Backpack — carry upgrade
   leather: { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "leather", qty: 1 } },

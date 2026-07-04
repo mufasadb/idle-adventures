@@ -8,7 +8,7 @@ import { resolveCombat } from "./combat";
 import { endExpedition, subtractStacks } from "./bank";
 import { craft as applyRecipe } from "./craft";
 import { packItem, reserveLoadout } from "./pack";
-import { ENERGY_PER_FOOD, PLAYER_BASE_HP, GRID_SIZE, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, LOOT_TABLE, MONSTERS, MONSTER_TIER_HP_CURVE, MONSTER_TIER_DMG_CURVE, SCOUT_ENERGY_COST, SCOUT_RADIUS, SCOUT_TOOL } from "../data/constants";
+import { ENERGY_PER_FOOD, PLAYER_BASE_HP, GRID_SIZE, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, MATERIAL_TIER, LOOT_TABLE, MONSTERS, MONSTER_TIER_HP_CURVE, MONSTER_TIER_DMG_CURVE, SCOUT_ENERGY_COST, SCOUT_RADIUS, SCOUT_TOOL } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 
 // Pure reducer. M2 fills embark/move; M3 fills gather/drop; M4 fills scout/fight; remaining cases are no-op stubs:
@@ -172,6 +172,14 @@ function gather(state: GameState): { state: GameState; events: GameEvent[] } {
   const kind = poi.kind as GatherableNodeType;
   const quality = toolQualityFor(expedition.loadout.equipment.tools, NODE_TOOL[kind]);
   if (quality === null) return rejected(state, "gather", "missing-tool");
+  // Tier gate (2026-07-04): a tool's quality doubles as its tier. A material
+  // rolled from a higher tier (e.g. coal T2, mithril T3) needs a tool that
+  // strong — you SEE the node but can't work it until you've climbed. This one
+  // check enforces the whole tech tree (no smelting step). legalActions gets it
+  // for free via speculative reduce (D29).
+  if (quality < (MATERIAL_TIER[poi.material] ?? 1)) {
+    return rejected(state, "gather", "tool-too-weak");
+  }
   const cost = NODE_HARDNESS[kind] / quality;
   if (cost > expedition.energy) return rejected(state, "gather", "exhausted");
   // D23: packed food/potion stacks are ballast against the same slot cap.

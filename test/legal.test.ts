@@ -3,6 +3,10 @@ import { townActions, expeditionActions, legalActions } from "../src/sim/legal";
 import { reduce } from "../src/engine/reduce";
 import { newGame, candidateMaps } from "../src/engine/town";
 import { play } from "../src/sim/play";
+import { generateGrid, rollBiome } from "../src/engine/grid";
+import type { Poi } from "../src/engine/grid";
+import { emptyLoadout } from "../src/engine/loadout";
+import { MATERIAL_TIER } from "../src/data/constants";
 import type { Action, GameState } from "../src/engine/types";
 
 const accepts = (state: GameState, action: Action) =>
@@ -64,4 +68,29 @@ test("legalActions: dispatches by phase", () => {
     { type: "embark", mapSeed: "s:map:0" },
   ]).state;
   expect(legalActions(onMap)).toEqual(expeditionActions(onMap));
+});
+
+// Tier gate (2026-07-04): a node whose material out-tiers your tool is "visible
+// but locked" — legalActions must NOT offer gather there. This is the D29 "free"
+// property: no parallel logic, the speculative reduce filters it.
+test("expeditionActions: a tier-locked node is not offered gather (D29 free)", () => {
+  // find a T2+ gatherable node
+  let seed = "";
+  let poi: Poi | undefined;
+  for (let i = 0; i < 300 && !poi; i++) {
+    const s = `lock-${i}`;
+    const g = generateGrid(s, rollBiome(s));
+    poi = g.pois.find((p) => p.material !== null && (MATERIAL_TIER[p.material] ?? 1) >= 2);
+    if (poi) seed = s;
+  }
+  expect(poi).toBeTruthy();
+  const loadout = emptyLoadout();
+  loadout.equipment.tools = ["pick", "axe", "knife"]; // all T1 — too weak for the locked node
+  const state: GameState = {
+    seed: "g", phase: "expedition", bank: [], loadout: emptyLoadout(),
+    expedition: { mapSeed: seed, pos: { x: poi!.x, y: poi!.y }, energy: 100, hp: 30, loadout, carry: [], cleared: [] },
+  };
+  const actions = expeditionActions(state);
+  for (const a of actions) expect(accepts(state, a)).toBe(true); // nothing offered is rejected
+  expect(actions.some((a) => a.type === "gather")).toBe(false); // the locked node is not workable
 });

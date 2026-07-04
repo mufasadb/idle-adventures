@@ -8,19 +8,33 @@ import {
   GATHER_YIELD,
   TOOL_QUALITY,
   BASE_CARRY_SLOTS,
+  MATERIAL_TIER,
 } from "../src/data/constants";
 import type { NodeType } from "../src/data/constants";
 import type { GameState } from "../src/engine/types";
 
 // Deterministically find a map whose rolled biome contains a POI of `kind`.
-function mapWith(kind: NodeType): { seed: string; grid: Grid; poi: Poi } {
+// For gatherable kinds, default to a TIER-1 (ungated) material so these
+// scenario tests exercise energy/carry/clear rejections without the tier gate
+// (2026-07-04) preempting them; the tier gate has dedicated tests below.
+function mapWith(
+  kind: NodeType,
+  opts: { minTier?: number; maxTier?: number } = {},
+): { seed: string; grid: Grid; poi: Poi } {
+  const minTier = opts.minTier ?? 1;
+  const maxTier = opts.maxTier ?? 1;
   for (let i = 0; i < 300; i++) {
     const seed = `m3-scan-${i}`;
     const grid = generateGrid(seed, rollBiome(seed));
-    const poi = grid.pois.find((p) => p.kind === kind);
+    const poi = grid.pois.find((p) => {
+      if (p.kind !== kind) return false;
+      if (p.material === null) return true; // monster nodes carry no tier
+      const tier = MATERIAL_TIER[p.material] ?? 1;
+      return tier >= minTier && tier <= maxTier;
+    });
     if (poi) return { seed, grid, poi };
   }
-  throw new Error(`no map with a ${kind} POI in scan range`);
+  throw new Error(`no map with a ${kind} POI (tier ${minTier}-${maxTier}) in scan range`);
 }
 
 function standingOn(
@@ -176,4 +190,43 @@ test("gather: deterministic and does not mutate input", () => {
   const r1 = reduce(a, { type: "gather" });
   expect(a).toEqual(before);
   expect(r1).toEqual(reduce(standingOn(seed, poi, { tools: ["axe"] }), { type: "gather" }));
+});
+
+// --- Tier gate (2026-07-04): tool quality doubles as tier; a material rolled
+// above the tool's tier rejects with "tool-too-weak" (distinct from missing the
+// tool entirely). One gate enforces the whole tech tree — see the design spec.
+
+test("gather: a basic pick cannot work a T2 mining node (coal/silver) — tool-too-weak", () => {
+  const { seed, poi } = mapWith("mining", { minTier: 2, maxTier: 2 });
+  expect(MATERIAL_TIER[poi.material!]).toBe(2);
+  const { state, events } = reduce(standingOn(seed, poi, { tools: ["pick"] }), { type: "gather" });
+  expect(events).toEqual([
+    { type: "action-rejected", action: "gather", reason: "tool-too-weak" },
+  ]);
+  expect(state.expedition!.carry).toEqual([]); // node untouched — you can see it, not work it
+});
+
+test("gather: tool-too-weak is distinct from missing-tool (has a pick, just too weak)", () => {
+  const { seed, poi } = mapWith("mining", { minTier: 2, maxTier: 2 });
+  const noPick = reduce(standingOn(seed, poi, { tools: [] }), { type: "gather" }).events;
+  const weakPick = reduce(standingOn(seed, poi, { tools: ["pick"] }), { type: "gather" }).events;
+  expect(noPick[0]).toMatchObject({ reason: "missing-tool" });
+  expect(weakPick[0]).toMatchObject({ reason: "tool-too-weak" });
+});
+
+test("gather: an iron-pick (T2) unlocks the T2 node the basic pick could not", () => {
+  const { seed, poi } = mapWith("mining", { minTier: 2, maxTier: 2 });
+  const { state, events } = reduce(standingOn(seed, poi, { tools: ["iron-pick"] }), { type: "gather" });
+  expect(events.some((e) => e.type === "action-rejected")).toBe(false);
+  expect(state.expedition!.carry).toEqual([{ defId: poi.material!, qty: GATHER_YIELD.mining }]);
+});
+
+test("gather: mithril (T3) needs a steel-pick — an iron-pick is still too weak", () => {
+  const { seed, poi } = mapWith("mining", { minTier: 3, maxTier: 3 });
+  expect(poi.material).toBe("mithril-ore");
+  const iron = reduce(standingOn(seed, poi, { tools: ["iron-pick"] }), { type: "gather" }).events;
+  expect(iron[0]).toMatchObject({ reason: "tool-too-weak" });
+  const steel = reduce(standingOn(seed, poi, { tools: ["steel-pick"] }), { type: "gather" });
+  expect(steel.events.some((e) => e.type === "action-rejected")).toBe(false);
+  expect(steel.state.expedition!.carry).toEqual([{ defId: "mithril-ore", qty: GATHER_YIELD.mining }]);
 });

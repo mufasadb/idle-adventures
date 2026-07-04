@@ -79,6 +79,7 @@ export type RejectionReason =
   | "already-cleared"
   | "not-gatherable"
   | "missing-tool"
+  | "tool-too-weak"
   | "carry-full"
   | "not-carried"
   | "no-monster"
