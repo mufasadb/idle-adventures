@@ -6,6 +6,7 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
+    "play": "bun run src/sim/cli.ts",
     "web": "bun ./src/web/index.html"
   },
   "devDependencies": {
