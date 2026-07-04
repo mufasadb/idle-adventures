@@ -86,7 +86,7 @@ test("gather: a cleared node cannot be gathered again (one-shot, D24)", () => {
   const { state, events } = reduce(first, { type: "gather" });
   expect(state).toEqual(first);
   expect(events).toEqual([
-    { type: "action-rejected", action: "gather", reason: "no-node" },
+    { type: "action-rejected", action: "gather", reason: "already-cleared" },
   ]);
 });
 

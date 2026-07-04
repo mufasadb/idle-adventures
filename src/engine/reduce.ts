@@ -1,4 +1,4 @@
-import type { GameState, Action, GameEvent, LoadoutSlot } from "./types";
+import type { GameState, Action, GameEvent, LoadoutSlot, RejectionReason } from "./types";
 import { generateGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
@@ -45,7 +45,7 @@ export function reduce(
 function rejected(
   state: GameState,
   action: Action["type"],
-  reason: string,
+  reason: RejectionReason,
 ): { state: GameState; events: GameEvent[] } {
   return { state, events: [{ type: "action-rejected", action, reason }] };
 }
@@ -164,7 +164,8 @@ function gather(state: GameState): { state: GameState; events: GameEvent[] } {
   const alreadyCleared = expedition.cleared.some(
     (c) => c.x === pos.x && c.y === pos.y,
   );
-  if (!poi || alreadyCleared) return rejected(state, "gather", "no-node");
+  if (!poi) return rejected(state, "gather", "no-node");
+  if (alreadyCleared) return rejected(state, "gather", "already-cleared");
   if (poi.kind === "monster" || poi.material === null) {
     return rejected(state, "gather", "not-gatherable");
   }

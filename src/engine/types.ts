@@ -66,6 +66,30 @@ export type Action =
   | { type: "drop"; itemId: string }
   | { type: "return" };
 
+// Closed set of every reason a reducer can reject an action (D30). Split out so
+// callers (legalActions, the field UI, the AI) can switch exhaustively.
+export type RejectionReason =
+  | "not-in-town"
+  | "not-on-expedition"
+  | "no-step"
+  | "out-of-bounds"
+  | "impassable"
+  | "exhausted"
+  | "no-node"
+  | "already-cleared"
+  | "not-gatherable"
+  | "missing-tool"
+  | "carry-full"
+  | "not-carried"
+  | "no-monster"
+  | "unaffordable"
+  | "no-recipe"
+  | "insufficient-materials"
+  | "wrong-slot"
+  | "insufficient"
+  | "already-packed"
+  | "no-slot";
+
 // Events are a render byproduct emitted by reduce. Named GameEvent (not Event)
 // to avoid colliding with the DOM Event global, which engine code must not use.
 // A closed discriminated union, extended per-milestone as systems land.
@@ -126,5 +150,5 @@ export type GameEvent =
   | {
       type: "action-rejected";
       action: Action["type"];
-      reason: string; // tightened to a closed union when M6's legalActions lands
+      reason: RejectionReason; // closed union (D30)
     };
