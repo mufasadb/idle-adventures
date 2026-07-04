@@ -15,6 +15,18 @@ export function bankStacks(bank: ItemStack[], stacks: ItemStack[]): ItemStack[] 
   return next;
 }
 
+// Inverse of bankStacks: remove `stacks` from `bank`, or return null if any
+// required defId is short. Emptied stacks are dropped. Used by craft + embark (D28).
+export function subtractStacks(bank: ItemStack[], stacks: ItemStack[]): ItemStack[] | null {
+  const next = bank.map((s) => ({ ...s }));
+  for (const need of stacks) {
+    const existing = next.find((s) => s.defId === need.defId);
+    if (!existing || existing.qty < need.qty) return null;
+    existing.qty -= need.qty;
+  }
+  return next.filter((s) => s.qty > 0);
+}
+
 export function endExpedition(state: GameState, expedition: Expedition): GameState {
   const { equipment } = expedition.loadout;
   const durables: ItemStack[] = [];

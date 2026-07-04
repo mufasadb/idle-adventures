@@ -120,6 +120,8 @@ export type GameEvent =
         forecast: { victory: boolean; hpLost: number; potionsUsed: number };
       }[];
     }
+  | { type: "crafted"; recipeId: string; output: ItemStack }
+  | { type: "packed"; slot: LoadoutSlot; defId: string }
   | { type: "run-ended"; reason: string }
   | {
       type: "action-rejected";

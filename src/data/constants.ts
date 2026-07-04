@@ -33,7 +33,7 @@ export type Biome = {
   terrainWeights: Partial<Record<Terrain, number>>; // relative mix; zero/absent = never generates
   nodeTypeWeights: Partial<Record<NodeType, number>>; // relative POI kind mix
   creatureTable: string[]; // biome-flavoured monster defIds (filled M4)
-  materialTable: Partial<Record<NodeType, string>>; // node kind → material defId (filled M3/M5)
+  materialTable: Partial<Record<NodeType, Record<string, number>>>; // node kind → weighted material defIds (D27)
 };
 
 export const BIOMES: Record<BiomeId, Biome> = {
@@ -41,19 +41,34 @@ export const BIOMES: Record<BiomeId, Biome> = {
     terrainWeights: { plains: 0.4, mud: 0.25, river: 0.15, mountain: 0.2 },
     nodeTypeWeights: { wood: 0.35, herb: 0.25, animal: 0.2, monster: 0.15, mining: 0.05 },
     creatureTable: ["werewolf", "fae-sprite", "forest-boar"],
-    materialTable: { mining: "iron-ore", wood: "oak-log", herb: "forest-herb", animal: "deer-hide" },
+    materialTable: {
+      mining: { "iron-ore": 7, "copper-ore": 2, "silver-ore": 1 },
+      wood: { "oak-log": 7, "pine-log": 2, "cactus-wood": 1 },
+      herb: { "forest-herb": 7, "desert-sage": 2, "ice-moss": 1 },
+      animal: { "deer-hide": 7, "wolf-pelt": 2, "lizard-hide": 1 },
+    },
   },
   desert: {
     terrainWeights: { plains: 0.55, mountain: 0.3, river: 0.15 },
     nodeTypeWeights: { mining: 0.4, monster: 0.25, herb: 0.15, wood: 0.1, animal: 0.1 },
     creatureTable: ["giant-scorpion", "dust-vampire", "sand-raider"],
-    materialTable: { mining: "copper-ore", wood: "cactus-wood", herb: "desert-sage", animal: "lizard-hide" },
+    materialTable: {
+      mining: { "copper-ore": 7, "iron-ore": 2, "silver-ore": 1 },
+      wood: { "cactus-wood": 7, "oak-log": 2, "pine-log": 1 },
+      herb: { "desert-sage": 7, "forest-herb": 2, "ice-moss": 1 },
+      animal: { "lizard-hide": 7, "deer-hide": 2, "wolf-pelt": 1 },
+    },
   },
   tundra: {
     terrainWeights: { ice: 0.5, mountain: 0.25, plains: 0.15, river: 0.1 },
     nodeTypeWeights: { animal: 0.35, monster: 0.25, mining: 0.2, wood: 0.1, herb: 0.1 },
     creatureTable: ["frost-fae", "snow-wolf", "ice-troll"],
-    materialTable: { mining: "silver-ore", wood: "pine-log", herb: "ice-moss", animal: "wolf-pelt" },
+    materialTable: {
+      mining: { "silver-ore": 7, "iron-ore": 2, "copper-ore": 1 },
+      wood: { "pine-log": 7, "oak-log": 2, "cactus-wood": 1 },
+      herb: { "ice-moss": 7, "desert-sage": 2, "forest-herb": 1 },
+      animal: { "wolf-pelt": 7, "deer-hide": 2, "lizard-hide": 1 },
+    },
   },
 };
 
@@ -99,11 +114,19 @@ export const TOOL_CAPABILITY: Record<string, string> = {
   pick: "pick",
   axe: "axe",
   knife: "knife",
+  "iron-pick": "pick",
+  "iron-axe": "axe",
+  "steel-knife": "knife",
+  spyglass: "scout", // scouting capability; NODE_TOOL never asks for "scout", so no gather impact
 }; // tool defId → capability; tiered tools (M5: "iron-pick": "pick") are data-only
 export const TOOL_QUALITY: Record<string, number> = {
   pick: 1,
   axe: 1,
   knife: 1,
+  "iron-pick": 2, // halves mining cost vs the basic pick — the "cheaper second run" demonstrator
+  "iron-axe": 2,
+  "steel-knife": 2,
+  spyglass: 1, // quality irrelevant to scouting; present to satisfy the catalog invariant
 }; // gather-cost divisor by tool defId
 export const GATHER_YIELD: Record<GatherableNodeType, number> = {
   mining: 3,
@@ -169,23 +192,24 @@ export const WEAPONS: Record<string, Weapon> = {
   "fire-staff": { dmgType: "magic", damage: 3, tags: [] },
 }; // weapon damage type and affinity tags
 
-export const ARMOUR: Record<string, { armourType: ArmourType; defense: number }> = {
-  "plate-helmet": { armourType: "plate", defense: 2 },
-  "plate-chest": { armourType: "plate", defense: 3 },
-  "plate-legs": { armourType: "plate", defense: 2 },
-  "plate-boots": { armourType: "plate", defense: 1 },
-  "plate-gloves": { armourType: "plate", defense: 1 },
-  "light-helmet": { armourType: "light", defense: 1 },
-  "light-chest": { armourType: "light", defense: 2 },
-  "light-legs": { armourType: "light", defense: 1 },
-  "light-boots": { armourType: "light", defense: 1 },
-  "light-gloves": { armourType: "light", defense: 1 },
-  "robe-hood": { armourType: "robe", defense: 1 },
-  "robe-chest": { armourType: "robe", defense: 1 },
-  "robe-legs": { armourType: "robe", defense: 1 },
-  "robe-boots": { armourType: "robe", defense: 1 },
-  "robe-gloves": { armourType: "robe", defense: 1 },
-}; // armour pieces by type and defense contribution
+export type ArmourSlot = "helmet" | "chest" | "legs" | "boots" | "gloves";
+export const ARMOUR: Record<string, { armourType: ArmourType; defense: number; slot: ArmourSlot }> = {
+  "plate-helmet": { armourType: "plate", defense: 2, slot: "helmet" },
+  "plate-chest": { armourType: "plate", defense: 3, slot: "chest" },
+  "plate-legs": { armourType: "plate", defense: 2, slot: "legs" },
+  "plate-boots": { armourType: "plate", defense: 1, slot: "boots" },
+  "plate-gloves": { armourType: "plate", defense: 1, slot: "gloves" },
+  "light-helmet": { armourType: "light", defense: 1, slot: "helmet" },
+  "light-chest": { armourType: "light", defense: 2, slot: "chest" },
+  "light-legs": { armourType: "light", defense: 1, slot: "legs" },
+  "light-boots": { armourType: "light", defense: 1, slot: "boots" },
+  "light-gloves": { armourType: "light", defense: 1, slot: "gloves" },
+  "robe-hood": { armourType: "robe", defense: 1, slot: "helmet" },
+  "robe-chest": { armourType: "robe", defense: 1, slot: "chest" },
+  "robe-legs": { armourType: "robe", defense: 1, slot: "legs" },
+  "robe-boots": { armourType: "robe", defense: 1, slot: "boots" },
+  "robe-gloves": { armourType: "robe", defense: 1, slot: "gloves" },
+}; // armour pieces by type, defense contribution, and body slot (slot: M5 pack validation)
 
 export const LOOT_TABLE: Record<string, ItemStackSpec[]> = {
   werewolf: [{ defId: "werewolf-pelt", qty: 2 }],
@@ -203,7 +227,43 @@ export const SCOUT_ENERGY_COST = 1; // energy per scout activation
 export const SCOUT_RADIUS = 3; // Chebyshev radius of scout reveal
 export const SCOUT_TOOL = "spyglass"; // required tool defId for scouting
 
-// --- Crafting (filled in M5) ---
-export const RECIPE = {} as Record<string, { inputs: ItemStackSpec[]; output: ItemStackSpec }>; // (placeholder — M5)
+// --- Consumable item catalogs (M5) ---
+// ENERGY_PER_FOOD / POTION_HEAL are flat, so these are single-item catalogs for
+// the POC; the list is what `pack`/`slotOf` validate a food/potion defId against.
+export const FOOD: string[] = ["ration"];
+export const POTION: string[] = ["potion"];
+
+// --- Crafting (M5): direct & instant, materials → item (D10). One shared tree
+// so hauls from different biomes feed each other. Weighted materials (D27) make
+// cross-biome inputs a soft pull (silver best-farmed in tundra), not a hard gate.
+export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStackSpec }> = {
+  // Consumables
+  ration: { inputs: [{ defId: "forest-herb", qty: 1 }, { defId: "deer-hide", qty: 1 }], output: { defId: "ration", qty: 2 } },
+  potion: { inputs: [{ defId: "desert-sage", qty: 1 }, { defId: "forest-herb", qty: 1 }], output: { defId: "potion", qty: 1 } },
+  // Tools — tiered upgrades (iron-pick is the "cheaper second run" demonstrator)
+  "iron-pick": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "iron-pick", qty: 1 } },
+  "iron-axe": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "iron-axe", qty: 1 } },
+  "steel-knife": { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "silver-ore", qty: 1 }], output: { defId: "steel-knife", qty: 1 } },
+  spyglass: { inputs: [{ defId: "copper-ore", qty: 2 }, { defId: "ice-moss", qty: 1 }], output: { defId: "spyglass", qty: 1 } }, // cross-biome: desert copper + tundra moss
+  // Backpack — carry upgrade
+  leather: { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "leather", qty: 1 } },
+  // Transport
+  horse: { inputs: [{ defId: "deer-hide", qty: 3 }, { defId: "oak-log", qty: 2 }], output: { defId: "horse", qty: 1 } },
+  // Weapons
+  "iron-sword": { inputs: [{ defId: "iron-ore", qty: 3 }], output: { defId: "iron-sword", qty: 1 } },
+  "silver-sword": { inputs: [{ defId: "silver-ore", qty: 3 }], output: { defId: "silver-sword", qty: 1 } }, // werewolf affinity; silver best-farmed in tundra
+  bow: { inputs: [{ defId: "oak-log", qty: 2 }, { defId: "deer-hide", qty: 1 }], output: { defId: "bow", qty: 1 } },
+  "fire-staff": { inputs: [{ defId: "pine-log", qty: 2 }, { defId: "fae-dust", qty: 1 }], output: { defId: "fire-staff", qty: 1 } },
+  // Armour — full plate set + light/robe samples
+  "plate-helmet": { inputs: [{ defId: "iron-ore", qty: 2 }], output: { defId: "plate-helmet", qty: 1 } },
+  "plate-chest": { inputs: [{ defId: "iron-ore", qty: 3 }], output: { defId: "plate-chest", qty: 1 } },
+  "plate-legs": { inputs: [{ defId: "iron-ore", qty: 2 }], output: { defId: "plate-legs", qty: 1 } },
+  "plate-boots": { inputs: [{ defId: "iron-ore", qty: 1 }], output: { defId: "plate-boots", qty: 1 } },
+  "plate-gloves": { inputs: [{ defId: "iron-ore", qty: 1 }], output: { defId: "plate-gloves", qty: 1 } },
+  "light-chest": { inputs: [{ defId: "deer-hide", qty: 2 }], output: { defId: "light-chest", qty: 1 } },
+  "light-legs": { inputs: [{ defId: "deer-hide", qty: 1 }, { defId: "wolf-pelt", qty: 1 }], output: { defId: "light-legs", qty: 1 } },
+  "robe-chest": { inputs: [{ defId: "forest-herb", qty: 2 }, { defId: "ice-moss", qty: 1 }], output: { defId: "robe-chest", qty: 1 } },
+  "robe-hood": { inputs: [{ defId: "forest-herb", qty: 1 }, { defId: "ice-moss", qty: 1 }], output: { defId: "robe-hood", qty: 1 } },
+};
 
 type ItemStackSpec = { defId: string; qty: number };

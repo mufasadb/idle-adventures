@@ -1,0 +1,93 @@
+// Town-side loadout planning (M5, D28). `pack` edits a PLAN on GameState.loadout
+// without touching the bank; the plan is validated against `bank − reservations`
+// so it never exceeds holdings. The bank is only debited at embark. There is no
+// unpack action — reduce a mis-planned consumable by embarking and re-planning.
+import type { ItemStack, Loadout, LoadoutSlot } from "./types";
+import { slotOf } from "./catalog";
+import { slotCap, addToCarry } from "./carry";
+
+// Single-occupancy equipment slots keyed exactly by LoadoutSlot name.
+const EQUIP_SLOTS = ["weapon", "helmet", "chest", "legs", "boots", "gloves", "transport", "backpack"] as const;
+type EquipSlot = (typeof EQUIP_SLOTS)[number];
+
+// Every defId the plan reserves from the bank (each equipment piece ×1, each
+// tool ×1, transport, backpack, plus food/potion stack quantities). This is the
+// exact set embark debits (D28) and mirrors what endExpedition banks back (D26,
+// minus food).
+export function reserveLoadout(loadout: Loadout): ItemStack[] {
+  const { equipment, food, potions } = loadout;
+  const out: ItemStack[] = [];
+  for (const piece of [equipment.weapon, equipment.helmet, equipment.chest, equipment.legs, equipment.boots, equipment.gloves]) {
+    if (piece !== null) out.push({ defId: piece, qty: 1 });
+  }
+  for (const tool of equipment.tools) out.push({ defId: tool, qty: 1 });
+  if (equipment.transport !== null) out.push({ defId: equipment.transport, qty: 1 });
+  if (equipment.backpack !== null) out.push({ defId: equipment.backpack, qty: 1 });
+  for (const stack of food) out.push({ defId: stack.defId, qty: stack.qty });
+  for (const stack of potions) out.push({ defId: stack.defId, qty: stack.qty });
+  return out;
+}
+
+function reservedQty(loadout: Loadout, defId: string): number {
+  return reserveLoadout(loadout)
+    .filter((s) => s.defId === defId)
+    .reduce((sum, s) => sum + s.qty, 0);
+}
+
+function bankQty(bank: ItemStack[], defId: string): number {
+  return bank.find((s) => s.defId === defId)?.qty ?? 0;
+}
+
+export function packItem(
+  loadout: Loadout,
+  bank: ItemStack[],
+  slot: LoadoutSlot,
+  itemId: string,
+):
+  | { ok: true; loadout: Loadout }
+  | { ok: false; reason: "wrong-slot" | "insufficient" | "already-packed" | "no-slot" } {
+  if (slotOf(itemId) !== slot) return { ok: false, reason: "wrong-slot" };
+
+  // Equipment: overwrite the slot. Affordability is checked against the CANDIDATE
+  // loadout, so replacing frees the old occupant's reservation.
+  if ((EQUIP_SLOTS as readonly string[]).includes(slot)) {
+    const equipment = { ...loadout.equipment, [slot as EquipSlot]: itemId };
+    const candidate: Loadout = { ...loadout, equipment };
+    if (reservedQty(candidate, itemId) > bankQty(bank, itemId)) {
+      return { ok: false, reason: "insufficient" };
+    }
+    return { ok: true, loadout: candidate };
+  }
+
+  if (slot === "tool") {
+    if (loadout.equipment.tools.includes(itemId)) return { ok: false, reason: "already-packed" };
+    const equipment = { ...loadout.equipment, tools: [...loadout.equipment.tools, itemId] };
+    const candidate: Loadout = { ...loadout, equipment };
+    if (reservedQty(candidate, itemId) > bankQty(bank, itemId)) {
+      return { ok: false, reason: "insufficient" };
+    }
+    return { ok: true, loadout: candidate };
+  }
+
+  // food / potion: merge into stacks (STACK_CAP), opening a new slot only when
+  // needed; addToCarry returns null when a new stack would exceed the slot cap
+  // shared with the other consumable list (bead note e).
+  const cap = slotCap(loadout.equipment.backpack);
+  if (slot === "food") {
+    const food = addToCarry(loadout.food, itemId, 1, cap - loadout.potions.length);
+    if (food === null) return { ok: false, reason: "no-slot" };
+    const candidate: Loadout = { ...loadout, food };
+    if (reservedQty(candidate, itemId) > bankQty(bank, itemId)) {
+      return { ok: false, reason: "insufficient" };
+    }
+    return { ok: true, loadout: candidate };
+  }
+  // slot === "potion"
+  const potions = addToCarry(loadout.potions, itemId, 1, cap - loadout.food.length);
+  if (potions === null) return { ok: false, reason: "no-slot" };
+  const candidate: Loadout = { ...loadout, potions };
+  if (reservedQty(candidate, itemId) > bankQty(bank, itemId)) {
+    return { ok: false, reason: "insufficient" };
+  }
+  return { ok: true, loadout: candidate };
+}

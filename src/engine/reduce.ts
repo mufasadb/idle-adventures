@@ -1,11 +1,13 @@
-import type { GameState, Action, GameEvent } from "./types";
+import type { GameState, Action, GameEvent, LoadoutSlot } from "./types";
 import { generateGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
 import { addToCarry, freeCarryStacks } from "./carry";
 import { toolQualityFor } from "./tools";
 import { resolveCombat } from "./combat";
-import { endExpedition } from "./bank";
+import { endExpedition, subtractStacks } from "./bank";
+import { craft as applyRecipe } from "./craft";
+import { packItem, reserveLoadout } from "./pack";
 import { ENERGY_PER_FOOD, PLAYER_BASE_HP, GRID_SIZE, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, LOOT_TABLE, MONSTERS, MONSTER_TIER_HP_CURVE, MONSTER_TIER_DMG_CURVE, SCOUT_ENERGY_COST, SCOUT_RADIUS, SCOUT_TOOL } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 
@@ -30,9 +32,11 @@ export function reduce(
     case "scout":
       return scout(state);
     case "craft":
+      return craftAction(state, action.recipeId);
     case "pack":
+      return packAction(state, action.slot, action.itemId);
     case "return":
-      return { state, events: [] };
+      return returnHome(state);
     default:
       return assertNever(action);
   }
@@ -51,6 +55,10 @@ function embark(
   mapSeed: string,
 ): { state: GameState; events: GameEvent[] } {
   if (state.phase !== "town") return rejected(state, "embark", "not-in-town");
+  // D28: settle the plan against the bank — debit everything the loadout pulls.
+  const reserved = reserveLoadout(state.loadout);
+  const bank = subtractStacks(state.bank, reserved);
+  if (bank === null) return rejected(state, "embark", "unaffordable");
   const grid = generateGrid(mapSeed, rollBiome(mapSeed));
   const foodQty = state.loadout.food.reduce((sum, stack) => sum + stack.qty, 0);
   const energy = foodQty * ENERGY_PER_FOOD;
@@ -58,6 +66,7 @@ function embark(
     state: {
       ...state,
       phase: "expedition",
+      bank,
       loadout: emptyLoadout(),
       expedition: {
         mapSeed,
@@ -72,6 +81,44 @@ function embark(
     events: [
       { type: "embarked", mapSeed, biomeId: grid.biomeId, pos: grid.entry, energy },
     ],
+  };
+}
+
+function craftAction(
+  state: GameState,
+  recipeId: string,
+): { state: GameState; events: GameEvent[] } {
+  if (state.phase !== "town") return rejected(state, "craft", "not-in-town");
+  const result = applyRecipe(state.bank, recipeId);
+  if (!result.ok) return rejected(state, "craft", result.reason);
+  return {
+    state: { ...state, bank: result.bank },
+    events: [{ type: "crafted", recipeId, output: result.output }],
+  };
+}
+
+function returnHome(state: GameState): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) {
+    return rejected(state, "return", "not-on-expedition");
+  }
+  return {
+    state: endExpedition(state, expedition),
+    events: [{ type: "run-ended", reason: "returned" }],
+  };
+}
+
+function packAction(
+  state: GameState,
+  slot: LoadoutSlot,
+  itemId: string,
+): { state: GameState; events: GameEvent[] } {
+  if (state.phase !== "town") return rejected(state, "pack", "not-in-town");
+  const result = packItem(state.loadout, state.bank, slot, itemId);
+  if (!result.ok) return rejected(state, "pack", result.reason);
+  return {
+    state: { ...state, loadout: result.loadout },
+    events: [{ type: "packed", slot, defId: itemId }],
   };
 }
 
