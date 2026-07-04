@@ -203,12 +203,19 @@ export const MONSTERS: Record<string, Monster> = {
 
 export type Weapon = { dmgType: DmgType; damage: number; tags: string[] };
 export const WEAPONS: Record<string, Weapon> = {
+  // T1 (damage 3) — starter/basic, matrix + affinity choices live here early
   sword: { dmgType: "melee", damage: 3, tags: [] },
-  "iron-sword": { dmgType: "melee", damage: 3, tags: ["iron"] },
-  "silver-sword": { dmgType: "melee", damage: 3, tags: ["silver"] },
+  "iron-sword": { dmgType: "melee", damage: 3, tags: ["iron"] }, // fae affinity
   bow: { dmgType: "ranged", damage: 3, tags: [] },
   "fire-staff": { dmgType: "magic", damage: 3, tags: [] },
-}; // weapon damage type and affinity tags
+  // T2 (damage 4) — gated by a T2 material; silver-sword is the werewolf pick
+  "silver-sword": { dmgType: "melee", damage: 3, tags: ["silver"] }, // stays dmg 3; its edge is the ×2 affinity
+  "steel-sword": { dmgType: "melee", damage: 4, tags: [] },
+  "composite-bow": { dmgType: "ranged", damage: 4, tags: [] },
+  "inferno-staff": { dmgType: "magic", damage: 4, tags: [] },
+  // T3 (damage 6) — melee only; top of the mithril climb
+  "mithril-sword": { dmgType: "melee", damage: 6, tags: [] },
+}; // weapon damage type and affinity tags. Damage scales modestly (3/4/6) so armour type still matters vs a tier-up weapon
 
 export type ArmourSlot = "helmet" | "chest" | "legs" | "boots" | "gloves";
 export const ARMOUR: Record<string, { armourType: ArmourType; defense: number; slot: ArmourSlot }> = {
@@ -227,6 +234,24 @@ export const ARMOUR: Record<string, { armourType: ArmourType; defense: number; s
   "robe-legs": { armourType: "robe", defense: 1, slot: "legs" },
   "robe-boots": { armourType: "robe", defense: 1, slot: "boots" },
   "robe-gloves": { armourType: "robe", defense: 1, slot: "gloves" },
+  // --- Tier ladder (2026-07-04). Plate carries the full 3-tier climb (it's the
+  // combat-trivializer at the top); light/robe get a single T2 bump on their
+  // sample pieces so type-matchup stays a live choice without a full extra set.
+  // Steel = iron plate +1/pc (coal-gated); mithril = iron plate +2/pc (steel-pick-gated).
+  "steel-plate-helmet": { armourType: "plate", defense: 3, slot: "helmet" },
+  "steel-plate-chest": { armourType: "plate", defense: 4, slot: "chest" },
+  "steel-plate-legs": { armourType: "plate", defense: 3, slot: "legs" },
+  "steel-plate-boots": { armourType: "plate", defense: 2, slot: "boots" },
+  "steel-plate-gloves": { armourType: "plate", defense: 2, slot: "gloves" },
+  "mithril-plate-helmet": { armourType: "plate", defense: 4, slot: "helmet" },
+  "mithril-plate-chest": { armourType: "plate", defense: 5, slot: "chest" },
+  "mithril-plate-legs": { armourType: "plate", defense: 4, slot: "legs" },
+  "mithril-plate-boots": { armourType: "plate", defense: 3, slot: "boots" },
+  "mithril-plate-gloves": { armourType: "plate", defense: 3, slot: "gloves" },
+  "studded-chest": { armourType: "light", defense: 3, slot: "chest" }, // light-chest +1 (drake-gated)
+  "studded-legs": { armourType: "light", defense: 2, slot: "legs" },
+  "enchanted-chest": { armourType: "robe", defense: 2, slot: "chest" }, // robe-chest +1 (silver-gated)
+  "enchanted-hood": { armourType: "robe", defense: 2, slot: "helmet" },
 }; // armour pieces by type, defense contribution, and body slot (slot: M5 pack validation)
 
 export const LOOT_TABLE: Record<string, ItemStackSpec[]> = {
@@ -270,11 +295,17 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   leather: { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "leather", qty: 1 } },
   // Transport
   horse: { inputs: [{ defId: "deer-hide", qty: 3 }, { defId: "oak-log", qty: 2 }], output: { defId: "horse", qty: 1 } },
-  // Weapons
+  // Weapons — T1
   "iron-sword": { inputs: [{ defId: "iron-ore", qty: 3 }], output: { defId: "iron-sword", qty: 1 } },
-  "silver-sword": { inputs: [{ defId: "silver-ore", qty: 3 }], output: { defId: "silver-sword", qty: 1 } }, // werewolf affinity; silver best-farmed in tundra
   bow: { inputs: [{ defId: "oak-log", qty: 2 }, { defId: "deer-hide", qty: 1 }], output: { defId: "bow", qty: 1 } },
   "fire-staff": { inputs: [{ defId: "pine-log", qty: 2 }, { defId: "fae-dust", qty: 1 }], output: { defId: "fire-staff", qty: 1 } },
+  // Weapons — T2 (each needs a T2 material → all sit behind the iron-pick/iron-axe/steel-knife tier)
+  "silver-sword": { inputs: [{ defId: "silver-ore", qty: 3 }], output: { defId: "silver-sword", qty: 1 } }, // werewolf affinity; silver T2, best-farmed in tundra
+  "steel-sword": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "steel-sword", qty: 1 } },
+  "composite-bow": { inputs: [{ defId: "ironwood-log", qty: 2 }, { defId: "deer-hide", qty: 1 }], output: { defId: "composite-bow", qty: 1 } }, // ironwood T2 → iron-axe
+  "inferno-staff": { inputs: [{ defId: "fae-dust", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "inferno-staff", qty: 1 } },
+  // Weapons — T3 (mithril → steel-pick)
+  "mithril-sword": { inputs: [{ defId: "mithril-ore", qty: 3 }], output: { defId: "mithril-sword", qty: 1 } },
   // Armour — full plate set + light/robe samples
   "plate-helmet": { inputs: [{ defId: "iron-ore", qty: 2 }], output: { defId: "plate-helmet", qty: 1 } },
   "plate-chest": { inputs: [{ defId: "iron-ore", qty: 3 }], output: { defId: "plate-chest", qty: 1 } },
@@ -285,6 +316,23 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   "light-legs": { inputs: [{ defId: "deer-hide", qty: 1 }, { defId: "wolf-pelt", qty: 1 }], output: { defId: "light-legs", qty: 1 } },
   "robe-chest": { inputs: [{ defId: "forest-herb", qty: 2 }, { defId: "ice-moss", qty: 1 }], output: { defId: "robe-chest", qty: 1 } },
   "robe-hood": { inputs: [{ defId: "forest-herb", qty: 1 }, { defId: "ice-moss", qty: 1 }], output: { defId: "robe-hood", qty: 1 } },
+  // Armour — T2 steel plate (iron-plate cost + coal → iron-pick-gated)
+  "steel-plate-helmet": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "steel-plate-helmet", qty: 1 } },
+  "steel-plate-chest": { inputs: [{ defId: "iron-ore", qty: 3 }, { defId: "coal", qty: 2 }], output: { defId: "steel-plate-chest", qty: 1 } },
+  "steel-plate-legs": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "steel-plate-legs", qty: 1 } },
+  "steel-plate-boots": { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "coal", qty: 1 }], output: { defId: "steel-plate-boots", qty: 1 } },
+  "steel-plate-gloves": { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "coal", qty: 1 }], output: { defId: "steel-plate-gloves", qty: 1 } },
+  // Armour — T3 mithril plate (mithril → steel-pick-gated). The combat-trivializer, top of the longest climb.
+  "mithril-plate-helmet": { inputs: [{ defId: "mithril-ore", qty: 2 }], output: { defId: "mithril-plate-helmet", qty: 1 } },
+  "mithril-plate-chest": { inputs: [{ defId: "mithril-ore", qty: 3 }], output: { defId: "mithril-plate-chest", qty: 1 } },
+  "mithril-plate-legs": { inputs: [{ defId: "mithril-ore", qty: 2 }], output: { defId: "mithril-plate-legs", qty: 1 } },
+  "mithril-plate-boots": { inputs: [{ defId: "mithril-ore", qty: 1 }], output: { defId: "mithril-plate-boots", qty: 1 } },
+  "mithril-plate-gloves": { inputs: [{ defId: "mithril-ore", qty: 1 }], output: { defId: "mithril-plate-gloves", qty: 1 } },
+  // Armour — light/robe T2 samples (gated by a T2 material so they sit mid-climb)
+  "studded-chest": { inputs: [{ defId: "drake-hide", qty: 1 }, { defId: "deer-hide", qty: 1 }], output: { defId: "studded-chest", qty: 1 } }, // drake T2 → steel-knife
+  "studded-legs": { inputs: [{ defId: "drake-hide", qty: 1 }], output: { defId: "studded-legs", qty: 1 } },
+  "enchanted-chest": { inputs: [{ defId: "ice-moss", qty: 2 }, { defId: "silver-ore", qty: 1 }], output: { defId: "enchanted-chest", qty: 1 } }, // silver T2 → iron-pick
+  "enchanted-hood": { inputs: [{ defId: "ice-moss", qty: 1 }, { defId: "silver-ore", qty: 1 }], output: { defId: "enchanted-hood", qty: 1 } },
 };
 
 type ItemStackSpec = { defId: string; qty: number };
