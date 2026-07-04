@@ -86,7 +86,13 @@ export const MATERIAL_TIER: Record<string, number> = {
 };
 
 // --- Energy economy (filled in M2) ---
-export const ENERGY_PER_FOOD = 10; // energy per packed food item
+export const ENERGY_PER_FOOD = 10; // default energy per packed food item (fallback for FOOD_ENERGY)
+// Per-food energy (2026-07-04): tiered food gives more energy per item, so
+// progression EARNS slot efficiency against the firm carry squeeze. Absent = ENERGY_PER_FOOD.
+export const FOOD_ENERGY: Record<string, number> = {
+  ration: 10,
+  "trail-ration": 20,
+};
 export const MOVE_BASE_COST = 1; // energy per tile on neutral ground, on foot
 export const TERRAIN_COST: Record<Terrain, number> = {
   plains: 1,
@@ -97,6 +103,7 @@ export const TERRAIN_COST: Record<Terrain, number> = {
 }; // cost multiplier per terrain stepped ONTO
 export const TRANSPORT_MULTIPLIER: Record<string, number> = {
   horse: 1.5, // fast — divides move cost (spec §10: base × terrain ÷ transport)
+  wagon: 2.0, // T2 transport: halves move cost — the answer to ice-heavy tundra
   mule: 0.8, // slow — will pay for it in carry capacity (M3/M5)
 }; // keyed by transport defId; absent/on-foot = 1
 
@@ -165,7 +172,13 @@ export const DMG_ARMOUR_MATRIX: Record<DmgType, Record<ArmourType, number>> = {
 
 export const PLAYER_BASE_HP = 30; // player starting HP
 export const CHIP_DAMAGE_MIN = 1; // floor on damage both directions; HP always drains, fights always end
-export const POTION_HEAL = 10; // HP restored per potion use
+export const POTION_HEAL = 10; // default HP restored per potion use (fallback for POTION_HEAL_BY)
+// Per-potion heal (2026-07-04): tiered potions restore more, gated by a T2
+// material so they too sit behind the iron-pick. Absent = POTION_HEAL.
+export const POTION_HEAL_BY: Record<string, number> = {
+  potion: 10,
+  "greater-potion": 20,
+};
 export const AUTO_POTION_THRESHOLD = 0.5; // fraction of base HP to auto-quaff at
 export const UNARMED_DAMAGE = 1; // damage when wielding no weapon
 
@@ -273,16 +286,19 @@ export const SCOUT_TOOL = "spyglass"; // required tool defId for scouting
 // --- Consumable item catalogs (M5) ---
 // ENERGY_PER_FOOD / POTION_HEAL are flat, so these are single-item catalogs for
 // the POC; the list is what `pack`/`slotOf` validate a food/potion defId against.
-export const FOOD: string[] = ["ration"];
-export const POTION: string[] = ["potion"];
+export const FOOD: string[] = ["ration", "trail-ration"];
+export const POTION: string[] = ["potion", "greater-potion"];
 
 // --- Crafting (M5): direct & instant, materials → item (D10). One shared tree
 // so hauls from different biomes feed each other. Weighted materials (D27) make
 // cross-biome inputs a soft pull (silver best-farmed in tundra), not a hard gate.
 export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStackSpec }> = {
-  // Consumables
+  // Consumables — T1
   ration: { inputs: [{ defId: "forest-herb", qty: 1 }, { defId: "deer-hide", qty: 1 }], output: { defId: "ration", qty: 2 } },
   potion: { inputs: [{ defId: "desert-sage", qty: 1 }, { defId: "forest-herb", qty: 1 }], output: { defId: "potion", qty: 1 } },
+  // Consumables — T2 (gated by a T2 material → sit behind the iron-pick)
+  "trail-ration": { inputs: [{ defId: "ration", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "trail-ration", qty: 1 } }, // cooked over coal — denser energy/slot
+  "greater-potion": { inputs: [{ defId: "potion", qty: 1 }, { defId: "silver-ore", qty: 1 }], output: { defId: "greater-potion", qty: 1 } },
   // Tools — tiered upgrades (iron-pick is the "cheaper second run" demonstrator)
   "iron-pick": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "iron-pick", qty: 1 } },
   "iron-axe": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "iron-axe", qty: 1 } },
@@ -291,10 +307,12 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   "steel-axe": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "steel-axe", qty: 1 } },
   "steel-knife": { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "silver-ore", qty: 1 }], output: { defId: "steel-knife", qty: 1 } }, // silver T2 → iron-pick-gated
   spyglass: { inputs: [{ defId: "copper-ore", qty: 2 }, { defId: "ice-moss", qty: 1 }], output: { defId: "spyglass", qty: 1 } }, // cross-biome: desert copper + tundra moss
-  // Backpack — carry upgrade
+  // Backpack — carry upgrades (large-pack is T2: drake-hide gates it behind steel-knife)
   leather: { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "leather", qty: 1 } },
+  "large-pack": { inputs: [{ defId: "drake-hide", qty: 2 }, { defId: "ironwood-log", qty: 1 }], output: { defId: "large-pack", qty: 1 } },
   // Transport
   horse: { inputs: [{ defId: "deer-hide", qty: 3 }, { defId: "oak-log", qty: 2 }], output: { defId: "horse", qty: 1 } },
+  wagon: { inputs: [{ defId: "ironwood-log", qty: 2 }, { defId: "iron-ore", qty: 2 }], output: { defId: "wagon", qty: 1 } }, // T2: ironwood → iron-axe
   // Weapons — T1
   "iron-sword": { inputs: [{ defId: "iron-ore", qty: 3 }], output: { defId: "iron-sword", qty: 1 } },
   bow: { inputs: [{ defId: "oak-log", qty: 2 }, { defId: "deer-hide", qty: 1 }], output: { defId: "bow", qty: 1 } },

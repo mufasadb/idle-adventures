@@ -8,7 +8,7 @@ import { resolveCombat } from "./combat";
 import { endExpedition, subtractStacks } from "./bank";
 import { craft as applyRecipe } from "./craft";
 import { packItem, reserveLoadout } from "./pack";
-import { ENERGY_PER_FOOD, PLAYER_BASE_HP, GRID_SIZE, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, MATERIAL_TIER, LOOT_TABLE, MONSTERS, MONSTER_TIER_HP_CURVE, MONSTER_TIER_DMG_CURVE, SCOUT_ENERGY_COST, SCOUT_RADIUS, SCOUT_TOOL } from "../data/constants";
+import { ENERGY_PER_FOOD, FOOD_ENERGY, PLAYER_BASE_HP, GRID_SIZE, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, MATERIAL_TIER, LOOT_TABLE, MONSTERS, MONSTER_TIER_HP_CURVE, MONSTER_TIER_DMG_CURVE, SCOUT_ENERGY_COST, SCOUT_RADIUS, SCOUT_TOOL } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 
 // Pure reducer. M2 fills embark/move; M3 fills gather/drop; M4 fills scout/fight; remaining cases are no-op stubs:
@@ -60,8 +60,12 @@ function embark(
   const bank = subtractStacks(state.bank, reserved);
   if (bank === null) return rejected(state, "embark", "unaffordable");
   const grid = generateGrid(mapSeed, rollBiome(mapSeed));
-  const foodQty = state.loadout.food.reduce((sum, stack) => sum + stack.qty, 0);
-  const energy = foodQty * ENERGY_PER_FOOD;
+  // Per-food energy (2026-07-04): each stack contributes its defId's energy;
+  // tiered food (trail-ration) is denser, so a better-fed player fights the squeeze.
+  const energy = state.loadout.food.reduce(
+    (sum, stack) => sum + stack.qty * (FOOD_ENERGY[stack.defId] ?? ENERGY_PER_FOOD),
+    0,
+  );
   return {
     state: {
       ...state,

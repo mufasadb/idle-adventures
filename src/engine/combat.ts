@@ -13,6 +13,7 @@ import {
   MONSTER_TIER_DMG_CURVE,
   LOOT_TABLE,
   POTION_HEAL,
+  POTION_HEAL_BY,
   AUTO_POTION_THRESHOLD,
   UNARMED_DAMAGE,
   CHIP_DAMAGE_MIN,
@@ -80,7 +81,10 @@ export function resolveCombat(
   );
   let current = hp;
   let monsterHp = MONSTER_TIER_HP_CURVE[monster.tier]!;
-  let potionsLeft = loadout.potions.reduce((sum, p) => sum + p.qty, 0);
+  // Flat queue of potion defIds in stack order — quaffed front-to-back so heal
+  // amount tracks WHICH potion is drunk (2026-07-04 tiered consumables). The
+  // post-hoc consumption below drains the same stacks in the same order.
+  const potionQueue = loadout.potions.flatMap((p) => Array<string>(p.qty).fill(p.defId));
   let potionsUsed = 0;
   // Player strikes first. dmgOut ≥ CHIP_DAMAGE_MIN > 0 guarantees termination.
   for (;;) {
@@ -91,9 +95,9 @@ export function resolveCombat(
       current = 0; // soft-fail floor
       break;
     }
-    if (current <= AUTO_POTION_THRESHOLD * PLAYER_BASE_HP && potionsLeft > 0) {
-      current = Math.min(PLAYER_BASE_HP, current + POTION_HEAL);
-      potionsLeft -= 1;
+    if (current <= AUTO_POTION_THRESHOLD * PLAYER_BASE_HP && potionsUsed < potionQueue.length) {
+      const heal = POTION_HEAL_BY[potionQueue[potionsUsed]!] ?? POTION_HEAL;
+      current = Math.min(PLAYER_BASE_HP, current + heal);
       potionsUsed += 1;
     }
   }
