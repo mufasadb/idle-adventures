@@ -9,14 +9,25 @@ test("slotCap: no backpack gives base slots; backpack defines the cap", () => {
   expect(slotCap("unknown-pack")).toBe(BASE_CARRY_SLOTS);
 });
 
+// Firm carry squeeze (2026-07-04 tiered-progression pass): the tuned tier ladder
+// starter 3 < leather 5 < large-pack 7, and a tighter STACK_CAP so a real haul
+// opens new slots and food-vs-loot is a live per-run call.
+test("carry squeeze: backpack tiers 3/5/7 and STACK_CAP is firm", () => {
+  expect(STACK_CAP).toBe(5);
+  expect(slotCap("starter")).toBe(3);
+  expect(slotCap("leather")).toBe(5);
+  expect(slotCap("large-pack")).toBe(7);
+});
+
 test("addToCarry: new material starts a stack", () => {
   expect(addToCarry([], "iron-ore", 3, 2)).toEqual([{ defId: "iron-ore", qty: 3 }]);
 });
 
 test("addToCarry: merges into an existing stack without a new slot", () => {
-  const carry = [{ defId: "iron-ore", qty: 3 }];
-  expect(addToCarry(carry, "iron-ore", 3, 1)).toEqual([{ defId: "iron-ore", qty: 6 }]);
-  expect(carry).toEqual([{ defId: "iron-ore", qty: 3 }]); // pure — input untouched
+  const carry = [{ defId: "iron-ore", qty: 1 }];
+  const merged = 1 + (STACK_CAP - 1); // fill the partial stack up to the cap, still one slot
+  expect(addToCarry(carry, "iron-ore", STACK_CAP - 1, 1)).toEqual([{ defId: "iron-ore", qty: merged }]);
+  expect(carry).toEqual([{ defId: "iron-ore", qty: 1 }]); // pure — input untouched
 });
 
 test("addToCarry: overflow past STACK_CAP starts a new stack", () => {

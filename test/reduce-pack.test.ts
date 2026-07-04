@@ -2,6 +2,8 @@ import { test, expect } from "bun:test";
 import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
 import { reserveLoadout } from "../src/engine/pack";
+import { slotCap } from "../src/engine/carry";
+import { STACK_CAP } from "../src/data/constants";
 import type { GameState } from "../src/engine/types";
 
 function town(bank: { defId: string; qty: number }[]): GameState {
@@ -52,18 +54,20 @@ test("pack: food merges into a stack up to STACK_CAP before opening a new slot",
 });
 
 test("pack: rejects when a new food/potion stack would exceed backpack slots (bead note e)", () => {
-  // leather backpack = 6 slots; fill all 6 with full ration stacks (STACK_CAP=10),
-  // then packing a potion (new stack) must fail.
+  // Fill EVERY leather slot with full ration stacks, then packing a potion
+  // (a new stack) must fail. Lever-driven so it never churns on a re-tune.
+  const slots = slotCap("leather"); // total stacks the leather pack holds
+  const rations = slots * STACK_CAP; // fills exactly `slots` full stacks
   let state = town([
     { defId: "leather", qty: 1 },
-    { defId: "ration", qty: 60 },
+    { defId: "ration", qty: rations },
     { defId: "potion", qty: 1 },
   ]);
-  state = reduce(state, { type: "pack", slot: "backpack", itemId: "leather" }).state; // 6 slots
-  for (let i = 0; i < 60; i++) {
+  state = reduce(state, { type: "pack", slot: "backpack", itemId: "leather" }).state;
+  for (let i = 0; i < rations; i++) {
     state = reduce(state, { type: "pack", slot: "food", itemId: "ration" }).state;
   }
-  expect(state.loadout.food.length).toBe(6);
+  expect(state.loadout.food.length).toBe(slots);
   const { events } = reduce(state, { type: "pack", slot: "potion", itemId: "potion" });
   expect(events).toEqual([{ type: "action-rejected", action: "pack", reason: "no-slot" }]);
 });

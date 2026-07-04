@@ -90,10 +90,11 @@ export const TRANSPORT_MULTIPLIER: Record<string, number> = {
 // --- Carry (filled in M3) ---
 export const BASE_CARRY_SLOTS = 2; // carry stacks with no backpack equipped
 export const BACKPACK_SLOTS: Record<string, number> = {
-  starter: 4,
-  leather: 6,
+  starter: 3,
+  leather: 5,
+  "large-pack": 7, // top tier (recipe lands in the consumable/transport/backpack phase)
 }; // TOTAL carry stacks by backpack defId (replaces the base, not added to it)
-export const STACK_CAP = 10; // max qty per stack; overflow starts a new stack (new slot)
+export const STACK_CAP = 5; // max qty per stack; overflow starts a new stack (new slot). Firm squeeze (2026-07-04): a food/potion stack is now real slot pressure, and a haul opens new slots.
 
 // --- Gathering (filled in M3) ---
 // D21: hardness/tool/yield are per NODE TYPE, never per biome. The biome only
