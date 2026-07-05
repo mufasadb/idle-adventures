@@ -20,6 +20,15 @@ A turn-based exploration RPG built as a "logistics puzzle on a grid": pack a loa
 
 Work is tracked in **beads** — run `bd ready` for the next unblocked task before writing code.
 
+## Git & Sync Policy (ACTIVE — overrides the beads block below)
+
+The user has granted standing push authority and wants the remote kept current (set 2026-07-06). This **overrides** the "Conservative (default)" profile in the Beads Integration block — treat the repo as **Team-maintainer**:
+
+- **Keep git and Dolt up to date.** After landing a coherent unit of work (a feature/fix merged to `main`, or closed beads), commit, `git push`, and `bd dolt push` without asking.
+- You **have permission to push** — do not stop and ask for a landing decision each time. Push `main` and sync beads as part of normal session close.
+- Still hold to good hygiene: run the quality gates (`bun test` + `bun run typecheck` + `bun run lint`) green before pushing; write clear commit messages; branch for risky/large work and merge when green.
+- A later explicit "don't push" / "hold off" from the user overrides this for that request.
+
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:6cd5cc61 -->
 ## Beads Issue Tracker
 
