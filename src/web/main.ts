@@ -44,7 +44,6 @@ type Pending = { goal: Pos; path: Pos[]; cost: number; fight?: string } | null;
 let state: GameState = load() ?? newGame(seed);
 let log: string[] = loadLog();
 let pending: Pending = null; // a proposed walk awaiting a confirm click
-let chosenMap: { mapSeed: string; headline: string } | null = null; // one auto-picked candidate
 const app = document.querySelector<HTMLDivElement>("#app")!;
 
 // --- persistence: survive a page refresh (the run isn't lost) ----------------
@@ -60,21 +59,13 @@ function load(): GameState | null {
 function loadLog(): string[] {
   try { const raw = localStorage.getItem(`${SAVE_KEY}:log`); return raw ? (JSON.parse(raw) as string[]) : []; } catch { return []; }
 }
-function newRun(): void { state = newGame(seed); log = ["· new game"]; pending = null; chosenMap = null; draw(); }
-
-// pick one candidate map at random from THIS visit's fresh offer (rotates with runs)
-function pickMap(): { mapSeed: string; headline: string } {
-  const maps = candidateMaps(state.seed, state.runs ?? 0);
-  const m = maps[Math.floor(Math.random() * maps.length)]!;
-  return { mapSeed: m.mapSeed, headline: m.preview.headline };
-}
+function newRun(): void { state = newGame(seed); log = ["· new game"]; pending = null; draw(); }
 
 // --- action plumbing: one funnel so every interaction goes through reduce ----
 function apply(action: Action): void {
   const { state: next, events } = reduce(state, action);
   state = next;
   for (const e of events) log.unshift(fmt(e));
-  if (action.type === "embark") chosenMap = null; // reroll next time we're in town
   trimAndDraw();
 }
 function note(line: string): void { log.unshift(line); trimAndDraw(); }
@@ -209,7 +200,7 @@ function townView(): string {
   const eq = lo.equipment;
   const cap = carryCap(eq);
   const inv = inventoryGrid(lo, [], cap);
-  if (!chosenMap) chosenMap = pickMap();
+  const offer = candidateMaps(state.seed, state.runs ?? 0);
   const equipRow = (label: string, val: string | null) =>
     `<div class="row"><span class="k">${label}</span><span class="v">${val ?? "<span class='muted'>—</span>"}</span></div>`;
 
@@ -217,13 +208,16 @@ function townView(): string {
   <header><h1>Town</h1><span class="muted">seed "${state.seed}"</span><button class="link" data-newgame>new game</button></header>
   <div class="cols">
     <section>
-      <h2>Next map</h2>
-      <div class="mapcard">
-        <b>${chosenMap.headline}</b>
-        <button data-embark="${chosenMap.mapSeed}">Embark ▶</button>
+      <h2>Choose a map <span class="muted small">3 fresh each visit — no going back</span></h2>
+      <div class="mapoffer">
+        ${offer.map((m) => `
+          <div class="mapcard">
+            <b>${m.preview.headline}</b>
+            <button data-embark="${m.mapSeed}">Embark ▶</button>
+          </div>`).join("")}
       </div>
       ${lo.food.length === 0 ? `<div class="warn">⚠ no food packed → you'll embark with 0 energy</div>` : ""}
-      <div class="muted small">A map is rolled for you. Pack, then embark.</div>
+      <div class="muted small">Pick a biome to work this run. The offer rotates every time you return.</div>
     </section>
 
     <section>
