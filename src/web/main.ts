@@ -107,7 +107,7 @@ const kk = (p: Pos) => `${p.x},${p.y}`;
 // `blocked` = live-monster tiles routed AROUND (monsters block a tile until
 // beaten). The goal itself is allowed even if blocked, so you can click a monster
 // to walk in and fight it — the route just won't pass through OTHER monsters.
-function findPath(grid: Grid, start: Pos, goal: Pos, transport: string | null, blocked: Set<string>): { path: Pos[]; cost: number } | null {
+function findPath(grid: Grid, start: Pos, goal: Pos, transport: string | null, tools: string[], blocked: Set<string>): { path: Pos[]; cost: number } | null {
   if (kk(start) === kk(goal)) return { path: [], cost: 0 };
   const goalK = kk(goal);
   const startK = kk(start);
@@ -133,7 +133,7 @@ function findPath(grid: Grid, start: Pos, goal: Pos, transport: string | null, b
       if (nx < 0 || ny < 0 || nx >= GRID_SIZE || ny >= GRID_SIZE) continue;
       const nk = `${nx},${ny}`;
       if (blocked.has(nk) && nk !== goalK) continue; // route around other monsters
-      const step = moveCost(grid.terrain[ny]![nx]!, transport);
+      const step = moveCost(grid.terrain[ny]![nx]!, transport, tools);
       if (!Number.isFinite(step)) continue;
       const tentative = (g.get(cur) ?? Infinity) + step;
       if (tentative < (g.get(nk) ?? Infinity)) {
@@ -395,7 +395,7 @@ function onTileClick(to: Pos): void {
   const cleared = new Set(exp.cleared.map(kk));
   // live monsters block the route (you fight what you walk into) — routed around
   const blocked = new Set(grid.pois.filter((p) => p.kind === "monster" && p.creature && !cleared.has(kk(p))).map(kk));
-  const found = findPath(grid, exp.pos, to, exp.loadout.equipment.transport, blocked);
+  const found = findPath(grid, exp.pos, to, exp.loadout.equipment.transport, exp.loadout.equipment.tools, blocked);
   if (!found || found.path.length === 0) { pending = null; note("✗ can't reach that tile (walled off / blocked by a monster)"); return; }
   const goalPoi = grid.pois.find((p) => kk(p) === kk(to));
   const fight = goalPoi?.kind === "monster" && goalPoi.creature && !cleared.has(kk(to)) ? goalPoi.creature : undefined;

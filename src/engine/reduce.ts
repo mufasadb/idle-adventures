@@ -156,7 +156,7 @@ function move(
     return fightAt(state, expedition, step, poiAtStep.creature, "move", true);
   }
   const terrain = grid.terrain[step.y]![step.x]!;
-  const cost = moveCost(terrain, expedition.loadout.equipment.transport);
+  const cost = moveCost(terrain, expedition.loadout.equipment.transport, expedition.loadout.equipment.tools);
   if (!Number.isFinite(cost)) return rejected(state, "move", "impassable");
   if (cost > expedition.energy) return rejected(state, "move", "exhausted");
   const energy = expedition.energy - cost;

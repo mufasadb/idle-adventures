@@ -131,6 +131,27 @@ test("move: impassable terrain is rejected and costs nothing", () => {
   ]);
 });
 
+test("move: climbing-pick lets you step onto a mountain (finite cost, not rejected)", () => {
+  const seed = seedFor("tundra");
+  const grid = generateGrid(seed, rollBiome(seed));
+  const { from, to } = findStep(grid, "mountain");
+
+  // On foot the same step is impassable (mirrors the impassable test's combo).
+  const onFoot = reduce(expeditionState(seed, from, 10), { type: "move", to });
+  expect(onFoot.events).toEqual([
+    { type: "action-rejected", action: "move", reason: "impassable" },
+  ]);
+
+  // With a climbing-pick equipped, mountain becomes finite (gate cost 4).
+  const withPick = expeditionState(seed, from, 10);
+  withPick.expedition!.loadout.equipment.tools = ["climbing-pick"];
+  const climbed = reduce(withPick, { type: "move", to });
+  expect(climbed.state.expedition!.pos).toEqual(to);
+  expect(climbed.events).toEqual([
+    { type: "moved", from, to, terrain: "mountain", cost: 4, energy: 6 },
+  ]);
+});
+
 test("move: energy at 0 stops further moves (bead acceptance)", () => {
   const seed = seedFor("woodland");
   const grid = generateGrid(seed, rollBiome(seed));
