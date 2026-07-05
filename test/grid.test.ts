@@ -1,7 +1,8 @@
 import { test, expect } from "bun:test";
 import { generateGrid, rollBiome } from "../src/engine/grid";
-import { GRID_SIZE, BIOME_IDS, TERRAINS, POI_DENSITY, POI_MIN_SPACING, NODE_TYPES, BIOMES } from "../src/data/constants";
+import { GRID_SIZE, BIOME_IDS, TERRAINS, POI_DENSITY, POI_MIN_SPACING, NODE_TYPES, BIOMES, FOOD_REACH_MIN } from "../src/data/constants";
 import type { Terrain } from "../src/data/constants";
+import { costToReach } from "../src/engine/reach";
 
 const chebyshev = (a: { x: number; y: number }, b: { x: number; y: number }) =>
   Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
@@ -178,4 +179,42 @@ test("generateGrid: POI materials are deterministic and drawn from the biome tab
     const table = BIOMES[biomeId].materialTable[poi.kind]!;
     expect(Object.keys(table)).toContain(poi.material!);
   }
+});
+
+// --- Phase 3 (b91): barrier topology + reachability guard ---
+
+test("generateGrid: barrier bias is deterministic — same seed yields identical POIs", () => {
+  const a = generateGrid("topo-seed-1", rollBiome("topo-seed-1"));
+  const b = generateGrid("topo-seed-1", rollBiome("topo-seed-1"));
+  expect(b.pois).toEqual(a.pois);
+});
+
+test("generateGrid: reachability guard — every seed keeps >= FOOD_REACH_MIN forageable food on finite-reach tiles", () => {
+  for (let i = 0; i < 120; i++) {
+    const seed = `guard-${i}`;
+    const g = generateGrid(seed, rollBiome(seed));
+    const reach = costToReach(g.terrain, g.entry);
+    const reachableFood = g.pois.filter(
+      (p) => (p.kind === "herb" || p.kind === "animal") && Number.isFinite(reach[p.y]![p.x]!),
+    ).length;
+    const totalFood = g.pois.filter((p) => p.kind === "herb" || p.kind === "animal").length;
+    // Guard only promises the minimum when the map actually has that much food.
+    expect(reachableFood).toBeGreaterThanOrEqual(Math.min(FOOD_REACH_MIN, totalFood));
+  }
+});
+
+test("generateGrid: prizes trend farther to reach than food (statistical, across seeds)", () => {
+  let prizeSum = 0, prizeN = 0, foodSum = 0, foodN = 0;
+  for (let i = 0; i < 120; i++) {
+    const seed = `trend-${i}`;
+    const g = generateGrid(seed, rollBiome(seed));
+    const reach = costToReach(g.terrain, g.entry);
+    for (const p of g.pois) {
+      const c = reach[p.y]![p.x]!;
+      const r = Number.isFinite(c) ? c : 1000; // treat walled-off as very far
+      if (p.kind === "monster") { prizeSum += r; prizeN++; }
+      else if (p.kind === "herb" || p.kind === "animal") { foodSum += r; foodN++; }
+    }
+  }
+  expect(prizeSum / prizeN).toBeGreaterThan(foodSum / foodN); // monsters farther than food on average
 });

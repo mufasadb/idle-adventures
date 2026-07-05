@@ -9,6 +9,7 @@ export const NOISE_FREQUENCY = 0.15; // Perlin sample step per tile; lower = lar
 export const POI_DENSITY = 18; // POIs per map — richer than one run can harvest (2026-07-05, qrl): forces "which region do I work?" (sim: ~91%→~55% cleared with 3 food slots). Was 12.
 export const POI_MIN_SPACING = 3; // min Chebyshev distance between POIs (spec: 3–4 tiles apart)
 export const POI_PLACEMENT_ATTEMPTS = 400; // seeded rejection-sampling budget per map
+export const FOOD_REACH_MIN = 2; // Phase 3 (b91): min forageable (herb/animal) nodes that must sit on finite on-foot cost-to-reach tiles; else generateGrid falls back to unbiased placement so a bare loadout is never walled off from food
 export const CANDIDATE_MAP_COUNT = 3; // town map choices (spec §11)
 export const PREVIEW_FIDELITY = 0; // how much a preview reveals (placeholder — M5)
 
