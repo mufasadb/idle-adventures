@@ -36,3 +36,22 @@ test("moveCost: mountain is impassable regardless of transport", () => {
   expect(moveCost("mountain", null)).toBe(Infinity);
   expect(moveCost("mountain", "horse")).toBe(Infinity);
 });
+
+test("moveCost: climbing-pick makes mountain finite (Infinity → gate cost)", () => {
+  expect(moveCost("mountain", null)).toBe(Infinity);
+  expect(moveCost("mountain", null, ["climbing-pick"])).toBe(4);
+});
+
+test("moveCost: raft cheapens river (uses the min of base and gate)", () => {
+  expect(moveCost("river", null)).toBe(3);
+  expect(moveCost("river", null, ["raft"])).toBe(1);
+});
+
+test("moveCost: a gate never raises cost — irrelevant tool is a no-op", () => {
+  expect(moveCost("plains", null, ["climbing-pick", "raft"])).toBe(moveCost("plains", null));
+  expect(moveCost("mud", null, ["raft"])).toBe(moveCost("mud", null));
+});
+
+test("moveCost: gate composes with transport (÷ multiplier still applies)", () => {
+  expect(moveCost("mountain", "horse", ["climbing-pick"])).toBe(4 / 1.5);
+});

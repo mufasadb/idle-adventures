@@ -105,6 +105,14 @@ export const TERRAIN_COST: Record<Terrain, number> = {
   river: 3, // fordable but expensive
   mountain: Infinity, // impassable (gating gear may cheapen this later)
 }; // cost multiplier per terrain stepped ONTO
+// Equipped tools that reduce/enable gated terrain (Phase 3, boo). Effective
+// terrain cost = MIN of base TERRAIN_COST and any gate value a currently-equipped
+// tool confers. Hard walls (mountain = Infinity) become finite only with the tool;
+// that gear costs a tool slot, so bringing it is a real loadout tradeoff.
+export const TERRAIN_GATE: Partial<Record<Terrain, Record<string, number>>> = {
+  mountain: { "climbing-pick": 4 }, // Infinity → 4: passable but expensive (detour-or-climb call)
+  river: { raft: 1 }, // 3 → 1: a cheap crossing where rivers wall you off
+}; // sparse: only gated terrains listed
 export const TRANSPORT_MULTIPLIER: Record<string, number> = {
   horse: 1.5, // fast — divides move cost (spec §10: base × terrain ÷ transport)
   wagon: 2.0, // T2 transport: halves move cost — the answer to ice-heavy tundra
