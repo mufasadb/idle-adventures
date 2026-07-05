@@ -27,8 +27,6 @@ import {
   AUTO_POTION_THRESHOLD,
   UNARMED_DAMAGE,
   AFFINITY_MULTIPLIER,
-  SCOUT_ENERGY_COST,
-  SCOUT_RADIUS,
   MONSTER_TIER_HP_CURVE,
   MONSTER_TIER_DMG_CURVE,
   MONSTERS,
@@ -147,8 +145,6 @@ test("constants: M4 combat levers are filled", () => {
   expect(AUTO_POTION_THRESHOLD).toBeLessThanOrEqual(1);
   expect(UNARMED_DAMAGE).toBeGreaterThan(0);
   expect(AFFINITY_MULTIPLIER).toBeGreaterThan(1);
-  expect(SCOUT_ENERGY_COST).toBeGreaterThanOrEqual(0);
-  expect(SCOUT_RADIUS).toBeGreaterThan(0);
 });
 
 test("constants: monster catalog is internally consistent", () => {

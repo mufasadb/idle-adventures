@@ -154,3 +154,34 @@ test("tier curves: bigger tiers are tougher (sanity)", () => {
   expect(MONSTER_TIER_DMG_CURVE[3]!).toBeGreaterThan(MONSTER_TIER_DMG_CURVE[1]!);
   expect(MONSTERS["ice-troll"]!.tier).toBe(3);
 });
+
+// --- explainMatchup (9u9.2): post-fight RPS/affinity lesson facts ---
+import { explainMatchup } from "../src/engine/combat";
+
+function loadoutWith(patch: Partial<ReturnType<typeof emptyLoadout>["equipment"]>) {
+  const l = emptyLoadout();
+  Object.assign(l.equipment, patch);
+  return l;
+}
+
+test("explainMatchup: right-type weapon beats the hide (>1), wrong-type glances (<1)", () => {
+  // fire-staff (magic) vs ice-troll (plate): magic→plate = 1.5 (>1)
+  expect(explainMatchup(loadoutWith({ weapon: "fire-staff" }), "ice-troll").weaponVsHide).toBeGreaterThan(1);
+  // bow (ranged) vs ice-troll (plate): ranged→plate = 0.5 (<1)
+  expect(explainMatchup(loadoutWith({ weapon: "bow" }), "ice-troll").weaponVsHide).toBeLessThan(1);
+});
+
+test("explainMatchup: affinity pairing fires", () => {
+  // silver-sword (silver) vs werewolf (werewolf tag) → affinity
+  expect(explainMatchup(loadoutWith({ weapon: "silver-sword" }), "werewolf").affinityFired).toBe(true);
+  expect(explainMatchup(loadoutWith({ weapon: "sword" }), "werewolf").affinityFired).toBe(false);
+});
+
+test("explainMatchup: armour class vs incoming damage type classifies", () => {
+  // sand-raider = ranged; plate→ranged matrix 0.5 (<1) → resisted
+  expect(explainMatchup(loadoutWith({ chest: "plate-chest" }), "sand-raider").armourVsAttack).toBe("resisted");
+  // dust-vampire = magic; plate→magic 1.5 (>1) → exposed
+  expect(explainMatchup(loadoutWith({ chest: "plate-chest" }), "dust-vampire").armourVsAttack).toBe("exposed");
+  // no armour → neutral
+  expect(explainMatchup(emptyLoadout(), "sand-raider").armourVsAttack).toBe("neutral");
+});

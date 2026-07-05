@@ -107,6 +107,41 @@ export function mitigation(loadout: Loadout, dmgType: DmgType): number {
   return total;
 }
 
+export type Matchup = {
+  weaponVsHide: number | null; // matrix multiplier of weapon type vs monster hide; null if unarmed
+  affinityFired: boolean; // a hidden affinity triggered (the discovery channel)
+  armourVsAttack: "resisted" | "neutral" | "exposed"; // how the player's armour fared vs monster dmgType
+};
+
+// Post-fight lesson facts (9u9.2). Pure — the render layer flavors these into
+// "your blade skated off its hide" etc. Teaches the RPS system + affinity by playing.
+export function explainMatchup(loadout: Loadout, monsterId: string): Matchup {
+  const monster = MONSTERS[monsterId];
+  if (!monster) throw new Error(`unknown monster: ${monsterId}`);
+  const weaponId = loadout.equipment.weapon;
+  const weapon = weaponId === null ? undefined : WEAPONS[weaponId];
+  const weaponVsHide = weapon
+    ? DMG_ARMOUR_MATRIX[weapon.dmgType][monster.armourType]
+    : null;
+  const affinityFired = AFFINITIES.some(
+    (a) => monster.tags.includes(a.monsterTag) && (weapon?.tags ?? []).includes(a.itemTag),
+  );
+  // Average how each equipped armour piece's class fares vs the incoming dmg type.
+  let sum = 0;
+  let n = 0;
+  for (const slot of ARMOUR_SLOTS) {
+    const pieceId = loadout.equipment[slot];
+    if (pieceId === null) continue;
+    const piece = ARMOUR[pieceId];
+    if (!piece) continue;
+    sum += DMG_ARMOUR_MATRIX[monster.dmgType][piece.armourType];
+    n += 1;
+  }
+  const armourVsAttack: Matchup["armourVsAttack"] =
+    n === 0 ? "neutral" : sum / n < 1 ? "resisted" : sum / n > 1 ? "exposed" : "neutral";
+  return { weaponVsHide, affinityFired, armourVsAttack };
+}
+
 export function resolveCombat(
   loadout: Loadout,
   hp: number,

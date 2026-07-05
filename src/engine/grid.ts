@@ -51,7 +51,7 @@ function rollMaterial(
   return weightedPick(table, order, roll);
 }
 
-// Memoize generation: the reducer regenerates the grid on every move/gather/scout
+// Memoize generation: the reducer regenerates the grid on every move/gather
 // with identical (mapSeed, biomeId), and generation now runs reachability passes
 // (b91) that are wasteful to repeat. Pure (deterministic in the key), so caching
 // is transparent; callers treat the grid as read-only. Bounded to cap memory

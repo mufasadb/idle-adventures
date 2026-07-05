@@ -75,3 +75,21 @@ test("renderGridHtml: emits a CSS grid with one tile per cell", () => {
   expect(html.match(/ poi /g)?.length).toBe(POI_DENSITY);
   expect(html).toBe(renderGridHtml(generateGrid("snap-1", "woodland"), grid.entry));
 });
+
+// --- perception flavor (9u9.2): facts → vague human text, no numbers/outcome ---
+import { flavorDetail, matchupLessons } from "../src/render/render";
+
+test("flavorDetail: null detail gives kind-only text; monster detail is vague, no numbers", () => {
+  expect(flavorDetail(null, "monster")).toBe("a monster");
+  const txt = flavorDetail({ tier: 3, dmgType: "magic", armourType: "plate", creature: "ice-troll" }, "monster");
+  expect(txt).not.toMatch(/\d/); // no exact numbers leak
+  expect(txt.length).toBeGreaterThan(0);
+});
+
+test("matchupLessons: surfaces affinity + weapon-vs-hide + armour result", () => {
+  const l = matchupLessons({ weaponVsHide: 0.5, affinityFired: true, armourVsAttack: "exposed" }, "bow");
+  expect(l.length).toBeGreaterThan(0);
+  expect(l.join(" ")).toMatch(/savaged|something/i); // affinity line present
+  const none = matchupLessons({ weaponVsHide: 1, affinityFired: false, armourVsAttack: "neutral" }, "sword");
+  expect(none.length).toBe(0); // nothing notable → no noise
+});

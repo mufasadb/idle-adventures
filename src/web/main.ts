@@ -13,8 +13,9 @@ import { slotOf } from "../engine/catalog";
 import { moveCost } from "../engine/move";
 import { carryCap } from "../engine/carry";
 import { heldFoodEnergy } from "../engine/food";
-import { RECIPE, MATERIAL_TIER, GRID_SIZE, MONSTERS } from "../data/constants";
-import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR } from "../render/render";
+import { RECIPE, MATERIAL_TIER, GRID_SIZE } from "../data/constants";
+import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons } from "../render/render";
+import { perceive } from "../engine/perceive";
 import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, LoadoutSlot } from "../engine/types";
 
 // Per-node verb so the UI reads right: you don't "mine" an animal.
@@ -90,10 +91,13 @@ function fmt(e: GameEvent): string {
     case "moved": return `walked to (${e.to.x},${e.to.y}) on ${e.terrain} · −${round(e.cost)}e → ${round(e.energy)}e`;
     case "gathered": return `${GATHER_VERB[e.kind]?.past ?? "gathered"} ${e.qty}× ${name(e.material)} · −${round(e.cost)}e → ${round(e.energy)}e`;
     case "dropped": return `dropped ${e.qty}× ${name(e.defId)}`;
-    case "fought": return e.victory
-      ? `⚔ beat the ${name(e.creature)} · −${round(e.hpLost)}hp${e.potionsUsed ? ` (${e.potionsUsed} potion${e.potionsUsed > 1 ? "s" : ""})` : ""} · loot ${e.loot.map((l) => `${l.qty}× ${name(l.defId)}`).join(", ") || "none"}`
-      : `☠ the ${name(e.creature)} downed you · run ends, haul kept`;
-    case "scouted": return `🔭 scouted: ${e.monsters.map((m) => `${name(m.creature)} T${m.tier} (${m.forecast.victory ? "win" : "LOSE"} −${round(m.forecast.hpLost)}hp)`).join("; ") || "nothing near"}`;
+    case "fought": {
+      const lessons = matchupLessons(e.matchup, null);
+      const tail = lessons.length ? ` · ${lessons.join(" · ")}` : "";
+      return (e.victory
+        ? `⚔ beat the ${name(e.creature)} · −${round(e.hpLost)}hp${e.potionsUsed ? ` (${e.potionsUsed} potion${e.potionsUsed > 1 ? "s" : ""})` : ""} · loot ${e.loot.map((l) => `${l.qty}× ${name(l.defId)}`).join(", ") || "none"}`
+        : `☠ the ${name(e.creature)} downed you · run ends, haul kept`) + tail;
+    }
     case "crafted": return `✦ crafted ${e.output.qty}× ${name(e.output.defId)}`;
     case "packed": return `packed ${name(e.defId)} → ${e.slot}`;
     case "run-ended": return `— run ended (${e.reason}) —`;
@@ -279,9 +283,11 @@ function herePanel(grid: Grid, exp: NonNullable<GameState["expedition"]>, legal:
     return `<div class="here"><b>Here:</b> open ${terrain}${clearedText}.</div>`;
   }
   if (poi.kind === "monster" && poi.creature) {
-    const m = MONSTERS[poi.creature]!;
+    // You're standing on it, so it's always within perception range.
+    const per = perceive(grid, exp.pos, exp.loadout.equipment.tools).find((p) => p.x === poi.x && p.y === poi.y);
+    const desc = flavorDetail(per?.detail ?? null, "monster");
     return `<div class="here monster">
-      <b>Here:</b> a <b>${name(poi.creature!)}</b> — tier ${m.tier}, ${m.dmgType} damage, ${m.armourType} hide.
+      <b>Here:</b> a <b>${name(poi.creature!)}</b> — <i>${desc}</i>.
       It's static: it won't touch you unless you Fight. You can just walk past it.
       ${canFight ? `<button data-act="fight">⚔ Fight the ${name(poi.creature!)}</button>` : `<span class="warn">can't fight (bag full for its loot?)</span>`}
     </div>`;
@@ -303,9 +309,11 @@ function expeditionView(): string {
   const exp = state.expedition!;
   const grid = generateGrid(exp.mapSeed, rollBiome(exp.mapSeed));
   const legal = legalActions(state);
-  const canScout = legal.some((a) => a.type === "scout");
 
   const poiAt = new Map(grid.pois.map((p) => [kk(p), p]));
+  const perceived = new Map(
+    perceive(grid, exp.pos, exp.loadout.equipment.tools).map((p) => [`${p.x},${p.y}`, p]),
+  );
   const cleared = new Set(exp.cleared.map(kk));
   const pathSet = new Set(pending ? pending.path.map(kk) : []);
   const goalK = pending ? kk(pending.goal) : "";
@@ -324,8 +332,11 @@ function expeditionView(): string {
     const locked = poi && !isCleared && poi.material && (MATERIAL_TIER[poi.material] ?? 1) > 1;
     if (locked) cls.push("locked");
     const ch = isPlayer ? PLAYER_CHAR : isCleared ? "·" : poi ? POI_CHAR[poi.kind] : TERRAIN_CHAR[grid.terrain[y]![x]!];
+    const per = poi ? perceived.get(k) : undefined;
     const title = poi
-      ? `${poi.kind}${poi.material ? ` · ${poi.material}${locked ? ` (T${MATERIAL_TIER[poi.material]} — needs a better tool)` : ""}` : ""}${poi.creature ? ` · ${poi.creature}` : ""}`
+      ? (per && per.detail
+          ? `${poi.kind} · ${flavorDetail(per.detail, poi.kind)}${locked ? ` (needs a better tool)` : ""}`
+          : poi.kind === "monster" ? "a monster" : `a ${poi.kind} node`)
       : grid.terrain[y]![x]!;
     cells += `<div class="${cls.join(" ")}" data-x="${x}" data-y="${y}" title="${title}">${ch}</div>`;
   }
@@ -352,7 +363,6 @@ function expeditionView(): string {
       ${herePanel(grid, exp, legal)}
       <h2>Actions</h2>
       <div class="actions">
-        ${canScout ? `<button data-act="scout">🔭 Scout</button>` : ""}
         <button data-act="return">⏎ Return to town</button>
       </div>
       <h2>Bag <span class="muted small">${inv.used}/${cap} slots</span></h2>

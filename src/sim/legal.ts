@@ -47,7 +47,6 @@ export function expeditionActions(state: GameState): Action[] {
   }
   // tile-contextual actions
   candidates.push({ type: "gather" });
-  candidates.push({ type: "scout" });
   candidates.push({ type: "fight" });
   // drop each carried stack
   for (const stack of carry) candidates.push({ type: "drop", itemId: stack.defId });

@@ -25,11 +25,11 @@ The POC ships with *feel-pass* values, not balanced ones. The discipline that ke
 
 **Combat**
 - `PLAYER_BASE_HP` · `DMG_ARMOUR_MATRIX[dmgType][armourType]` — read BOTH ways: damage multiplier vs the monster's hide class going out, mitigation divisor per armour piece coming in (`defense ÷ matrix`) · `ARMOUR{pieceDefId} → {armourType, defense}` · `WEAPONS{defId} → {dmgType, damage, tags}` · `UNARMED_DAMAGE`
-- `AFFINITIES[{monsterTag, itemTag}]` + `AFFINITY_MULTIPLIER` — the hidden discoverable layer (silver↔werewolf, iron↔fae, garlic↔vampire); scout forecasts price it in without naming it
+- `AFFINITIES[{monsterTag, itemTag}]` + `AFFINITY_MULTIPLIER` — the hidden discoverable layer (silver↔werewolf, iron↔fae, garlic↔vampire); never shown by perception, **discovered post-fight** via `matchup.affinityFired` (D38)
 - `POTION_HEAL` (default) · `POTION_HEAL_BY{potionDefId}` (2026-07-04, `potion` 10 / `greater-potion` 20; absent = `POTION_HEAL`) · `AUTO_POTION_THRESHOLD` (fraction of base HP) · `CHIP_DAMAGE_MIN` — the "HP always drains" floor, both directions
 - `COMBAT_BUFF{battleItemDefId} → {damageAdd?, mitigationAdd?}` (bzd, 2026-07-05) — packed battle items, summed into `dmgOut`/mitigation and **consumed at fight start** (`elixir-of-power` +2 dmg, `warding-draught` +3 mitigation). The T3-fight-only reward branch; they cost inventory slots (pqp) and let a fought-up player beat the Wyrm without full mithril (§4.3). `BATTLE_ITEM[]` is the catalog list (`slotOf` → `"battle-item"`).
 - `MONSTER_TIER_HP_CURVE` / `MONSTER_TIER_DMG_CURVE` · `MONSTERS{defId} → {tier, dmgType, armourType, tags}` · `LOOT_TABLE{monster}` (fixed drops — determinism needs no RNG) · `BIOMES{id}.creatureTable` (uniform pick, stamped at generation)
-- `SCOUT_ENERGY_COST` · `SCOUT_RADIUS` · `SCOUT_TOOL`
+- `DETAIL_RADIUS` (2) + `VISION_RANGE_BONUS{toolDefId}` (spyglass +3) — passive perception (9u9.2, D38): node KIND always visible; qualitative `detail` (species/material/tier/dmg+armour type — **never the outcome**) resolves only within `DETAIL_RADIUS + Σ bonuses` of the player. Future glasses/cartography/scent items slot into `VISION_RANGE_BONUS`. (Replaced `SCOUT_ENERGY_COST`/`SCOUT_RADIUS`/`SCOUT_TOOL`.)
 
 **Crafting**
 - `RECIPE{itemDefId} → {inputs, output}` — the shared tree (M5, filled): tiered tools (`iron-pick` halves mining cost — the "cheaper second run" demonstrator), backpacks, weapons incl. affinity gear (`silver-sword`), armour pieces, transport, food, potions. Cross-biome inputs are a **soft pull** (D27: silver best-farmed in tundra, obtainable anywhere), not a hard gate. `FOOD`/`POTION` catalogs list which defIds `pack`/`slotOf` accept in the consumable slots.

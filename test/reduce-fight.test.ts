@@ -3,7 +3,7 @@ import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import type { Grid, Poi } from "../src/engine/grid";
-import { resolveCombat, rollLoot } from "../src/engine/combat";
+import { resolveCombat, rollLoot, explainMatchup } from "../src/engine/combat";
 import { PLAYER_BASE_HP, BASE_CARRY_SLOTS } from "../src/data/constants";
 import type { GameState, Loadout } from "../src/engine/types";
 
@@ -62,6 +62,7 @@ test("fight: victory drains HP, consumes the monster, loots into carry", () => {
       potionsUsed: 0,
       loot,
       hp: expected.hpAfter,
+      matchup: explainMatchup(before.expedition!.loadout, poi.creature!),
     },
   ]);
 });

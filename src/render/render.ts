@@ -1,10 +1,51 @@
 import type { GameState } from "../engine/types";
 import { generateGrid, rollBiome } from "../engine/grid";
 import type { Grid } from "../engine/grid";
-import type { Terrain, NodeType } from "../data/constants";
+import type { Terrain, NodeType, DmgType, ArmourType } from "../data/constants";
+import type { PoiDetail } from "../engine/perceive";
+import type { Matchup } from "../engine/combat";
 
 // Dumb view: state → string. The grid is REGENERATED from mapSeed (D14) —
 // render holds no state and makes no decisions.
+
+// --- Perception flavor (9u9.2): turn structured facts into vague, learn-the-
+// vocabulary text. NEVER numbers or the fight outcome. New monsters get flavor
+// for free (generated from facts); per-creature overrides can land later.
+const DMG_FLAVOR: Record<DmgType, string> = {
+  melee: "it shifts its weight to strike",
+  ranged: "it keeps its distance, wary",
+  magic: "an odd sheen ripples off its skin",
+};
+const HIDE_FLAVOR: Record<ArmourType, string> = {
+  plate: "a thick, scaled hide",
+  light: "a lean, quick frame",
+  robe: "a soft, unarmoured shape",
+};
+const SIZE_FLAVOR = ["", "a small", "a fair-sized", "a large", "a towering"]; // by tier 1-4
+
+// Vague human text from perception facts. `detail === null` → kind only.
+export function flavorDetail(detail: PoiDetail | null, kind: NodeType): string {
+  if (detail === null) return kind === "monster" ? "a monster" : `a ${kind} node`;
+  if (kind === "monster") {
+    const size = SIZE_FLAVOR[detail.tier] ?? "a";
+    const hide = detail.armourType ? HIDE_FLAVOR[detail.armourType] : "an unclear form";
+    const tell = detail.dmgType ? `; ${DMG_FLAVOR[detail.dmgType]}` : "";
+    return `${size} creature — ${hide}${tell}`;
+  }
+  return detail.material ?? `a ${kind} node`;
+}
+
+// 0-2 salient post-fight lessons; empty when nothing notable happened. `weaponId`
+// is part of the interface for callers that flavor per-weapon later.
+export function matchupLessons(matchup: Matchup, _weaponId: string | null): string[] {
+  const out: string[] = [];
+  if (matchup.affinityFired) out.push("something in your weapon savaged it");
+  if (matchup.weaponVsHide !== null && matchup.weaponVsHide < 1) out.push("your weapon skated off its hide");
+  else if (matchup.weaponVsHide !== null && matchup.weaponVsHide > 1) out.push("you found the gap in its guard");
+  if (matchup.armourVsAttack === "exposed") out.push("its attacks tore through your armour");
+  else if (matchup.armourVsAttack === "resisted") out.push("your armour turned the blows aside");
+  return out.slice(0, 2);
+}
 
 export const TERRAIN_CHAR: Record<Terrain, string> = {
   river: "~",

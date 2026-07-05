@@ -3,13 +3,19 @@
 // M0 defines the NAMES and SHAPES with placeholder values; each milestone fills in
 // the real numbers for its system. See docs/balance-levers.md.
 
-// --- Map & forecast (filled in M1) ---
+// --- Map & perception (filled in M1) ---
 export const GRID_SIZE = 20; // tiles per side
 export const NOISE_FREQUENCY = 0.15; // Perlin sample step per tile; lower = larger terrain regions
 export const POI_DENSITY = 18; // POIs per map — richer than one run can harvest (2026-07-05, qrl): forces "which region do I work?" (sim: ~91%→~55% cleared with 3 food slots). Was 12.
 export const POI_MIN_SPACING = 3; // min Chebyshev distance between POIs (spec: 3–4 tiles apart)
 export const POI_PLACEMENT_ATTEMPTS = 400; // seeded rejection-sampling budget per map
 export const FOOD_REACH_MIN = 2; // Phase 3 (b91): min forageable (herb/animal) nodes that must sit on finite on-foot cost-to-reach tiles; else generateGrid falls back to unbiased placement so a bare loadout is never walled off from food
+// Perception (9u9.2): node KIND is always visible; a node's qualitative identity
+// (species/material/tier/dmg+armour type — never the fight outcome) resolves only
+// within this Chebyshev radius of the player. Tools in VISION_RANGE_BONUS widen it
+// (data-driven like TERRAIN_GATE; future glasses/cartography/scent items slot in).
+export const DETAIL_RADIUS = 2;
+export const VISION_RANGE_BONUS: Record<string, number> = { spyglass: 3 }; // spyglass → radius 5
 export const CANDIDATE_MAP_COUNT = 3; // town map choices (spec §11)
 export const PREVIEW_FIDELITY = 0; // how much a preview reveals (placeholder — M5)
 
@@ -171,7 +177,7 @@ export const TOOL_CAPABILITY: Record<string, string> = {
   "steel-pick": "pick",
   "steel-axe": "axe",
   "steel-knife": "knife",
-  spyglass: "scout", // scouting capability; NODE_TOOL never asks for "scout", so no gather impact
+  spyglass: "vision", // perception-range capability (9u9.2); NODE_TOOL never asks for it, so no gather impact
   "climbing-pick": "climb", // gating capability (boo); NODE_TOOL never asks for "climb", so no gather impact
   raft: "ford", // gating capability for rivers (boo)
 }; // tool defId → capability; tiered tools (M5: "iron-pick": "pick") are data-only
@@ -184,7 +190,7 @@ export const TOOL_QUALITY: Record<string, number> = {
   "steel-pick": 3, // tier 3: unlocks mithril; also cheapest mining
   "steel-axe": 3,
   "steel-knife": 2,
-  spyglass: 1, // quality irrelevant to scouting; present to satisfy the catalog invariant
+  spyglass: 1, // quality irrelevant to vision; present to satisfy the catalog invariant
   "climbing-pick": 1, // quality irrelevant to gating; present to satisfy the catalog invariant
   raft: 1,
 }; // gather-cost divisor AND tier gate (quality == max MATERIAL_TIER gatherable)
@@ -344,10 +350,6 @@ export const LOOT_TABLE: Record<string, ItemStackSpec[]> = {
   // 1/5 rare) → wyrmfang. `chance` is rolled per-encounter in fightAt (§4.5).
   "ancient-wyrm": [{ defId: "wyrm-scale", qty: 3 }, { defId: "dragonheart", qty: 1, chance: 0.2 }],
 }; // monster fixed loot drops (entries with `chance` roll deterministically in fightAt)
-
-export const SCOUT_ENERGY_COST = 1; // energy per scout activation
-export const SCOUT_RADIUS = 3; // Chebyshev radius of scout reveal
-export const SCOUT_TOOL = "spyglass"; // required tool defId for scouting
 
 // --- Consumable item catalogs (M5) ---
 // ENERGY_PER_FOOD / POTION_HEAL are flat, so these are single-item catalogs for
