@@ -2,6 +2,7 @@ import { test, expect } from "bun:test";
 import { townActions, expeditionActions, legalActions } from "../src/sim/legal";
 import { reduce } from "../src/engine/reduce";
 import { newGame, candidateMaps } from "../src/engine/town";
+const OFFER_S = candidateMaps("s", 0)[0]!.mapSeed; // offered map for seed "s" (9u9.3)
 import { play } from "../src/sim/play";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import type { Poi } from "../src/engine/grid";
@@ -31,7 +32,7 @@ test("townActions: offers pack + embark on a fresh game, never move/gather", () 
 test("townActions: empty when not in town", () => {
   const onMap = play("s", [
     { type: "pack", slot: "food", itemId: "ration" },
-    { type: "embark", mapSeed: "s:map:0" },
+    { type: "embark", mapSeed: OFFER_S },
   ]).state;
   expect(townActions(onMap)).toEqual([]);
 });
@@ -40,7 +41,7 @@ test("expeditionActions: offers return (always) + some moves, never craft/pack",
   const onMap = play("s", [
     { type: "pack", slot: "food", itemId: "ration" },
     { type: "pack", slot: "food", itemId: "ration" },
-    { type: "embark", mapSeed: "s:map:0" },
+    { type: "embark", mapSeed: OFFER_S },
   ]).state;
   const actions = expeditionActions(onMap);
   for (const a of actions) expect(accepts(onMap, a)).toBe(true);
@@ -52,7 +53,7 @@ test("expeditionActions: offers return (always) + some moves, never craft/pack",
 test("expeditionActions: return is offered even at zero energy (never a dead end)", () => {
   // Drain to a genuine 0 (embark now floors energy at BASE_ENERGY_FLOOR, qrl):
   // moves are all unaffordable, but return must still stand.
-  const embarked = play("s", [{ type: "embark", mapSeed: "s:map:0" }]).state;
+  const embarked = play("s", [{ type: "embark", mapSeed: OFFER_S }]).state;
   const zero: GameState = { ...embarked, expedition: { ...embarked.expedition!, energy: 0 } };
   expect(expeditionActions(zero)).toContainEqual({ type: "return" });
 });
@@ -66,7 +67,7 @@ test("legalActions: dispatches by phase", () => {
   expect(legalActions(town)).toEqual(townActions(town));
   const onMap = play("s", [
     { type: "pack", slot: "food", itemId: "ration" },
-    { type: "embark", mapSeed: "s:map:0" },
+    { type: "embark", mapSeed: OFFER_S },
   ]).state;
   expect(legalActions(onMap)).toEqual(expeditionActions(onMap));
 });

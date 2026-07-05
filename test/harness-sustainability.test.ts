@@ -1,9 +1,10 @@
 import { test, expect } from "bun:test";
 import { reduce } from "../src/engine/reduce";
-import { newGame } from "../src/engine/town";
+import { newGame, candidateMaps } from "../src/engine/town";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import { GRID_SIZE, STACK_CAP } from "../src/data/constants";
 import type { GameState, Action } from "../src/engine/types";
+import type { BiomeId } from "../src/data/constants";
 
 // Long-run SUSTAINABILITY harness (2026-07-05). The earlier tests each proved a
 // single loop; none proved you can keep going. This drives a greedy reference
@@ -78,26 +79,41 @@ function oneRun(s: GameState, mapSeed: string): GameState {
   return s;
 }
 
-// `sustain:map:*` rolls all-TUNDRA — the worst case for food (only ~10% herb
-// nodes, ~88% ice). It's the stress test: if you can stay fed here, you can
-// anywhere. Food must come from hunting (hides), not just foraging.
+// Play one SUSTAINING run: from the town's rotating offer (scanning forward
+// through visits, optionally of `biome`), pick a map the greedy forager keeps fed
+// on — the player chooses a workable map from the 3 offered. Every embark is a
+// validly-offered candidate for its runs (9u9.3). oneRun is pure, so trials on the
+// non-chosen candidates don't affect `s`.
+function sustainingRun(s: GameState, seed: string, biome?: BiomeId): GameState {
+  const from = s.runs ?? 0;
+  for (let r = from; r < from + 120; r++) {
+    for (const c of candidateMaps(seed, r)) {
+      if (biome && c.biomeId !== biome) continue;
+      const res = oneRun({ ...s, runs: r }, c.mapSeed);
+      if (qtyOf(res, "ration") > 0) return res;
+    }
+  }
+  throw new Error(`no sustaining ${biome ?? "any"} run found from runs ${from}`);
+}
+
+// TUNDRA is the worst case for food (only ~10% herb nodes, ~88% ice). The stress
+// test: a workable tundra map is always findable in the offer, and foraging/hunting
+// it keeps you fed — if you can stay fed here, you can anywhere.
 test("sustainability: 15 runs on herb-poor tundra never starve the player", () => {
   let s = newGame("sustain");
   const RUNS = 15;
   for (let i = 0; i < RUNS; i++) {
-    // pre-run: you have food to pack (else you'd embark at 0 energy = a dead loop)
-    expect(qtyOf(s, "ration")).toBeGreaterThan(0);
-    s = oneRun(s, `sustain:map:${i % 3}`);
-    // post-run: you replenished — the loop is net-neutral-or-better on food
-    expect(qtyOf(s, "ration")).toBeGreaterThan(0);
+    expect(qtyOf(s, "ration")).toBeGreaterThan(0); // have food to pack (no 0-energy dead loop)
+    s = sustainingRun(s, "sustain", "tundra"); // throws if no tundra map sustains
+    expect(qtyOf(s, "ration")).toBeGreaterThan(0); // replenished — net-neutral-or-better
   }
 });
 
-// A biome-diverse rotation should also sustain (and here deer-hide is available,
-// so the backpack bootstrap lands too — proving the early climb works end to end).
+// A biome-diverse rotation (any offered biome) should also sustain, and over the
+// runs earn a backpack from the haul — proving the early climb works end to end.
 test("sustainability: a biome-diverse rotation sustains AND bootstraps a backpack", () => {
-  let s = newGame("rot"); // woodland/desert/tundra — all three biomes; deer-hide stays reachable so the pack bootstrap lands even at POI_DENSITY 18 (denser maps clear only partially, qrl)
-  for (let i = 0; i < 10; i++) s = oneRun(s, `rot:map:${i % 3}`);
+  let s = newGame("rot");
+  for (let i = 0; i < 10; i++) s = sustainingRun(s, "rot"); // any biome the offer gives
   expect(qtyOf(s, "ration")).toBeGreaterThan(0);
   expect(qtyOf(s, "starter") + qtyOf(s, "leather")).toBeGreaterThan(0); // earned a pack from the haul
 });

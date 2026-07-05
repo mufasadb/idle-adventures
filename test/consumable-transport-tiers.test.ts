@@ -4,7 +4,10 @@ import { resolveCombat } from "../src/engine/combat";
 import { moveCost } from "../src/engine/move";
 import { slotCap } from "../src/engine/carry";
 import { emptyLoadout } from "../src/engine/loadout";
+import { candidateMaps } from "../src/engine/town";
 import type { GameState } from "../src/engine/types";
+
+const OFFER_T = candidateMaps("t", 0)[0]!.mapSeed; // an offered map for seed "t" (9u9.3)
 
 // Consumable/transport/backpack tiers (2026-07-04). Better consumables give more
 // per item — progression EARNS efficiency against the firm carry squeeze.
@@ -17,11 +20,11 @@ test("embark: trail-ration yields 2× a ration's energy/item (per-food lever, ff
   // qty 3 so both clear BASE_ENERGY_FLOOR (20) and the per-item ratio is visible.
   const withRation = reduce(
     { ...town([{ defId: "ration", qty: 3 }]), loadout: { ...emptyLoadout(), food: [{ defId: "ration", qty: 3 }] } },
-    { type: "embark", mapSeed: "t:map:0" },
+    { type: "embark", mapSeed: OFFER_T },
   ).state;
   const withTrail = reduce(
     { ...town([{ defId: "trail-ration", qty: 3 }]), loadout: { ...emptyLoadout(), food: [{ defId: "trail-ration", qty: 3 }] } },
-    { type: "embark", mapSeed: "t:map:0" },
+    { type: "embark", mapSeed: OFFER_T },
   ).state;
   expect(withRation.expedition!.energy).toBe(24); // 3 × 8
   expect(withTrail.expedition!.energy).toBe(48); // 3 × 16 — same slots, double energy

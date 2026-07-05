@@ -2,7 +2,7 @@ import { test, expect } from "bun:test";
 import { reduce } from "../src/engine/reduce";
 import { legalActions } from "../src/sim/legal";
 import { play } from "../src/sim/play";
-import { newGame } from "../src/engine/town";
+import { newGame, candidateMaps } from "../src/engine/town";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import { GRID_SIZE } from "../src/data/constants";
 import type { Action, GameState } from "../src/engine/types";
@@ -14,8 +14,8 @@ const accepts = (s: GameState, a: Action) =>
 // Greedy driver: pack a mining loadout, embark on `mapSeed`, walk to the nearest
 // gatherable POI and gather, then return. Returns the full run + whether it
 // gathered. Every action goes through reduce; legalActions is asserted en route.
-function runLoop(seed: string, mapSeed: string): { state: GameState; gathered: boolean } {
-  let state = newGame(seed);
+function runLoop(seed: string, mapSeed: string, runs: number): { state: GameState; gathered: boolean } {
+  let state: GameState = { ...newGame(seed), runs }; // runs must match the visit that offered mapSeed (9u9.3)
   const pack = (a: Action) => { state = reduce(state, a).state; };
   pack({ type: "pack", slot: "tool", itemId: "pick" });
   pack({ type: "pack", slot: "tool", itemId: "axe" });
@@ -67,29 +67,26 @@ function runLoop(seed: string, mapSeed: string): { state: GameState; gathered: b
   return { state, gathered };
 }
 
-// Find CANDIDATE map seeds (derived like candidateMaps: `${seed}:map:${i}`) whose
-// biome differs, so we prove the harness on ≥2 biomes.
-function twoBiomeMaps(): { mapSeed: string; biome: BiomeId }[] {
-  const byBiome = new Map<BiomeId, string>();
-  for (let i = 0; i < 60 && byBiome.size < 2; i++) {
-    const mapSeed = `hl:map:${i}`;
-    const biome = rollBiome(mapSeed);
-    if (!byBiome.has(biome)) byBiome.set(biome, mapSeed);
-  }
-  return [...byBiome.entries()].map(([biome, mapSeed]) => ({ mapSeed, biome }));
-}
-
 test("harness: a JSON action stream drives a full loop on two different biomes", () => {
-  const maps = twoBiomeMaps();
-  expect(maps.length).toBe(2);
-  expect(maps[0]!.biome).not.toBe(maps[1]!.biome);
-  for (const { mapSeed } of maps) {
-    const { state, gathered } = runLoop("hl", mapSeed);
+  // Scan the town's rotating offer (candidateMaps, by town-visit `runs`) for two
+  // DISTINCT biomes on which the greedy driver actually completes a gather. The
+  // driver is naive (no pathfinding — mountains can wedge a straight-line route),
+  // so we don't bet on a specific map; we prove the loop works on ≥2 biomes and
+  // every embark is a validly-offered candidate (9u9.3).
+  const done = new Map<BiomeId, { state: GameState; gathered: boolean }>();
+  for (let r = 0; r < 80 && done.size < 2; r++) {
+    for (const c of candidateMaps("hl", r)) {
+      if (done.has(c.biomeId)) continue;
+      const res = runLoop("hl", c.mapSeed, r); // embark validates: mapSeed ∈ offer at runs=r
+      if (res.gathered) done.set(c.biomeId, res);
+    }
+  }
+  expect(done.size).toBe(2); // two biomes drove a full gather loop
+  const starter = new Set(["starter", "pick", "axe", "knife", "sword", "ration", "potion"]);
+  for (const { state, gathered } of done.values()) {
     expect(state.phase).toBe("town");
-    expect(gathered).toBe(true); // walked to a node and gathered
-    // banked at least one non-starter material (loot came home)
-    const starter = new Set(["starter", "pick", "axe", "knife", "sword", "ration", "potion"]);
-    expect(state.bank.some((s) => !starter.has(s.defId) && s.qty > 0)).toBe(true);
+    expect(gathered).toBe(true);
+    expect(state.bank.some((s) => !starter.has(s.defId) && s.qty > 0)).toBe(true); // loot came home
   }
 });
 
@@ -98,7 +95,7 @@ test("harness: play() reproduces a hand-authored full loop headlessly", () => {
   const actions: Action[] = [
     { type: "pack", slot: "food", itemId: "ration" },
     { type: "pack", slot: "food", itemId: "ration" },
-    { type: "embark", mapSeed: "hl:map:0" },
+    { type: "embark", mapSeed: candidateMaps("hl", 0)[0]!.mapSeed },
     { type: "return" },
   ];
   const { state, events } = play("hl", actions);

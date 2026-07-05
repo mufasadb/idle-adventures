@@ -1,6 +1,7 @@
 import { test, expect } from "bun:test";
 import { summarize } from "../src/sim/report";
-import { newGame } from "../src/engine/town";
+import { newGame, candidateMaps } from "../src/engine/town";
+const OFFER_S = candidateMaps("s", 0)[0]!.mapSeed; // offered map for seed "s" (9u9.3)
 import { play } from "../src/sim/play";
 
 test("summarize: town snapshot shows phase and bank, no expedition block", () => {
@@ -13,7 +14,7 @@ test("summarize: town snapshot shows phase and bank, no expedition block", () =>
 test("summarize: expedition snapshot shows pos/energy/hp/carry", () => {
   const state = play("s", [
     { type: "pack", slot: "food", itemId: "ration" },
-    { type: "embark", mapSeed: "s:map:0" },
+    { type: "embark", mapSeed: OFFER_S },
   ]).state;
   const s = summarize(state);
   expect(s.phase).toBe("expedition");

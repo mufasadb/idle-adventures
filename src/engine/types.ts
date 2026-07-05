@@ -75,6 +75,7 @@ export type Action =
 // callers (legalActions, the field UI, the AI) can switch exhaustively.
 export type RejectionReason =
   | "not-in-town"
+  | "not-offered"
   | "not-on-expedition"
   | "no-step"
   | "out-of-bounds"

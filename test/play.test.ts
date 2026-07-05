@@ -1,6 +1,7 @@
 import { test, expect } from "bun:test";
 import { play } from "../src/sim/play";
-import { newGame } from "../src/engine/town";
+import { newGame, candidateMaps } from "../src/engine/town";
+const OFFER_S = candidateMaps("s", 0)[0]!.mapSeed; // offered map for seed "s" (9u9.3)
 
 test("play: no actions returns the fresh game unchanged", () => {
   const { state, events } = play("s", []);
@@ -32,7 +33,7 @@ test("play: a rejected action leaves state unchanged but records the rejection",
 test("play: deterministic — same seed + actions replays identically", () => {
   const actions = [
     { type: "pack", slot: "tool", itemId: "pick" } as const,
-    { type: "embark", mapSeed: "s:map:0" } as const,
+    { type: "embark", mapSeed: OFFER_S } as const,
   ];
   expect(play("s", actions)).toEqual(play("s", actions));
 });

@@ -9,6 +9,7 @@ import { digest } from "./food";
 import { endExpedition, subtractStacks } from "./bank";
 import { craft as applyRecipe } from "./craft";
 import { packItem, reserveLoadout } from "./pack";
+import { candidateMaps } from "./town";
 import { ENERGY_PER_FOOD, FOOD_ENERGY, BASE_ENERGY_FLOOR, PLAYER_BASE_HP, GRID_SIZE, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, MATERIAL_TIER } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 
@@ -54,6 +55,12 @@ function embark(
   mapSeed: string,
 ): { state: GameState; events: GameEvent[] } {
   if (state.phase !== "town") return rejected(state, "embark", "not-in-town");
+  // No seed re-farming (9u9.3): you can only embark on a map the town is CURRENTLY
+  // offering (candidateMaps rotates with runs). legalActions already restricts to
+  // these; validating here makes reduce the source of truth (D29) so no driver can
+  // farm a favourable seed by hand-building the action.
+  const offered = candidateMaps(state.seed, state.runs ?? 0).map((m) => m.mapSeed);
+  if (!offered.includes(mapSeed)) return rejected(state, "embark", "not-offered");
   // D28: settle the plan against the bank — debit everything the loadout pulls.
   const reserved = reserveLoadout(state.loadout);
   const bank = subtractStacks(state.bank, reserved);
