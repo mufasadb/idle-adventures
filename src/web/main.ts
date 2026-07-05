@@ -248,13 +248,26 @@ function townView(): string {
     </section>
 
     <section>
-      <h2>Craft ${craftable.length === 0 ? `<span class="muted small">(nothing affordable yet)</span>` : ""}</h2>
+      <h2>Recipe book <span class="muted small">everything craftable · ingredients named, sources not</span></h2>
       <div class="craftlist">
-        ${craftable.map((a) => {
-          const r = RECIPE[a.recipeId]!;
-          const cost = r.inputs.map((i) => `${i.qty}× ${name(i.defId)}`).join(" + ");
-          return `<div class="craftitem"><button data-craft="${a.recipeId}">${r.output.qty}× ${name(r.output.defId)}</button><span class="muted small">${cost}</span></div>`;
-        }).join("")}
+        ${(() => {
+          const affordable = new Set(craftable.map((a) => a.recipeId));
+          const ids = Object.keys(RECIPE).sort((a, b) => {
+            const av = affordable.has(a) ? 0 : 1, bv = affordable.has(b) ? 0 : 1;
+            return av - bv; // affordable first, else stable insertion order
+          });
+          return ids.map((id) => {
+            const r = RECIPE[id]!;
+            const cost = r.inputs.map((i) => `${i.qty}× ${name(i.defId)}`).join(" + ");
+            const can = affordable.has(id);
+            const out = `${r.output.qty}× ${name(r.output.defId)}`;
+            return `<div class="craftitem${can ? "" : " locked"}">${
+              can
+                ? `<button data-craft="${id}">${out}</button>`
+                : `<span class="craftname">${out}</span>`
+            }<span class="muted small">${cost}</span></div>`;
+          }).join("");
+        })()}
       </div>
     </section>
   </div>
