@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { playerDamage, mitigation, resolveCombat } from "../src/engine/combat";
+import { playerDamage, mitigation, resolveCombat, rollLoot } from "../src/engine/combat";
 import { emptyLoadout } from "../src/engine/loadout";
 import {
   AFFINITY_MULTIPLIER,
@@ -74,11 +74,29 @@ test("resolveCombat: HP always drains even well-geared (chip floor)", () => {
   expect(result.hpLost).toBeGreaterThan(0);
 });
 
-test("resolveCombat: victory yields the monster's fixed loot", () => {
-  const result = resolveCombat(armed("sword"), PLAYER_BASE_HP, "werewolf");
-  expect(result.victory).toBe(true);
-  expect(result.loot).toEqual(LOOT_TABLE.werewolf!);
-  expect(result.loot).not.toBe(LOOT_TABLE.werewolf); // fresh copies, no aliasing
+test("rollLoot: a fixed-drop monster yields fresh copies of its table", () => {
+  const loot = rollLoot("s", "werewolf", { x: 1, y: 2 });
+  expect(loot).toEqual(LOOT_TABLE.werewolf!);
+  expect(loot).not.toBe(LOOT_TABLE.werewolf); // fresh copies, no aliasing
+});
+
+test("rollLoot: chance drops roll deterministically (Wyrm's dragonheart @0.2)", () => {
+  // Same (seed, creature, tile) → identical outcome; the guaranteed wyrm-scale
+  // is always present, the dragonheart appears only when its roll lands.
+  const at = { x: 4, y: 7 };
+  const loot = rollLoot("boss-seed", "ancient-wyrm", at);
+  expect(rollLoot("boss-seed", "ancient-wyrm", at)).toEqual(loot); // deterministic
+  expect(loot.some((l) => l.defId === "wyrm-scale" && l.qty === 3)).toBe(true); // always
+  // Sweep tiles: ~1-in-5 include the rare, and every drop is 0 or 1 dragonheart.
+  let withHeart = 0;
+  for (let x = 0; x < 200; x++) {
+    const roll = rollLoot("boss-seed", "ancient-wyrm", { x, y: 0 });
+    const hearts = roll.filter((l) => l.defId === "dragonheart");
+    expect(hearts.length).toBeLessThanOrEqual(1);
+    if (hearts.length) withHeart++;
+  }
+  expect(withHeart).toBeGreaterThan(20); // ≈40/200; loose band around 20%
+  expect(withHeart).toBeLessThan(60);
 });
 
 test("resolveCombat: silver sword beats the werewolf cheaper than a plain sword", () => {
@@ -97,12 +115,11 @@ test("resolveCombat: auto-potions quaff at the threshold and are consumed in sta
   expect(withPotions.hpAfter).toBeGreaterThanOrEqual(noPotions.hpAfter);
 });
 
-test("resolveCombat: defeat clamps to 0, yields no loot", () => {
+test("resolveCombat: defeat clamps to 0", () => {
   const result = resolveCombat(armed(null), 3, "ice-troll");
   expect(result.victory).toBe(false);
   expect(result.hpAfter).toBe(0);
   expect(result.hpLost).toBe(3);
-  expect(result.loot).toEqual([]);
 });
 
 test("resolveCombat: pure and deterministic", () => {
@@ -111,6 +128,25 @@ test("resolveCombat: pure and deterministic", () => {
   const a = resolveCombat(loadout, PLAYER_BASE_HP, "frost-fae");
   expect(loadout).toEqual(before);
   expect(a).toEqual(resolveCombat(loadout, PLAYER_BASE_HP, "frost-fae"));
+});
+
+test("battle items (bzd): elixir adds damage, warding adds mitigation, both consumed", () => {
+  // A survivable fight (werewolf, tier 2) so the buff's effect on HP lost shows.
+  const plain = resolveCombat(armed("sword"), PLAYER_BASE_HP, "werewolf");
+  expect(plain.victory).toBe(true);
+  // elixir-of-power (+2 dmg) ends the fight sooner → less HP lost
+  const withElixir = armed("sword");
+  withElixir.battleItems = [{ defId: "elixir-of-power", qty: 1 }];
+  const elixir = resolveCombat(withElixir, PLAYER_BASE_HP, "werewolf");
+  expect(elixir.hpLost).toBeLessThan(plain.hpLost);
+  // warding-draught (+3 mitigation) softens every incoming hit → less HP lost
+  const withWard = armed("sword");
+  withWard.battleItems = [{ defId: "warding-draught", qty: 1 }];
+  const ward = resolveCombat(withWard, PLAYER_BASE_HP, "werewolf");
+  expect(ward.hpLost).toBeLessThan(plain.hpLost);
+  // consumed at fight start — nothing carries over
+  expect(elixir.battleItemsAfter).toEqual([]);
+  expect(ward.battleItemsAfter).toEqual([]);
 });
 
 test("tier curves: bigger tiers are tougher (sanity)", () => {

@@ -2,7 +2,7 @@ import { test, expect } from "bun:test";
 import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
 import { generateGrid, rollBiome } from "../src/engine/grid";
-import { ENERGY_PER_FOOD } from "../src/data/constants";
+import { ENERGY_PER_FOOD, BASE_ENERGY_FLOOR } from "../src/data/constants";
 import type { GameState } from "../src/engine/types";
 
 function townState(): GameState {
@@ -100,12 +100,12 @@ test("embark: unaffordable plan is rejected (safety net)", () => {
   expect(events).toEqual([{ type: "action-rejected", action: "embark", reason: "unaffordable" }]);
 });
 
-test("embark: zero-food is allowed (0 energy expedition)", () => {
+test("embark: zero-food embark falls back to the base energy floor (qrl)", () => {
   const state: GameState = {
     seed: "e", phase: "town", bank: [], loadout: emptyLoadout(), expedition: null,
   };
   const { state: next, events } = reduce(state, { type: "embark", mapSeed: "map-1" });
   expect(next.phase).toBe("expedition");
-  expect(next.expedition!.energy).toBe(0);
+  expect(next.expedition!.energy).toBe(BASE_ENERGY_FLOOR); // no dead-loop — ~5 actions to recover
   expect(events[0]!.type).toBe("embarked");
 });

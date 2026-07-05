@@ -48,7 +48,8 @@ test("move: a wagon halves cost (÷2.0) — cheaper than a horse (÷1.5)", () =>
   expect(moveCost("plains", "wagon")).toBe(moveCost("plains", null) / 2);
 });
 
-test("backpack: large-pack (8) tops the leather (6) / starter (4) ladder", () => {
-  expect(slotCap("large-pack")).toBe(8);
+test("backpack: large-pack (16) tops the leather (12) / starter (8) ladder", () => {
+  expect(slotCap("large-pack")).toBe(16);
   expect(slotCap("large-pack")).toBeGreaterThan(slotCap("leather"));
+  expect(slotCap("leather")).toBeGreaterThan(slotCap("starter"));
 });

@@ -96,8 +96,8 @@ test("sustainability: 15 runs on herb-poor tundra never starve the player", () =
 // A biome-diverse rotation should also sustain (and here deer-hide is available,
 // so the backpack bootstrap lands too — proving the early climb works end to end).
 test("sustainability: a biome-diverse rotation sustains AND bootstraps a backpack", () => {
-  let s = newGame("ff"); // desert/tundra/desert
-  for (let i = 0; i < 10; i++) s = oneRun(s, `ff:map:${i % 3}`);
+  let s = newGame("rot"); // woodland/desert/tundra — all three biomes; deer-hide stays reachable so the pack bootstrap lands even at POI_DENSITY 18 (denser maps clear only partially, qrl)
+  for (let i = 0; i < 10; i++) s = oneRun(s, `rot:map:${i % 3}`);
   expect(qtyOf(s, "ration")).toBeGreaterThan(0);
   expect(qtyOf(s, "starter") + qtyOf(s, "leather")).toBeGreaterThan(0); // earned a pack from the haul
 });

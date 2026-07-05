@@ -12,12 +12,12 @@ test("slotCap: no backpack gives base slots; backpack defines the cap", () => {
 // Firm carry squeeze (2026-07-04 tiered-progression pass): the tuned tier ladder
 // starter 3 < leather 5 < large-pack 7, and a tighter STACK_CAP so a real haul
 // opens new slots and food-vs-loot is a live per-run call.
-test("carry squeeze: bare 3 → starter 4 → leather 6 → large-pack 8, STACK_CAP firm", () => {
-  expect(STACK_CAP).toBe(5);
-  expect(BASE_CARRY_SLOTS).toBe(3); // bare opening is playable (pack 1 food, still gather)
-  expect(slotCap("starter")).toBe(4);
-  expect(slotCap("leather")).toBe(6);
-  expect(slotCap("large-pack")).toBe(8);
+test("carry squeeze: bare 6 → starter 8 → leather 12 → large-pack 16, STACK_CAP firm (pqp)", () => {
+  expect(STACK_CAP).toBe(5); // loot stacks; consumables are 1 unit/slot (pqp)
+  expect(BASE_CARRY_SLOTS).toBe(6); // bare opening is playable: a tool + a little food + some loot
+  expect(slotCap("starter")).toBe(8);
+  expect(slotCap("leather")).toBe(12);
+  expect(slotCap("large-pack")).toBe(16);
 });
 
 test("addToCarry: new material starts a stack", () => {
@@ -50,11 +50,12 @@ test("addToCarry: zero free stacks still allows a pure merge", () => {
   expect(addToCarry(carry, "iron-ore", 3, 1)).toEqual([{ defId: "iron-ore", qty: 5 }]);
 });
 
-test("freeCarryStacks: subtracts D23 ballast from the backpack cap", () => {
+test("freeCarryStacks: consumable units + tools each take a slot (pqp)", () => {
   const loadout = emptyLoadout();
   expect(freeCarryStacks(loadout)).toBe(BASE_CARRY_SLOTS);
   loadout.equipment.backpack = "starter";
-  loadout.food = [{ defId: "bread", qty: 3 }];
-  loadout.potions = [{ defId: "healing-potion", qty: 2 }];
-  expect(freeCarryStacks(loadout)).toBe(BACKPACK_SLOTS.starter! - 2);
+  loadout.food = [{ defId: "bread", qty: 3 }]; // 3 units → 3 slots (no stacking)
+  loadout.potions = [{ defId: "healing-potion", qty: 2 }]; // 2 units → 2 slots
+  loadout.equipment.tools = ["pick"]; // tools cost a slot too
+  expect(freeCarryStacks(loadout)).toBe(BACKPACK_SLOTS.starter! - 3 - 2 - 1);
 });

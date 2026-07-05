@@ -21,14 +21,14 @@ test("bankStacks: pure", () => {
   expect(bank).toEqual([{ defId: "iron-ore", qty: 1 }]);
 });
 
-test("endExpedition: banks carry + durables + potions, discards food (D26)", () => {
+test("endExpedition: banks carry + durables + potions + uneaten food (D26, pqp)", () => {
   const loadout = emptyLoadout();
   loadout.equipment.weapon = "sword";
   loadout.equipment.chest = "plate-chest";
   loadout.equipment.tools = ["pick", "spyglass"];
   loadout.equipment.transport = "horse";
   loadout.equipment.backpack = "starter";
-  loadout.food = [{ defId: "bread", qty: 2 }]; // ballast — must vanish
+  loadout.food = [{ defId: "bread", qty: 2 }]; // uneaten — banks back (pqp)
   loadout.potions = [{ defId: "healing-potion", qty: 1 }];
   const state: GameState = {
     seed: "g",
@@ -58,7 +58,7 @@ test("endExpedition: banks carry + durables + potions, discards food (D26)", () 
     { defId: "horse", qty: 1 },
     { defId: "starter", qty: 1 },
     { defId: "healing-potion", qty: 1 },
+    { defId: "bread", qty: 2 }, // uneaten food banks back (pqp)
   ]);
-  expect(ended.bank.some((s) => s.defId === "bread")).toBe(false);
   expect(state.phase).toBe("expedition"); // pure — input untouched
 });

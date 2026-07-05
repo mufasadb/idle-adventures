@@ -4,7 +4,15 @@
 // unpack action — reduce a mis-planned consumable by embarking and re-planning.
 import type { ItemStack, Loadout, LoadoutSlot } from "./types";
 import { slotOf } from "./catalog";
-import { slotCap, addToCarry } from "./carry";
+import { slotCap, consumableSlots } from "./carry";
+
+// Add one unit of a consumable, merging into an existing same-defId stack
+// (representation stays merged; slots are counted per-unit by consumableSlots).
+function addConsumable(list: ItemStack[], defId: string): ItemStack[] {
+  const idx = list.findIndex((s) => s.defId === defId);
+  if (idx === -1) return [...list, { defId, qty: 1 }];
+  return list.map((s, i) => (i === idx ? { defId, qty: s.qty + 1 } : s));
+}
 
 // Single-occupancy equipment slots keyed exactly by LoadoutSlot name.
 const EQUIP_SLOTS = ["weapon", "helmet", "chest", "legs", "boots", "gloves", "transport", "backpack"] as const;
@@ -25,6 +33,7 @@ export function reserveLoadout(loadout: Loadout): ItemStack[] {
   if (equipment.backpack !== null) out.push({ defId: equipment.backpack, qty: 1 });
   for (const stack of food) out.push({ defId: stack.defId, qty: stack.qty });
   for (const stack of potions) out.push({ defId: stack.defId, qty: stack.qty });
+  for (const stack of loadout.battleItems ?? []) out.push({ defId: stack.defId, qty: stack.qty });
   return out;
 }
 
@@ -59,33 +68,30 @@ export function packItem(
     return { ok: true, loadout: candidate };
   }
 
+  // Tools now cost an inventory slot each (pqp): pick + axe + knife + spyglass
+  // can't all come along with a full food supply — a mining run and a boss run
+  // become different loadouts.
+  const cap = slotCap(loadout.equipment.backpack);
   if (slot === "tool") {
     if (loadout.equipment.tools.includes(itemId)) return { ok: false, reason: "already-packed" };
     const equipment = { ...loadout.equipment, tools: [...loadout.equipment.tools, itemId] };
     const candidate: Loadout = { ...loadout, equipment };
+    if (consumableSlots(candidate) > cap) return { ok: false, reason: "no-slot" };
     if (reservedQty(candidate, itemId) > bankQty(bank, itemId)) {
       return { ok: false, reason: "insufficient" };
     }
     return { ok: true, loadout: candidate };
   }
 
-  // food / potion: merge into stacks (STACK_CAP), opening a new slot only when
-  // needed; addToCarry returns null when a new stack would exceed the slot cap
-  // shared with the other consumable list (bead note e).
-  const cap = slotCap(loadout.equipment.backpack);
-  if (slot === "food") {
-    const food = addToCarry(loadout.food, itemId, 1, cap - loadout.potions.length);
-    if (food === null) return { ok: false, reason: "no-slot" };
-    const candidate: Loadout = { ...loadout, food };
-    if (reservedQty(candidate, itemId) > bankQty(bank, itemId)) {
-      return { ok: false, reason: "insufficient" };
-    }
-    return { ok: true, loadout: candidate };
-  }
-  // slot === "potion"
-  const potions = addToCarry(loadout.potions, itemId, 1, cap - loadout.food.length);
-  if (potions === null) return { ok: false, reason: "no-slot" };
-  const candidate: Loadout = { ...loadout, potions };
+  // food / potion / battle-item: one unit = one slot, no stacking (pqp). Packing
+  // 5 rations takes 5 slots — the visible, live food-vs-loot commitment.
+  const candidate: Loadout =
+    slot === "food"
+      ? { ...loadout, food: addConsumable(loadout.food, itemId) }
+      : slot === "potion"
+        ? { ...loadout, potions: addConsumable(loadout.potions, itemId) }
+        : { ...loadout, battleItems: addConsumable(loadout.battleItems, itemId) };
+  if (consumableSlots(candidate) > cap) return { ok: false, reason: "no-slot" };
   if (reservedQty(candidate, itemId) > bankQty(bank, itemId)) {
     return { ok: false, reason: "insufficient" };
   }

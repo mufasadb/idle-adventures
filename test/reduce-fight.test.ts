@@ -3,7 +3,7 @@ import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import type { Grid, Poi } from "../src/engine/grid";
-import { resolveCombat } from "../src/engine/combat";
+import { resolveCombat, rollLoot } from "../src/engine/combat";
 import { PLAYER_BASE_HP, BASE_CARRY_SLOTS } from "../src/data/constants";
 import type { GameState, Loadout } from "../src/engine/types";
 
@@ -44,11 +44,12 @@ test("fight: victory drains HP, consumes the monster, loots into carry", () => {
   const { seed, poi } = mapWithMonster("forest-boar"); // tier 1 — a sword wins this
   const before = atMonster(seed, poi);
   const expected = resolveCombat(before.expedition!.loadout, PLAYER_BASE_HP, poi.creature!);
+  const loot = rollLoot(before.seed, poi.creature!, { x: poi.x, y: poi.y });
   expect(expected.victory).toBe(true);
   const { state, events } = reduce(before, { type: "fight" });
   expect(state.phase).toBe("expedition");
   expect(state.expedition!.hp).toBe(expected.hpAfter);
-  expect(state.expedition!.carry).toEqual(expected.loot);
+  expect(state.expedition!.carry).toEqual(loot);
   expect(state.expedition!.cleared).toEqual([{ x: poi.x, y: poi.y }]);
   expect(state.expedition!.energy).toBe(50); // fight costs no energy
   expect(events).toEqual([
@@ -59,7 +60,7 @@ test("fight: victory drains HP, consumes the monster, loots into carry", () => {
       victory: true,
       hpLost: expected.hpLost,
       potionsUsed: 0,
-      loot: expected.loot,
+      loot,
       hp: expected.hpAfter,
     },
   ]);
@@ -127,6 +128,7 @@ test("fight: defeat banks only the UNSPENT potions (quaffed ones are gone)", () 
   const { seed, poi } = mapWithMonster("ice-troll"); // lethal without gear
   const before = atMonster(seed, poi, (l) => {
     l.equipment.weapon = null; // unarmed → guaranteed defeat
+    l.equipment.backpack = "leather"; // room for loot so the fit-check passes (pqp: potions now cost slots)
     l.potions = [{ defId: "healing-potion", qty: 3 }];
   }, 12); // low start so the auto-quaff threshold triggers
   const expected = resolveCombat(before.expedition!.loadout, 12, "ice-troll");

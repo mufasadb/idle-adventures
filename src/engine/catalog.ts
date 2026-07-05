@@ -1,6 +1,6 @@
 // Item classification (M5): maps a defId to the loadout slot it belongs to, so
 // `pack` can reject items in the wrong slot. Reads the code-side catalog only.
-import { WEAPONS, ARMOUR, TOOL_CAPABILITY, TRANSPORT_MULTIPLIER, BACKPACK_SLOTS, FOOD, POTION } from "../data/constants";
+import { WEAPONS, ARMOUR, TOOL_CAPABILITY, TRANSPORT_MULTIPLIER, BACKPACK_SLOTS, FOOD, POTION, BATTLE_ITEM } from "../data/constants";
 import type { LoadoutSlot } from "./types";
 
 export function slotOf(defId: string): LoadoutSlot | null {
@@ -11,6 +11,7 @@ export function slotOf(defId: string): LoadoutSlot | null {
   if (defId in BACKPACK_SLOTS) return "backpack";
   if (FOOD.includes(defId)) return "food";
   if (POTION.includes(defId)) return "potion";
+  if (BATTLE_ITEM.includes(defId)) return "battle-item";
   return null;
 }
 

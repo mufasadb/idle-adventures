@@ -1,16 +1,25 @@
-// Carry-slot accounting (M3). A slot holds ONE stack; STACK_CAP bounds qty
-// per stack. D23: callers count packed food/potion stacks against the cap.
+// Carry-slot accounting. Loot stacks hold STACK_CAP each; consumables and tools
+// each occupy ONE slot per unit (Phase 2, pqp — no stacking for consumables).
 import { BASE_CARRY_SLOTS, BACKPACK_SLOTS, STACK_CAP } from "../data/constants";
 import type { ItemStack, Loadout } from "./types";
 
-// Free carry stacks after D23 ballast: packed food/potion stacks occupy the
-// same slots as loot. Single source for gather/fight (M3/M4) and pack (M5).
-export function freeCarryStacks(loadout: Loadout): number {
+// Inventory slots consumed by non-loot items (pqp): each food unit, each potion
+// unit, and each tool is one slot. Loot (carry) stacks take the rest.
+export function consumableSlots(loadout: Loadout): number {
+  const units = (stacks: ItemStack[]) => stacks.reduce((n, s) => n + s.qty, 0);
   return (
-    slotCap(loadout.equipment.backpack) -
-    loadout.food.length -
-    loadout.potions.length
+    units(loadout.food) +
+    units(loadout.potions) +
+    units(loadout.battleItems ?? []) +
+    loadout.equipment.tools.length
   );
+}
+
+// Free carry stacks for loot after consumables + tools take their slots (pqp):
+// food/potions burn down over the run (food.digest), so this grows as you go.
+// Single source for gather/fight (M3/M4) and pack (M5).
+export function freeCarryStacks(loadout: Loadout): number {
+  return slotCap(loadout.equipment.backpack) - consumableSlots(loadout);
 }
 
 // Total carry stacks available. The backpack REPLACES the base (it IS your

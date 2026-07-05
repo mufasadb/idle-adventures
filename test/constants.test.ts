@@ -168,11 +168,11 @@ test("constants: monster catalog is internally consistent", () => {
   }
 });
 
-test("constants: every biome's creatureTable is 2-3 real monsters", () => {
+test("constants: every biome's creatureTable is 2-4 real monsters", () => {
   for (const id of BIOME_IDS) {
     const table = BIOMES[id].creatureTable;
     expect(table.length).toBeGreaterThanOrEqual(2);
-    expect(table.length).toBeLessThanOrEqual(3);
+    expect(table.length).toBeLessThanOrEqual(4); // tundra carries the tier-4 wyrm as a 4th (D34)
     for (const creature of table) expect(MONSTERS[creature]).toBeDefined();
   }
 });

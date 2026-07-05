@@ -14,11 +14,11 @@ function onExpedition(over: { carry?: ItemStack[]; loadout?: Loadout; bank?: Ite
   };
 }
 
-test("return: banks carry + durables + potions, discards food (D26), back to town", () => {
+test("return: banks carry + durables + potions + uneaten food (D26, pqp), back to town", () => {
   const loadout = emptyLoadout();
   loadout.equipment.weapon = "iron-sword";
   loadout.equipment.tools = ["pick"];
-  loadout.food = [{ defId: "ration", qty: 2 }]; // must NOT be banked
+  loadout.food = [{ defId: "ration", qty: 2 }]; // uneaten — banks back (pqp)
   loadout.potions = [{ defId: "potion", qty: 1 }];
   const { state, events } = reduce(
     onExpedition({ carry: [{ defId: "silver-ore", qty: 4 }], loadout, bank: [{ defId: "iron-ore", qty: 1 }] }),
@@ -32,8 +32,8 @@ test("return: banks carry + durables + potions, discards food (D26), back to tow
     { defId: "iron-sword", qty: 1 },
     { defId: "pick", qty: 1 },
     { defId: "potion", qty: 1 },
+    { defId: "ration", qty: 2 }, // uneaten food banks back (pqp)
   ]);
-  expect(state.bank.find((s) => s.defId === "ration")).toBeUndefined();
   expect(events).toEqual([{ type: "run-ended", reason: "returned" }]);
 });
 

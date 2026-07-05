@@ -17,9 +17,11 @@ import {
   AUTO_POTION_THRESHOLD,
   UNARMED_DAMAGE,
   CHIP_DAMAGE_MIN,
+  COMBAT_BUFF,
 } from "../data/constants";
 import type { DmgType } from "../data/constants";
 import type { Loadout, ItemStack } from "./types";
+import { rand } from "./rng";
 
 export type CombatResult = {
   victory: boolean;
@@ -27,8 +29,46 @@ export type CombatResult = {
   hpLost: number;
   potionsUsed: number;
   potionsAfter: ItemStack[];
-  loot: ItemStack[]; // empty on defeat
+  battleItemsAfter: ItemStack[]; // battle items are all consumed at fight start (bzd) → []
 };
+
+// Sum the packed battle-item buffs (bzd). All are consumed at fight start, so
+// their damageAdd/mitigationAdd apply to THIS fight and nothing banks back.
+function battleBuff(battleItems: ItemStack[]): { damageAdd: number; mitigationAdd: number } {
+  let damageAdd = 0;
+  let mitigationAdd = 0;
+  for (const stack of battleItems) {
+    const buff = COMBAT_BUFF[stack.defId];
+    if (!buff) continue;
+    damageAdd += (buff.damageAdd ?? 0) * stack.qty;
+    mitigationAdd += (buff.mitigationAdd ?? 0) * stack.qty;
+  }
+  return { damageAdd, mitigationAdd };
+}
+
+// Deterministic loot roll (2026-07-05, t07). Loot lives OUTSIDE resolveCombat
+// because it needs a seed and resolveCombat is pure fight-math. `chance` entries
+// (e.g. the Wyrm's dragonheart @0.2) roll per-encounter; absent chance = always.
+// The roll is keyed by (seed, creature, tile, defId) so it's replayable (D14)
+// and multiple chance drops on one creature stay independent (defId disambiguates
+// beyond the spec's bare context). fightAt calls this on victory only.
+export function rollLoot(
+  seed: string,
+  creature: string,
+  at: { x: number; y: number },
+): ItemStack[] {
+  const loot: ItemStack[] = [];
+  for (const entry of LOOT_TABLE[creature] ?? []) {
+    if (
+      entry.chance !== undefined &&
+      rand(seed, "loot", creature, at.x, at.y, entry.defId) >= entry.chance
+    ) {
+      continue;
+    }
+    loot.push({ defId: entry.defId, qty: entry.qty });
+  }
+  return loot;
+}
 
 const ARMOUR_SLOTS = ["helmet", "chest", "legs", "boots", "gloves"] as const;
 
@@ -74,10 +114,12 @@ export function resolveCombat(
 ): CombatResult {
   const monster = MONSTERS[monsterId];
   if (!monster) throw new Error(`unknown monster: ${monsterId}`);
-  const dmgOut = playerDamage(loadout, monsterId);
+  // Battle items (bzd): consumed at fight start, buffing only this fight.
+  const buff = battleBuff(loadout.battleItems ?? []);
+  const dmgOut = playerDamage(loadout, monsterId) + buff.damageAdd;
   const dmgIn = Math.max(
     CHIP_DAMAGE_MIN,
-    MONSTER_TIER_DMG_CURVE[monster.tier]! - mitigation(loadout, monster.dmgType),
+    MONSTER_TIER_DMG_CURVE[monster.tier]! - mitigation(loadout, monster.dmgType) - buff.mitigationAdd,
   );
   let current = hp;
   let monsterHp = MONSTER_TIER_HP_CURVE[monster.tier]!;
@@ -115,6 +157,6 @@ export function resolveCombat(
     hpLost: hp - current,
     potionsUsed,
     potionsAfter,
-    loot: victory ? (LOOT_TABLE[monsterId] ?? []).map((s) => ({ ...s })) : [],
+    battleItemsAfter: [], // all battle items consumed at fight start (bzd)
   };
 }

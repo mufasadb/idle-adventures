@@ -4,11 +4,12 @@ import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
 import { addToCarry, freeCarryStacks } from "./carry";
 import { toolQualityFor } from "./tools";
-import { resolveCombat } from "./combat";
+import { resolveCombat, rollLoot } from "./combat";
+import { digest } from "./food";
 import { endExpedition, subtractStacks } from "./bank";
 import { craft as applyRecipe } from "./craft";
 import { packItem, reserveLoadout } from "./pack";
-import { ENERGY_PER_FOOD, FOOD_ENERGY, PLAYER_BASE_HP, GRID_SIZE, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, MATERIAL_TIER, LOOT_TABLE, MONSTERS, MONSTER_TIER_HP_CURVE, MONSTER_TIER_DMG_CURVE, SCOUT_ENERGY_COST, SCOUT_RADIUS, SCOUT_TOOL } from "../data/constants";
+import { ENERGY_PER_FOOD, FOOD_ENERGY, BASE_ENERGY_FLOOR, PLAYER_BASE_HP, GRID_SIZE, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, MATERIAL_TIER, MONSTERS, MONSTER_TIER_HP_CURVE, MONSTER_TIER_DMG_CURVE, SCOUT_ENERGY_COST, SCOUT_RADIUS, SCOUT_TOOL } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 
 // Pure reducer. M2 fills embark/move; M3 fills gather/drop; M4 fills scout/fight; remaining cases are no-op stubs:
@@ -62,10 +63,13 @@ function embark(
   const grid = generateGrid(mapSeed, rollBiome(mapSeed));
   // Per-food energy (2026-07-04): each stack contributes its defId's energy;
   // tiered food (trail-ration) is denser, so a better-fed player fights the squeeze.
-  const energy = state.loadout.food.reduce(
+  const foodEnergy = state.loadout.food.reduce(
     (sum, stack) => sum + stack.qty * (FOOD_ENERGY[stack.defId] ?? ENERGY_PER_FOOD),
     0,
   );
+  // Base energy floor (2026-07-05, qrl): no-food embarks still get ~5 actions —
+  // a recoverable fail state, not a 0-energy dead-loop (spec §3/§4.5).
+  const energy = Math.max(BASE_ENERGY_FLOOR, foodEnergy);
   return {
     state: {
       ...state,
@@ -156,10 +160,11 @@ function move(
   if (!Number.isFinite(cost)) return rejected(state, "move", "impassable");
   if (cost > expedition.energy) return rejected(state, "move", "exhausted");
   const energy = expedition.energy - cost;
+  const food = digest(expedition.loadout.food, energy); // eat just-in-time, free slots (pqp)
   return {
     state: {
       ...state,
-      expedition: { ...expedition, pos: step, energy },
+      expedition: { ...expedition, pos: step, energy, loadout: { ...expedition.loadout, food } },
     },
     events: [{ type: "moved", from, to: step, terrain, cost, energy }],
   };
@@ -194,12 +199,14 @@ function gather(state: GameState): { state: GameState; events: GameEvent[] } {
   }
   const cost = NODE_HARDNESS[kind] / quality;
   if (cost > expedition.energy) return rejected(state, "gather", "exhausted");
-  // D23: packed food/potion stacks are ballast against the same slot cap.
-  const maxStacks = freeCarryStacks(expedition.loadout);
+  // Pay energy first — eating food frees its slot, which can make room for this
+  // gather's loot (pqp): the fit-check runs against the post-digest inventory.
+  const energy = expedition.energy - cost;
+  const loadout = { ...expedition.loadout, food: digest(expedition.loadout.food, energy) };
+  const maxStacks = freeCarryStacks(loadout);
   const qty = GATHER_YIELD[kind];
   const carry = addToCarry(expedition.carry, poi.material, qty, maxStacks);
   if (carry === null) return rejected(state, "gather", "carry-full");
-  const energy = expedition.energy - cost;
   return {
     state: {
       ...state,
@@ -208,6 +215,7 @@ function gather(state: GameState): { state: GameState; events: GameEvent[] } {
         energy,
         carry,
         cleared: [...expedition.cleared, { x: pos.x, y: pos.y }],
+        loadout,
       },
     },
     events: [
@@ -270,11 +278,14 @@ function fightAt(
   action: "fight" | "move",
   moveOnWin: boolean,
 ): { state: GameState; events: GameEvent[] } {
+  // Roll the actual drops up front (deterministic, t07): the fit-check reserves
+  // space only for loot that WILL drop, so an unrolled 20% rare never blocks.
+  const loot = rollLoot(state.seed, creature, at);
   // Pre-fight fit check: rejecting is free, so the player can drop and retry
   // instead of losing loot (or HP) to a full pack.
   const maxStacks = freeCarryStacks(expedition.loadout);
   let carryWithLoot: typeof expedition.carry | null = expedition.carry;
-  for (const stack of LOOT_TABLE[creature] ?? []) {
+  for (const stack of loot) {
     carryWithLoot = addToCarry(carryWithLoot, stack.defId, stack.qty, maxStacks);
     if (carryWithLoot === null) return rejected(state, action, "carry-full");
   }
@@ -286,14 +297,14 @@ function fightAt(
     victory: result.victory,
     hpLost: result.hpLost,
     potionsUsed: result.potionsUsed,
-    loot: result.loot,
+    loot: result.victory ? loot : [],
     hp: result.hpAfter,
   };
   if (!result.victory) {
     // Soft fail (D26): run ends, carry is kept — banked with the durables.
     const ended = endExpedition(state, {
       ...expedition,
-      loadout: { ...expedition.loadout, potions: result.potionsAfter },
+      loadout: { ...expedition.loadout, potions: result.potionsAfter, battleItems: result.battleItemsAfter },
     });
     return { state: ended, events: [fought, { type: "run-ended", reason: "defeated" }] };
   }
@@ -304,7 +315,7 @@ function fightAt(
         ...expedition,
         pos: moveOnWin ? { x: at.x, y: at.y } : expedition.pos,
         hp: result.hpAfter,
-        loadout: { ...expedition.loadout, potions: result.potionsAfter },
+        loadout: { ...expedition.loadout, potions: result.potionsAfter, battleItems: result.battleItemsAfter },
         carry: carryWithLoot,
         cleared: [...expedition.cleared, { x: at.x, y: at.y }],
       },
@@ -354,8 +365,9 @@ function scout(state: GameState): { state: GameState; events: GameEvent[] } {
       };
     });
   const energy = expedition.energy - SCOUT_ENERGY_COST;
+  const food = digest(expedition.loadout.food, energy); // scouting spends energy too (pqp)
   return {
-    state: { ...state, expedition: { ...expedition, energy } },
+    state: { ...state, expedition: { ...expedition, energy, loadout: { ...expedition.loadout, food } } },
     events: [
       { type: "scouted", at: { x: pos.x, y: pos.y }, cost: SCOUT_ENERGY_COST, energy, monsters },
     ],

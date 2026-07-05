@@ -3,7 +3,6 @@ import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
 import { reserveLoadout } from "../src/engine/pack";
 import { slotCap } from "../src/engine/carry";
-import { STACK_CAP } from "../src/data/constants";
 import type { GameState } from "../src/engine/types";
 
 function town(bank: { defId: string; qty: number }[]): GameState {
@@ -45,31 +44,44 @@ test("pack: cannot plan more than the bank holds", () => {
   expect(events).toEqual([{ type: "action-rejected", action: "pack", reason: "insufficient" }]);
 });
 
-test("pack: food merges into a stack up to STACK_CAP before opening a new slot", () => {
+test("pack: food representation merges by defId (but each unit is one slot, pqp)", () => {
   const s = reduce(town([{ defId: "ration", qty: 5 }]), {
     type: "pack", slot: "food", itemId: "ration",
   }).state;
   const s2 = reduce(s, { type: "pack", slot: "food", itemId: "ration" }).state;
-  expect(s2.loadout.food).toEqual([{ defId: "ration", qty: 2 }]); // one stack, qty 2
+  expect(s2.loadout.food).toEqual([{ defId: "ration", qty: 2 }]); // merged entry, 2 units = 2 slots
 });
 
-test("pack: rejects when a new food/potion stack would exceed backpack slots (bead note e)", () => {
-  // Fill EVERY leather slot with full ration stacks, then packing a potion
-  // (a new stack) must fail. Lever-driven so it never churns on a re-tune.
-  const slots = slotCap("leather"); // total stacks the leather pack holds
-  const rations = slots * STACK_CAP; // fills exactly `slots` full stacks
+test("pack: consumables take one slot per unit — filling the pack rejects the next (pqp)", () => {
+  // Each ration is ONE slot now (no stacking). Fill every leather slot with
+  // rations, then packing a potion must fail. Lever-driven so it never churns.
+  const slots = slotCap("leather"); // total inventory slots the leather pack holds
   let state = town([
     { defId: "leather", qty: 1 },
-    { defId: "ration", qty: rations },
+    { defId: "ration", qty: slots },
     { defId: "potion", qty: 1 },
   ]);
   state = reduce(state, { type: "pack", slot: "backpack", itemId: "leather" }).state;
-  for (let i = 0; i < rations; i++) {
+  for (let i = 0; i < slots; i++) {
     state = reduce(state, { type: "pack", slot: "food", itemId: "ration" }).state;
   }
-  expect(state.loadout.food.length).toBe(slots);
+  const foodUnits = state.loadout.food.reduce((n, s) => n + s.qty, 0);
+  expect(foodUnits).toBe(slots); // all slots consumed by food units
   const { events } = reduce(state, { type: "pack", slot: "potion", itemId: "potion" });
   expect(events).toEqual([{ type: "action-rejected", action: "pack", reason: "no-slot" }]);
+});
+
+test("pack: a battle item packs into its slot and counts as a consumable (bzd)", () => {
+  const s1 = reduce(town([{ defId: "elixir-of-power", qty: 2 }]), {
+    type: "pack", slot: "battle-item", itemId: "elixir-of-power",
+  }).state;
+  expect(s1.loadout.battleItems).toEqual([{ defId: "elixir-of-power", qty: 1 }]);
+  expect(reserveLoadout(s1.loadout)).toContainEqual({ defId: "elixir-of-power", qty: 1 });
+  // packing to the wrong slot is rejected (it's a battle-item, not a potion)
+  const { events } = reduce(town([{ defId: "elixir-of-power", qty: 1 }]), {
+    type: "pack", slot: "potion", itemId: "elixir-of-power",
+  });
+  expect(events).toEqual([{ type: "action-rejected", action: "pack", reason: "wrong-slot" }]);
 });
 
 test("pack: duplicate tool defId is rejected", () => {

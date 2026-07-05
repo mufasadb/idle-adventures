@@ -17,5 +17,6 @@ export function emptyLoadout(): Loadout {
     },
     food: [],
     potions: [],
+    battleItems: [],
   };
 }

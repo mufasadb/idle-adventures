@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { craft } from "../src/engine/craft";
-import { RECIPE, ARMOUR, WEAPONS, TOOL_CAPABILITY, BACKPACK_SLOTS, TRANSPORT_MULTIPLIER, FOOD, POTION } from "../src/data/constants";
+import { RECIPE, ARMOUR, WEAPONS, TOOL_CAPABILITY, BACKPACK_SLOTS, TRANSPORT_MULTIPLIER, FOOD, POTION, BATTLE_ITEM } from "../src/data/constants";
 import { slotOf } from "../src/engine/catalog";
 
 test("craft: consumes inputs and yields output (bead acceptance)", () => {
@@ -32,14 +32,16 @@ test("craft: does not mutate the input bank", () => {
 test("recipes: every output is a real equippable/consumable defId", () => {
   const known = (d: string) =>
     d in WEAPONS || d in ARMOUR || d in TOOL_CAPABILITY || d in BACKPACK_SLOTS ||
-    d in TRANSPORT_MULTIPLIER || FOOD.includes(d) || POTION.includes(d);
+    d in TRANSPORT_MULTIPLIER || FOOD.includes(d) || POTION.includes(d) || BATTLE_ITEM.includes(d);
   for (const [id, recipe] of Object.entries(RECIPE)) {
     expect(known(recipe.output.defId)).toBe(true);
     expect(recipe.output.qty).toBeGreaterThan(0);
     expect(recipe.inputs.length).toBeGreaterThan(0);
-    // recipe id conventionally matches its output for gear
+    // recipe id conventionally matches its output for gear — optionally with a
+    // "-variant" suffix for an alternate recipe (e.g. large-pack-troll, a combat
+    // shortcut to the same pack; peu 2026-07-05).
     if (slotOf(recipe.output.defId) !== "food" && slotOf(recipe.output.defId) !== "potion") {
-      expect(id).toBe(recipe.output.defId);
+      expect(id === recipe.output.defId || id.startsWith(recipe.output.defId + "-")).toBe(true);
     }
   }
 });

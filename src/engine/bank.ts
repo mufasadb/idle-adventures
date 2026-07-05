@@ -1,6 +1,7 @@
-// Run-end banking (D26): carry + durable loadout (equipment, tools,
-// transport, backpack) + unspent potions go home; food does NOT — it was
-// converted to energy at embark and its stacks were pure ballast (D23).
+// Run-end banking (D26; food rule updated by pqp): carry + durable loadout
+// (equipment, tools, transport, backpack) + unspent potions + UNEATEN food go
+// home. Food now banks back — it's carried and eaten just-in-time (food.digest),
+// never pre-converted, so returning it is not duplication (supersedes D23).
 // Used by fight's soft-fail (M4) and return (M5).
 import type { GameState, Expedition, ItemStack } from "./types";
 import { emptyLoadout } from "./loadout";
@@ -50,6 +51,8 @@ export function endExpedition(state: GameState, expedition: Expedition): GameSta
       ...expedition.carry,
       ...durables,
       ...expedition.loadout.potions,
+      ...expedition.loadout.food, // uneaten food banks back (pqp)
+      ...(expedition.loadout.battleItems ?? []), // unused battle items bank back (bzd)
     ]),
     loadout: emptyLoadout(),
     expedition: null,

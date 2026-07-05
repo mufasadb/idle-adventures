@@ -20,6 +20,7 @@ export type Loadout = {
   equipment: Equipment;
   food: ItemStack[];
   potions: ItemStack[];
+  battleItems: ItemStack[]; // combat consumables (bzd): buff a single fight, consumed at fight start
 };
 
 export type Expedition = {
@@ -54,7 +55,8 @@ export type LoadoutSlot =
   | "transport"
   | "backpack"
   | "food"
-  | "potion";
+  | "potion"
+  | "battle-item";
 
 export type Action =
   | { type: "craft"; recipeId: string }

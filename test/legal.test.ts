@@ -50,9 +50,10 @@ test("expeditionActions: offers return (always) + some moves, never craft/pack",
 });
 
 test("expeditionActions: return is offered even at zero energy (never a dead end)", () => {
-  // embark with no food → 0 energy; moves may all be unaffordable, but return stands
-  const zero = play("s", [{ type: "embark", mapSeed: "s:map:0" }]).state;
-  expect(zero.expedition!.energy).toBe(0);
+  // Drain to a genuine 0 (embark now floors energy at BASE_ENERGY_FLOOR, qrl):
+  // moves are all unaffordable, but return must still stand.
+  const embarked = play("s", [{ type: "embark", mapSeed: "s:map:0" }]).state;
+  const zero: GameState = { ...embarked, expedition: { ...embarked.expedition!, energy: 0 } };
   expect(expeditionActions(zero)).toContainEqual({ type: "return" });
 });
 

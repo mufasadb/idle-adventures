@@ -6,7 +6,7 @@
 // --- Map & forecast (filled in M1) ---
 export const GRID_SIZE = 20; // tiles per side
 export const NOISE_FREQUENCY = 0.15; // Perlin sample step per tile; lower = larger terrain regions
-export const POI_DENSITY = 12; // POIs per map
+export const POI_DENSITY = 18; // POIs per map — richer than one run can harvest (2026-07-05, qrl): forces "which region do I work?" (sim: ~91%→~55% cleared with 3 food slots). Was 12.
 export const POI_MIN_SPACING = 3; // min Chebyshev distance between POIs (spec: 3–4 tiles apart)
 export const POI_PLACEMENT_ATTEMPTS = 400; // seeded rejection-sampling budget per map
 export const CANDIDATE_MAP_COUNT = 3; // town map choices (spec §11)
@@ -62,7 +62,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
   tundra: {
     terrainWeights: { ice: 0.5, mountain: 0.25, plains: 0.15, river: 0.1 },
     nodeTypeWeights: { animal: 0.35, monster: 0.25, mining: 0.2, wood: 0.1, herb: 0.1 },
-    creatureTable: ["frost-fae", "snow-wolf", "ice-troll"],
+    creatureTable: ["frost-fae", "snow-wolf", "ice-troll", "ancient-wyrm"], // wyrm = the tier-4 boss/goal (~1-in-4 tundra monster POIs); no spawn code — its lethality is the gate (D34)
     materialTable: {
       mining: { "silver-ore": 5, "coal": 2, "iron-ore": 2, "mithril-ore": 1 }, // silver T2 + coal T2 + mithril T3: tundra is the deep-tier mine
       wood: { "pine-log": 7, "oak-log": 2, "ironwood-log": 1 },
@@ -87,6 +87,10 @@ export const MATERIAL_TIER: Record<string, number> = {
 
 // --- Energy economy (filled in M2) ---
 export const ENERGY_PER_FOOD = 10; // default energy per packed food item (fallback for FOOD_ENERGY)
+// Base energy floor (2026-07-05, qrl): embark energy = max(BASE_ENERGY_FLOOR,
+// packedFoodEnergy). Gives ~5 actions with no food — the recoverable-by-effort
+// fail state (spec §3), NOT a 0-energy dead-loop. See reduce.embark.
+export const BASE_ENERGY_FLOOR = 20;
 // Per-food energy (2026-07-04): tiered food gives more energy per item, so
 // progression EARNS slot efficiency against the firm carry squeeze. Absent = ENERGY_PER_FOOD.
 export const FOOD_ENERGY: Record<string, number> = {
@@ -107,14 +111,18 @@ export const TRANSPORT_MULTIPLIER: Record<string, number> = {
   mule: 0.8, // slow — will pay for it in carry capacity (M3/M5)
 }; // keyed by transport defId; absent/on-foot = 1
 
-// --- Carry (filled in M3) ---
-export const BASE_CARRY_SLOTS = 3; // carry stacks with NO backpack (you start bare) — enough to pack 1 food stack and still gather to bootstrap the loop
+// --- Carry (filled in M3; rebalanced Phase 2 / pqp) ---
+// Slots are now UNIT-based (pqp): each food/potion/battleItem unit and each tool
+// takes one slot; only loot materials stack (STACK_CAP). So a food supply is ~5×
+// the slot pressure it was — caps are bumped to keep a run viable while keeping
+// the food↔loot squeeze live. Loot still compresses (STACK_CAP), consumables don't.
+export const BASE_CARRY_SLOTS = 6; // slots with NO backpack (bare) — a minimal run: a tool + a little food + some loot
 export const BACKPACK_SLOTS: Record<string, number> = {
-  starter: 4, // your first craftable pack
-  leather: 6,
-  "large-pack": 8, // top tier
-}; // TOTAL carry stacks by backpack defId (replaces the base, not added to it)
-export const STACK_CAP = 5; // max qty per stack; overflow starts a new stack (new slot). Firm squeeze (2026-07-04): a food/potion stack is now real slot pressure, and a haul opens new slots.
+  starter: 8, // your first craftable pack
+  leather: 12,
+  "large-pack": 16, // top tier
+}; // TOTAL inventory slots by backpack defId (replaces the base, not added to it)
+export const STACK_CAP = 5; // max qty per LOOT stack; overflow opens a new stack (slot). Consumables/tools do NOT stack (pqp) — one unit per slot.
 
 // --- Gathering (filled in M3) ---
 // D21: hardness/tool/yield are per NODE TYPE, never per biome. The biome only
@@ -186,13 +194,26 @@ export const MONSTER_TIER_HP_CURVE: Record<number, number> = {
   1: 6,
   2: 14,
   3: 28,
+  4: 48, // tier-4 boss (ancient-wyrm) — winnable only with the full mithril climb + ≥3 greater-potions (D34)
 }; // monster base HP by tier
 export const MONSTER_TIER_DMG_CURVE: Record<number, number> = {
   1: 2,
   2: 5,
   3: 11,
+  4: 20, // tier-4 boss — magic into plate (÷1.5) stays lethal even in full mithril (D34)
 }; // monster base damage by tier. Steepened 2026-07-05 so cheap iron plate no
    // longer floors tier-3 — you need the steel/mithril climb to tame them.
+
+// Combat consumables (bzd, spec §4.3): a "battle item" packed into the loadout
+// buffs a SINGLE fight and is consumed at fight start. Gated only behind fighting
+// T3 monsters (vampire→elixir, troll→warding), so a player who FOUGHT their way
+// up can beat the Wyrm without the full mithril grind — at a real inventory-slot
+// cost (pqp). resolveCombat sums damageAdd into dmgOut and mitigationAdd into
+// mitigation. Absent defId = no buff.
+export const COMBAT_BUFF: Record<string, { damageAdd?: number; mitigationAdd?: number }> = {
+  "elixir-of-power": { damageAdd: 2 }, // from dust-vampire's vampire-ash
+  "warding-draught": { mitigationAdd: 3 }, // from ice-troll's troll-hide
+};
 
 export const AFFINITY_MULTIPLIER = 2; // hidden affinity effect, e.g. silver↔werewolf
 export type Affinity = { monsterTag: string; itemTag: string };
@@ -200,6 +221,7 @@ export const AFFINITIES: Affinity[] = [
   { monsterTag: "werewolf", itemTag: "silver" },
   { monsterTag: "fae", itemTag: "iron" },
   { monsterTag: "vampire", itemTag: "garlic-coated" },
+  { monsterTag: "dragon", itemTag: "wyrmbane" }, // wyrmfang ×2 vs the Wyrm — the first kill is brutal, then the boss becomes a farmable node (D34)
 ]; // discoverable damage multiplier pairings
 
 export type Monster = { tier: number; dmgType: DmgType; armourType: ArmourType; tags: string[] };
@@ -213,6 +235,10 @@ export const MONSTERS: Record<string, Monster> = {
   "frost-fae": { tier: 2, dmgType: "magic", armourType: "robe", tags: ["fae"] },
   "snow-wolf": { tier: 1, dmgType: "melee", armourType: "light", tags: ["beast"] },
   "ice-troll": { tier: 3, dmgType: "melee", armourType: "plate", tags: ["troll"] },
+  // Tier-4 boss (D34): magic damage into a plate hide — punishes the plate
+  // strategy that carried the whole game (plate weak to magic, ÷1.5). The
+  // dragon tag pairs with the wyrmbane affinity so wyrmfang farms it (§4.1).
+  "ancient-wyrm": { tier: 4, dmgType: "magic", armourType: "plate", tags: ["dragon"] },
 }; // monster combat stats and loot triggers
 
 export type Weapon = { dmgType: DmgType; damage: number; tags: string[] };
@@ -229,6 +255,9 @@ export const WEAPONS: Record<string, Weapon> = {
   "inferno-staff": { dmgType: "magic", damage: 4, tags: [] },
   // T3 (damage 6) — melee only; top of the mithril climb
   "mithril-sword": { dmgType: "melee", damage: 6, tags: [] },
+  // Boss capstone (D34) — from the Wyrm's rare dragonheart. dmg 8 + wyrmbane
+  // affinity (×2 vs dragons) turns the brutal first kill into a farmable node.
+  wyrmfang: { dmgType: "melee", damage: 8, tags: ["wyrmbane"] },
 }; // weapon damage type and affinity tags. Damage scales modestly (3/4/6) so armour type still matters vs a tier-up weapon
 
 export type ArmourSlot = "helmet" | "chest" | "legs" | "boots" | "gloves";
@@ -266,6 +295,12 @@ export const ARMOUR: Record<string, { armourType: ArmourType; defense: number; s
   "studded-legs": { armourType: "light", defense: 2, slot: "legs" },
   "enchanted-chest": { armourType: "robe", defense: 2, slot: "chest" }, // robe-chest +1 (silver-gated)
   "enchanted-hood": { armourType: "robe", defense: 2, slot: "helmet" },
+  // --- Combat-drop shortcuts (2026-07-05, peu): monster parts craft into gear,
+  // so routing AROUND a monster forfeits real power (§4.2). Each bypasses a
+  // normal material gate — the reward for choosing to fight.
+  "warg-jerkin": { armourType: "light", defense: 3, slot: "chest" }, // werewolf-pelt → light chest def 3, no drake needed
+  "scorpion-plate-chest": { armourType: "plate", defense: 3, slot: "chest" }, // scorpion-carapace → steel-grade plate chest, NO coal
+  "dragonscale-cuirass": { armourType: "plate", defense: 5, slot: "chest" }, // boss drop — best chest in the game (D34)
 }; // armour pieces by type, defense contribution, and body slot (slot: M5 pack validation)
 
 export const LOOT_TABLE: Record<string, ItemStackSpec[]> = {
@@ -278,7 +313,10 @@ export const LOOT_TABLE: Record<string, ItemStackSpec[]> = {
   "frost-fae": [{ defId: "fae-dust", qty: 2 }],
   "snow-wolf": [{ defId: "wolf-pelt", qty: 2 }],
   "ice-troll": [{ defId: "troll-hide", qty: 2 }],
-}; // monster fixed loot drops
+  // Boss (D34): wyrm-scale always → dragonscale-cuirass; dragonheart @0.2 (the
+  // 1/5 rare) → wyrmfang. `chance` is rolled per-encounter in fightAt (§4.5).
+  "ancient-wyrm": [{ defId: "wyrm-scale", qty: 3 }, { defId: "dragonheart", qty: 1, chance: 0.2 }],
+}; // monster fixed loot drops (entries with `chance` roll deterministically in fightAt)
 
 export const SCOUT_ENERGY_COST = 1; // energy per scout activation
 export const SCOUT_RADIUS = 3; // Chebyshev radius of scout reveal
@@ -289,6 +327,7 @@ export const SCOUT_TOOL = "spyglass"; // required tool defId for scouting
 // the POC; the list is what `pack`/`slotOf` validate a food/potion defId against.
 export const FOOD: string[] = ["ration", "trail-ration"];
 export const POTION: string[] = ["potion", "greater-potion"];
+export const BATTLE_ITEM: string[] = ["elixir-of-power", "warding-draught"]; // combat consumables (bzd); COMBAT_BUFF keys
 
 // --- Crafting (M5): direct & instant, materials → item (D10). One shared tree
 // so hauls from different biomes feed each other. Weighted materials (D27) make
@@ -364,6 +403,21 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   "studded-legs": { inputs: [{ defId: "drake-hide", qty: 1 }], output: { defId: "studded-legs", qty: 1 } },
   "enchanted-chest": { inputs: [{ defId: "ice-moss", qty: 2 }, { defId: "silver-ore", qty: 1 }], output: { defId: "enchanted-chest", qty: 1 } }, // silver T2 → iron-pick
   "enchanted-hood": { inputs: [{ defId: "ice-moss", qty: 1 }, { defId: "silver-ore", qty: 1 }], output: { defId: "enchanted-hood", qty: 1 } },
+  // --- Combat-drop crafts (2026-07-05, peu): the ONLY source of the combat
+  // branch, so routing around a monster forfeits real power (§4.2). Every
+  // monster part now feeds a recipe. (T3 combat consumables elixir-of-power /
+  // warding-draught land in Phase 2 with the battleItems mechanic — bzd.)
+  "ration-boar": { inputs: [{ defId: "boar-hide", qty: 2 }], output: { defId: "ration", qty: 2 } }, // boar-hide = meat
+  "trail-ration-raider": { inputs: [{ defId: "raider-supplies", qty: 1 }], output: { defId: "trail-ration", qty: 1 } }, // T2 food shortcut, no coal
+  "warg-jerkin": { inputs: [{ defId: "werewolf-pelt", qty: 2 }], output: { defId: "warg-jerkin", qty: 1 } },
+  "scorpion-plate-chest": { inputs: [{ defId: "scorpion-carapace", qty: 2 }], output: { defId: "scorpion-plate-chest", qty: 1 } },
+  "large-pack-troll": { inputs: [{ defId: "troll-hide", qty: 2 }, { defId: "ironwood-log", qty: 1 }], output: { defId: "large-pack", qty: 1 } }, // alt route to the top pack
+  // T3 combat consumables (bzd) — the exclusive reward for fighting T3 monsters
+  "elixir-of-power": { inputs: [{ defId: "vampire-ash", qty: 2 }], output: { defId: "elixir-of-power", qty: 1 } }, // +2 dmg, one fight
+  "warding-draught": { inputs: [{ defId: "troll-hide", qty: 2 }], output: { defId: "warding-draught", qty: 1 } }, // +3 mitigation, one fight
+  // Boss capstone (D34)
+  "dragonscale-cuirass": { inputs: [{ defId: "wyrm-scale", qty: 3 }], output: { defId: "dragonscale-cuirass", qty: 1 } },
+  wyrmfang: { inputs: [{ defId: "dragonheart", qty: 1 }], output: { defId: "wyrmfang", qty: 1 } },
 };
 
-type ItemStackSpec = { defId: string; qty: number };
+type ItemStackSpec = { defId: string; qty: number; chance?: number }; // chance ∈ (0,1): drop probability, rolled per-encounter (LOOT_TABLE only); absent = always drops

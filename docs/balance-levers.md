@@ -7,13 +7,14 @@ The POC ships with *feel-pass* values, not balanced ones. The discipline that ke
 **Energy economy** — how far/long a trip lasts
 - `ENERGY_PER_FOOD` — default energy per food item (fallback for `FOOD_ENERGY`)
 - `FOOD_ENERGY{foodDefId}` (2026-07-04) — per-food energy; tiered food (`trail-ration` = 20 vs `ration` = 10) is denser, so progression earns slot efficiency against the firm squeeze. Absent = `ENERGY_PER_FOOD`
+- `BASE_ENERGY_FLOOR` (2026-07-05, qrl) — embark energy = `max(BASE_ENERGY_FLOOR, packedFoodEnergy)`; a no-food embark still gets ~5 actions, so starvation is recoverable-by-effort, not a 0-energy dead-loop (spec §3/§4.5)
 - `MOVE_BASE_COST` — energy per tile on neutral ground
 - `TERRAIN_COST{plains, mud, ice, river, mountain}` — per-terrain multiplier; `Infinity` = impassable without gear (mountain, until gating gear exists)
 - `TRANSPORT_MULTIPLIER{horse, wagon, mule, …}` — move-cost **divisor** (spec §10: base × terrain ÷ transport): >1 faster than foot (horse ÷1.5, wagon ÷2.0 — the answer to ice-heavy tundra), <1 slower (mule); carry bonuses arrive with M3/M5
 
-**Carry** — loot vs supplies tension
-- `BASE_CARRY_SLOTS` — carry stacks with NO backpack (**3** since 2026-07-05: you start bare, and 3 keeps the opening playable — pack 1 food stack and still gather to bootstrap food) · `BACKPACK_SLOTS{tier}` — total stacks per backpack (replaces the base): `starter` 4 / `leather` 6 / `large-pack` 8 (`starter` is now the first *craftable* pack, not a freebie) · `STACK_CAP` — max qty per stack (**5**, firm squeeze: a food/potion stack is real slot pressure and a haul opens new slots)
-- D23: packed food/potion stacks count against the same cap (ballast) — every ration packed is a loot slot spent
+**Carry** — loot vs supplies tension (UNIT-based since Phase 2 / pqp)
+- `BASE_CARRY_SLOTS` — inventory slots with NO backpack (**6** since pqp) · `BACKPACK_SLOTS{tier}` — total slots per backpack (replaces the base): `starter` 8 / `leather` 12 / `large-pack` 16 · `STACK_CAP` — max qty per **loot** stack (**5**); consumables/tools do NOT stack
+- **pqp (2026-07-05, supersedes D23):** each food/potion/battleItem **unit** and **each tool** is one slot; only loot stacks. Food is eaten just-in-time (`food.digest`) and its slot frees mid-run; **uneaten food banks back** on return. So the squeeze is *temporal* — cramped early (heavy food), roomy late — and packing a supply is a live, visible loot slot given up. Caps were bumped (3→6, 4/6/8→8/12/16) for the ~5× consumable pressure vs the old per-stack model. Re-tuning: keep the sustainability harness green (`test/harness-sustainability.test.ts`).
 
 **Gathering**
 - `NODE_HARDNESS{nodeType}` — energy cost numerator · `TOOL_QUALITY{toolDefId}` — cost divisor **AND tier** (D31): quality doubles as the max material tier the tool can work · `GATHER_YIELD{nodeType}` — qty per (one-shot) node
@@ -25,6 +26,7 @@ The POC ships with *feel-pass* values, not balanced ones. The discipline that ke
 - `PLAYER_BASE_HP` · `DMG_ARMOUR_MATRIX[dmgType][armourType]` — read BOTH ways: damage multiplier vs the monster's hide class going out, mitigation divisor per armour piece coming in (`defense ÷ matrix`) · `ARMOUR{pieceDefId} → {armourType, defense}` · `WEAPONS{defId} → {dmgType, damage, tags}` · `UNARMED_DAMAGE`
 - `AFFINITIES[{monsterTag, itemTag}]` + `AFFINITY_MULTIPLIER` — the hidden discoverable layer (silver↔werewolf, iron↔fae, garlic↔vampire); scout forecasts price it in without naming it
 - `POTION_HEAL` (default) · `POTION_HEAL_BY{potionDefId}` (2026-07-04, `potion` 10 / `greater-potion` 20; absent = `POTION_HEAL`) · `AUTO_POTION_THRESHOLD` (fraction of base HP) · `CHIP_DAMAGE_MIN` — the "HP always drains" floor, both directions
+- `COMBAT_BUFF{battleItemDefId} → {damageAdd?, mitigationAdd?}` (bzd, 2026-07-05) — packed battle items, summed into `dmgOut`/mitigation and **consumed at fight start** (`elixir-of-power` +2 dmg, `warding-draught` +3 mitigation). The T3-fight-only reward branch; they cost inventory slots (pqp) and let a fought-up player beat the Wyrm without full mithril (§4.3). `BATTLE_ITEM[]` is the catalog list (`slotOf` → `"battle-item"`).
 - `MONSTER_TIER_HP_CURVE` / `MONSTER_TIER_DMG_CURVE` · `MONSTERS{defId} → {tier, dmgType, armourType, tags}` · `LOOT_TABLE{monster}` (fixed drops — determinism needs no RNG) · `BIOMES{id}.creatureTable` (uniform pick, stamped at generation)
 - `SCOUT_ENERGY_COST` · `SCOUT_RADIUS` · `SCOUT_TOOL`
 
