@@ -12,7 +12,7 @@ The POC ships with *feel-pass* values, not balanced ones. The discipline that ke
 - `TRANSPORT_MULTIPLIER{horse, wagon, mule, …}` — move-cost **divisor** (spec §10: base × terrain ÷ transport): >1 faster than foot (horse ÷1.5, wagon ÷2.0 — the answer to ice-heavy tundra), <1 slower (mule); carry bonuses arrive with M3/M5
 
 **Carry** — loot vs supplies tension
-- `BASE_CARRY_SLOTS` — carry stacks with no backpack · `BACKPACK_SLOTS{tier}` — total stacks per backpack (replaces the base): `starter` 3 / `leather` 5 / `large-pack` 7 (2026-07-04 firm squeeze) · `STACK_CAP` — max qty per stack (**5** since 2026-07-04, so a food/potion stack is real slot pressure and a haul opens new slots)
+- `BASE_CARRY_SLOTS` — carry stacks with NO backpack (**3** since 2026-07-05: you start bare, and 3 keeps the opening playable — pack 1 food stack and still gather to bootstrap food) · `BACKPACK_SLOTS{tier}` — total stacks per backpack (replaces the base): `starter` 4 / `leather` 6 / `large-pack` 8 (`starter` is now the first *craftable* pack, not a freebie) · `STACK_CAP` — max qty per stack (**5**, firm squeeze: a food/potion stack is real slot pressure and a haul opens new slots)
 - D23: packed food/potion stacks count against the same cap (ballast) — every ration packed is a loot slot spent
 
 **Gathering**
