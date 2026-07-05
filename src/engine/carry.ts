@@ -1,7 +1,7 @@
 // Carry-slot accounting. Loot stacks hold STACK_CAP each; consumables and tools
 // each occupy ONE slot per unit (Phase 2, pqp — no stacking for consumables).
-import { BASE_CARRY_SLOTS, BACKPACK_SLOTS, STACK_CAP } from "../data/constants";
-import type { ItemStack, Loadout } from "./types";
+import { BASE_CARRY_SLOTS, BACKPACK_SLOTS, STACK_CAP, TRANSPORT_CARRY, BEAST_TRANSPORTS, PANNIERS_SLOTS } from "../data/constants";
+import type { ItemStack, Loadout, Equipment } from "./types";
 
 // Inventory slots consumed by non-loot items (pqp): each food unit, each potion
 // unit, and each tool is one slot. Loot (carry) stacks take the rest.
@@ -19,14 +19,26 @@ export function consumableSlots(loadout: Loadout): number {
 // food/potions burn down over the run (food.digest), so this grows as you go.
 // Single source for gather/fight (M3/M4) and pack (M5).
 export function freeCarryStacks(loadout: Loadout): number {
-  return slotCap(loadout.equipment.backpack) - consumableSlots(loadout);
+  return carryCap(loadout.equipment) - consumableSlots(loadout);
 }
 
-// Total carry stacks available. The backpack REPLACES the base (it IS your
-// storage), it doesn't add to it.
+// Backpack tier total. The backpack REPLACES the base (it IS your storage), it
+// doesn't add to it. Transport/panniers layer ON TOP via carryCap (zhn).
 export function slotCap(backpack: string | null): number {
   if (backpack === null) return BASE_CARRY_SLOTS;
   return BACKPACK_SLOTS[backpack] ?? BASE_CARRY_SLOTS;
+}
+
+// Total inventory capacity from all carry sources (zhn): backpack tier + a small
+// transport bonus (bringing a beast/cart) + panniers (only with a beast). So a
+// mule + panniers is a hauler; a horse is fast with a little extra room.
+export function carryCap(equipment: Equipment): number {
+  let cap = slotCap(equipment.backpack);
+  if (equipment.transport !== null) cap += TRANSPORT_CARRY[equipment.transport] ?? 0;
+  if (equipment.panniers !== null && equipment.transport !== null && BEAST_TRANSPORTS.includes(equipment.transport)) {
+    cap += PANNIERS_SLOTS[equipment.panniers] ?? 0;
+  }
+  return cap;
 }
 
 // Pure: returns the new carry, or null if qty can't FULLY fit within

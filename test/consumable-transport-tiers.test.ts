@@ -13,17 +13,18 @@ function town(bank: { defId: string; qty: number }[]): GameState {
   return { seed: "t", phase: "town", bank, loadout: emptyLoadout(), expedition: null };
 }
 
-test("embark: trail-ration yields 20 energy/item vs ration's 10 (per-food lever)", () => {
+test("embark: trail-ration yields 2× a ration's energy/item (per-food lever, ff7)", () => {
+  // qty 3 so both clear BASE_ENERGY_FLOOR (20) and the per-item ratio is visible.
   const withRation = reduce(
-    { ...town([{ defId: "ration", qty: 2 }]), loadout: { ...emptyLoadout(), food: [{ defId: "ration", qty: 2 }] } },
+    { ...town([{ defId: "ration", qty: 3 }]), loadout: { ...emptyLoadout(), food: [{ defId: "ration", qty: 3 }] } },
     { type: "embark", mapSeed: "t:map:0" },
   ).state;
   const withTrail = reduce(
-    { ...town([{ defId: "trail-ration", qty: 2 }]), loadout: { ...emptyLoadout(), food: [{ defId: "trail-ration", qty: 2 }] } },
+    { ...town([{ defId: "trail-ration", qty: 3 }]), loadout: { ...emptyLoadout(), food: [{ defId: "trail-ration", qty: 3 }] } },
     { type: "embark", mapSeed: "t:map:0" },
   ).state;
-  expect(withRation.expedition!.energy).toBe(20); // 2 × 10
-  expect(withTrail.expedition!.energy).toBe(40); // 2 × 20 — same 1 slot, double energy
+  expect(withRation.expedition!.energy).toBe(24); // 3 × 8
+  expect(withTrail.expedition!.energy).toBe(48); // 3 × 16 — same slots, double energy
 });
 
 test("combat: a greater-potion heals 20 where a potion heals 10", () => {

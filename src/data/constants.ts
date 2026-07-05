@@ -86,7 +86,7 @@ export const MATERIAL_TIER: Record<string, number> = {
 };
 
 // --- Energy economy (filled in M2) ---
-export const ENERGY_PER_FOOD = 10; // default energy per packed food item (fallback for FOOD_ENERGY)
+export const ENERGY_PER_FOOD = 8; // default energy per packed food item (fallback for FOOD_ENERGY). ff7 (2026-07-05): 10→8 so one food stack no longer buys half a map — max-food stops dominating. Do NOT drop below 8 (7 risks the forage-only tundra path).
 // Base energy floor (2026-07-05, qrl): embark energy = max(BASE_ENERGY_FLOOR,
 // packedFoodEnergy). Gives ~5 actions with no food — the recoverable-by-effort
 // fail state (spec §3), NOT a 0-energy dead-loop. See reduce.embark.
@@ -94,8 +94,8 @@ export const BASE_ENERGY_FLOOR = 20;
 // Per-food energy (2026-07-04): tiered food gives more energy per item, so
 // progression EARNS slot efficiency against the firm carry squeeze. Absent = ENERGY_PER_FOOD.
 export const FOOD_ENERGY: Record<string, number> = {
-  ration: 10,
-  "trail-ration": 20,
+  ration: 8, // ff7 (2026-07-05): 10→8
+  "trail-ration": 16, // ff7: 20→16 (stays 2× a ration — the T2 density edge)
 };
 export const MOVE_BASE_COST = 1; // energy per tile on neutral ground, on foot
 export const TERRAIN_COST: Record<Terrain, number> = {
@@ -108,8 +108,22 @@ export const TERRAIN_COST: Record<Terrain, number> = {
 export const TRANSPORT_MULTIPLIER: Record<string, number> = {
   horse: 1.5, // fast — divides move cost (spec §10: base × terrain ÷ transport)
   wagon: 2.0, // T2 transport: halves move cost — the answer to ice-heavy tundra
-  mule: 0.8, // slow — will pay for it in carry capacity (M3/M5)
+  mule: 0.8, // slow — but the hauler: biggest carry bonus + panniers-capable
 }; // keyed by transport defId; absent/on-foot = 1
+
+// Carry sources stack (zhn, spec §4.4): bringing transport adds a small carry
+// bonus on top of your backpack; a beast (horse/mule) can also wear panniers for
+// more. So a mule + panniers is a hauler; a horse is fast with a little extra room.
+export const TRANSPORT_CARRY: Record<string, number> = {
+  horse: 2,
+  wagon: 6, // a cart hauls cargo (but can't wear panniers — not a beast)
+  mule: 4, // the pack animal
+}; // extra inventory slots added by transport defId; absent = 0
+export const BEAST_TRANSPORTS: string[] = ["horse", "mule"]; // living transports panniers can strap to
+export const PANNIERS: string[] = ["panniers"]; // saddlebag catalog (zhn)
+export const PANNIERS_SLOTS: Record<string, number> = {
+  panniers: 4, // extra slots, but ONLY with a beast transport equipped
+}; // keyed by panniers defId
 
 // --- Carry (filled in M3; rebalanced Phase 2 / pqp) ---
 // Slots are now UNIT-based (pqp): each food/potion/battleItem unit and each tool
@@ -365,6 +379,7 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   // Transport
   horse: { inputs: [{ defId: "deer-hide", qty: 3 }, { defId: "oak-log", qty: 2 }], output: { defId: "horse", qty: 1 } },
   wagon: { inputs: [{ defId: "ironwood-log", qty: 2 }, { defId: "iron-ore", qty: 2 }], output: { defId: "wagon", qty: 1 } }, // T2: ironwood → iron-axe
+  panniers: { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "panniers", qty: 1 } }, // saddlebags — extra carry, needs a beast (zhn)
   // Weapons — T1
   "iron-sword": { inputs: [{ defId: "iron-ore", qty: 3 }], output: { defId: "iron-sword", qty: 1 } },
   bow: { inputs: [{ defId: "oak-log", qty: 2 }, { defId: "deer-hide", qty: 1 }], output: { defId: "bow", qty: 1 } },

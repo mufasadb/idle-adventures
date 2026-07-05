@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { craft } from "../src/engine/craft";
-import { RECIPE, ARMOUR, WEAPONS, TOOL_CAPABILITY, BACKPACK_SLOTS, TRANSPORT_MULTIPLIER, FOOD, POTION, BATTLE_ITEM } from "../src/data/constants";
+import { RECIPE, ARMOUR, WEAPONS, TOOL_CAPABILITY, BACKPACK_SLOTS, TRANSPORT_MULTIPLIER, FOOD, POTION, BATTLE_ITEM, PANNIERS } from "../src/data/constants";
 import { slotOf } from "../src/engine/catalog";
 
 test("craft: consumes inputs and yields output (bead acceptance)", () => {
@@ -32,7 +32,7 @@ test("craft: does not mutate the input bank", () => {
 test("recipes: every output is a real equippable/consumable defId", () => {
   const known = (d: string) =>
     d in WEAPONS || d in ARMOUR || d in TOOL_CAPABILITY || d in BACKPACK_SLOTS ||
-    d in TRANSPORT_MULTIPLIER || FOOD.includes(d) || POTION.includes(d) || BATTLE_ITEM.includes(d);
+    d in TRANSPORT_MULTIPLIER || FOOD.includes(d) || POTION.includes(d) || BATTLE_ITEM.includes(d) || PANNIERS.includes(d);
   for (const [id, recipe] of Object.entries(RECIPE)) {
     expect(known(recipe.output.defId)).toBe(true);
     expect(recipe.output.qty).toBeGreaterThan(0);

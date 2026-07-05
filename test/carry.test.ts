@@ -1,12 +1,29 @@
 import { test, expect } from "bun:test";
-import { slotCap, addToCarry, freeCarryStacks } from "../src/engine/carry";
-import { BASE_CARRY_SLOTS, BACKPACK_SLOTS, STACK_CAP } from "../src/data/constants";
+import { slotCap, carryCap, addToCarry, freeCarryStacks } from "../src/engine/carry";
+import { BASE_CARRY_SLOTS, BACKPACK_SLOTS, STACK_CAP, TRANSPORT_CARRY, PANNIERS_SLOTS } from "../src/data/constants";
 import { emptyLoadout } from "../src/engine/loadout";
 
 test("slotCap: no backpack gives base slots; backpack defines the cap", () => {
   expect(slotCap(null)).toBe(BASE_CARRY_SLOTS);
   expect(slotCap("starter")).toBe(BACKPACK_SLOTS.starter!);
   expect(slotCap("unknown-pack")).toBe(BASE_CARRY_SLOTS);
+});
+
+test("carryCap: carry sources stack — backpack + transport + panniers (zhn)", () => {
+  const eq = () => ({ ...emptyLoadout().equipment });
+  // backpack alone = its tier total
+  expect(carryCap({ ...eq(), backpack: "leather" })).toBe(BACKPACK_SLOTS.leather!);
+  // transport adds a bonus on top
+  const horse = { ...eq(), backpack: "leather", transport: "horse" };
+  expect(carryCap(horse)).toBe(BACKPACK_SLOTS.leather! + TRANSPORT_CARRY.horse!);
+  // panniers add MORE, but only with a beast — mule + panniers = hauler
+  const muleHauler = { ...eq(), backpack: "leather", transport: "mule", panniers: "panniers" };
+  expect(carryCap(muleHauler)).toBe(BACKPACK_SLOTS.leather! + TRANSPORT_CARRY.mule! + PANNIERS_SLOTS.panniers!);
+  // panniers WITHOUT a beast (wagon is a cart, not a beast) grant nothing
+  const wagonPanniers = { ...eq(), backpack: "leather", transport: "wagon", panniers: "panniers" };
+  expect(carryCap(wagonPanniers)).toBe(BACKPACK_SLOTS.leather! + TRANSPORT_CARRY.wagon!);
+  // panniers with NO transport at all also grant nothing
+  expect(carryCap({ ...eq(), backpack: "leather", panniers: "panniers" })).toBe(BACKPACK_SLOTS.leather!);
 });
 
 // Firm carry squeeze (2026-07-04 tiered-progression pass): the tuned tier ladder

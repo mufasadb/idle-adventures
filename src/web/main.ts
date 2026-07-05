@@ -11,10 +11,11 @@ import { generateGrid, rollBiome } from "../engine/grid";
 import type { Grid } from "../engine/grid";
 import { slotOf } from "../engine/catalog";
 import { moveCost } from "../engine/move";
-import { slotCap } from "../engine/carry";
+import { carryCap } from "../engine/carry";
+import { heldFoodEnergy } from "../engine/food";
 import { RECIPE, MATERIAL_TIER, GRID_SIZE, MONSTERS } from "../data/constants";
 import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR } from "../render/render";
-import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot } from "../engine/types";
+import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, LoadoutSlot } from "../engine/types";
 
 // Per-node verb so the UI reads right: you don't "mine" an animal.
 const GATHER_VERB: Record<string, { label: string; past: string; noun: string }> = {
@@ -162,14 +163,39 @@ function draw(): void {
   wire(); save();
 }
 
-// A slot strip: `cap` boxes, filled left-to-right. `groups` are drawn in order
-// with their class (food/potion ballast dimmed, loot bright); the rest are empty.
-function slotStrip(groups: { items: ItemStack[]; cls: string }[], cap: number): string {
-  const filled: string[] = [];
-  for (const gr of groups) for (const it of gr.items) filled.push(`<div class="slot ${gr.cls}" title="${name(it.defId)} ×${it.qty}">${name(it.defId)}<span class="q">×${it.qty}</span></div>`);
-  const boxes = filled.slice(0, cap);
+// The inventory grid (pqp/ju3). Each food/potion/battle-item UNIT and each tool
+// is its own filled box (no stacking); loot materials stack (one box per stack,
+// shown ×qty). Empty boxes pad to `cap`. Worn gear (weapon/armour/transport/
+// backpack/panniers) is appended as semi-transparent GHOST boxes — you see your
+// whole kit in one place, but ghosts don't spend a real slot. Food burns down
+// over the run, so its boxes disappear live as they're eaten.
+function slotBox(cls: string, label: string, q: string): string {
+  return `<div class="slot ${cls}" title="${label}${q}">${label}${q ? `<span class="q">${q}</span>` : ""}</div>`;
+}
+function realSlots(loadout: Loadout, carry: ItemStack[]): string[] {
+  const boxes: string[] = [];
+  const units = (items: ItemStack[], cls: string) => {
+    for (const it of items) for (let i = 0; i < it.qty; i++) boxes.push(slotBox(cls, name(it.defId), ""));
+  };
+  units(loadout.food, "food");
+  units(loadout.potions, "potion");
+  units(loadout.battleItems ?? [], "battle");
+  for (const t of loadout.equipment.tools) boxes.push(slotBox("tool", name(t), ""));
+  for (const s of carry) boxes.push(slotBox("loot", name(s.defId), `×${s.qty}`));
+  return boxes;
+}
+function wornGhosts(eq: Equipment): string[] {
+  const worn = [eq.weapon, eq.helmet, eq.chest, eq.legs, eq.boots, eq.gloves, eq.transport, eq.backpack, eq.panniers].filter(Boolean) as string[];
+  return worn.map((d) => `<div class="slot ghost" title="${name(d)} — worn, no slot">${name(d)}</div>`);
+}
+// Returns { used, html }. used = real filled slots (ghosts excluded).
+function inventoryGrid(loadout: Loadout, carry: ItemStack[], cap: number): { used: number; html: string } {
+  const real = realSlots(loadout, carry);
+  const boxes = [...real];
   while (boxes.length < cap) boxes.push(`<div class="slot empty">·</div>`);
-  return `<div class="slots">${boxes.join("")}</div>`;
+  const ghosts = wornGhosts(loadout.equipment);
+  const ghostStrip = ghosts.length ? `<div class="slots ghosts" title="worn gear — free, doesn't use a slot">${ghosts.join("")}</div>` : "";
+  return { used: real.length, html: `<div class="slots">${boxes.join("")}</div>${ghostStrip}` };
 }
 
 function townView(): string {
@@ -177,8 +203,8 @@ function townView(): string {
   const craftable = legal.filter((a): a is Extract<Action, { type: "craft" }> => a.type === "craft");
   const lo = state.loadout;
   const eq = lo.equipment;
-  const cap = slotCap(eq.backpack);
-  const foodEnergyHint = lo.food.reduce((s, f) => s + f.qty, 0);
+  const cap = carryCap(eq);
+  const inv = inventoryGrid(lo, [], cap);
   if (!chosenMap) chosenMap = pickMap();
   const equipRow = (label: string, val: string | null) =>
     `<div class="row"><span class="k">${label}</span><span class="v">${val ?? "<span class='muted'>—</span>"}</span></div>`;
@@ -201,11 +227,12 @@ function townView(): string {
       ${equipRow("weapon", eq.weapon ? name(eq.weapon) : null)}
       ${equipRow("armour", [eq.helmet, eq.chest, eq.legs, eq.boots, eq.gloves].filter(Boolean).map((d) => name(d as string)).join(", ") || null)}
       ${equipRow("transport", eq.transport ? name(eq.transport) : null)}
-      ${equipRow("backpack", eq.backpack ? `${name(eq.backpack)} (${cap} slots)` : `none (${cap} slots)`)}
+      ${eq.panniers ? equipRow("panniers", name(eq.panniers)) : ""}
+      ${equipRow("backpack", eq.backpack ? name(eq.backpack) : "none")}
       ${equipRow("tools", eq.tools.map(name).join(", ") || null)}
-      <div class="row"><span class="k">bag (${cap} slots)</span></div>
-      ${slotStrip([{ items: lo.food, cls: "food" }, { items: lo.potions, cls: "potion" }], cap)}
-      <div class="muted small">food ≈ ${foodEnergyHint * 10}+ energy · dimmed slots are supplies; the rest carry loot on the map</div>
+      <div class="row"><span class="k">bag</span><span class="v">${inv.used}/${cap} slots</span></div>
+      ${inv.html}
+      <div class="muted small">worn gear (ghosted) is free · each food / potion / battle-item / tool takes one slot · food banks ≈ ${heldFoodEnergy(lo.food)} energy and burns down as you travel</div>
     </section>
 
     <section>
@@ -311,7 +338,8 @@ function expeditionView(): string {
     ? `<div class="pathbanner">${pending.fight ? `⚔ walk in &amp; <b>fight the ${name(pending.fight)}</b> · ` : ""}→ (${pending.goal.x},${pending.goal.y}): ${pending.path.length} tile${pending.path.length !== 1 ? "s" : ""}, <b class="${pending.cost > exp.energy ? "over" : ""}">−${round(pending.cost)} energy</b> · <button data-walk>${pending.fight ? "Fight ▶" : "Walk ▶"}</button> <button class="link" data-cancelpath>cancel</button></div>`
     : `<div class="pathbanner muted">Click a tile → previews the route + energy. Click <b>Walk</b> (or the tile again / right-click) to go. Monsters (<b>X</b>) block their tile — click one to fight, or route around.</div>`;
 
-  const cap = slotCap(exp.loadout.equipment.backpack);
+  const cap = carryCap(exp.loadout.equipment);
+  const inv = inventoryGrid(exp.loadout, exp.carry, cap);
   return `
   <header><h1>${rollBiome(exp.mapSeed)} expedition</h1><span class="muted">pos (${exp.pos.x},${exp.pos.y})</span><button class="link" data-newgame>new game</button></header>
   <div class="cols">
@@ -327,9 +355,9 @@ function expeditionView(): string {
         ${canScout ? `<button data-act="scout">🔭 Scout</button>` : ""}
         <button data-act="return">⏎ Return to town</button>
       </div>
-      <h2>Bag <span class="muted small">${exp.loadout.food.length + exp.loadout.potions.length + exp.carry.length}/${cap}</span></h2>
-      ${slotStrip([{ items: exp.loadout.food, cls: "food" }, { items: exp.loadout.potions, cls: "potion" }, { items: exp.carry, cls: "loot" }], cap)}
-      <div class="muted small">dim = supplies (food/potions) · bright = loot. Every supply slot is a loot slot you gave up.</div>
+      <h2>Bag <span class="muted small">${inv.used}/${cap} slots</span></h2>
+      ${inv.html}
+      <div class="muted small">food (green) burns down as you travel — freeing slots for loot (gold). Potions purple · battle items red · tools grey · worn gear ghosted (free).</div>
       ${exp.carry.length ? `<div class="bank" style="margin-top:.5rem">${exp.carry.map((s) => `<div class="bankitem"><span class="chip">${name(s.defId)} ×${s.qty}</span><button data-drop="${s.defId}">drop</button></div>`).join("")}</div>` : ""}
     </section>
   </div>

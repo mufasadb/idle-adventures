@@ -4,7 +4,7 @@
 // unpack action — reduce a mis-planned consumable by embarking and re-planning.
 import type { ItemStack, Loadout, LoadoutSlot } from "./types";
 import { slotOf } from "./catalog";
-import { slotCap, consumableSlots } from "./carry";
+import { carryCap, consumableSlots } from "./carry";
 
 // Add one unit of a consumable, merging into an existing same-defId stack
 // (representation stays merged; slots are counted per-unit by consumableSlots).
@@ -15,7 +15,7 @@ function addConsumable(list: ItemStack[], defId: string): ItemStack[] {
 }
 
 // Single-occupancy equipment slots keyed exactly by LoadoutSlot name.
-const EQUIP_SLOTS = ["weapon", "helmet", "chest", "legs", "boots", "gloves", "transport", "backpack"] as const;
+const EQUIP_SLOTS = ["weapon", "helmet", "chest", "legs", "boots", "gloves", "transport", "backpack", "panniers"] as const;
 type EquipSlot = (typeof EQUIP_SLOTS)[number];
 
 // Every defId the plan reserves from the bank (each equipment piece ×1, each
@@ -31,6 +31,7 @@ export function reserveLoadout(loadout: Loadout): ItemStack[] {
   for (const tool of equipment.tools) out.push({ defId: tool, qty: 1 });
   if (equipment.transport !== null) out.push({ defId: equipment.transport, qty: 1 });
   if (equipment.backpack !== null) out.push({ defId: equipment.backpack, qty: 1 });
+  if (equipment.panniers !== null) out.push({ defId: equipment.panniers, qty: 1 });
   for (const stack of food) out.push({ defId: stack.defId, qty: stack.qty });
   for (const stack of potions) out.push({ defId: stack.defId, qty: stack.qty });
   for (const stack of loadout.battleItems ?? []) out.push({ defId: stack.defId, qty: stack.qty });
@@ -71,7 +72,7 @@ export function packItem(
   // Tools now cost an inventory slot each (pqp): pick + axe + knife + spyglass
   // can't all come along with a full food supply — a mining run and a boss run
   // become different loadouts.
-  const cap = slotCap(loadout.equipment.backpack);
+  const cap = carryCap(loadout.equipment);
   if (slot === "tool") {
     if (loadout.equipment.tools.includes(itemId)) return { ok: false, reason: "already-packed" };
     const equipment = { ...loadout.equipment, tools: [...loadout.equipment.tools, itemId] };

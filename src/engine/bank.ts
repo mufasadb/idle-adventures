@@ -44,6 +44,7 @@ export function endExpedition(state: GameState, expedition: Expedition): GameSta
   for (const tool of equipment.tools) durables.push({ defId: tool, qty: 1 });
   if (equipment.transport !== null) durables.push({ defId: equipment.transport, qty: 1 });
   if (equipment.backpack !== null) durables.push({ defId: equipment.backpack, qty: 1 });
+  if (equipment.panniers !== null) durables.push({ defId: equipment.panniers, qty: 1 });
   return {
     ...state,
     phase: "town",

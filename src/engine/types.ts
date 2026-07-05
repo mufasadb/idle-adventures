@@ -14,6 +14,7 @@ export type Equipment = {
   tools: string[]; // pick, axe, fishing rod, spyglass — capabilities
   transport: string | null;
   backpack: string | null;
+  panniers: string | null; // saddlebags (zhn): extra carry, only works with a beast transport
 };
 
 export type Loadout = {
@@ -54,6 +55,7 @@ export type LoadoutSlot =
   | "tool"
   | "transport"
   | "backpack"
+  | "panniers"
   | "food"
   | "potion"
   | "battle-item";

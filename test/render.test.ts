@@ -18,7 +18,7 @@ const expeditionState = (mapSeed: string): GameState => ({
     loadout: {
       equipment: {
         weapon: null, helmet: null, chest: null, legs: null, boots: null,
-        gloves: null, tools: [], transport: null, backpack: null,
+        gloves: null, tools: [], transport: null, backpack: null, panniers: null,
       },
       food: [],
       potions: [],

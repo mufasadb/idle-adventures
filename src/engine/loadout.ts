@@ -14,6 +14,7 @@ export function emptyLoadout(): Loadout {
       tools: [],
       transport: null,
       backpack: null,
+      panniers: null,
     },
     food: [],
     potions: [],

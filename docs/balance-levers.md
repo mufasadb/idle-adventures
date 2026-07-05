@@ -6,7 +6,7 @@ The POC ships with *feel-pass* values, not balanced ones. The discipline that ke
 
 **Energy economy** — how far/long a trip lasts
 - `ENERGY_PER_FOOD` — default energy per food item (fallback for `FOOD_ENERGY`)
-- `FOOD_ENERGY{foodDefId}` (2026-07-04) — per-food energy; tiered food (`trail-ration` = 20 vs `ration` = 10) is denser, so progression earns slot efficiency against the firm squeeze. Absent = `ENERGY_PER_FOOD`
+- `FOOD_ENERGY{foodDefId}` (2026-07-04; ff7 2026-07-05: cut to `ration` 8 / `trail-ration` 16) — per-food energy; tiered food stays 2× denser so progression earns slot efficiency. `ENERGY_PER_FOOD` (fallback) 10→8 too. Do NOT drop below 8 (7 risks the forage-only tundra path). Absent = `ENERGY_PER_FOOD`
 - `BASE_ENERGY_FLOOR` (2026-07-05, qrl) — embark energy = `max(BASE_ENERGY_FLOOR, packedFoodEnergy)`; a no-food embark still gets ~5 actions, so starvation is recoverable-by-effort, not a 0-energy dead-loop (spec §3/§4.5)
 - `MOVE_BASE_COST` — energy per tile on neutral ground
 - `TERRAIN_COST{plains, mud, ice, river, mountain}` — per-terrain multiplier; `Infinity` = impassable without gear (mountain, until gating gear exists)
@@ -15,6 +15,7 @@ The POC ships with *feel-pass* values, not balanced ones. The discipline that ke
 **Carry** — loot vs supplies tension (UNIT-based since Phase 2 / pqp)
 - `BASE_CARRY_SLOTS` — inventory slots with NO backpack (**6** since pqp) · `BACKPACK_SLOTS{tier}` — total slots per backpack (replaces the base): `starter` 8 / `leather` 12 / `large-pack` 16 · `STACK_CAP` — max qty per **loot** stack (**5**); consumables/tools do NOT stack
 - **pqp (2026-07-05, supersedes D23):** each food/potion/battleItem **unit** and **each tool** is one slot; only loot stacks. Food is eaten just-in-time (`food.digest`) and its slot frees mid-run; **uneaten food banks back** on return. So the squeeze is *temporal* — cramped early (heavy food), roomy late — and packing a supply is a live, visible loot slot given up. Caps were bumped (3→6, 4/6/8→8/12/16) for the ~5× consumable pressure vs the old per-stack model. Re-tuning: keep the sustainability harness green (`test/harness-sustainability.test.ts`).
+- **Carry sources stack (zhn, 2026-07-05):** `carryCap(equipment)` = backpack tier + `TRANSPORT_CARRY{transport}` (a beast/cart bonus: horse 2, mule 4, wagon 6) + `PANNIERS_SLOTS{panniers}` (4) — panniers only count with a `BEAST_TRANSPORTS` (horse/mule), so a mule+panniers is a hauler and a wagon can't wear them. `panniers` is a new equipment slot (worn/free, durable, banks back).
 
 **Gathering**
 - `NODE_HARDNESS{nodeType}` — energy cost numerator · `TOOL_QUALITY{toolDefId}` — cost divisor **AND tier** (D31): quality doubles as the max material tier the tool can work · `GATHER_YIELD{nodeType}` — qty per (one-shot) node
