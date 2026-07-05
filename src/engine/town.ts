@@ -8,23 +8,24 @@ import { emptyLoadout } from "./loadout";
 import { rollBiome } from "./grid";
 import { CANDIDATE_MAP_COUNT, PREVIEW_FIDELITY } from "../data/constants";
 
-// Modest, functional starter kit: enough to run a real first expedition. Gear
-// upgrades come from crafting the haul (the loop's point).
+// Modest, functional starter kit: enough to run a real first expedition. You
+// start with NO backpack (bare BASE_CARRY_SLOTS) — the "starter" pack is your
+// first craftable upgrade. Everything else comes from crafting the haul.
 export function newGame(seed: string): GameState {
   return {
     seed,
     phase: "town",
     bank: [
-      { defId: "starter", qty: 1 }, // starter backpack (4 slots)
       { defId: "pick", qty: 1 },
       { defId: "axe", qty: 1 },
       { defId: "knife", qty: 1 },
       { defId: "sword", qty: 1 },
-      { defId: "ration", qty: 4 },
+      { defId: "ration", qty: 5 }, // exactly one stack (STACK_CAP) — 1 slot, ~a run's buffer while you bootstrap the food loop
       { defId: "potion", qty: 2 },
     ],
     loadout: emptyLoadout(),
     expedition: null,
+    runs: 0,
   };
 }
 
@@ -36,12 +37,17 @@ function previewHints(_mapSeed: string, _biomeId: BiomeId): string[] {
   return []; // higher-fidelity whispers land here when the lever is raised
 }
 
+// The town's offer for the CURRENT visit. `runs` (GameState.runs) advances the
+// seed namespace so every return to town rolls a fresh batch of Perlin maps —
+// the world is effectively infinite, not the same 3 maps forever. Still pure and
+// deterministic: (seed, runs) fully determines the offer.
 export function candidateMaps(
   seed: string,
+  runs = 0,
 ): { mapSeed: string; biomeId: BiomeId; preview: { headline: string; hints: string[] } }[] {
   const maps: { mapSeed: string; biomeId: BiomeId; preview: { headline: string; hints: string[] } }[] = [];
   for (let i = 0; i < CANDIDATE_MAP_COUNT; i++) {
-    const mapSeed = `${seed}:map:${i}`;
+    const mapSeed = `${seed}:map:${runs}:${i}`;
     const biomeId = rollBiome(mapSeed);
     maps.push({ mapSeed, biomeId, preview: { headline: biomeId, hints: previewHints(mapSeed, biomeId) } });
   }

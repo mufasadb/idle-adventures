@@ -9,6 +9,7 @@ test("types: a minimal GameState and Action are constructible", () => {
     bank: [],
     loadout: emptyLoadout(),
     expedition: null,
+    runs: 0,
   };
   const action: Action = { type: "return" };
   expect(state.phase).toBe("town");

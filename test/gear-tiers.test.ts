@@ -36,11 +36,15 @@ const fullPlate = (p: "plate-" | "steel-plate-" | "mithril-plate-"): Loadout => 
   return l;
 };
 
-test("full mithril plate trivializes even tier-3 monsters (intended F1, now earned)", () => {
+test("full mithril plate trivializes tier-3s that iron plate barely survives (the climb pays off)", () => {
   for (const mid of ["dust-vampire", "ice-troll"]) {
-    const r = resolveCombat(fullPlate("mithril-plate-"), 30, mid);
-    expect(r.victory).toBe(true);
-    expect(r.hpLost).toBeLessThanOrEqual(3); // near-immune at the top of the climb
+    const mithril = resolveCombat(fullPlate("mithril-plate-"), 30, mid);
+    const iron = resolveCombat(fullPlate("plate-"), 30, mid);
+    expect(mithril.victory).toBe(true);
+    expect(mithril.hpLost).toBeLessThanOrEqual(6); // near-immune at the top of the climb
+    // …and it's a REAL upgrade: iron plate loses far more HP to the same tier-3
+    // (post-2026-07-05 rebalance — cheap iron no longer floors tier-3).
+    expect(iron.hpLost).toBeGreaterThan(mithril.hpLost + 5);
   }
 });
 

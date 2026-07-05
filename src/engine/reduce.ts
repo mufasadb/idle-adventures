@@ -1,4 +1,4 @@
-import type { GameState, Action, GameEvent, LoadoutSlot, RejectionReason } from "./types";
+import type { GameState, Action, GameEvent, LoadoutSlot, RejectionReason, Expedition } from "./types";
 import { generateGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
@@ -143,6 +143,14 @@ function move(
     return rejected(state, "move", "out-of-bounds");
   }
   const grid = generateGrid(expedition.mapSeed, rollBiome(expedition.mapSeed));
+  // Walking INTO a live monster is a fight, not a step (2026-07-05): monsters
+  // block their tile until beaten, so pathing through one is a real choice
+  // (fight it, or route around). No energy cost — combat spends HP, not energy.
+  const poiAtStep = grid.pois.find((p) => p.x === step.x && p.y === step.y);
+  const stepCleared = expedition.cleared.some((c) => c.x === step.x && c.y === step.y);
+  if (poiAtStep && poiAtStep.kind === "monster" && poiAtStep.creature !== null && !stepCleared) {
+    return fightAt(state, expedition, step, poiAtStep.creature, "move", true);
+  }
   const terrain = grid.terrain[step.y]![step.x]!;
   const cost = moveCost(terrain, expedition.loadout.equipment.transport);
   if (!Number.isFinite(cost)) return rejected(state, "move", "impassable");
@@ -247,19 +255,33 @@ function fight(state: GameState): { state: GameState; events: GameEvent[] } {
   if (!poi || poi.kind !== "monster" || alreadyCleared || poi.creature === null) {
     return rejected(state, "fight", "no-monster");
   }
-  const creature = poi.creature;
+  return fightAt(state, expedition, pos, poi.creature, "fight", false);
+}
+
+// Shared combat resolution at a tile. `fight` uses it to stand and fight the
+// monster you're on; `move` uses it when you walk INTO a live monster (monsters
+// block a tile until beaten — routing around them is the choice, 2026-07-05).
+// moveOnWin=true relocates you onto the cleared tile after a win.
+function fightAt(
+  state: GameState,
+  expedition: Expedition,
+  at: { x: number; y: number },
+  creature: string,
+  action: "fight" | "move",
+  moveOnWin: boolean,
+): { state: GameState; events: GameEvent[] } {
   // Pre-fight fit check: rejecting is free, so the player can drop and retry
   // instead of losing loot (or HP) to a full pack.
   const maxStacks = freeCarryStacks(expedition.loadout);
   let carryWithLoot: typeof expedition.carry | null = expedition.carry;
   for (const stack of LOOT_TABLE[creature] ?? []) {
     carryWithLoot = addToCarry(carryWithLoot, stack.defId, stack.qty, maxStacks);
-    if (carryWithLoot === null) return rejected(state, "fight", "carry-full");
+    if (carryWithLoot === null) return rejected(state, action, "carry-full");
   }
   const result = resolveCombat(expedition.loadout, expedition.hp, creature);
   const fought: GameEvent = {
     type: "fought",
-    at: { x: pos.x, y: pos.y },
+    at: { x: at.x, y: at.y },
     creature,
     victory: result.victory,
     hpLost: result.hpLost,
@@ -280,10 +302,11 @@ function fight(state: GameState): { state: GameState; events: GameEvent[] } {
       ...state,
       expedition: {
         ...expedition,
+        pos: moveOnWin ? { x: at.x, y: at.y } : expedition.pos,
         hp: result.hpAfter,
         loadout: { ...expedition.loadout, potions: result.potionsAfter },
         carry: carryWithLoot,
-        cleared: [...expedition.cleared, { x: pos.x, y: pos.y }],
+        cleared: [...expedition.cleared, { x: at.x, y: at.y }],
       },
     },
     events: [fought],

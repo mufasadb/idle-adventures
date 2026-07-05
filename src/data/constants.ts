@@ -108,11 +108,11 @@ export const TRANSPORT_MULTIPLIER: Record<string, number> = {
 }; // keyed by transport defId; absent/on-foot = 1
 
 // --- Carry (filled in M3) ---
-export const BASE_CARRY_SLOTS = 2; // carry stacks with no backpack equipped
+export const BASE_CARRY_SLOTS = 3; // carry stacks with NO backpack (you start bare) — enough to pack 1 food stack and still gather to bootstrap the loop
 export const BACKPACK_SLOTS: Record<string, number> = {
-  starter: 3,
-  leather: 5,
-  "large-pack": 7, // top tier (recipe lands in the consumable/transport/backpack phase)
+  starter: 4, // your first craftable pack
+  leather: 6,
+  "large-pack": 8, // top tier
 }; // TOTAL carry stacks by backpack defId (replaces the base, not added to it)
 export const STACK_CAP = 5; // max qty per stack; overflow starts a new stack (new slot). Firm squeeze (2026-07-04): a food/potion stack is now real slot pressure, and a haul opens new slots.
 
@@ -184,14 +184,15 @@ export const UNARMED_DAMAGE = 1; // damage when wielding no weapon
 
 export const MONSTER_TIER_HP_CURVE: Record<number, number> = {
   1: 6,
-  2: 12,
-  3: 24,
+  2: 14,
+  3: 28,
 }; // monster base HP by tier
 export const MONSTER_TIER_DMG_CURVE: Record<number, number> = {
   1: 2,
-  2: 4,
-  3: 7,
-}; // monster base damage by tier
+  2: 5,
+  3: 11,
+}; // monster base damage by tier. Steepened 2026-07-05 so cheap iron plate no
+   // longer floors tier-3 — you need the steel/mithril climb to tame them.
 
 export const AFFINITY_MULTIPLIER = 2; // hidden affinity effect, e.g. silver↔werewolf
 export type Affinity = { monsterTag: string; itemTag: string };
@@ -232,9 +233,9 @@ export const WEAPONS: Record<string, Weapon> = {
 
 export type ArmourSlot = "helmet" | "chest" | "legs" | "boots" | "gloves";
 export const ARMOUR: Record<string, { armourType: ArmourType; defense: number; slot: ArmourSlot }> = {
-  "plate-helmet": { armourType: "plate", defense: 2, slot: "helmet" },
-  "plate-chest": { armourType: "plate", defense: 3, slot: "chest" },
-  "plate-legs": { armourType: "plate", defense: 2, slot: "legs" },
+  "plate-helmet": { armourType: "plate", defense: 1, slot: "helmet" }, // iron plate Σ6 (cut 2026-07-05): protective but doesn't floor tier-3
+  "plate-chest": { armourType: "plate", defense: 2, slot: "chest" },
+  "plate-legs": { armourType: "plate", defense: 1, slot: "legs" },
   "plate-boots": { armourType: "plate", defense: 1, slot: "boots" },
   "plate-gloves": { armourType: "plate", defense: 1, slot: "gloves" },
   "light-helmet": { armourType: "light", defense: 1, slot: "helmet" },
@@ -251,16 +252,16 @@ export const ARMOUR: Record<string, { armourType: ArmourType; defense: number; s
   // combat-trivializer at the top); light/robe get a single T2 bump on their
   // sample pieces so type-matchup stays a live choice without a full extra set.
   // Steel = iron plate +1/pc (coal-gated); mithril = iron plate +2/pc (steel-pick-gated).
-  "steel-plate-helmet": { armourType: "plate", defense: 3, slot: "helmet" },
-  "steel-plate-chest": { armourType: "plate", defense: 4, slot: "chest" },
-  "steel-plate-legs": { armourType: "plate", defense: 3, slot: "legs" },
+  "steel-plate-helmet": { armourType: "plate", defense: 2, slot: "helmet" }, // steel Σ10: tames tier-3 to a real but survivable fight
+  "steel-plate-chest": { armourType: "plate", defense: 3, slot: "chest" },
+  "steel-plate-legs": { armourType: "plate", defense: 2, slot: "legs" },
   "steel-plate-boots": { armourType: "plate", defense: 2, slot: "boots" },
-  "steel-plate-gloves": { armourType: "plate", defense: 2, slot: "gloves" },
-  "mithril-plate-helmet": { armourType: "plate", defense: 4, slot: "helmet" },
-  "mithril-plate-chest": { armourType: "plate", defense: 5, slot: "chest" },
-  "mithril-plate-legs": { armourType: "plate", defense: 4, slot: "legs" },
+  "steel-plate-gloves": { armourType: "plate", defense: 1, slot: "gloves" },
+  "mithril-plate-helmet": { armourType: "plate", defense: 3, slot: "helmet" }, // mithril Σ15: the trivializer, top of the climb
+  "mithril-plate-chest": { armourType: "plate", defense: 4, slot: "chest" },
+  "mithril-plate-legs": { armourType: "plate", defense: 3, slot: "legs" },
   "mithril-plate-boots": { armourType: "plate", defense: 3, slot: "boots" },
-  "mithril-plate-gloves": { armourType: "plate", defense: 3, slot: "gloves" },
+  "mithril-plate-gloves": { armourType: "plate", defense: 2, slot: "gloves" },
   "studded-chest": { armourType: "light", defense: 3, slot: "chest" }, // light-chest +1 (drake-gated)
   "studded-legs": { armourType: "light", defense: 2, slot: "legs" },
   "enchanted-chest": { armourType: "robe", defense: 2, slot: "chest" }, // robe-chest +1 (silver-gated)
@@ -293,8 +294,18 @@ export const POTION: string[] = ["potion", "greater-potion"];
 // so hauls from different biomes feed each other. Weighted materials (D27) make
 // cross-biome inputs a soft pull (silver best-farmed in tundra), not a hard gate.
 export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStackSpec }> = {
-  // Consumables — T1
-  ration: { inputs: [{ defId: "forest-herb", qty: 1 }, { defId: "deer-hide", qty: 1 }], output: { defId: "ration", qty: 2 } },
+  // Consumables — T1. Rations are FORAGED: any herb → food. Herbs need no tool
+  // and every biome has herb nodes, so food is always sustainable wherever you
+  // go (one variant per herb so the loop never depends on a specific biome).
+  ration: { inputs: [{ defId: "forest-herb", qty: 2 }], output: { defId: "ration", qty: 2 } },
+  "ration-sage": { inputs: [{ defId: "desert-sage", qty: 2 }], output: { defId: "ration", qty: 2 } },
+  "ration-moss": { inputs: [{ defId: "ice-moss", qty: 2 }], output: { defId: "ration", qty: 2 } },
+  // …or from HUNTING — every T1 hide is also meat. Herb-poor biomes (tundra is
+  // 88% ice, ~10% herb but ~35% animal) stay fed by hunting instead of foraging,
+  // so food is robust everywhere. Hides double as gear stock — a real tradeoff.
+  "ration-venison": { inputs: [{ defId: "deer-hide", qty: 1 }], output: { defId: "ration", qty: 2 } },
+  "ration-game": { inputs: [{ defId: "wolf-pelt", qty: 1 }], output: { defId: "ration", qty: 2 } },
+  "ration-jerky": { inputs: [{ defId: "lizard-hide", qty: 1 }], output: { defId: "ration", qty: 2 } },
   potion: { inputs: [{ defId: "desert-sage", qty: 1 }, { defId: "forest-herb", qty: 1 }], output: { defId: "potion", qty: 1 } },
   // Consumables — T2 (gated by a T2 material → sit behind the iron-pick)
   "trail-ration": { inputs: [{ defId: "ration", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "trail-ration", qty: 1 } }, // cooked over coal — denser energy/slot
@@ -307,7 +318,9 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   "steel-axe": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "steel-axe", qty: 1 } },
   "steel-knife": { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "silver-ore", qty: 1 }], output: { defId: "steel-knife", qty: 1 } }, // silver T2 → iron-pick-gated
   spyglass: { inputs: [{ defId: "copper-ore", qty: 2 }, { defId: "ice-moss", qty: 1 }], output: { defId: "spyglass", qty: 1 } }, // cross-biome: desert copper + tundra moss
-  // Backpack — carry upgrades (large-pack is T2: drake-hide gates it behind steel-knife)
+  // Backpack — carry upgrades. `starter` is your FIRST pack (you start bare):
+  // cheap, one hunt's worth of hide. Then leather (5), large-pack (7, T2).
+  starter: { inputs: [{ defId: "deer-hide", qty: 1 }], output: { defId: "starter", qty: 1 } },
   leather: { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "leather", qty: 1 } },
   "large-pack": { inputs: [{ defId: "drake-hide", qty: 2 }, { defId: "ironwood-log", qty: 1 }], output: { defId: "large-pack", qty: 1 } },
   // Transport

@@ -12,11 +12,12 @@ test("slotCap: no backpack gives base slots; backpack defines the cap", () => {
 // Firm carry squeeze (2026-07-04 tiered-progression pass): the tuned tier ladder
 // starter 3 < leather 5 < large-pack 7, and a tighter STACK_CAP so a real haul
 // opens new slots and food-vs-loot is a live per-run call.
-test("carry squeeze: backpack tiers 3/5/7 and STACK_CAP is firm", () => {
+test("carry squeeze: bare 3 → starter 4 → leather 6 → large-pack 8, STACK_CAP firm", () => {
   expect(STACK_CAP).toBe(5);
-  expect(slotCap("starter")).toBe(3);
-  expect(slotCap("leather")).toBe(5);
-  expect(slotCap("large-pack")).toBe(7);
+  expect(BASE_CARRY_SLOTS).toBe(3); // bare opening is playable (pack 1 food, still gather)
+  expect(slotCap("starter")).toBe(4);
+  expect(slotCap("leather")).toBe(6);
+  expect(slotCap("large-pack")).toBe(8);
 });
 
 test("addToCarry: new material starts a stack", () => {

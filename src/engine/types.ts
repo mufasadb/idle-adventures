@@ -39,6 +39,7 @@ export type GameState = {
   bank: ItemStack[]; // materials + crafted gear (persists across runs)
   loadout: Loadout; // town-side staging (D22): pack (M5) edits it, embark consumes it
   expedition: Expedition | null;
+  runs?: number; // completed expeditions — advances the candidate-map offer so town shows FRESH maps each visit (not the same 3 forever). Optional/absent = 0 (old saves, terse test states); reads guard with `?? 0`.
 };
 
 // Loadout slots an action can target when packing.

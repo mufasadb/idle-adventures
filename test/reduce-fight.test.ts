@@ -146,3 +146,33 @@ test("fight: same seed same outcome; input not mutated (bead acceptance)", () =>
   expect(a).toEqual(before);
   expect(r1).toEqual(reduce(atMonster(seed, poi), { type: "fight" }));
 });
+
+// Move-into-monster (2026-07-05): monsters block their tile; walking onto a live
+// monster forces the fight instead of a step, so routing around is a real choice.
+test("move: walking onto a live monster fights it (no energy cost), win takes the tile", () => {
+  const { seed, poi } = mapWithMonster();
+  // stand one tile to the left of the monster, fully plated so we win
+  const plate = (l: Loadout) => {
+    l.equipment.helmet = "mithril-plate-helmet"; l.equipment.chest = "mithril-plate-chest";
+    l.equipment.legs = "mithril-plate-legs"; l.equipment.boots = "mithril-plate-boots";
+    l.equipment.gloves = "mithril-plate-gloves"; l.equipment.weapon = "mithril-sword";
+  };
+  const base = atMonster(seed, poi, plate);
+  const adj: GameState = { ...base, expedition: { ...base.expedition!, pos: { x: poi.x - 1, y: poi.y } } };
+  const { state, events } = reduce(adj, { type: "move", to: { x: poi.x, y: poi.y } });
+  expect(events.some((e) => e.type === "fought")).toBe(true);
+  expect(events.some((e) => e.type === "moved")).toBe(false); // it's a fight, not a step
+  expect(state.expedition!.energy).toBe(50); // combat spends HP, not energy
+  expect(state.expedition!.pos).toEqual({ x: poi.x, y: poi.y }); // won → now on the tile
+  expect(state.expedition!.cleared).toContainEqual({ x: poi.x, y: poi.y });
+});
+
+test("move: losing the walk-in fight soft-fails the run (keeps the haul)", () => {
+  const { seed, poi } = mapWithMonster("ice-troll"); // tier-3, lethal unarmoured
+  const base = atMonster(seed, poi); // basic sword, no armour, no potions
+  const adj: GameState = { ...base, expedition: { ...base.expedition!, pos: { x: poi.x - 1, y: poi.y }, carry: [{ defId: "iron-ore", qty: 2 }] } };
+  const { state, events } = reduce(adj, { type: "move", to: { x: poi.x, y: poi.y } });
+  expect(events.some((e) => e.type === "run-ended")).toBe(true);
+  expect(state.phase).toBe("town");
+  expect(state.bank).toContainEqual({ defId: "iron-ore", qty: 2 }); // haul kept on soft-fail
+});

@@ -53,5 +53,6 @@ export function endExpedition(state: GameState, expedition: Expedition): GameSta
     ]),
     loadout: emptyLoadout(),
     expedition: null,
+    runs: (state.runs ?? 0) + 1, // advance the town's map offer for the next visit
   };
 }

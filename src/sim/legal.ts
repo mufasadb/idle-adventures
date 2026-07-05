@@ -26,8 +26,8 @@ export function townActions(state: GameState): Action[] {
     const slot = slotOf(stack.defId);
     if (slot !== null) candidates.push({ type: "pack", slot, itemId: stack.defId });
   }
-  // embark: each candidate map the town is offering
-  for (const map of candidateMaps(state.seed)) {
+  // embark: each candidate map the town is offering (rotates with state.runs)
+  for (const map of candidateMaps(state.seed, state.runs ?? 0)) {
     candidates.push({ type: "embark", mapSeed: map.mapSeed });
   }
   return candidates.filter((a) => accepts(state, a));

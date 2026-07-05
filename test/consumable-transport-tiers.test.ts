@@ -27,9 +27,15 @@ test("embark: trail-ration yields 20 energy/item vs ration's 10 (per-food lever)
 });
 
 test("combat: a greater-potion heals 20 where a potion heals 10", () => {
+  // iron plate makes the tier-3 fight winnable so the heal difference actually
+  // shows (ungeared vs a tier-3 is lethal after the 2026-07-05 rebalance).
   const base = emptyLoadout();
   base.equipment.weapon = "sword";
-  // ungeared vs ice-troll needs sustain; 2 greater-potions clearly beats 2 potions
+  base.equipment.helmet = "plate-helmet";
+  base.equipment.chest = "plate-chest";
+  base.equipment.legs = "plate-legs";
+  base.equipment.boots = "plate-boots";
+  base.equipment.gloves = "plate-gloves";
   const withPotions = { ...base, potions: [{ defId: "potion", qty: 2 }] };
   const withGreater = { ...base, potions: [{ defId: "greater-potion", qty: 2 }] };
   const a = resolveCombat(withPotions, 30, "ice-troll");
@@ -42,7 +48,7 @@ test("move: a wagon halves cost (÷2.0) — cheaper than a horse (÷1.5)", () =>
   expect(moveCost("plains", "wagon")).toBe(moveCost("plains", null) / 2);
 });
 
-test("backpack: large-pack (7) tops the leather (5) / starter (3) ladder", () => {
-  expect(slotCap("large-pack")).toBe(7);
+test("backpack: large-pack (8) tops the leather (6) / starter (4) ladder", () => {
+  expect(slotCap("large-pack")).toBe(8);
   expect(slotCap("large-pack")).toBeGreaterThan(slotCap("leather"));
 });
