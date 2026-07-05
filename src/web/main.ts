@@ -13,7 +13,7 @@ import { slotOf } from "../engine/catalog";
 import { moveCost } from "../engine/move";
 import { carryCap } from "../engine/carry";
 import { heldFoodEnergy } from "../engine/food";
-import { RECIPE, MATERIAL_TIER, GRID_SIZE } from "../data/constants";
+import { RECIPE, MATERIAL_TIER, GRID_SIZE, BASE_ENERGY_FLOOR } from "../data/constants";
 import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons } from "../render/render";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, LoadoutSlot } from "../engine/types";
@@ -216,7 +216,7 @@ function townView(): string {
             <button data-embark="${m.mapSeed}">Embark ▶</button>
           </div>`).join("")}
       </div>
-      ${lo.food.length === 0 ? `<div class="warn">⚠ no food packed → you'll embark with 0 energy</div>` : ""}
+      ${lo.food.length === 0 ? `<div class="warn">⚠ no food packed → only the base ${BASE_ENERGY_FLOOR} energy (a short run), and nothing to eat mid-run</div>` : ""}
       <div class="muted small">Pick a biome to work this run. The offer rotates every time you return.</div>
     </section>
 
