@@ -171,6 +171,8 @@ export const TOOL_CAPABILITY: Record<string, string> = {
   "steel-axe": "axe",
   "steel-knife": "knife",
   spyglass: "scout", // scouting capability; NODE_TOOL never asks for "scout", so no gather impact
+  "climbing-pick": "climb", // gating capability (boo); NODE_TOOL never asks for "climb", so no gather impact
+  raft: "ford", // gating capability for rivers (boo)
 }; // tool defId → capability; tiered tools (M5: "iron-pick": "pick") are data-only
 export const TOOL_QUALITY: Record<string, number> = {
   pick: 1,
@@ -182,6 +184,8 @@ export const TOOL_QUALITY: Record<string, number> = {
   "steel-axe": 3,
   "steel-knife": 2,
   spyglass: 1, // quality irrelevant to scouting; present to satisfy the catalog invariant
+  "climbing-pick": 1, // quality irrelevant to gating; present to satisfy the catalog invariant
+  raft: 1,
 }; // gather-cost divisor AND tier gate (quality == max MATERIAL_TIER gatherable)
 export const GATHER_YIELD: Record<GatherableNodeType, number> = {
   mining: 3,
@@ -379,6 +383,9 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   "steel-axe": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "steel-axe", qty: 1 } },
   "steel-knife": { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "silver-ore", qty: 1 }], output: { defId: "steel-knife", qty: 1 } }, // silver T2 → iron-pick-gated
   spyglass: { inputs: [{ defId: "copper-ore", qty: 2 }, { defId: "ice-moss", qty: 1 }], output: { defId: "spyglass", qty: 1 } }, // cross-biome: desert copper + tundra moss
+  // Terrain-gating tools (boo): each a tool slot, so bringing one is a real loadout tradeoff
+  "climbing-pick": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "climbing-pick", qty: 1 } }, // opens mountains (Infinity → 4)
+  raft: { inputs: [{ defId: "pine-log", qty: 2 }, { defId: "deer-hide", qty: 1 }], output: { defId: "raft", qty: 1 } }, // cheapens rivers (3 → 1)
   // Backpack — carry upgrades. `starter` is your FIRST pack (you start bare):
   // cheap, one hunt's worth of hide. Then leather (5), large-pack (7, T2).
   starter: { inputs: [{ defId: "deer-hide", qty: 1 }], output: { defId: "starter", qty: 1 } },

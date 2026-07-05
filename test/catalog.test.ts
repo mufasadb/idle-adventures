@@ -15,6 +15,11 @@ test("slotOf: classifies each catalog family to its loadout slot", () => {
   expect(slotOf("iron-ore")).toBeNull(); // raw material, not equippable
 });
 
+test("slotOf: gating tools classify as tools", () => {
+  expect(slotOf("climbing-pick")).toBe("tool");
+  expect(slotOf("raft")).toBe("tool");
+});
+
 test("validForSlot: only accepts a defId in its own slot", () => {
   expect(validForSlot("helmet", "plate-helmet")).toBe(true);
   expect(validForSlot("chest", "plate-helmet")).toBe(false);
