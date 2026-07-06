@@ -40,6 +40,12 @@ function oneRun(s: GameState, mapSeed: string): GameState {
 
   const grid = generateGrid(mapSeed, rollBiome(mapSeed));
   const targets = grid.pois.filter((p) => p.kind === "herb" || p.kind === "animal");
+  // Live monsters block their tile until beaten (a move INTO one is a fight). An
+  // unarmed forager routes AROUND them — walking in would end the run in a loss.
+  // With the stamina model (dtv) the forager reaches much further (embark at max +
+  // eat-to-refill), so it now meets monsters the old shorter reach never touched;
+  // avoiding them is the correct re-derivation, not a workaround.
+  const monsters = new Set(grid.pois.filter((p) => p.kind === "monster" && p.creature).map((p) => `${p.x},${p.y}`));
   const visited = new Set<string>();
   for (let step = 0; step < GRID_SIZE * 6 && s.expedition; step++) {
     const here = s.expedition.pos;
@@ -56,13 +62,15 @@ function oneRun(s: GameState, mapSeed: string): GameState {
       const nb = { x: here.x + dx, y: here.y + dy };
       if (nb.x < 0 || nb.y < 0 || nb.x >= GRID_SIZE || nb.y >= GRID_SIZE) continue;
       if (visited.has(`${nb.x},${nb.y}`)) continue;
+      if (monsters.has(`${nb.x},${nb.y}`)) continue; // route around live monsters (no unarmed fights)
       if (!accepts(s, { type: "move", to: nb })) continue;
       const d = cheb(nb, t); if (d < bd) { bd = d; best = nb; }
     }
     if (!best) break;
     s = reduce(s, { type: "move", to: best }).state;
+    if (!s.expedition) break; // run ended mid-move (shouldn't happen now monsters are avoided)
     visited.add(`${best.x},${best.y}`);
-    if (s.expedition!.energy <= 0) break;
+    if (s.expedition.energy <= 0) break;
   }
   s = reduce(s, { type: "return" }).state;
 

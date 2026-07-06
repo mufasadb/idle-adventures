@@ -4,10 +4,12 @@ The POC ships with *feel-pass* values, not balanced ones. The discipline that ke
 
 ## Lever groups
 
-**Energy economy** — how far/long a trip lasts
-- `ENERGY_PER_FOOD` — default energy per food item (fallback for `FOOD_ENERGY`)
-- `FOOD_ENERGY{foodDefId}` (2026-07-04; ff7 2026-07-05: cut to `ration` 8 / `trail-ration` 16) — per-food energy; tiered food stays 2× denser so progression earns slot efficiency. `ENERGY_PER_FOOD` (fallback) 10→8 too. Do NOT drop below 8 (7 risks the forage-only tundra path). Absent = `ENERGY_PER_FOOD`
-- `BASE_ENERGY_FLOOR` (2026-07-05, qrl) — embark energy = `max(BASE_ENERGY_FLOOR, packedFoodEnergy)`; a no-food embark still gets ~5 actions, so starvation is recoverable-by-effort, not a 0-energy dead-loop (spec §3/§4.5)
+**Energy economy** — how far/long a trip lasts. Stamina model (D41/dtv): energy is CURRENT stamina on a max/current bar; you embark at `MAX_ENERGY` and EAT food to refill toward max. Total reach ≈ `MAX_ENERGY + Σ(food restore × tentMult)`.
+- `MAX_ENERGY` (300, 2026-07-06 dtv) — the stamina ceiling; `expedition.energy` starts here on embark regardless of packed food, and `expedition.maxEnergy` = this (gear-raisable later — a future progression axis). Bumping it raises baseline reach; a difficulty re-tune for the extra reach is a playtest follow-up
+- `TENT_FOOD_MULTIPLIER` (1.5, 2026-07-06 dtv) — a `tent` (durable "camp" tool) multiplies energy restored per food unit, so each ration goes 50% further. Tunable
+- `ENERGY_PER_FOOD` — default energy RESTORED per food unit eaten (fallback for `FOOD_ENERGY`)
+- `FOOD_ENERGY{foodDefId}` (`ration` 80 / `trail-ration` 160) — RESTORE per food unit eaten (D41: was embark energy, now refill-per-unit); tiered food stays 2× denser so progression earns slot efficiency. `eatToRefill` is waste-free (never overfills past max). Do NOT drop `ration` below 80 (risks the forage-only tundra sustainability floor). Absent = `ENERGY_PER_FOOD`
+- (retired) `BASE_ENERGY_FLOOR` — removed by D41; its "recoverable short run" role is now "embark at `MAX_ENERGY`, just nothing to refill with"
 - `TERRAIN_COST{plains 10, mud 15, ice 20, river 30, mountain ∞}` — **absolute** step energy on a ×10 scale (svz, graded movement); `Infinity` = the one hard gate (mountain), enabled by `climbing-pick`
 - `MIN_STEP` (5) — floor: a discounted step never costs less than this
 - `TERRAIN_GATE{terrain → toolDefId → {enable?, discount?}}` — gear modifiers: `enable` turns an impassable terrain finite (climbing-pick/mountain → 40); `discount` subtracts points (raft/river −20, waders/mud −5, ice-cleats/ice −15 → glide). Each tool = one slot
