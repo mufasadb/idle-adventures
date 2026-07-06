@@ -69,8 +69,8 @@ test("constants: every biome is a complete generation profile", () => {
     );
     expect(terrainTotal).toBeGreaterThan(0);
     expect(nodeTotal).toBeGreaterThan(0);
-    // creatureTable/materialTable stay empty until M4/M5 — but the slots exist
-    expect(Array.isArray(biome.creatureTable)).toBe(true);
+    // creatureTable is weighted (si7.1), same shape as materialTable entries
+    expect(typeof biome.creatureTable).toBe("object");
     expect(typeof biome.materialTable).toBe("object");
   }
 });
@@ -168,12 +168,16 @@ test("constants: monster catalog is internally consistent", () => {
   }
 });
 
-test("constants: every biome's creatureTable is 2-5 real monsters", () => {
+test("constants: every biome's creatureTable is 2-6 real monsters, weighted", () => {
   for (const id of BIOME_IDS) {
     const table = BIOMES[id].creatureTable;
-    expect(table.length).toBeGreaterThanOrEqual(2);
-    expect(table.length).toBeLessThanOrEqual(5); // tundra carries the tier-4 wyrm (D34) + snow-marauder (8ec)
-    for (const creature of table) expect(MONSTERS[creature]).toBeDefined();
+    const creatures = Object.keys(table);
+    expect(creatures.length).toBeGreaterThanOrEqual(2);
+    expect(creatures.length).toBeLessThanOrEqual(6); // tundra carries the tier-4 wyrm (D34) + snow-marauder (8ec) + ice-crab (si7.1)
+    for (const creature of creatures) {
+      expect(MONSTERS[creature]).toBeDefined();
+      expect(table[creature]).toBeGreaterThan(0); // weighted (si7.1): every entry has a real weight
+    }
   }
 });
 

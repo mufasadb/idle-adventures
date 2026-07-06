@@ -43,7 +43,7 @@ test("every monster has a category", () => {
 
 test("each biome spawns a humanoid — map-hunting is viable anywhere", () => {
   for (const biome of Object.values(BIOMES)) {
-    const hasHumanoid = biome.creatureTable.some((c) => MONSTERS[c]?.category === "humanoid");
+    const hasHumanoid = Object.keys(biome.creatureTable).some((c) => MONSTERS[c]?.category === "humanoid");
     expect(hasHumanoid).toBe(true);
   }
 });

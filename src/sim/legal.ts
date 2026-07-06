@@ -54,6 +54,9 @@ export function expeditionActions(state: GameState): Action[] {
   // tile-contextual actions
   candidates.push({ type: "gather" });
   candidates.push({ type: "fight" });
+  candidates.push({ type: "flee" });
+  candidates.push({ type: "quaff" });
+  candidates.push({ type: "toggle-auto-quaff" });
   // stamina (dtv): eat when there's food + room; toggle the auto-eat any time
   candidates.push({ type: "eat" });
   candidates.push({ type: "toggle-auto-eat" });
@@ -61,7 +64,9 @@ export function expeditionActions(state: GameState): Action[] {
   for (const stack of carry) candidates.push({ type: "drop", itemId: stack.defId });
   // drop each carried map (8ec)
   for (const m of state.expedition.carriedMaps ?? []) candidates.push({ type: "drop-map", mapSeed: m.mapSeed });
-  // return is always legal — a 0-energy run is never a dead end (bead note a)
+  // return is always legal when un-engaged — a 0-energy run is never a dead end
+  // (bead note a). While engaged, reduce rejects return; flee is the always-
+  // available out instead (D43) — accepts() below filters return out for us.
   candidates.push({ type: "return" });
   return candidates.filter((a) => accepts(state, a));
 }

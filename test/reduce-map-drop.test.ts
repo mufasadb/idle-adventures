@@ -13,7 +13,21 @@ import {
   BASE_CARRY_SLOTS,
   STACK_CAP,
 } from "../src/data/constants";
-import type { GameState, MapItem } from "../src/engine/types";
+import type { GameState, GameEvent, MapItem } from "../src/engine/types";
+
+// Combat is no longer atomic (si7.1): the first `fight` engages, subsequent
+// `fight`s each run one exchange. Loop to the terminal outcome so these tests
+// can assert on the same victory/defeat/loot facts the old atomic API gave.
+function fightToEnd(state: GameState): { state: GameState; events: GameEvent[] } {
+  let s = reduce(state, { type: "fight" });
+  const all = [...s.events];
+  let guard = 0;
+  while (s.state.expedition?.combat && ++guard < 100) {
+    s = reduce(s.state, { type: "fight" });
+    all.push(...s.events);
+  }
+  return { state: s.state, events: all };
+}
 
 // Find a map with a tier-1 humanoid the base sword build beats, where the
 // map-scroll roll PASSES (drop=true) or FAILS (drop=false) on the game seed "g".
@@ -56,7 +70,7 @@ function atMonster(seed: string, poi: Poi, mutate?: (s: GameState) => void): Gam
 
 test("humanoid victory mints a carried map: deterministic seed, biome from rollBiome, vintage=runs", () => {
   const { seed, poi } = humanoidFight(true);
-  const { state, events } = reduce(atMonster(seed, poi), { type: "fight" });
+  const { state, events } = fightToEnd(atMonster(seed, poi));
   const expectedSeed = `${seed}:drop:${poi.x},${poi.y}`;
   expect(state.expedition!.carriedMaps ?? []).toEqual([
     { mapSeed: expectedSeed, biomeId: rollBiome(expectedSeed), vintage: 3 },
@@ -77,7 +91,7 @@ test("humanoid victory mints a carried map: deterministic seed, biome from rollB
 
 test("no roll, no map", () => {
   const { seed, poi } = humanoidFight(false);
-  const { state, events } = reduce(atMonster(seed, poi), { type: "fight" });
+  const { state, events } = fightToEnd(atMonster(seed, poi));
   expect(state.expedition!.carriedMaps ?? []).toEqual([]);
   expect(events.some((e) => e.type === "map-dropped")).toBe(false);
 });
@@ -92,7 +106,7 @@ test("full pack: map left behind (carried:false), fight unaffected", () => {
       qty: STACK_CAP,
     }));
   });
-  const { state, events } = reduce(before, { type: "fight" });
+  const { state, events } = fightToEnd(before);
   const dropped = events.find((e) => e.type === "map-dropped") as { carried: boolean } | undefined;
   expect(dropped?.carried).toBe(false);
   expect(state.expedition!.carriedMaps ?? []).toEqual([]);
@@ -138,7 +152,7 @@ test("drop-map in town rejects", () => {
 
 test("carried map banks on return and is embarkable+spent like a pocketed map", () => {
   const { seed, poi } = humanoidFight(true);
-  const won = reduce(atMonster(seed, poi), { type: "fight" }).state;
+  const won = fightToEnd(atMonster(seed, poi)).state;
   const home = reduce(won, { type: "return" }).state;
   const minted = `${seed}:drop:${poi.x},${poi.y}`;
   expect(home.phase).toBe("town");

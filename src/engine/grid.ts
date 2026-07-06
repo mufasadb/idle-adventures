@@ -226,11 +226,10 @@ function buildGrid(mapSeed: string, biomeId: BiomeId): Grid {
   //     acceptance order — decoupled from position so we can reassign by value.
   const specs = positions.map((_, i) => {
     const kind = weightedPick(biome.nodeTypeWeights, NODE_TYPES, rand(mapSeed, "poi-kind", i));
+    const creatureKeys = Object.keys(biome.creatureTable).sort(); // deterministic order, like rollMaterial
     const creature =
-      kind === "monster" && biome.creatureTable.length > 0
-        ? biome.creatureTable[
-            Math.floor(rand(mapSeed, "poi-creature", i) * biome.creatureTable.length)
-          ]!
+      kind === "monster" && creatureKeys.length > 0
+        ? weightedPick(biome.creatureTable, creatureKeys, rand(mapSeed, "poi-creature", i))
         : null;
     const material =
       kind === "monster"

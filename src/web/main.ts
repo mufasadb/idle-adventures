@@ -13,7 +13,8 @@ import { slotOf } from "../engine/catalog";
 import { moveCost, moveCostBreakdown } from "../engine/move";
 import { carryCap } from "../engine/carry";
 import { heldFoodEnergy } from "../engine/food";
-import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER } from "../data/constants";
+import { damageTaken, playerDamage } from "../engine/combat";
+import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS } from "../data/constants";
 import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons } from "../render/render";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, LoadoutSlot, MapItem } from "../engine/types";
@@ -100,6 +101,11 @@ function fmt(e: GameEvent): string {
     case "packed": return `packed ${name(e.defId)} → ${e.slot}`;
     case "run-ended": return `— run ended (${e.reason}) —`;
     case "action-rejected": return `✗ ${e.action} rejected: ${e.reason}`;
+    case "engaged": return `⚔ engaged the ${name(e.creature)}`;
+    case "exchanged": return `⚔ traded blows with the ${e.creature} — dealt ${round(e.dmgDealt)}, took ${round(e.dmgTaken)} · ${round(e.hp)}hp left`;
+    case "fled": return `🏃 fled the ${name(e.creature)} · −${round(e.partingHit)}hp → ${round(e.hp)}hp`;
+    case "quaffed": return `🧪 quaffed ${name(e.defId)} · +${round(e.healed)}hp → ${round(e.hp)}hp`;
+    case "auto-quaff-toggled": return `auto-quaff ${e.on ? "on" : "off"}`;
   }
 }
 const round = (n: number) => Math.round(n * 10) / 10;
@@ -346,10 +352,15 @@ function herePanel(grid: Grid, exp: NonNullable<GameState["expedition"]>, legal:
     // You're standing on it, so it's always within perception range.
     const per = perceive(grid, exp.pos, exp.loadout.equipment.tools).find((p) => p.x === poi.x && p.y === poi.y);
     const desc = flavorDetail(per?.detail ?? null, "monster");
+    // Standing on a live, un-engaged monster shouldn't happen in normal play
+    // (move-onto-tile auto-engages, grid gen bars POIs from the entry tile,
+    // victory relocation lands only on cleared tiles) — this branch is kept
+    // defensively for hand-built/test states. No pre-fight forecast here; that
+    // lives in the walk-in path banner (§5), where the decision actually happens.
     return `<div class="here monster">
       <b>Here:</b> a <b>${name(poi.creature!)}</b> — <i>${desc}</i>.
       It's static: it won't touch you unless you Fight. You can just walk past it.
-      ${canFight ? `<button data-act="fight">⚔ Fight the ${name(poi.creature!)}</button>` : `<span class="warn">can't fight (bag full for its loot?)</span>`}
+      ${canFight ? `<button data-act="fight">⚔ Engage the ${name(poi.creature!)}</button>` : `<span class="warn">can't fight (bag full for its loot?)</span>`}
     </div>`;
   }
   // gatherable node
@@ -362,6 +373,32 @@ function herePanel(grid: Grid, exp: NonNullable<GameState["expedition"]>, legal:
     ${canGather ? `<button data-act="gather">${verb.label} it</button>`
       : locked ? `🔒 <span class="warn">your tool is too weak — needs a tier-${tier} tool to work ${name(poi.material!)}</span>`
       : `<span class="warn">can't ${verb.past.replace(/ed$/, "")} (no tool / bag full)</span>`}
+  </div>`;
+}
+
+// The engagement panel replaces herePanel while a live fight is in progress
+// (exp.combat set): monster HP bar, per-round forecast (the honest race —
+// toKill vs toDie, no potion double-count), and Fight/Flee/Potion/auto-quaff.
+function engagementPanel(exp: NonNullable<GameState["expedition"]>, legal: Action[]): string {
+  const c = exp.combat!;
+  const maxHp = MONSTER_TIER_HP_CURVE[MONSTERS[c.creature]!.tier]!;
+  const dmgOut = playerDamage(exp.loadout, c.creature) + c.damageAdd;
+  const dmgIn = damageTaken(exp.loadout, c.creature, c.mitigationAdd);
+  const toKill = Math.ceil(c.monsterHp / dmgOut);
+  const hpPool = exp.hp; // potions extend this — the forecast shows the raw race
+  const toDie = Math.ceil(hpPool / dmgIn);
+  const winning = toKill <= toDie;
+  const canQuaff = legal.some((a) => a.type === "quaff");
+  return `<div class="here monster engagement">
+    <b>⚔ Engaged: ${name(c.creature)}</b>
+    <div class="bar"><span>Its HP</span><div class="track"><div class="fill monster" style="width:${(c.monsterHp / maxHp) * 100}%"></div></div><b>${round(c.monsterHp)}/${maxHp}</b></div>
+    <div class="forecast">you hit for <b>${round(dmgOut)}</b> · it hits for <b>${round(dmgIn)}</b> · <b class="${winning ? "good" : "over"}">${winning ? `kill in ${toKill}` : `it kills you first (~${toDie} rounds)`}</b>${exp.loadout.potions.length ? ` · ${exp.loadout.potions.reduce((n, p) => n + p.qty, 0)} potion(s) extend that` : ""}</div>
+    <div class="actions">
+      <button data-act="fight">⚔ Fight (1 round)</button>
+      <button data-act="flee" title="disengage — take one parting hit (${round(dmgIn)})">🏃 Flee (−${round(dmgIn)} HP)</button>
+      ${canQuaff ? `<button data-act="quaff">🧪 Potion</button>` : `<button disabled title="no potions, or full HP">🧪 Potion</button>`}
+      <button data-act="toggle-auto-quaff">Auto-potion: <b>${(exp.autoQuaff ?? true) ? "on" : "off"}</b></button>
+    </div>
   </div>`;
 }
 
@@ -433,8 +470,18 @@ function expeditionView(): string {
     ? pending.path.reduce((s, p) => s + moveCostBreakdown(grid.terrain[p.y]![p.x]!, null, []).final, 0) - pending.cost
     : 0;
   const savingClause = pending && Number.isFinite(saving) && saving > 0 ? ` · gear/transport saved ${round(saving)}e` : "";
+  const forecastClause = pending?.fight
+    ? (() => {
+        const dmgOut = playerDamage(exp.loadout, pending.fight!);
+        const dmgIn = damageTaken(exp.loadout, pending.fight!, 0);
+        const toKill = Math.ceil(MONSTER_TIER_HP_CURVE[MONSTERS[pending.fight!]!.tier]! / dmgOut);
+        const toDie = Math.ceil(exp.hp / dmgIn);
+        const winning = toKill <= toDie;
+        return ` · <span class="forecast" title="bare-kit forecast — battle items apply when the fight starts">forecast: you hit ${round(dmgOut)}, it hits ${round(dmgIn)} — <b class="${winning ? "good" : "over"}">${winning ? `kill in ${toKill}` : "it wins the race"}</b></span>`;
+      })()
+    : "";
   const pathBanner = pending
-    ? `<div class="pathbanner">${pending.fight ? `⚔ walk in &amp; <b>fight the ${name(pending.fight)}</b> · ` : ""}→ (${pending.goal.x},${pending.goal.y}): ${pending.path.length} tile${pending.path.length !== 1 ? "s" : ""}, <b class="${pending.cost > exp.energy ? "over" : ""}">−${round(pending.cost)} energy</b>${savingClause} · <button data-walk>${pending.fight ? "Fight ▶" : "Walk ▶"}</button> <button class="link" data-cancelpath>cancel</button></div>`
+    ? `<div class="pathbanner">${pending.fight ? `⚔ walk in &amp; <b>fight the ${name(pending.fight)}</b> · ` : ""}→ (${pending.goal.x},${pending.goal.y}): ${pending.path.length} tile${pending.path.length !== 1 ? "s" : ""}, <b class="${pending.cost > exp.energy ? "over" : ""}">−${round(pending.cost)} energy</b>${savingClause}${forecastClause} · <button data-walk>${pending.fight ? "Fight ▶" : "Walk ▶"}</button> <button class="link" data-cancelpath>cancel</button></div>`
     : `<div class="pathbanner muted">Click a tile → previews the route + energy. Click <b>Walk</b> (or the tile again / right-click) to go. Monsters (<b>X</b>) block their tile — click one to fight, or route around.</div>`;
 
   const cap = carryCap(exp.loadout.equipment);
@@ -448,7 +495,7 @@ function expeditionView(): string {
       <div class="gridscroll"><div class="grid" style="grid-template-columns:repeat(${MAP_WIDTH}, 1.4rem);">${cells}</div></div>
     </section>
     <section>
-      ${herePanel(grid, exp, legal)}
+      ${exp.combat ? engagementPanel(exp, legal) : herePanel(grid, exp, legal)}
       <h2>Actions</h2>
       <div class="actions">
         ${legal.some((a) => a.type === "eat") ? `<button data-act="eat">🍖 Eat${exp.loadout.equipment.tools.includes("tent") ? " (+50%)" : ""}</button>` : `<button disabled title="no food, or already full">🍖 Eat</button>`}

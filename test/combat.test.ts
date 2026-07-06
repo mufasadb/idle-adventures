@@ -106,13 +106,31 @@ test("resolveCombat: silver sword beats the werewolf cheaper than a plain sword"
 });
 
 test("resolveCombat: auto-potions quaff at the threshold and are consumed in stack order", () => {
-  const loadout = armed("sword", { potions: [{ defId: "healing-potion", qty: 2 }] });
-  const noPotions = resolveCombat(armed("sword"), 12, "ice-troll"); // tier 3 hits hard
-  const withPotions = resolveCombat(loadout, 12, "ice-troll");
-  expect(withPotions.potionsUsed).toBeGreaterThan(0);
-  expect(withPotions.potionsAfter.reduce((s, p) => s + p.qty, 0)).toBe(2 - withPotions.potionsUsed);
-  // potions keep you alive longer / end better than without
-  expect(withPotions.hpAfter).toBeGreaterThanOrEqual(noPotions.hpAfter);
+  // Re-picked (si7.1 task 3 review): the OLD ice-troll bare-kit scenario went
+  // vacuous once the steepened tier-3 curve made both hpAfter clamp to 0
+  // (0 >= 0 always passes, potions or not). werewolf (tier 2, HP curve 16,
+  // dmgOut=3.75/hit sword, dmgIn=8/hit unarmoured) is the real case: it's a
+  // LOSS bare-kit and a WIN with potions —
+  //
+  //   no potions: R1 mHp 16→12.25, hp 30→22 · R2 mHp→8.5, hp→14 (≤15 threshold
+  //   but no potions to quaff) · R3 mHp→4.75, hp→6 · R4 mHp→1 (still >0), hp
+  //   6-8=-2→clamped 0 → defeated (loss).
+  //
+  //   3 potions: R1 same, hp→22 · R2 mHp→8.5, hp 22-8=14 ≤15 threshold → quaff
+  //   (10 heal) → hp 24, potionsUsed=1 · R3 mHp→4.75, hp 24-8=16 · R4 mHp→1
+  //   (still >0), hp 16-8=8 ≤15 → quaff → hp 18, potionsUsed=1 · R5 dmgDealt
+  //   3.75 vs monsterHp 1 → monster dies (victory), no retaliation, hp stays
+  //   18. Net: potionsUsed=2, victory flips false→true, hpAfter 0→18.
+  const noPotions = resolveCombat(armed("sword"), PLAYER_BASE_HP, "werewolf");
+  const withPotions = resolveCombat(armed("sword", { potions: [{ defId: "healing-potion", qty: 3 }] }), PLAYER_BASE_HP, "werewolf");
+  expect(noPotions.victory).toBe(false);
+  expect(noPotions.hpAfter).toBe(0);
+  expect(withPotions.victory).toBe(true);
+  expect(withPotions.potionsUsed).toBe(2);
+  expect(withPotions.potionsAfter.reduce((s, p) => s + p.qty, 0)).toBe(3 - withPotions.potionsUsed);
+  expect(withPotions.hpAfter).toBe(18);
+  // potions are what turned this loss into a win — a real assertion, not 0≥0.
+  expect(withPotions.hpAfter).toBeGreaterThan(noPotions.hpAfter);
 });
 
 test("resolveCombat: defeat clamps to 0", () => {
@@ -131,18 +149,21 @@ test("resolveCombat: pure and deterministic", () => {
 });
 
 test("battle items (bzd): elixir adds damage, warding adds mitigation, both consumed", () => {
-  // A survivable fight (werewolf, tier 2) so the buff's effect on HP lost shows.
-  const plain = resolveCombat(armed("sword"), PLAYER_BASE_HP, "werewolf");
+  // A survivable fight so the buff's effect on HP lost shows. si7.1: bare-kit
+  // sword vs werewolf (tier 2) no longer survives under the steepened curves
+  // (4 retaliations × 8 dmg = 32 > 30 HP) — forest-boar (tier 1, neutral
+  // matchup) is the bare-kit-survivable fight the old werewolf case relied on.
+  const plain = resolveCombat(armed("sword"), PLAYER_BASE_HP, "forest-boar");
   expect(plain.victory).toBe(true);
   // elixir-of-power (+2 dmg) ends the fight sooner → less HP lost
   const withElixir = armed("sword");
   withElixir.battleItems = [{ defId: "elixir-of-power", qty: 1 }];
-  const elixir = resolveCombat(withElixir, PLAYER_BASE_HP, "werewolf");
+  const elixir = resolveCombat(withElixir, PLAYER_BASE_HP, "forest-boar");
   expect(elixir.hpLost).toBeLessThan(plain.hpLost);
   // warding-draught (+3 mitigation) softens every incoming hit → less HP lost
   const withWard = armed("sword");
   withWard.battleItems = [{ defId: "warding-draught", qty: 1 }];
-  const ward = resolveCombat(withWard, PLAYER_BASE_HP, "werewolf");
+  const ward = resolveCombat(withWard, PLAYER_BASE_HP, "forest-boar");
   expect(ward.hpLost).toBeLessThan(plain.hpLost);
   // consumed at fight start — nothing carries over
   expect(elixir.battleItemsAfter).toEqual([]);

@@ -156,7 +156,7 @@ test("generateGrid: monster POIs carry a creature from the biome's table (M4)", 
     const grid = generateGrid(`creature-stamp-${biome}`, biome);
     for (const poi of grid.pois) {
       if (poi.kind === "monster") {
-        expect(BIOMES[biome].creatureTable).toContain(poi.creature!);
+        expect(Object.keys(BIOMES[biome].creatureTable)).toContain(poi.creature!);
       } else {
         expect(poi.creature).toBeNull();
       }
