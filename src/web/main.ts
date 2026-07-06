@@ -352,14 +352,14 @@ function herePanel(grid: Grid, exp: NonNullable<GameState["expedition"]>, legal:
     // You're standing on it, so it's always within perception range.
     const per = perceive(grid, exp.pos, exp.loadout.equipment.tools).find((p) => p.x === poi.x && p.y === poi.y);
     const desc = flavorDetail(per?.detail ?? null, "monster");
-    // Pre-engagement forecast: no battle-item buffs applied yet (those land at
-    // engage), so this previews the bare-kit trade — say so in the title.
-    const dmgOut = playerDamage(exp.loadout, poi.creature);
-    const dmgIn = damageTaken(exp.loadout, poi.creature, 0);
+    // Standing on a live, un-engaged monster shouldn't happen in normal play
+    // (move-onto-tile auto-engages, grid gen bars POIs from the entry tile,
+    // victory relocation lands only on cleared tiles) — this branch is kept
+    // defensively for hand-built/test states. No pre-fight forecast here; that
+    // lives in the walk-in path banner (§5), where the decision actually happens.
     return `<div class="here monster">
       <b>Here:</b> a <b>${name(poi.creature!)}</b> — <i>${desc}</i>.
       It's static: it won't touch you unless you Fight. You can just walk past it.
-      <div class="forecast" title="bare-kit forecast — battle items buff you once you engage">you'd hit for <b>${round(dmgOut)}</b> · it'd hit for <b>${round(dmgIn)}</b></div>
       ${canFight ? `<button data-act="fight">⚔ Engage the ${name(poi.creature!)}</button>` : `<span class="warn">can't fight (bag full for its loot?)</span>`}
     </div>`;
   }
@@ -470,8 +470,18 @@ function expeditionView(): string {
     ? pending.path.reduce((s, p) => s + moveCostBreakdown(grid.terrain[p.y]![p.x]!, null, []).final, 0) - pending.cost
     : 0;
   const savingClause = pending && Number.isFinite(saving) && saving > 0 ? ` · gear/transport saved ${round(saving)}e` : "";
+  const forecastClause = pending?.fight
+    ? (() => {
+        const dmgOut = playerDamage(exp.loadout, pending.fight!);
+        const dmgIn = damageTaken(exp.loadout, pending.fight!, 0);
+        const toKill = Math.ceil(MONSTER_TIER_HP_CURVE[MONSTERS[pending.fight!]!.tier]! / dmgOut);
+        const toDie = Math.ceil(exp.hp / dmgIn);
+        const winning = toKill <= toDie;
+        return ` · <span class="forecast" title="bare-kit forecast — battle items apply when the fight starts">forecast: you hit ${round(dmgOut)}, it hits ${round(dmgIn)} — <b class="${winning ? "good" : "over"}">${winning ? `kill in ${toKill}` : "it wins the race"}</b></span>`;
+      })()
+    : "";
   const pathBanner = pending
-    ? `<div class="pathbanner">${pending.fight ? `⚔ walk in &amp; <b>fight the ${name(pending.fight)}</b> · ` : ""}→ (${pending.goal.x},${pending.goal.y}): ${pending.path.length} tile${pending.path.length !== 1 ? "s" : ""}, <b class="${pending.cost > exp.energy ? "over" : ""}">−${round(pending.cost)} energy</b>${savingClause} · <button data-walk>${pending.fight ? "Fight ▶" : "Walk ▶"}</button> <button class="link" data-cancelpath>cancel</button></div>`
+    ? `<div class="pathbanner">${pending.fight ? `⚔ walk in &amp; <b>fight the ${name(pending.fight)}</b> · ` : ""}→ (${pending.goal.x},${pending.goal.y}): ${pending.path.length} tile${pending.path.length !== 1 ? "s" : ""}, <b class="${pending.cost > exp.energy ? "over" : ""}">−${round(pending.cost)} energy</b>${savingClause}${forecastClause} · <button data-walk>${pending.fight ? "Fight ▶" : "Walk ▶"}</button> <button class="link" data-cancelpath>cancel</button></div>`
     : `<div class="pathbanner muted">Click a tile → previews the route + energy. Click <b>Walk</b> (or the tile again / right-click) to go. Monsters (<b>X</b>) block their tile — click one to fight, or route around.</div>`;
 
   const cap = carryCap(exp.loadout.equipment);
