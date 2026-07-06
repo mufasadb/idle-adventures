@@ -4,12 +4,23 @@
 // the real numbers for its system. See docs/balance-levers.md.
 
 // --- Map & perception (filled in M1) ---
-export const GRID_SIZE = 20; // tiles per side
+// 20×60 strip (e3j): the map outgrows one 300-energy tank so food buys reach
+// again. WIDTH is thumb-sized for phone portrait; HEIGHT is the long axis you
+// scroll — the whole reach economy hangs off this pair.
+export const MAP_WIDTH = 20; // tiles across
+export const MAP_HEIGHT = 60; // tiles along the strip
 export const NOISE_FREQUENCY = 0.15; // Perlin sample step per tile; lower = larger terrain regions
-export const POI_DENSITY = 18; // POIs per map — richer than one run can harvest (2026-07-05, qrl): forces "which region do I work?" (sim: ~91%→~55% cleared with 3 food slots). Was 12.
+// Barrier layer (e3j): a SECOND, lower-frequency noise field lays long walls of
+// each biome's barrierTerrain across the strip — the navigation puzzle. Tiles
+// whose barrier sample exceeds BARRIER_THRESHOLD become wall; a connectivity
+// pass then guarantees all walkable tiles stay one component (nothing is ever
+// literally unreachable barefoot — mountains are cost-walls, not prisons).
+export const BARRIER_NOISE_FREQUENCY = 0.06; // ≪ NOISE_FREQUENCY → chunky ridges, not speckle
+export const BARRIER_THRESHOLD = 0.68; // the "how walled is the world" dial: lower = more maze
+export const POI_DENSITY = 60; // POIs per 20×60 map (e3j): ~3× area × slightly denser — a geared+provisioned run should harvest ~half and CHOOSE which half. Was 18 on 20×20.
 export const POI_MIN_SPACING = 3; // min Chebyshev distance between POIs (spec: 3–4 tiles apart)
-export const POI_PLACEMENT_ATTEMPTS = 400; // seeded rejection-sampling budget per map
-export const FOOD_REACH_MIN = 2; // Phase 3 (b91): min forageable (herb/animal) nodes that must sit on finite on-foot cost-to-reach tiles; else generateGrid falls back to unbiased placement so a bare loadout is never walled off from food
+export const POI_PLACEMENT_ATTEMPTS = 2000; // seeded rejection-sampling budget per map (scaled with density, e3j)
+export const FOOD_REACH_MIN = 2; // Phase 3 (b91): min forageable (herb/animal) nodes that must sit on finite on-foot cost-to-reach tiles; the guard holds by construction of the value-vs-reach pairing (low-value forage takes the most-reachable tiles — see grid.ts pairing comment), so a bare loadout is never walled off from food
 // Perception (9u9.2): node KIND is always visible; a node's qualitative identity
 // (species/material/tier/dmg+armour type — never the fight outcome) resolves only
 // within this Chebyshev radius of the player. Tools in VISION_RANGE_BONUS widen it
@@ -41,6 +52,7 @@ export type Biome = {
   nodeTypeWeights: Partial<Record<NodeType, number>>; // relative POI kind mix
   creatureTable: string[]; // biome-flavoured monster defIds (filled M4)
   materialTable: Partial<Record<NodeType, Record<string, number>>>; // node kind → weighted material defIds (D27)
+  barrierTerrain: Terrain; // what a wall is made of here (e3j)
 };
 
 export const BIOMES: Record<BiomeId, Biome> = {
@@ -51,9 +63,10 @@ export const BIOMES: Record<BiomeId, Biome> = {
     materialTable: {
       mining: { "iron-ore": 7, "copper-ore": 2, "silver-ore": 1 }, // silver present (D27) but T2-gated
       wood: { "oak-log": 7, "pine-log": 2, "ironwood-log": 1 }, // ironwood T2 (iron-axe)
-      herb: { "forest-herb": 7, "desert-sage": 2, "ice-moss": 1 },
+      herb: { "forest-herb": 7, berries: 4, "desert-sage": 2, "ice-moss": 1 },
       animal: { "deer-hide": 7, "wolf-pelt": 2, "lizard-hide": 1 },
     },
+    barrierTerrain: "mountain",
   },
   desert: {
     terrainWeights: { plains: 0.55, mountain: 0.3, river: 0.15 },
@@ -62,9 +75,10 @@ export const BIOMES: Record<BiomeId, Biome> = {
     materialTable: {
       mining: { "copper-ore": 7, "iron-ore": 2, "coal": 1 }, // coal T2 (iron-pick) — desert is a fuel source
       wood: { "cactus-wood": 7, "oak-log": 2, "pine-log": 1 },
-      herb: { "desert-sage": 7, "forest-herb": 2, "ice-moss": 1 },
+      herb: { "desert-sage": 7, "forest-herb": 2, berries: 1, "ice-moss": 1 },
       animal: { "lizard-hide": 7, "deer-hide": 2, "drake-hide": 1 }, // drake T2 (steel-knife)
     },
+    barrierTerrain: "mountain",
   },
   tundra: {
     terrainWeights: { ice: 0.5, mountain: 0.25, plains: 0.15, river: 0.1 },
@@ -73,9 +87,10 @@ export const BIOMES: Record<BiomeId, Biome> = {
     materialTable: {
       mining: { "silver-ore": 5, "coal": 2, "iron-ore": 2, "mithril-ore": 1 }, // silver T2 + coal T2 + mithril T3: tundra is the deep-tier mine
       wood: { "pine-log": 7, "oak-log": 2, "ironwood-log": 1 },
-      herb: { "ice-moss": 7, "desert-sage": 2, "forest-herb": 1 },
+      herb: { "ice-moss": 7, "desert-sage": 2, berries: 1, "forest-herb": 1 },
       animal: { "wolf-pelt": 7, "deer-hide": 2, "drake-hide": 1 },
     },
+    barrierTerrain: "mountain",
   },
 };
 
@@ -111,7 +126,16 @@ export const TENT_FOOD_MULTIPLIER = 1.5;
 export const FOOD_ENERGY: Record<string, number> = {
   ration: 80,
   "trail-ration": 160, // stays 2× a ration — the T2 density edge
+  berries: 30, // fresh forage (e3j): weak-but-immediate — eat on the trail or lose them to staleness
+  jam: 120, // processed stale-berries — hauling the harvest home beats eating it raw (1.5 rations/slot)
 };
+
+// Fresh→processed food (e3j): fresh forage eaten on-map is good NOW; hauled
+// home it STALES into a material (endExpedition maps defIds at banking) that
+// town-crafts into denser food (jam). Stale forms are materials — slotOf never
+// returns "food" for them — so they can't be packed back out: "old berries"
+// enforce themselves with no extra rule.
+export const FRESH_TO_STALE: Record<string, string> = { berries: "stale-berries" };
 export const MIN_STEP = 5; // a discounted step never costs less than this (svz)
 // Movement is GRADED (svz): TERRAIN_COST is ABSOLUTE step energy on a ×10 scale.
 // Gear subtracts point-discounts (TERRAIN_GATE), transport divides per-terrain.
@@ -399,7 +423,7 @@ export const CATEGORY_LOOT_TABLE: Record<MonsterCategory, ItemStackSpec[]> = {
 // --- Consumable item catalogs (M5) ---
 // ENERGY_PER_FOOD / POTION_HEAL are flat, so these are single-item catalogs for
 // the POC; the list is what `pack`/`slotOf` validate a food/potion defId against.
-export const FOOD: string[] = ["ration", "trail-ration"];
+export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam"];
 export const POTION: string[] = ["potion", "greater-potion"];
 export const BATTLE_ITEM: string[] = ["elixir-of-power", "warding-draught"]; // combat consumables (bzd); COMBAT_BUFF keys
 
@@ -419,6 +443,7 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   "ration-venison": { inputs: [{ defId: "deer-hide", qty: 1 }], output: { defId: "ration", qty: 2 } },
   "ration-game": { inputs: [{ defId: "wolf-pelt", qty: 1 }], output: { defId: "ration", qty: 2 } },
   "ration-jerky": { inputs: [{ defId: "lizard-hide", qty: 1 }], output: { defId: "ration", qty: 2 } },
+  jam: { inputs: [{ defId: "stale-berries", qty: 3 }], output: { defId: "jam", qty: 1 } }, // the stale-berry payoff (e3j): denser than ration, cheaper than trail-ration
   potion: { inputs: [{ defId: "desert-sage", qty: 1 }, { defId: "forest-herb", qty: 1 }], output: { defId: "potion", qty: 1 } },
   // Consumables — T2 (gated by a T2 material → sit behind the iron-pick)
   "trail-ration": { inputs: [{ defId: "ration", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "trail-ration", qty: 1 } }, // cooked over coal — denser energy/slot

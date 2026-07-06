@@ -3,15 +3,20 @@ import { reduce } from "../src/engine/reduce";
 import { newGame, candidateMaps } from "../src/engine/town";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import type { Grid, Poi } from "../src/engine/grid";
-import { NODE_HARDNESS, TOOL_QUALITY } from "../src/data/constants";
+import { NODE_HARDNESS, TOOL_QUALITY, MATERIAL_TIER } from "../src/data/constants";
 import type { GameState } from "../src/engine/types";
 
-// Find a map whose rolled biome has a mining POI, and return that POI.
+// Find a map whose rolled biome has a mining POI that a basic (tier-1) pick can
+// actually work — run 1 gathers with the plain `pick`, so a T2+ material (e.g.
+// coal, rolled more often now that POI_DENSITY is higher, e3j) would reject
+// tool-too-weak before the cost-drop assertion ever runs.
 function miningMap(): { seed: string; grid: Grid; poi: Poi } {
   for (let i = 0; i < 400; i++) {
     const seed = `loop-scan-${i}`;
     const grid = generateGrid(seed, rollBiome(seed));
-    const poi = grid.pois.find((p) => p.kind === "mining");
+    const poi = grid.pois.find(
+      (p) => p.kind === "mining" && (MATERIAL_TIER[p.material ?? ""] ?? 1) === 1,
+    );
     if (poi) return { seed, grid, poi };
   }
   throw new Error("no mining map in scan range");

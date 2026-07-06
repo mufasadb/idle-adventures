@@ -1,8 +1,11 @@
 // Deterministic map generation (M1). A biome is a generation profile only
 // (D21): it is read here, at generation time, and never consulted again.
 import {
-  GRID_SIZE,
+  MAP_WIDTH,
+  MAP_HEIGHT,
   NOISE_FREQUENCY,
+  BARRIER_NOISE_FREQUENCY,
+  BARRIER_THRESHOLD,
   BIOMES,
   BIOME_IDS,
   TERRAINS,
@@ -12,10 +15,11 @@ import {
   NODE_TYPES,
   MATERIAL_TIER,
 } from "../data/constants";
-import type { Terrain, NodeType, BiomeId } from "../data/constants";
+import type { Terrain, NodeType, BiomeId, Biome } from "../data/constants";
 import { rand, weightedPick } from "./rng";
 import { perlin2 } from "./noise";
 import { costToReach, reachableTiles } from "./reach";
+import { moveCost } from "./move";
 
 export type Poi = {
   x: number;
@@ -59,6 +63,78 @@ function rollMaterial(
 const gridCache = new Map<string, Grid>();
 const GRID_CACHE_CAP = 512;
 
+// e3j connectivity: barrier walls must never seal a pocket off entirely.
+// Flood-label walkable (finite on-foot cost) regions; carve a pass from each
+// minor region to the largest along the closest tile pair (Chebyshev, stable
+// row-major tie-break — deterministic with no extra RNG). Carved tiles become
+// the biome's most-weighted walkable terrain, so a pass reads as native
+// ground (tundra passes are ice, elsewhere plains), not a scar.
+const walkableTerrain = (t: Terrain): boolean => Number.isFinite(moveCost(t, null, []));
+
+function carveTerrainOf(biome: Biome): Terrain {
+  let best: Terrain = "plains";
+  let bw = -1;
+  for (const t of TERRAINS) {
+    const w = biome.terrainWeights[t] ?? 0;
+    if (walkableTerrain(t) && w > bw) { bw = w; best = t; }
+  }
+  return best;
+}
+
+function walkableRegions(terrain: Terrain[][]): { x: number; y: number }[][] {
+  const label: number[][] = terrain.map((row) => row.map(() => -1));
+  const regions: { x: number; y: number }[][] = [];
+  for (let sy = 0; sy < MAP_HEIGHT; sy++) {
+    for (let sx = 0; sx < MAP_WIDTH; sx++) {
+      if (!walkableTerrain(terrain[sy]![sx]!) || label[sy]![sx]! !== -1) continue;
+      const id = regions.length;
+      const tiles: { x: number; y: number }[] = [];
+      const stack = [{ x: sx, y: sy }];
+      label[sy]![sx] = id;
+      while (stack.length) {
+        const c = stack.pop()!;
+        tiles.push(c);
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (!dx && !dy) continue;
+            const nx = c.x + dx, ny = c.y + dy;
+            if (nx < 0 || ny < 0 || nx >= MAP_WIDTH || ny >= MAP_HEIGHT) continue;
+            if (!walkableTerrain(terrain[ny]![nx]!) || label[ny]![nx]! !== -1) continue;
+            label[ny]![nx] = id;
+            stack.push({ x: nx, y: ny });
+          }
+        }
+      }
+      regions.push(tiles);
+    }
+  }
+  return regions;
+}
+
+function carveConnectivity(terrain: Terrain[][], biome: Biome): void {
+  const carve = carveTerrainOf(biome);
+  // Each pass merges the second-largest region into the largest, so the
+  // region count strictly decreases — guaranteed termination.
+  for (;;) {
+    const regions = walkableRegions(terrain).sort((a, b) => b.length - a.length);
+    if (regions.length <= 1) return;
+    const main = regions[0]!, minor = regions[1]!;
+    let from = minor[0]!, to = main[0]!, best = Infinity;
+    for (const a of minor) {
+      for (const b of main) {
+        const d = Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+        if (d < best) { best = d; from = a; to = b; }
+      }
+    }
+    let cx = from.x, cy = from.y;
+    while (cx !== to.x || cy !== to.y) {
+      cx += Math.sign(to.x - cx);
+      cy += Math.sign(to.y - cy);
+      if (!walkableTerrain(terrain[cy]![cx]!)) terrain[cy]![cx] = carve;
+    }
+  }
+}
+
 export function generateGrid(mapSeed: string, biomeId: BiomeId): Grid {
   const key = `${mapSeed.length}:${mapSeed}:${biomeId}`;
   const hit = gridCache.get(key);
@@ -72,32 +148,52 @@ export function generateGrid(mapSeed: string, biomeId: BiomeId): Grid {
 function buildGrid(mapSeed: string, biomeId: BiomeId): Grid {
   const biome = BIOMES[biomeId];
   const terrain: Terrain[][] = [];
-  for (let y = 0; y < GRID_SIZE; y++) {
+  for (let y = 0; y < MAP_HEIGHT; y++) {
     const row: Terrain[] = [];
-    for (let x = 0; x < GRID_SIZE; x++) {
+    for (let x = 0; x < MAP_WIDTH; x++) {
       // Sample mid-tile (the +0.5) so integer lattice points — where Perlin
       // is always 0.5 — don't line up with the tile grid.
       const noise = perlin2(mapSeed, (x + 0.5) * NOISE_FREQUENCY, (y + 0.5) * NOISE_FREQUENCY);
-      // The noise value walks the biome's cumulative weight bands in TERRAINS
-      // (elevation) order: coherent noise regions become coherent terrain.
-      row.push(weightedPick(biome.terrainWeights, TERRAINS, noise));
+      // Barrier layer (e3j): a low-frequency field carves long walls; the seed is
+      // namespaced so the two fields are independent.
+      const barrier = perlin2(`${mapSeed}:barrier`, (x + 0.5) * BARRIER_NOISE_FREQUENCY, (y + 0.5) * BARRIER_NOISE_FREQUENCY);
+      row.push(
+        barrier > BARRIER_THRESHOLD
+          ? biome.barrierTerrain
+          : weightedPick(biome.terrainWeights, TERRAINS, noise),
+      );
     }
     terrain.push(row);
   }
+  carveConnectivity(terrain, biome);
   // Entry (b91): embark lands on the bottom row. Pick the x that opens onto the
   // LARGEST on-foot reachable region, so a bare loadout is never boxed into a
   // dead corner pocket (the food reachability guarantee starts here). Ties break
   // toward a seeded preferred x for determinism + variety.
-  const preferred = Math.floor(rand(mapSeed, "entry") * GRID_SIZE);
-  let entry = { x: preferred, y: GRID_SIZE - 1 };
+  // Constraint (e3j final review): the entry tile itself MUST be walkable — you
+  // must be able to return to it. Skip impassable bottom-row candidates; without
+  // this, a bottom-row wall tile adjacent to the one walkable component can tie
+  // (or beat) every real candidate and strand the player on a tile they can leave
+  // but never re-enter.
+  const preferred = Math.floor(rand(mapSeed, "entry") * MAP_WIDTH);
+  let entry = { x: preferred, y: MAP_HEIGHT - 1 };
   let bestReach = -1;
-  for (let x = 0; x < GRID_SIZE; x++) {
-    const cand = { x, y: GRID_SIZE - 1 };
+  for (let x = 0; x < MAP_WIDTH; x++) {
+    if (!walkableTerrain(terrain[MAP_HEIGHT - 1]![x]!)) continue;
+    const cand = { x, y: MAP_HEIGHT - 1 };
     const n = reachableTiles(terrain, cand);
     if (n > bestReach || (n === bestReach && Math.abs(x - preferred) < Math.abs(entry.x - preferred))) {
       bestReach = n;
       entry = cand;
     }
+  }
+  // Fallback: the ENTIRE bottom row was unwalkable. Carve the preferred-x tile to
+  // native walkable terrain and re-run connectivity so it joins the main
+  // component, then use it as entry.
+  if (bestReach === -1) {
+    entry = { x: preferred, y: MAP_HEIGHT - 1 };
+    terrain[entry.y]![entry.x] = carveTerrainOf(biome);
+    carveConnectivity(terrain, biome);
   }
   // Phase 3 (b91): place POIs in two steps so we can bias value against terrain.
   // (a) Collect accepted POSITIONS via seeded rejection sampling — walk a
@@ -111,9 +207,15 @@ function buildGrid(mapSeed: string, biomeId: BiomeId): Grid {
     attempt < POI_PLACEMENT_ATTEMPTS && positions.length < POI_DENSITY;
     attempt++
   ) {
-    const x = Math.floor(rand(mapSeed, "poi-x", attempt) * GRID_SIZE);
-    const y = Math.floor(rand(mapSeed, "poi-y", attempt) * GRID_SIZE);
+    const x = Math.floor(rand(mapSeed, "poi-x", attempt) * MAP_WIDTH);
+    const y = Math.floor(rand(mapSeed, "poi-y", attempt) * MAP_HEIGHT);
     if (x === entry.x && y === entry.y) continue; // entry tile stays clear (M2: embark lands here)
+    // Walls carry no nodes (e3j final review): reject unwalkable candidates so
+    // the value-vs-reach pairing never strands its highest-value specs on
+    // impassable terrain (mountain-top content can return deliberately with a
+    // future cartography/climbing pass). 2000 attempts on ~1000 walkable tiles
+    // cannot starve the POI_DENSITY budget.
+    if (!walkableTerrain(terrain[y]![x]!)) continue;
     const clear = positions.every(
       (p) => Math.max(Math.abs(p.x - x), Math.abs(p.y - y)) >= POI_MIN_SPACING,
     );

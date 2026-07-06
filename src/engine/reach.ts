@@ -2,7 +2,7 @@
 // (Phase 3, b91). No RNG, no biome lookup — reused by generation and, later, by
 // previews. Uses moveCost so it honours transport + gating tools identically to
 // the move reducer. mountain (Infinity) is a wall unless a gating tool cheapens it.
-import { GRID_SIZE } from "../data/constants";
+import { MAP_WIDTH, MAP_HEIGHT } from "../data/constants";
 import type { Terrain } from "../data/constants";
 import { moveCost } from "./move";
 import type { Coord } from "./move";
@@ -26,7 +26,7 @@ export function reachableTiles(
       for (let dx = -1; dx <= 1; dx++) {
         if (!dx && !dy) continue;
         const nx = cur.x + dx, ny = cur.y + dy;
-        if (nx < 0 || ny < 0 || nx >= GRID_SIZE || ny >= GRID_SIZE) continue;
+        if (nx < 0 || ny < 0 || nx >= MAP_WIDTH || ny >= MAP_HEIGHT) continue;
         const k = `${nx},${ny}`;
         if (seen.has(k)) continue;
         if (!Number.isFinite(moveCost(terrain[ny]![nx]!, transport, tools))) continue;
@@ -45,16 +45,16 @@ export function costToReach(
   transport: string | null = null,
   tools: string[] = [],
 ): number[][] {
-  const cost = Array.from({ length: GRID_SIZE }, () =>
-    Array<number>(GRID_SIZE).fill(Infinity),
+  const cost = Array.from({ length: MAP_HEIGHT }, () =>
+    Array<number>(MAP_WIDTH).fill(Infinity),
   );
   cost[entry.y]![entry.x] = 0;
   const visited = new Set<string>();
-  // Grid is 20×20 = 400 tiles; a plain min-scan Dijkstra is fine (no heap needed).
+  // Grid is now 20×60 = 1200 tiles; the plain min-scan Dijkstra is still fine.
   for (;;) {
     let bx = -1, by = -1, best = Infinity;
-    for (let y = 0; y < GRID_SIZE; y++) {
-      for (let x = 0; x < GRID_SIZE; x++) {
+    for (let y = 0; y < MAP_HEIGHT; y++) {
+      for (let x = 0; x < MAP_WIDTH; x++) {
         if (visited.has(`${x},${y}`)) continue;
         if (cost[y]![x]! < best) { best = cost[y]![x]!; bx = x; by = y; }
       }
@@ -65,7 +65,7 @@ export function costToReach(
       for (let dx = -1; dx <= 1; dx++) {
         if (!dx && !dy) continue;
         const nx = bx + dx, ny = by + dy;
-        if (nx < 0 || ny < 0 || nx >= GRID_SIZE || ny >= GRID_SIZE) continue;
+        if (nx < 0 || ny < 0 || nx >= MAP_WIDTH || ny >= MAP_HEIGHT) continue;
         const step = moveCost(terrain[ny]![nx]!, transport, tools);
         if (!Number.isFinite(step)) continue; // impassable neighbor
         const nc = best + step;

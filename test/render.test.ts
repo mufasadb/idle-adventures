@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test";
 import { render, renderGridText, renderGridHtml } from "../src/render/render";
 import { generateGrid } from "../src/engine/grid";
-import { GRID_SIZE, POI_DENSITY } from "../src/data/constants";
+import { MAP_WIDTH, MAP_HEIGHT, POI_DENSITY } from "../src/data/constants";
 import type { GameState } from "../src/engine/types";
 import { emptyLoadout } from "../src/engine/loadout";
 
@@ -34,13 +34,13 @@ test("render: town state renders the town placeholder", () => {
   expect(render(state)).toBe("(town)");
 });
 
-test("renderGridText: 20 rows × 20 chars, byte-identical for same seed+biome", () => {
+test("renderGridText: 60 rows × 20 chars, byte-identical for same seed+biome", () => {
   const text = renderGridText(generateGrid("snap-1", "woodland"));
   const again = renderGridText(generateGrid("snap-1", "woodland"));
   expect(text).toBe(again);
   const rows = text.split("\n");
-  expect(rows.length).toBe(GRID_SIZE);
-  for (const row of rows) expect(row.length).toBe(GRID_SIZE);
+  expect(rows.length).toBe(MAP_HEIGHT);
+  for (const row of rows) expect(row.length).toBe(MAP_WIDTH);
 });
 
 test("renderGridText: snapshot per biome — same seed, visibly different maps", () => {
@@ -62,15 +62,15 @@ test("renderGridText: draws all POIs as uppercase markers", () => {
 test("render: expedition renders the grid with the player at pos", () => {
   const text = render(expeditionState("snap-1"));
   const rows = text.split("\n");
-  expect(rows.length).toBe(GRID_SIZE);
+  expect(rows.length).toBe(MAP_HEIGHT);
   expect(rows[5]![5]).toBe("@");
 });
 
 test("renderGridHtml: emits a CSS grid with one tile per cell", () => {
   const grid = generateGrid("snap-1", "woodland");
   const html = renderGridHtml(grid, grid.entry);
-  expect(html).toContain(`grid-template-columns: repeat(${GRID_SIZE}`);
-  expect(html.match(/class="tile /g)?.length).toBe(GRID_SIZE * GRID_SIZE);
+  expect(html).toContain(`grid-template-columns: repeat(${MAP_WIDTH}`);
+  expect(html.match(/class="tile /g)?.length).toBe(MAP_WIDTH * MAP_HEIGHT);
   expect(html).toContain("player");
   expect(html.match(/ poi /g)?.length).toBe(POI_DENSITY);
   expect(html).toBe(renderGridHtml(generateGrid("snap-1", "woodland"), grid.entry));

@@ -3,7 +3,7 @@ import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import { moveCost } from "../src/engine/move";
-import { GRID_SIZE } from "../src/data/constants";
+import { MAP_WIDTH, MAP_HEIGHT } from "../src/data/constants";
 import type { Terrain, BiomeId } from "../src/data/constants";
 import type { GameState } from "../src/engine/types";
 import type { Grid } from "../src/engine/grid";
@@ -19,13 +19,13 @@ function seedFor(biome: BiomeId): string {
 
 // Find a tile of `terrain` with an in-bounds neighbour to stand on.
 function findStep(grid: Grid, terrain: Terrain): { from: { x: number; y: number }; to: { x: number; y: number } } {
-  for (let y = 0; y < GRID_SIZE; y++) {
-    for (let x = 0; x < GRID_SIZE; x++) {
+  for (let y = 0; y < MAP_HEIGHT; y++) {
+    for (let x = 0; x < MAP_WIDTH; x++) {
       if (grid.terrain[y]![x] !== terrain) continue;
       for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as const) {
         const nx = x + dx;
         const ny = y + dy;
-        if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE) {
+        if (nx >= 0 && nx < MAP_WIDTH && ny >= 0 && ny < MAP_HEIGHT) {
           return { from: { x: nx, y: ny }, to: { x, y } };
         }
       }
@@ -187,8 +187,8 @@ test("move: already at target is rejected as no-step", () => {
 test("move: step off the grid edge is rejected", () => {
   const seed = seedFor("woodland");
   const { events } = reduce(
-    expeditionState(seed, { x: 0, y: GRID_SIZE - 1 }, 10),
-    { type: "move", to: { x: 0, y: GRID_SIZE + 5 } },
+    expeditionState(seed, { x: 0, y: MAP_HEIGHT - 1 }, 10),
+    { type: "move", to: { x: 0, y: MAP_HEIGHT + 5 } },
   );
   expect(events).toEqual([
     { type: "action-rejected", action: "move", reason: "out-of-bounds" },

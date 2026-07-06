@@ -18,7 +18,7 @@ import {
   POI_CHAR,
   PLAYER_CHAR,
 } from "../render/render";
-import { RECIPE, GRID_SIZE } from "../data/constants";
+import { RECIPE, MAP_WIDTH, MAP_HEIGHT } from "../data/constants";
 import { moveCostBreakdown } from "../engine/move";
 import { costToReach } from "../engine/reach";
 import type { Action, GameEvent, GameState } from "../engine/types";
@@ -141,9 +141,9 @@ function printExpedition(st: GameState): void {
   const cleared = new Set(exp.cleared.map((c) => `${c.x},${c.y}`));
   console.log("\n=== MAP (▲ you · letters = node kinds · detail only resolves near you) ===");
   const rows: string[] = [];
-  for (let y = 0; y < GRID_SIZE; y++) {
+  for (let y = 0; y < MAP_HEIGHT; y++) {
     let row = "";
-    for (let x = 0; x < GRID_SIZE; x++) {
+    for (let x = 0; x < MAP_WIDTH; x++) {
       const k = `${x},${y}`;
       if (exp.pos.x === x && exp.pos.y === y) row += PLAYER_CHAR;
       else if (cleared.has(k)) row += "·";

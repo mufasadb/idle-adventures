@@ -1,7 +1,8 @@
 // test/constants.test.ts
 import { test, expect } from "bun:test";
 import {
-  GRID_SIZE,
+  MAP_WIDTH,
+  MAP_HEIGHT,
   TERRAIN_COST,
   BACKPACK_SLOTS,
   TERRAINS,
@@ -39,13 +40,16 @@ import {
 } from "../src/data/constants";
 
 test("constants: lever groups exist with the documented shape", () => {
-  expect(typeof GRID_SIZE).toBe("number");
+  expect(typeof MAP_WIDTH).toBe("number");
+  expect(typeof MAP_HEIGHT).toBe("number");
   expect(TERRAIN_COST).toHaveProperty("ice");
   expect(BACKPACK_SLOTS).toHaveProperty("starter");
 });
 
 test("constants: M1 map levers are filled", () => {
-  expect(GRID_SIZE).toBe(20);
+  // 20×60 strip (e3j): phone-portrait — thumb-wide, scroll-long
+  expect(MAP_WIDTH).toBe(20);
+  expect(MAP_HEIGHT).toBe(60);
   expect(POI_DENSITY).toBeGreaterThan(0);
   expect(POI_MIN_SPACING).toBeGreaterThanOrEqual(3);
   expect(NOISE_FREQUENCY).toBeGreaterThan(0);

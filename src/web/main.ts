@@ -13,7 +13,7 @@ import { slotOf } from "../engine/catalog";
 import { moveCost, moveCostBreakdown } from "../engine/move";
 import { carryCap } from "../engine/carry";
 import { heldFoodEnergy } from "../engine/food";
-import { RECIPE, MATERIAL_TIER, GRID_SIZE, MAX_ENERGY, TENT_FOOD_MULTIPLIER } from "../data/constants";
+import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER } from "../data/constants";
 import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons } from "../render/render";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, LoadoutSlot, MapItem } from "../engine/types";
@@ -150,7 +150,7 @@ function findPath(grid: Grid, start: Pos, goal: Pos, transport: string | null, t
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
       if (!dx && !dy) continue;
       const nx = p.x + dx, ny = p.y + dy;
-      if (nx < 0 || ny < 0 || nx >= GRID_SIZE || ny >= GRID_SIZE) continue;
+      if (nx < 0 || ny < 0 || nx >= MAP_WIDTH || ny >= MAP_HEIGHT) continue;
       const nk = `${nx},${ny}`;
       if (blocked.has(nk) && nk !== goalK) continue; // route around other monsters
       const step = moveCost(grid.terrain[ny]![nx]!, transport, tools);
@@ -379,7 +379,7 @@ function expeditionView(): string {
   const goalK = pending ? kk(pending.goal) : "";
 
   let cells = "";
-  for (let y = 0; y < GRID_SIZE; y++) for (let x = 0; x < GRID_SIZE; x++) {
+  for (let y = 0; y < MAP_HEIGHT; y++) for (let x = 0; x < MAP_WIDTH; x++) {
     const k = `${x},${y}`;
     const isPlayer = exp.pos.x === x && exp.pos.y === y;
     const poi = poiAt.get(k);
@@ -445,7 +445,7 @@ function expeditionView(): string {
     <section class="mapwrap">
       ${bars}
       ${pathBanner}
-      <div class="grid" style="grid-template-columns:repeat(${GRID_SIZE}, 1.4rem);">${cells}</div>
+      <div class="gridscroll"><div class="grid" style="grid-template-columns:repeat(${MAP_WIDTH}, 1.4rem);">${cells}</div></div>
     </section>
     <section>
       ${herePanel(grid, exp, legal)}

@@ -2,7 +2,7 @@ import { test, expect } from "bun:test";
 import { reduce } from "../src/engine/reduce";
 import { newGame, candidateMaps } from "../src/engine/town";
 import { generateGrid, rollBiome } from "../src/engine/grid";
-import { GRID_SIZE, STACK_CAP } from "../src/data/constants";
+import { MAP_WIDTH, MAP_HEIGHT, STACK_CAP } from "../src/data/constants";
 import type { GameState, Action } from "../src/engine/types";
 import type { BiomeId } from "../src/data/constants";
 
@@ -47,7 +47,7 @@ function oneRun(s: GameState, mapSeed: string): GameState {
   // avoiding them is the correct re-derivation, not a workaround.
   const monsters = new Set(grid.pois.filter((p) => p.kind === "monster" && p.creature).map((p) => `${p.x},${p.y}`));
   const visited = new Set<string>();
-  for (let step = 0; step < GRID_SIZE * 6 && s.expedition; step++) {
+  for (let step = 0; step < (MAP_WIDTH + MAP_HEIGHT) * 3 && s.expedition; step++) {
     const here = s.expedition.pos;
     const cleared = s.expedition.cleared;
     const on = targets.find((p) => p.x === here.x && p.y === here.y && !cleared.some((c) => c.x === p.x && c.y === p.y));
@@ -60,7 +60,7 @@ function oneRun(s: GameState, mapSeed: string): GameState {
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
       if (!dx && !dy) continue;
       const nb = { x: here.x + dx, y: here.y + dy };
-      if (nb.x < 0 || nb.y < 0 || nb.x >= GRID_SIZE || nb.y >= GRID_SIZE) continue;
+      if (nb.x < 0 || nb.y < 0 || nb.x >= MAP_WIDTH || nb.y >= MAP_HEIGHT) continue;
       if (visited.has(`${nb.x},${nb.y}`)) continue;
       if (monsters.has(`${nb.x},${nb.y}`)) continue; // route around live monsters (no unarmed fights)
       if (!accepts(s, { type: "move", to: nb })) continue;

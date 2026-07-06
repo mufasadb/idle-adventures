@@ -5,6 +5,7 @@
 // Used by fight's soft-fail (M4) and return (M5).
 import type { GameState, Expedition, ItemStack } from "./types";
 import { emptyLoadout } from "./loadout";
+import { FRESH_TO_STALE } from "../data/constants";
 
 export function bankStacks(bank: ItemStack[], stacks: ItemStack[]): ItemStack[] {
   const next = bank.map((s) => ({ ...s }));
@@ -45,6 +46,13 @@ export function endExpedition(state: GameState, expedition: Expedition): GameSta
   if (equipment.transport !== null) durables.push({ defId: equipment.transport, qty: 1 });
   if (equipment.backpack !== null) durables.push({ defId: equipment.backpack, qty: 1 });
   if (equipment.panniers !== null) durables.push({ defId: equipment.panniers, qty: 1 });
+  // Fresh forage stales at the door (e3j): berries → stale-berries. Stale forms
+  // are materials (jam inputs), not food, so they can never be packed back out —
+  // "good now" food is only good now.
+  const foodHome = expedition.loadout.food.map((s) => ({
+    defId: FRESH_TO_STALE[s.defId] ?? s.defId,
+    qty: s.qty,
+  }));
   return {
     ...state,
     phase: "town",
@@ -52,7 +60,7 @@ export function endExpedition(state: GameState, expedition: Expedition): GameSta
       ...expedition.carry,
       ...durables,
       ...expedition.loadout.potions,
-      ...expedition.loadout.food, // uneaten food banks back (pqp)
+      ...foodHome, // uneaten food banks back (pqp); fresh forage stales (e3j)
       ...(expedition.loadout.battleItems ?? []), // unused battle items bank back (bzd)
     ]),
     maps: [...(state.maps ?? []), ...(expedition.carriedMaps ?? [])], // carried map drops bank as held maps (8ec) — same fate as the carry in every run-end path incl. defeat's soft fail (D26)
