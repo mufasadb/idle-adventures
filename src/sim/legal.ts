@@ -30,6 +30,12 @@ export function townActions(state: GameState): Action[] {
   for (const map of candidateMaps(state.seed, state.runs ?? 0)) {
     candidates.push({ type: "embark", mapSeed: map.mapSeed });
   }
+  // pocket each offered map you don't already hold; embark each held map (xzx)
+  const held = new Set((state.maps ?? []).map((m) => m.mapSeed));
+  for (const map of candidateMaps(state.seed, state.runs ?? 0)) {
+    if (!held.has(map.mapSeed)) candidates.push({ type: "pocket-map", mapSeed: map.mapSeed });
+  }
+  for (const m of state.maps ?? []) candidates.push({ type: "embark", mapSeed: m.mapSeed });
   return candidates.filter((a) => accepts(state, a));
 }
 

@@ -29,6 +29,20 @@ test("townActions: offers pack + embark on a fresh game, never move/gather", () 
   expect(actions.some((a) => a.type === "move" || a.type === "gather" || a.type === "return")).toBe(false);
 });
 
+test("townActions: offers pocket-map for each offered map; a held map is embarkable (xzx)", () => {
+  const state = newGame("s");
+  const offer = candidateMaps("s", 0);
+  const town = townActions(state);
+  // every offered map can be pocketed (none held yet)
+  for (const m of offer) expect(town).toContainEqual({ type: "pocket-map", mapSeed: m.mapSeed });
+  // after pocketing one, its seed is embarkable AND no longer offered to pocket
+  const held = reduce(state, { type: "pocket-map", mapSeed: offer[0]!.mapSeed }).state;
+  const after = townActions(held);
+  expect(after).toContainEqual({ type: "embark", mapSeed: offer[0]!.mapSeed });
+  expect(after).not.toContainEqual({ type: "pocket-map", mapSeed: offer[0]!.mapSeed });
+  for (const a of after) expect(accepts(held, a)).toBe(true); // D29: no drift
+});
+
 test("townActions: empty when not in town", () => {
   const onMap = play("s", [
     { type: "pack", slot: "food", itemId: "ration" },
