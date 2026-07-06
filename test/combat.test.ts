@@ -106,9 +106,15 @@ test("resolveCombat: silver sword beats the werewolf cheaper than a plain sword"
 });
 
 test("resolveCombat: auto-potions quaff at the threshold and are consumed in stack order", () => {
+  // si7.1: % mitigation steepened tier-3 dmgIn (14×6/(6+0)=14/hit vs a bare
+  // sword) enough that starting at 12 HP now dies on the FIRST hit, before the
+  // auto-quaff check ever runs. Start at PLAYER_BASE_HP so the threshold is
+  // actually crossed mid-fight (hit1: 30-14=16 > 15 threshold, no heal; hit2:
+  // 16-14=2 ≤ 15 → quaffs one potion to 12; hit3: 12-14 < 0 → still a loss, but
+  // potionsUsed=1 exercises the path this test is for).
   const loadout = armed("sword", { potions: [{ defId: "healing-potion", qty: 2 }] });
-  const noPotions = resolveCombat(armed("sword"), 12, "ice-troll"); // tier 3 hits hard
-  const withPotions = resolveCombat(loadout, 12, "ice-troll");
+  const noPotions = resolveCombat(armed("sword"), PLAYER_BASE_HP, "ice-troll"); // tier 3 hits hard
+  const withPotions = resolveCombat(loadout, PLAYER_BASE_HP, "ice-troll");
   expect(withPotions.potionsUsed).toBeGreaterThan(0);
   expect(withPotions.potionsAfter.reduce((s, p) => s + p.qty, 0)).toBe(2 - withPotions.potionsUsed);
   // potions keep you alive longer / end better than without
@@ -131,18 +137,21 @@ test("resolveCombat: pure and deterministic", () => {
 });
 
 test("battle items (bzd): elixir adds damage, warding adds mitigation, both consumed", () => {
-  // A survivable fight (werewolf, tier 2) so the buff's effect on HP lost shows.
-  const plain = resolveCombat(armed("sword"), PLAYER_BASE_HP, "werewolf");
+  // A survivable fight so the buff's effect on HP lost shows. si7.1: bare-kit
+  // sword vs werewolf (tier 2) no longer survives under the steepened curves
+  // (4 retaliations × 8 dmg = 32 > 30 HP) — forest-boar (tier 1, neutral
+  // matchup) is the bare-kit-survivable fight the old werewolf case relied on.
+  const plain = resolveCombat(armed("sword"), PLAYER_BASE_HP, "forest-boar");
   expect(plain.victory).toBe(true);
   // elixir-of-power (+2 dmg) ends the fight sooner → less HP lost
   const withElixir = armed("sword");
   withElixir.battleItems = [{ defId: "elixir-of-power", qty: 1 }];
-  const elixir = resolveCombat(withElixir, PLAYER_BASE_HP, "werewolf");
+  const elixir = resolveCombat(withElixir, PLAYER_BASE_HP, "forest-boar");
   expect(elixir.hpLost).toBeLessThan(plain.hpLost);
   // warding-draught (+3 mitigation) softens every incoming hit → less HP lost
   const withWard = armed("sword");
   withWard.battleItems = [{ defId: "warding-draught", qty: 1 }];
-  const ward = resolveCombat(withWard, PLAYER_BASE_HP, "werewolf");
+  const ward = resolveCombat(withWard, PLAYER_BASE_HP, "forest-boar");
   expect(ward.hpLost).toBeLessThan(plain.hpLost);
   // consumed at fight start — nothing carries over
   expect(elixir.battleItemsAfter).toEqual([]);

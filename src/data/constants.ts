@@ -255,6 +255,11 @@ export const DMG_ARMOUR_MATRIX: Record<DmgType, Record<ArmourType, number>> = {
 
 export const PLAYER_BASE_HP = 30; // player starting HP
 export const CHIP_DAMAGE_MIN = 1; // floor on damage both directions; HP always drains, fights always end
+// % mitigation (si7.1, supersedes flat subtraction): incoming damage is scaled
+// by MITIGATION_K/(K + D) where D = Σ(defense ÷ matrix). Armour REDUCES the
+// toll (full iron plate ≈ −50%, mithril ≈ −70%) but never floors it to chip —
+// the M7 F1 "plate floors the whole bestiary" collapse dies here.
+export const MITIGATION_K = 6;
 export const POTION_HEAL = 10; // default HP restored per potion use (fallback for POTION_HEAL_BY)
 // Per-potion heal (2026-07-04): tiered potions restore more, gated by a T2
 // material so they too sit behind the iron-pick. Absent = POTION_HEAL.
@@ -266,18 +271,19 @@ export const AUTO_POTION_THRESHOLD = 0.5; // fraction of base HP to auto-quaff a
 export const UNARMED_DAMAGE = 1; // damage when wielding no weapon
 
 export const MONSTER_TIER_HP_CURVE: Record<number, number> = {
-  1: 6,
-  2: 14,
+  1: 8,
+  2: 16,
   3: 28,
-  4: 48, // tier-4 boss (ancient-wyrm) — winnable only with the full mithril climb + ≥3 greater-potions (D34)
+  4: 54, // tier-4 boss: 9 mithril-sword strikes → 8 retaliations — exactly the 3-greater-potion gate (D34 recalibrated, si7.1)
 }; // monster base HP by tier
 export const MONSTER_TIER_DMG_CURVE: Record<number, number> = {
-  1: 2,
-  2: 5,
-  3: 11,
-  4: 20, // tier-4 boss — magic into plate (÷1.5) stays lethal even in full mithril (D34)
-}; // monster base damage by tier. Steepened 2026-07-05 so cheap iron plate no
-   // longer floors tier-3 — you need the steel/mithril climb to tame them.
+  1: 4,
+  2: 8,
+  3: 14,
+  4: 24, // ×K/(K+10) vs full mithril = 9/hit — lethal without the potion supply (si7.1)
+}; // monster base damage by tier, scaled by % mitigation (MITIGATION_K) coming in.
+   // Steepened at tier 1 (si7.1) so a bare-kit fight costs matchup-scaled real HP:
+   // good ≈ 13% of base HP, neutral ≈ 27%, bad ≥ 40% — HP is a second run-budget.
 
 // Combat consumables (bzd, spec §4.3): a "battle item" packed into the loadout
 // buffs a SINGLE fight and is consumed at fight start. Gated only behind fighting

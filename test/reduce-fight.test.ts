@@ -131,8 +131,11 @@ test("fight: defeat banks only the UNSPENT potions (quaffed ones are gone)", () 
     l.equipment.weapon = null; // unarmed → guaranteed defeat
     l.equipment.backpack = "leather"; // room for loot so the fit-check passes (pqp: potions now cost slots)
     l.potions = [{ defId: "healing-potion", qty: 3 }];
-  }, 12); // low start so the auto-quaff threshold triggers
-  const expected = resolveCombat(before.expedition!.loadout, 12, "ice-troll");
+  }); // si7.1: starting at 12 HP now dies on the FIRST hit (14 dmgIn, bare
+  // kit) before the auto-quaff check runs. PLAYER_BASE_HP (the atMonster
+  // default) still crosses the threshold mid-fight so potionsUsed > 0, while
+  // unarmed-vs-ice-troll remains a guaranteed eventual defeat.
+  const expected = resolveCombat(before.expedition!.loadout, PLAYER_BASE_HP, "ice-troll");
   expect(expected.victory).toBe(false);
   expect(expected.potionsUsed).toBeGreaterThan(0);
   const { state } = reduce(before, { type: "fight" });

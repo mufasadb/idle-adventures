@@ -19,6 +19,7 @@ import {
   UNARMED_DAMAGE,
   CHIP_DAMAGE_MIN,
   COMBAT_BUFF,
+  MITIGATION_K,
 } from "../data/constants";
 import type { DmgType } from "../data/constants";
 import type { Loadout, ItemStack } from "./types";
@@ -115,6 +116,19 @@ export function mitigation(loadout: Loadout, dmgType: DmgType): number {
   return total;
 }
 
+// Incoming damage per hit (si7.1, % model): the monster's tier damage scaled by
+// K/(K + D), floored at chip. D is the matrix-adjusted defense sum (mitigation)
+// plus any battle-item mitigationAdd — temporary armour under the same curve.
+export function damageTaken(loadout: Loadout, monsterId: string, mitigationAdd = 0): number {
+  const monster = MONSTERS[monsterId];
+  if (!monster) throw new Error(`unknown monster: ${monsterId}`);
+  const d = mitigation(loadout, monster.dmgType) + mitigationAdd;
+  return Math.max(
+    CHIP_DAMAGE_MIN,
+    MONSTER_TIER_DMG_CURVE[monster.tier]! * (MITIGATION_K / (MITIGATION_K + d)),
+  );
+}
+
 export type Matchup = {
   weaponVsHide: number | null; // matrix multiplier of weapon type vs monster hide; null if unarmed
   affinityFired: boolean; // a hidden affinity triggered (the discovery channel)
@@ -160,10 +174,7 @@ export function resolveCombat(
   // Battle items (bzd): consumed at fight start, buffing only this fight.
   const buff = battleBuff(loadout.battleItems ?? []);
   const dmgOut = playerDamage(loadout, monsterId) + buff.damageAdd;
-  const dmgIn = Math.max(
-    CHIP_DAMAGE_MIN,
-    MONSTER_TIER_DMG_CURVE[monster.tier]! - mitigation(loadout, monster.dmgType) - buff.mitigationAdd,
-  );
+  const dmgIn = damageTaken(loadout, monsterId, buff.mitigationAdd);
   let current = hp;
   let monsterHp = MONSTER_TIER_HP_CURVE[monster.tier]!;
   // Flat queue of potion defIds in stack order — quaffed front-to-back so heal
