@@ -28,6 +28,17 @@ export function freeLootStacks(loadout: Loadout, carriedMaps: { mapSeed: string 
   return freeCarryStacks(loadout) - (carriedMaps ?? []).length;
 }
 
+// Whole-bag occupancy (e3j): consumable units + loot stacks + carried maps.
+// Fresh forage lands in loadout.food (not carry), so gather's fit check for
+// food yields must count every slot source, not just loot stacks.
+export function usedSlots(
+  loadout: Loadout,
+  carry: ItemStack[],
+  carriedMaps: { mapSeed: string }[] | undefined,
+): number {
+  return consumableSlots(loadout) + carry.length + (carriedMaps ?? []).length;
+}
+
 // Backpack tier total. The backpack REPLACES the base (it IS your storage), it
 // doesn't add to it. Transport/panniers layer ON TOP via carryCap (zhn).
 export function slotCap(backpack: string | null): number {

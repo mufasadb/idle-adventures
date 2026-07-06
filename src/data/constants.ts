@@ -63,7 +63,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
     materialTable: {
       mining: { "iron-ore": 7, "copper-ore": 2, "silver-ore": 1 }, // silver present (D27) but T2-gated
       wood: { "oak-log": 7, "pine-log": 2, "ironwood-log": 1 }, // ironwood T2 (iron-axe)
-      herb: { "forest-herb": 7, "desert-sage": 2, "ice-moss": 1 },
+      herb: { "forest-herb": 7, berries: 4, "desert-sage": 2, "ice-moss": 1 },
       animal: { "deer-hide": 7, "wolf-pelt": 2, "lizard-hide": 1 },
     },
     barrierTerrain: "mountain",
@@ -75,7 +75,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
     materialTable: {
       mining: { "copper-ore": 7, "iron-ore": 2, "coal": 1 }, // coal T2 (iron-pick) — desert is a fuel source
       wood: { "cactus-wood": 7, "oak-log": 2, "pine-log": 1 },
-      herb: { "desert-sage": 7, "forest-herb": 2, "ice-moss": 1 },
+      herb: { "desert-sage": 7, "forest-herb": 2, berries: 1, "ice-moss": 1 },
       animal: { "lizard-hide": 7, "deer-hide": 2, "drake-hide": 1 }, // drake T2 (steel-knife)
     },
     barrierTerrain: "mountain",
@@ -87,7 +87,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
     materialTable: {
       mining: { "silver-ore": 5, "coal": 2, "iron-ore": 2, "mithril-ore": 1 }, // silver T2 + coal T2 + mithril T3: tundra is the deep-tier mine
       wood: { "pine-log": 7, "oak-log": 2, "ironwood-log": 1 },
-      herb: { "ice-moss": 7, "desert-sage": 2, "forest-herb": 1 },
+      herb: { "ice-moss": 7, "desert-sage": 2, berries: 1, "forest-herb": 1 },
       animal: { "wolf-pelt": 7, "deer-hide": 2, "drake-hide": 1 },
     },
     barrierTerrain: "mountain",
@@ -126,7 +126,16 @@ export const TENT_FOOD_MULTIPLIER = 1.5;
 export const FOOD_ENERGY: Record<string, number> = {
   ration: 80,
   "trail-ration": 160, // stays 2× a ration — the T2 density edge
+  berries: 30, // fresh forage (e3j): weak-but-immediate — eat on the trail or lose them to staleness
+  jam: 120, // processed stale-berries — hauling the harvest home beats eating it raw (1.5 rations/slot)
 };
+
+// Fresh→processed food (e3j): fresh forage eaten on-map is good NOW; hauled
+// home it STALES into a material (endExpedition maps defIds at banking) that
+// town-crafts into denser food (jam). Stale forms are materials — slotOf never
+// returns "food" for them — so they can't be packed back out: "old berries"
+// enforce themselves with no extra rule.
+export const FRESH_TO_STALE: Record<string, string> = { berries: "stale-berries" };
 export const MIN_STEP = 5; // a discounted step never costs less than this (svz)
 // Movement is GRADED (svz): TERRAIN_COST is ABSOLUTE step energy on a ×10 scale.
 // Gear subtracts point-discounts (TERRAIN_GATE), transport divides per-terrain.
@@ -414,7 +423,7 @@ export const CATEGORY_LOOT_TABLE: Record<MonsterCategory, ItemStackSpec[]> = {
 // --- Consumable item catalogs (M5) ---
 // ENERGY_PER_FOOD / POTION_HEAL are flat, so these are single-item catalogs for
 // the POC; the list is what `pack`/`slotOf` validate a food/potion defId against.
-export const FOOD: string[] = ["ration", "trail-ration"];
+export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam"];
 export const POTION: string[] = ["potion", "greater-potion"];
 export const BATTLE_ITEM: string[] = ["elixir-of-power", "warding-draught"]; // combat consumables (bzd); COMBAT_BUFF keys
 
@@ -434,6 +443,7 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   "ration-venison": { inputs: [{ defId: "deer-hide", qty: 1 }], output: { defId: "ration", qty: 2 } },
   "ration-game": { inputs: [{ defId: "wolf-pelt", qty: 1 }], output: { defId: "ration", qty: 2 } },
   "ration-jerky": { inputs: [{ defId: "lizard-hide", qty: 1 }], output: { defId: "ration", qty: 2 } },
+  jam: { inputs: [{ defId: "stale-berries", qty: 3 }], output: { defId: "jam", qty: 1 } }, // the stale-berry payoff (e3j): denser than ration, cheaper than trail-ration
   potion: { inputs: [{ defId: "desert-sage", qty: 1 }, { defId: "forest-herb", qty: 1 }], output: { defId: "potion", qty: 1 } },
   // Consumables — T2 (gated by a T2 material → sit behind the iron-pick)
   "trail-ration": { inputs: [{ defId: "ration", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "trail-ration", qty: 1 } }, // cooked over coal — denser energy/slot

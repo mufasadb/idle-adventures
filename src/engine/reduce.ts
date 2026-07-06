@@ -2,7 +2,7 @@ import type { GameState, Action, GameEvent, LoadoutSlot, RejectionReason, Expedi
 import { generateGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
-import { addToCarry, freeCarryStacks, freeLootStacks } from "./carry";
+import { addToCarry, freeCarryStacks, freeLootStacks, usedSlots, carryCap } from "./carry";
 import { toolQualityFor } from "./tools";
 import { resolveCombat, rollLoot, explainMatchup } from "./combat";
 import { eatToRefill, foodEnergyOf } from "./food";
@@ -10,7 +10,7 @@ import { endExpedition, subtractStacks } from "./bank";
 import { craft as applyRecipe } from "./craft";
 import { packItem, reserveLoadout } from "./pack";
 import { candidateMaps, previewHints } from "./town";
-import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, MATERIAL_TIER, MAP_SCROLL_ID } from "../data/constants";
+import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 
 // Pure reducer. M2 fills embark/move; M3 fills gather/drop; M4 fills fight; remaining cases are no-op stubs:
@@ -241,8 +241,36 @@ function gather(state: GameState): { state: GameState; events: GameEvent[] } {
   const fed = autoRefill(expedition, expedition.energy - cost);
   const energy = fed.energy;
   const loadout = { ...expedition.loadout, food: fed.food };
-  const maxStacks = freeLootStacks(loadout, expedition.carriedMaps);
   const qty = GATHER_YIELD[kind];
+  // Fresh forage (e3j): a yield that IS food (FOOD catalog) joins the food
+  // reserve at the FRONT — eaten before packed food, since fresh stales on
+  // return while rations bank back. One slot per unit, like packed food.
+  if (FOOD.includes(poi.material)) {
+    const front = loadout.food[0];
+    const food =
+      front && front.defId === poi.material
+        ? [{ defId: front.defId, qty: front.qty + qty }, ...loadout.food.slice(1)]
+        : [{ defId: poi.material, qty }, ...loadout.food];
+    const candidate = { ...loadout, food };
+    if (usedSlots(candidate, expedition.carry, expedition.carriedMaps) > carryCap(candidate.equipment)) {
+      return rejected(state, "gather", "carry-full");
+    }
+    return {
+      state: {
+        ...state,
+        expedition: {
+          ...expedition,
+          energy,
+          cleared: [...expedition.cleared, { x: pos.x, y: pos.y }],
+          loadout: candidate,
+        },
+      },
+      events: [
+        { type: "gathered", at: { x: pos.x, y: pos.y }, kind: poi.kind, material: poi.material, qty, cost, energy },
+      ],
+    };
+  }
+  const maxStacks = freeLootStacks(loadout, expedition.carriedMaps);
   const carry = addToCarry(expedition.carry, poi.material, qty, maxStacks);
   if (carry === null) return rejected(state, "gather", "carry-full");
   return {
