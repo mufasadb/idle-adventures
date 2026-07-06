@@ -3,7 +3,7 @@ import { reduce } from "../src/engine/reduce";
 import { newGame, candidateMaps } from "../src/engine/town";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import { costToReach } from "../src/engine/reach";
-import { MAX_ENERGY, MAP_WIDTH, MAP_HEIGHT } from "../src/data/constants";
+import { MAX_ENERGY, MAP_WIDTH, MAP_HEIGHT, MATERIAL_TIER } from "../src/data/constants";
 import type { Action, GameState } from "../src/engine/types";
 
 test("e3j structural: the strip out-ranges one energy tank (5 offered maps)", () => {
@@ -22,24 +22,48 @@ test("e3j structural: the strip out-ranges one energy tank (5 offered maps)", ()
 test("e3j report: starter-kit harvest fraction", () => {
   const c = candidateMaps("rf", 0)[0]!;
   let state: GameState = newGame("rf");
-  const act = (a: Action) => { state = reduce(state, a).state; };
-  act({ type: "pack", slot: "tool", itemId: "pick" });
-  act({ type: "pack", slot: "tool", itemId: "axe" });
-  act({ type: "pack", slot: "tool", itemId: "knife" });
-  act({ type: "pack", slot: "backpack", itemId: "starter" });
-  for (let i = 0; i < 4; i++) act({ type: "pack", slot: "food", itemId: "ration" });
-  act({ type: "embark", mapSeed: c.mapSeed });
+  const act = (a: Action) => reduce(state, a);
+  // Affordable kit: a fresh bank has no "starter" backpack yet (that's a
+  // craft output — see town.ts), so pack only what the bare BASE_CARRY_SLOTS
+  // bag fits: pick + knife tools, 2 ration food (4/6 slots). Assert each pack
+  // actually lands so an unaffordable/oversized kit can't silently regress
+  // this test back to a meaningless 0% (as starter+axe+4 rations did).
+  for (const a of [
+    { type: "pack", slot: "tool", itemId: "pick" } as const,
+    { type: "pack", slot: "tool", itemId: "knife" } as const,
+    { type: "pack", slot: "food", itemId: "ration" } as const,
+    { type: "pack", slot: "food", itemId: "ration" } as const,
+  ]) {
+    const r = act(a);
+    state = r.state;
+    expect(r.events.some((e) => e.type === "action-rejected")).toBe(false);
+  }
+  state = act({ type: "embark", mapSeed: c.mapSeed }).state;
   expect(state.phase).toBe("expedition");
   const grid = generateGrid(c.mapSeed, rollBiome(c.mapSeed));
-  const gatherable = grid.pois.filter((p) => p.kind !== "monster" && p.material !== null);
+  // Only target nodes this kit can actually work: herb (bare hands), mining
+  // (pick) or animal (knife) — no axe, so skip wood — and only materials at
+  // tier 1 or untiered (MATERIAL_TIER absent defaults to 1); tier-2+ rejects
+  // tool-too-weak with basic tools.
+  const gatherable = grid.pois.filter(
+    (p) =>
+      (p.kind === "herb" || p.kind === "mining" || p.kind === "animal") &&
+      p.material !== null &&
+      (MATERIAL_TIER[p.material] ?? 1) === 1,
+  );
   let cleared = 0;
+  const skipped = new Set<string>();
   // Greedy: walk to the nearest unworked gatherable node, gather, DROP the loot
   // (this measures energy reach, not carry pressure), repeat until exhausted,
   // wedged, or killed (walking into a blocking monster unarmed can end the run).
   for (let step = 0; step < (MAP_WIDTH + MAP_HEIGHT) * 4 && state.expedition; step++) {
     const exp = state.expedition;
     const here = exp.pos;
-    const targets = gatherable.filter((p) => !exp.cleared.some((q) => q.x === p.x && q.y === p.y));
+    const targets = gatherable.filter(
+      (p) =>
+        !exp.cleared.some((q) => q.x === p.x && q.y === p.y) &&
+        !skipped.has(`${p.x},${p.y}`),
+    );
     if (targets.length === 0) break;
     targets.sort(
       (a, b) =>
@@ -50,9 +74,15 @@ test("e3j report: starter-kit harvest fraction", () => {
     if (t.x === here.x && t.y === here.y) {
       const r = reduce(state, { type: "gather" });
       state = r.state;
-      if (!r.events.some((e) => e.type === "gathered")) break; // tool-too-weak/carry-full — greedy is done
+      if (!r.events.some((e) => e.type === "gathered")) {
+        // e.g. carry-full from a berries gather when food slots are momentarily
+        // full — skip this node and keep going, rather than ending the run.
+        skipped.add(`${t.x},${t.y}`);
+        continue;
+      }
       cleared++;
-      state = reduce(state, { type: "drop", itemId: t.material! }).state; // shed loot: measure reach, not carry
+      // shed loot: measure reach, not carry (rejection OK — berries went to food, not carry)
+      state = reduce(state, { type: "drop", itemId: t.material! }).state;
       continue;
     }
     const r = reduce(state, { type: "move", to: { x: t.x, y: t.y } });
