@@ -16,8 +16,10 @@ function town(bank: { defId: string; qty: number }[]): GameState {
   return { seed: "t", phase: "town", bank, loadout: emptyLoadout(), expedition: null };
 }
 
-test("embark: trail-ration yields 2× a ration's energy/item (per-food lever, ff7)", () => {
-  // qty 3 so both clear BASE_ENERGY_FLOOR (200) and the per-item ratio is visible.
+test("eat: trail-ration RESTORES 2× a ration (per-food lever now = restore, ff7/dtv)", () => {
+  // Stamina model (dtv): FOOD_ENERGY is restore-per-unit, not embark energy. Both
+  // embark at MAX_ENERGY; the tier edge shows when you EAT. Drain first so a full
+  // unit fits (no waste), then manually eat one and read the refill.
   const withRation = reduce(
     { ...town([{ defId: "ration", qty: 3 }]), loadout: { ...emptyLoadout(), food: [{ defId: "ration", qty: 3 }] } },
     { type: "embark", mapSeed: OFFER_T },
@@ -26,8 +28,16 @@ test("embark: trail-ration yields 2× a ration's energy/item (per-food lever, ff
     { ...town([{ defId: "trail-ration", qty: 3 }]), loadout: { ...emptyLoadout(), food: [{ defId: "trail-ration", qty: 3 }] } },
     { type: "embark", mapSeed: OFFER_T },
   ).state;
-  expect(withRation.expedition!.energy).toBe(240); // 3 × 80
-  expect(withTrail.expedition!.energy).toBe(480); // 3 × 160 — same slots, double energy
+  // both start at max
+  expect(withRation.expedition!.energy).toBe(300);
+  expect(withTrail.expedition!.energy).toBe(300);
+  // drain to 100 (below max − a trail-ration's 160), then eat one unit
+  const drainedR = { ...withRation, expedition: { ...withRation.expedition!, energy: 100 } };
+  const drainedT = { ...withTrail, expedition: { ...withTrail.expedition!, energy: 100 } };
+  const ateR = reduce(drainedR, { type: "eat" }).state;
+  const ateT = reduce(drainedT, { type: "eat" }).state;
+  expect(ateR.expedition!.energy).toBe(180); // 100 + 80
+  expect(ateT.expedition!.energy).toBe(260); // 100 + 160 — same slot, double restore
 });
 
 test("combat: a greater-potion heals 20 where a potion heals 10", () => {

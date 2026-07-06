@@ -54,6 +54,9 @@ export function expeditionActions(state: GameState): Action[] {
   // tile-contextual actions
   candidates.push({ type: "gather" });
   candidates.push({ type: "fight" });
+  // stamina (dtv): eat when there's food + room; toggle the auto-eat any time
+  candidates.push({ type: "eat" });
+  candidates.push({ type: "toggle-auto-eat" });
   // drop each carried stack
   for (const stack of carry) candidates.push({ type: "drop", itemId: stack.defId });
   // return is always legal — a 0-energy run is never a dead end (bead note a)

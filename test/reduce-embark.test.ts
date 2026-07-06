@@ -2,7 +2,7 @@ import { test, expect } from "bun:test";
 import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
 import { generateGrid, rollBiome } from "../src/engine/grid";
-import { ENERGY_PER_FOOD, BASE_ENERGY_FLOOR } from "../src/data/constants";
+import { MAX_ENERGY } from "../src/data/constants";
 import { candidateMaps } from "../src/engine/town";
 import type { GameState } from "../src/engine/types";
 
@@ -25,14 +25,16 @@ function townState(): GameState {
   return { seed: "g", phase: "town", bank, loadout, expedition: null };
 }
 
-test("embark: enters expedition at the map's entry with energy from packed food", () => {
+test("embark: enters expedition at the map's entry at MAX_ENERGY (stamina model, dtv)", () => {
   const { state, events } = reduce(townState(), { type: "embark", mapSeed: OFFER_G });
   const grid = generateGrid(OFFER_G, rollBiome(OFFER_G));
   expect(state.phase).toBe("expedition");
   expect(state.expedition).not.toBeNull();
   expect(state.expedition!.mapSeed).toBe(OFFER_G);
   expect(state.expedition!.pos).toEqual(grid.entry);
-  expect(state.expedition!.energy).toBe(4 * ENERGY_PER_FOOD); // 3 bread + 1 jerky
+  expect(state.expedition!.energy).toBe(MAX_ENERGY); // start at max regardless of packed food
+  expect(state.expedition!.maxEnergy).toBe(MAX_ENERGY);
+  expect(state.expedition!.autoEat).toBe(true);
   expect(state.expedition!.carry).toEqual([]);
   expect(state.expedition!.cleared).toEqual([]);
   expect(events).toEqual([
@@ -41,7 +43,7 @@ test("embark: enters expedition at the map's entry with energy from packed food"
       mapSeed: OFFER_G,
       biomeId: grid.biomeId,
       pos: grid.entry,
-      energy: 4 * ENERGY_PER_FOOD,
+      energy: MAX_ENERGY,
     },
   ]);
 });
@@ -90,7 +92,8 @@ test("embark: debits the packed loadout from the bank (D28)", () => {
   const { state: next } = reduce(state, { type: "embark", mapSeed: OFFER_E });
   // sword + 3 rations removed; the untouched iron-ore and 2 leftover rations remain
   expect(next.bank).toEqual([{ defId: "ration", qty: 2 }, { defId: "iron-ore", qty: 9 }]);
-  expect(next.expedition!.energy).toBe(3 * ENERGY_PER_FOOD);
+  expect(next.expedition!.energy).toBe(MAX_ENERGY); // stamina model: embark at max, food is the reserve
+  expect(next.expedition!.loadout.food).toEqual([{ defId: "ration", qty: 3 }]); // packed food carried as reserve
   expect(next.expedition!.loadout.equipment.weapon).toBe("sword");
 });
 
@@ -104,13 +107,14 @@ test("embark: unaffordable plan is rejected (safety net)", () => {
   expect(events).toEqual([{ type: "action-rejected", action: "embark", reason: "unaffordable" }]);
 });
 
-test("embark: zero-food embark falls back to the base energy floor (qrl)", () => {
+test("embark: zero-food embark still starts at MAX_ENERGY (stamina model, dtv)", () => {
   const state: GameState = {
     seed: "e", phase: "town", bank: [], loadout: emptyLoadout(), expedition: null,
   };
   const { state: next, events } = reduce(state, { type: "embark", mapSeed: OFFER_E });
   expect(next.phase).toBe("expedition");
-  expect(next.expedition!.energy).toBe(BASE_ENERGY_FLOOR); // no dead-loop — ~5 actions to recover
+  expect(next.expedition!.energy).toBe(MAX_ENERGY); // start at max; with no food there's just nothing to refill
+  expect(next.expedition!.loadout.food).toEqual([]);
   expect(events[0]!.type).toBe("embarked");
 });
 
