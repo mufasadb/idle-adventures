@@ -31,3 +31,26 @@ test("validForSlot: only accepts a defId in its own slot", () => {
   expect(validForSlot("tool", "spyglass")).toBe(true);
   expect(validForSlot("weapon", "iron-ore")).toBe(false);
 });
+
+// --- Monster categories (8ec) ---
+import { MONSTERS, BIOMES, LOOT_TABLE } from "../src/data/constants";
+
+test("every monster has a category", () => {
+  for (const m of Object.values(MONSTERS)) {
+    expect(["beast", "humanoid", "fae", "undead", "giant", "dragon"]).toContain(m.category);
+  }
+});
+
+test("each biome spawns a humanoid — map-hunting is viable anywhere", () => {
+  for (const biome of Object.values(BIOMES)) {
+    const hasHumanoid = biome.creatureTable.some((c) => MONSTERS[c]?.category === "humanoid");
+    expect(hasHumanoid).toBe(true);
+  }
+});
+
+test("new humanoids have loot and ordinary tiers", () => {
+  expect(MONSTERS["forest-bandit"]).toMatchObject({ tier: 1, category: "humanoid" });
+  expect(MONSTERS["snow-marauder"]).toMatchObject({ tier: 2, category: "humanoid" });
+  expect(LOOT_TABLE["forest-bandit"]).toEqual([{ defId: "raider-supplies", qty: 1 }]);
+  expect(LOOT_TABLE["snow-marauder"]).toEqual([{ defId: "raider-supplies", qty: 1 }]);
+});

@@ -47,7 +47,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
   woodland: {
     terrainWeights: { plains: 0.4, mud: 0.25, river: 0.15, mountain: 0.2 },
     nodeTypeWeights: { wood: 0.35, herb: 0.25, animal: 0.2, monster: 0.15, mining: 0.05 },
-    creatureTable: ["werewolf", "fae-sprite", "forest-boar"],
+    creatureTable: ["werewolf", "fae-sprite", "forest-boar", "forest-bandit"],
     materialTable: {
       mining: { "iron-ore": 7, "copper-ore": 2, "silver-ore": 1 }, // silver present (D27) but T2-gated
       wood: { "oak-log": 7, "pine-log": 2, "ironwood-log": 1 }, // ironwood T2 (iron-axe)
@@ -69,7 +69,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
   tundra: {
     terrainWeights: { ice: 0.5, mountain: 0.25, plains: 0.15, river: 0.1 },
     nodeTypeWeights: { animal: 0.35, monster: 0.25, mining: 0.2, wood: 0.1, herb: 0.1 },
-    creatureTable: ["frost-fae", "snow-wolf", "ice-troll", "ancient-wyrm"], // wyrm = the tier-4 boss/goal (~1-in-4 tundra monster POIs); no spawn code — its lethality is the gate (D34)
+    creatureTable: ["frost-fae", "snow-wolf", "ice-troll", "ancient-wyrm", "snow-marauder"], // wyrm = the tier-4 boss/goal (~1-in-5 tundra monster POIs); no spawn code — its lethality is the gate (D34)
     materialTable: {
       mining: { "silver-ore": 5, "coal": 2, "iron-ore": 2, "mithril-ore": 1 }, // silver T2 + coal T2 + mithril T3: tundra is the deep-tier mine
       wood: { "pine-log": 7, "oak-log": 2, "ironwood-log": 1 },
@@ -275,21 +275,30 @@ export const AFFINITIES: Affinity[] = [
   { monsterTag: "dragon", itemTag: "wyrmbane" }, // wyrmfang ×2 vs the Wyrm — the first kill is brutal, then the boss becomes a farmable node (D34)
 ]; // discoverable damage multiplier pairings
 
-export type Monster = { tier: number; dmgType: DmgType; armourType: ArmourType; tags: string[] };
+// `category` (8ec) is the "hunt this kind for that resource" legibility layer —
+// beasts → hides/meat, humanoids → maps, fae → potion dust — and keys
+// CATEGORY_LOOT_TABLE. Pure classification, no combat effect; affinity pairings
+// stay in `tags`.
+export type MonsterCategory = "beast" | "humanoid" | "fae" | "undead" | "giant" | "dragon";
+export type Monster = { tier: number; dmgType: DmgType; armourType: ArmourType; category: MonsterCategory; tags: string[] };
 export const MONSTERS: Record<string, Monster> = {
-  werewolf: { tier: 2, dmgType: "melee", armourType: "light", tags: ["werewolf", "beast"] },
-  "fae-sprite": { tier: 1, dmgType: "magic", armourType: "robe", tags: ["fae"] },
-  "forest-boar": { tier: 1, dmgType: "melee", armourType: "light", tags: ["beast"] },
-  "giant-scorpion": { tier: 2, dmgType: "melee", armourType: "plate", tags: ["beast"] },
-  "dust-vampire": { tier: 3, dmgType: "magic", armourType: "robe", tags: ["vampire"] },
-  "sand-raider": { tier: 1, dmgType: "ranged", armourType: "light", tags: [] },
-  "frost-fae": { tier: 2, dmgType: "magic", armourType: "robe", tags: ["fae"] },
-  "snow-wolf": { tier: 1, dmgType: "melee", armourType: "light", tags: ["beast"] },
-  "ice-troll": { tier: 3, dmgType: "melee", armourType: "plate", tags: ["troll"] },
+  werewolf: { tier: 2, dmgType: "melee", armourType: "light", category: "beast", tags: ["werewolf", "beast"] },
+  "fae-sprite": { tier: 1, dmgType: "magic", armourType: "robe", category: "fae", tags: ["fae"] },
+  "forest-boar": { tier: 1, dmgType: "melee", armourType: "light", category: "beast", tags: ["beast"] },
+  "giant-scorpion": { tier: 2, dmgType: "melee", armourType: "plate", category: "beast", tags: ["beast"] },
+  "dust-vampire": { tier: 3, dmgType: "magic", armourType: "robe", category: "undead", tags: ["vampire"] },
+  "sand-raider": { tier: 1, dmgType: "ranged", armourType: "light", category: "humanoid", tags: [] },
+  "frost-fae": { tier: 2, dmgType: "magic", armourType: "robe", category: "fae", tags: ["fae"] },
+  "snow-wolf": { tier: 1, dmgType: "melee", armourType: "light", category: "beast", tags: ["beast"] },
+  "ice-troll": { tier: 3, dmgType: "melee", armourType: "plate", category: "giant", tags: ["troll"] },
+  // Humanoids (8ec): one per biome so map-hunting is viable anywhere. Ordinary
+  // difficulty for their tier — the category is the point, not the stats.
+  "forest-bandit": { tier: 1, dmgType: "melee", armourType: "light", category: "humanoid", tags: [] },
+  "snow-marauder": { tier: 2, dmgType: "ranged", armourType: "light", category: "humanoid", tags: [] },
   // Tier-4 boss (D34): magic damage into a plate hide — punishes the plate
   // strategy that carried the whole game (plate weak to magic, ÷1.5). The
   // dragon tag pairs with the wyrmbane affinity so wyrmfang farms it (§4.1).
-  "ancient-wyrm": { tier: 4, dmgType: "magic", armourType: "plate", tags: ["dragon"] },
+  "ancient-wyrm": { tier: 4, dmgType: "magic", armourType: "plate", category: "dragon", tags: ["dragon"] },
 }; // monster combat stats and loot triggers
 
 export type Weapon = { dmgType: DmgType; damage: number; tags: string[] };
@@ -361,6 +370,8 @@ export const LOOT_TABLE: Record<string, ItemStackSpec[]> = {
   "giant-scorpion": [{ defId: "scorpion-carapace", qty: 2 }],
   "dust-vampire": [{ defId: "vampire-ash", qty: 2 }],
   "sand-raider": [{ defId: "raider-supplies", qty: 1 }],
+  "forest-bandit": [{ defId: "raider-supplies", qty: 1 }],
+  "snow-marauder": [{ defId: "raider-supplies", qty: 1 }],
   "frost-fae": [{ defId: "fae-dust", qty: 2 }],
   "snow-wolf": [{ defId: "wolf-pelt", qty: 2 }],
   "ice-troll": [{ defId: "troll-hide", qty: 2 }],
