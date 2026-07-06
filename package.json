@@ -9,6 +9,7 @@
     "play": "bun run src/sim/cli.ts",
     "playtest": "bun run src/sim/playtest.ts",
     "sim": "bun run src/sim/balance-cli.ts",
+    "sim:tables": "bun run src/sim/balance-cli.ts tables --write",
     "web": "bun ./src/web/index.html"
   },
   "devDependencies": {

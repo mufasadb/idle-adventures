@@ -64,11 +64,13 @@ export function resolveKit(name: string, overrides: KitSpec = {}): Loadout {
     known(spec.weapon, WEAPONS, "weapon");
     l.equipment.weapon = spec.weapon;
   }
-  for (const piece of spec.armour ?? []) {
+  // Copies, not aliases: spec.armour/tools may be the KIT_PRESETS entry itself
+  // (spread above is shallow) — iterating a copy keeps that preset read-only.
+  for (const piece of (spec.armour ?? []).slice()) {
     known(piece, ARMOUR, "armour piece");
     l.equipment[ARMOUR[piece]!.slot] = piece;
   }
-  for (const t of spec.tools ?? []) {
+  for (const t of (spec.tools ?? []).slice()) {
     known(t, TOOL_CAPABILITY, "tool");
     l.equipment.tools.push(t);
   }

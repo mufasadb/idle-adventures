@@ -1,7 +1,8 @@
 // CLI for the balance sim (dbc): parse argv, call balance.ts, render pretty or
 // --json. `run` is exported (pure in/out) so tests never need a subprocess;
 // the import.meta.main block is the only side-effectful line. --write (tables)
-// lands in the artifacts step of this feature.
+// regenerates docs/balance/tables.{json,md} — see test/balance-tables.test.ts.
+import { mkdirSync, writeFileSync } from "node:fs";
 import { KIT_PRESETS, resolveKit, simFight, simReach, simTables } from "./balance";
 import type { FightReport, ReachReport, TableData, KitSpec } from "./balance";
 import type { ItemStack } from "../engine/types";
@@ -117,7 +118,7 @@ export function run(argv: string[]): { code: number; output: string } {
     }
     if (cmd === "tables") {
       const data = simTables();
-      if (flags.write) return writeTables(data); // Task 2 wires this
+      if (flags.write) return writeTables(data);
       return { code: 0, output: flags.json ? JSON.stringify(data, null, 2) : renderTablesMd(data) };
     }
     return { code: 1, output: `unknown command: ${cmd}\n${USAGE}` };
@@ -126,9 +127,13 @@ export function run(argv: string[]): { code: number; output: string } {
   }
 }
 
-// Task 2 replaces this stub with the real artifact writer.
-function writeTables(_data: TableData): { code: number; output: string } {
-  return { code: 1, output: "--write not wired yet (Task 2)" };
+// Regenerates the checked-in balance surface. Byte-stable: no timestamps, all
+// numbers pre-rounded in balance.ts, plain JSON.stringify ordering.
+function writeTables(data: TableData): { code: number; output: string } {
+  mkdirSync("docs/balance", { recursive: true });
+  writeFileSync("docs/balance/tables.json", JSON.stringify(data, null, 2) + "\n");
+  writeFileSync("docs/balance/tables.md", renderTablesMd(data));
+  return { code: 0, output: "wrote docs/balance/tables.json + docs/balance/tables.md" };
 }
 
 if (import.meta.main) {
