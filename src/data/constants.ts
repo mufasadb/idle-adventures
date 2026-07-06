@@ -50,7 +50,7 @@ export type BiomeId = (typeof BIOME_IDS)[number];
 export type Biome = {
   terrainWeights: Partial<Record<Terrain, number>>; // relative mix; zero/absent = never generates
   nodeTypeWeights: Partial<Record<NodeType, number>>; // relative POI kind mix
-  creatureTable: string[]; // biome-flavoured monster defIds (filled M4)
+  creatureTable: Record<string, number>; // weighted monster defIds (si7.1): same shape as materialTable entries — tier-1/2 dominate, bosses rare
   materialTable: Partial<Record<NodeType, Record<string, number>>>; // node kind → weighted material defIds (D27)
   barrierTerrain: Terrain; // what a wall is made of here (e3j)
 };
@@ -59,7 +59,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
   woodland: {
     terrainWeights: { plains: 0.4, mud: 0.25, river: 0.15, mountain: 0.2 },
     nodeTypeWeights: { wood: 0.35, herb: 0.25, animal: 0.2, monster: 0.15, mining: 0.05 },
-    creatureTable: ["werewolf", "fae-sprite", "forest-boar", "forest-bandit"],
+    creatureTable: { "forest-boar": 5, "forest-bandit": 4, "shell-beetle": 4, "fae-sprite": 3, werewolf: 2 },
     materialTable: {
       mining: { "iron-ore": 7, "copper-ore": 2, "silver-ore": 1 }, // silver present (D27) but T2-gated
       wood: { "oak-log": 7, "pine-log": 2, "ironwood-log": 1 }, // ironwood T2 (iron-axe)
@@ -71,7 +71,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
   desert: {
     terrainWeights: { plains: 0.55, mountain: 0.3, river: 0.15 },
     nodeTypeWeights: { mining: 0.4, monster: 0.25, herb: 0.15, wood: 0.1, animal: 0.1 },
-    creatureTable: ["giant-scorpion", "dust-vampire", "sand-raider"],
+    creatureTable: { "sand-raider": 5, "mirage-wisp": 4, "giant-scorpion": 3, "dust-vampire": 1 },
     materialTable: {
       mining: { "copper-ore": 7, "iron-ore": 2, "coal": 1 }, // coal T2 (iron-pick) — desert is a fuel source
       wood: { "cactus-wood": 7, "oak-log": 2, "pine-log": 1 },
@@ -83,7 +83,8 @@ export const BIOMES: Record<BiomeId, Biome> = {
   tundra: {
     terrainWeights: { ice: 0.5, mountain: 0.25, plains: 0.15, river: 0.1 },
     nodeTypeWeights: { animal: 0.35, monster: 0.25, mining: 0.2, wood: 0.1, herb: 0.1 },
-    creatureTable: ["frost-fae", "snow-wolf", "ice-troll", "ancient-wyrm", "snow-marauder"], // wyrm = the tier-4 boss/goal (~1-in-5 tundra monster POIs); no spawn code — its lethality is the gate (D34)
+    // wyrm 1/16 ≈ 6% of monster POIs (was 1/5): the goal is a discovery, not a doormat (si7.1)
+    creatureTable: { "snow-wolf": 5, "ice-crab": 4, "snow-marauder": 3, "frost-fae": 2, "ice-troll": 1, "ancient-wyrm": 1 },
     materialTable: {
       mining: { "silver-ore": 5, "coal": 2, "iron-ore": 2, "mithril-ore": 1 }, // silver T2 + coal T2 + mithril T3: tundra is the deep-tier mine
       wood: { "pine-log": 7, "oak-log": 2, "ironwood-log": 1 },
@@ -323,8 +324,14 @@ export const MONSTERS: Record<string, Monster> = {
   "ice-troll": { tier: 3, dmgType: "melee", armourType: "plate", category: "giant", tags: ["troll"] },
   // Humanoids (8ec): one per biome so map-hunting is viable anywhere. Ordinary
   // difficulty for their tier — the category is the point, not the stats.
-  "forest-bandit": { tier: 1, dmgType: "melee", armourType: "light", category: "humanoid", tags: [] },
+  "forest-bandit": { tier: 1, dmgType: "ranged", armourType: "light", category: "humanoid", tags: [] }, // ranged (si7.1): completes woodland's incoming-type spread
   "snow-marauder": { tier: 2, dmgType: "ranged", armourType: "light", category: "humanoid", tags: [] },
+  // Tier-1 spread completers (si7.1): every biome's reachable band now covers
+  // melee/ranged/magic incoming AND plate/light/robe hides — the matchup lesson
+  // has material on day one. Ordinary stats; the TYPE is the point.
+  "shell-beetle": { tier: 1, dmgType: "melee", armourType: "plate", category: "beast", tags: ["beast"] }, // woodland: the first "my sword skates off it" moment
+  "mirage-wisp": { tier: 1, dmgType: "magic", armourType: "robe", category: "fae", tags: ["fae"] }, // desert: early iron-sword affinity teacher
+  "ice-crab": { tier: 1, dmgType: "melee", armourType: "plate", category: "beast", tags: ["beast"] }, // tundra: plate hide before the troll
   // Tier-4 boss (D34): magic damage into a plate hide — punishes the plate
   // strategy that carried the whole game (plate weak to magic, ÷1.5). The
   // dragon tag pairs with the wyrmbane affinity so wyrmfang farms it (§4.1).
@@ -405,6 +412,9 @@ export const LOOT_TABLE: Record<string, ItemStackSpec[]> = {
   "frost-fae": [{ defId: "fae-dust", qty: 2 }],
   "snow-wolf": [{ defId: "wolf-pelt", qty: 2 }],
   "ice-troll": [{ defId: "troll-hide", qty: 2 }],
+  "shell-beetle": [{ defId: "beetle-shell", qty: 2 }],
+  "mirage-wisp": [{ defId: "wisp-essence", qty: 2 }],
+  "ice-crab": [{ defId: "crab-shell", qty: 2 }],
   // Boss (D34): wyrm-scale always → dragonscale-cuirass; dragonheart @0.2 (the
   // 1/5 rare) → wyrmfang. `chance` is rolled per-encounter in fightAt (§4.5).
   "ancient-wyrm": [{ defId: "wyrm-scale", qty: 3 }, { defId: "dragonheart", qty: 1, chance: 0.2 }],
@@ -524,6 +534,9 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   "warg-jerkin": { inputs: [{ defId: "werewolf-pelt", qty: 2 }], output: { defId: "warg-jerkin", qty: 1 } },
   "scorpion-plate-chest": { inputs: [{ defId: "scorpion-carapace", qty: 2 }], output: { defId: "scorpion-plate-chest", qty: 1 } },
   "large-pack-troll": { inputs: [{ defId: "troll-hide", qty: 2 }, { defId: "ironwood-log", qty: 1 }], output: { defId: "large-pack", qty: 1 } }, // alt route to the top pack
+  "plate-boots-beetle": { inputs: [{ defId: "beetle-shell", qty: 2 }], output: { defId: "plate-boots", qty: 1 } }, // beetle chitin = plate without iron (si7.1)
+  "fire-staff-wisp": { inputs: [{ defId: "wisp-essence", qty: 1 }, { defId: "cactus-wood", qty: 2 }], output: { defId: "fire-staff", qty: 1 } }, // desert path to magic — no woodland fae needed (si7.1)
+  "ration-crab": { inputs: [{ defId: "crab-shell", qty: 1 }], output: { defId: "ration", qty: 2 } }, // crab meat (si7.1)
   // T3 combat consumables (bzd) — the exclusive reward for fighting T3 monsters
   "elixir-of-power": { inputs: [{ defId: "vampire-ash", qty: 2 }], output: { defId: "elixir-of-power", qty: 1 } }, // +2 dmg, one fight
   "warding-draught": { inputs: [{ defId: "troll-hide", qty: 2 }], output: { defId: "warding-draught", qty: 1 } }, // +3 mitigation, one fight
