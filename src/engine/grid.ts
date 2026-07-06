@@ -4,6 +4,8 @@ import {
   MAP_WIDTH,
   MAP_HEIGHT,
   NOISE_FREQUENCY,
+  BARRIER_NOISE_FREQUENCY,
+  BARRIER_THRESHOLD,
   BIOMES,
   BIOME_IDS,
   TERRAINS,
@@ -13,10 +15,11 @@ import {
   NODE_TYPES,
   MATERIAL_TIER,
 } from "../data/constants";
-import type { Terrain, NodeType, BiomeId } from "../data/constants";
+import type { Terrain, NodeType, BiomeId, Biome } from "../data/constants";
 import { rand, weightedPick } from "./rng";
 import { perlin2 } from "./noise";
 import { costToReach, reachableTiles } from "./reach";
+import { moveCost } from "./move";
 
 export type Poi = {
   x: number;
@@ -60,6 +63,78 @@ function rollMaterial(
 const gridCache = new Map<string, Grid>();
 const GRID_CACHE_CAP = 512;
 
+// e3j connectivity: barrier walls must never seal a pocket off entirely.
+// Flood-label walkable (finite on-foot cost) regions; carve a pass from each
+// minor region to the largest along the closest tile pair (Chebyshev, stable
+// row-major tie-break — deterministic with no extra RNG). Carved tiles become
+// the biome's most-weighted walkable terrain, so a pass reads as native
+// ground (tundra passes are ice, elsewhere plains), not a scar.
+const walkableTerrain = (t: Terrain): boolean => Number.isFinite(moveCost(t, null, []));
+
+function carveTerrainOf(biome: Biome): Terrain {
+  let best: Terrain = "plains";
+  let bw = -1;
+  for (const t of TERRAINS) {
+    const w = biome.terrainWeights[t] ?? 0;
+    if (walkableTerrain(t) && w > bw) { bw = w; best = t; }
+  }
+  return best;
+}
+
+function walkableRegions(terrain: Terrain[][]): { x: number; y: number }[][] {
+  const label: number[][] = terrain.map((row) => row.map(() => -1));
+  const regions: { x: number; y: number }[][] = [];
+  for (let sy = 0; sy < MAP_HEIGHT; sy++) {
+    for (let sx = 0; sx < MAP_WIDTH; sx++) {
+      if (!walkableTerrain(terrain[sy]![sx]!) || label[sy]![sx]! !== -1) continue;
+      const id = regions.length;
+      const tiles: { x: number; y: number }[] = [];
+      const stack = [{ x: sx, y: sy }];
+      label[sy]![sx] = id;
+      while (stack.length) {
+        const c = stack.pop()!;
+        tiles.push(c);
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (!dx && !dy) continue;
+            const nx = c.x + dx, ny = c.y + dy;
+            if (nx < 0 || ny < 0 || nx >= MAP_WIDTH || ny >= MAP_HEIGHT) continue;
+            if (!walkableTerrain(terrain[ny]![nx]!) || label[ny]![nx]! !== -1) continue;
+            label[ny]![nx] = id;
+            stack.push({ x: nx, y: ny });
+          }
+        }
+      }
+      regions.push(tiles);
+    }
+  }
+  return regions;
+}
+
+function carveConnectivity(terrain: Terrain[][], biome: Biome): void {
+  const carve = carveTerrainOf(biome);
+  // Each pass merges the second-largest region into the largest, so the
+  // region count strictly decreases — guaranteed termination.
+  for (;;) {
+    const regions = walkableRegions(terrain).sort((a, b) => b.length - a.length);
+    if (regions.length <= 1) return;
+    const main = regions[0]!, minor = regions[1]!;
+    let from = minor[0]!, to = main[0]!, best = Infinity;
+    for (const a of minor) {
+      for (const b of main) {
+        const d = Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+        if (d < best) { best = d; from = a; to = b; }
+      }
+    }
+    let cx = from.x, cy = from.y;
+    while (cx !== to.x || cy !== to.y) {
+      cx += Math.sign(to.x - cx);
+      cy += Math.sign(to.y - cy);
+      if (!walkableTerrain(terrain[cy]![cx]!)) terrain[cy]![cx] = carve;
+    }
+  }
+}
+
 export function generateGrid(mapSeed: string, biomeId: BiomeId): Grid {
   const key = `${mapSeed.length}:${mapSeed}:${biomeId}`;
   const hit = gridCache.get(key);
@@ -79,12 +154,18 @@ function buildGrid(mapSeed: string, biomeId: BiomeId): Grid {
       // Sample mid-tile (the +0.5) so integer lattice points — where Perlin
       // is always 0.5 — don't line up with the tile grid.
       const noise = perlin2(mapSeed, (x + 0.5) * NOISE_FREQUENCY, (y + 0.5) * NOISE_FREQUENCY);
-      // The noise value walks the biome's cumulative weight bands in TERRAINS
-      // (elevation) order: coherent noise regions become coherent terrain.
-      row.push(weightedPick(biome.terrainWeights, TERRAINS, noise));
+      // Barrier layer (e3j): a low-frequency field carves long walls; the seed is
+      // namespaced so the two fields are independent.
+      const barrier = perlin2(`${mapSeed}:barrier`, (x + 0.5) * BARRIER_NOISE_FREQUENCY, (y + 0.5) * BARRIER_NOISE_FREQUENCY);
+      row.push(
+        barrier > BARRIER_THRESHOLD
+          ? biome.barrierTerrain
+          : weightedPick(biome.terrainWeights, TERRAINS, noise),
+      );
     }
     terrain.push(row);
   }
+  carveConnectivity(terrain, biome);
   // Entry (b91): embark lands on the bottom row. Pick the x that opens onto the
   // LARGEST on-foot reachable region, so a bare loadout is never boxed into a
   // dead corner pocket (the food reachability guarantee starts here). Ties break

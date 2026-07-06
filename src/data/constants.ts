@@ -10,6 +10,13 @@
 export const MAP_WIDTH = 20; // tiles across
 export const MAP_HEIGHT = 60; // tiles along the strip
 export const NOISE_FREQUENCY = 0.15; // Perlin sample step per tile; lower = larger terrain regions
+// Barrier layer (e3j): a SECOND, lower-frequency noise field lays long walls of
+// each biome's barrierTerrain across the strip — the navigation puzzle. Tiles
+// whose barrier sample exceeds BARRIER_THRESHOLD become wall; a connectivity
+// pass then guarantees all walkable tiles stay one component (nothing is ever
+// literally unreachable barefoot — mountains are cost-walls, not prisons).
+export const BARRIER_NOISE_FREQUENCY = 0.06; // ≪ NOISE_FREQUENCY → chunky ridges, not speckle
+export const BARRIER_THRESHOLD = 0.68; // the "how walled is the world" dial: lower = more maze
 export const POI_DENSITY = 18; // POIs per map — richer than one run can harvest (2026-07-05, qrl): forces "which region do I work?" (sim: ~91%→~55% cleared with 3 food slots). Was 12.
 export const POI_MIN_SPACING = 3; // min Chebyshev distance between POIs (spec: 3–4 tiles apart)
 export const POI_PLACEMENT_ATTEMPTS = 400; // seeded rejection-sampling budget per map
@@ -45,6 +52,7 @@ export type Biome = {
   nodeTypeWeights: Partial<Record<NodeType, number>>; // relative POI kind mix
   creatureTable: string[]; // biome-flavoured monster defIds (filled M4)
   materialTable: Partial<Record<NodeType, Record<string, number>>>; // node kind → weighted material defIds (D27)
+  barrierTerrain: Terrain; // what a wall is made of here (e3j)
 };
 
 export const BIOMES: Record<BiomeId, Biome> = {
@@ -58,6 +66,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
       herb: { "forest-herb": 7, "desert-sage": 2, "ice-moss": 1 },
       animal: { "deer-hide": 7, "wolf-pelt": 2, "lizard-hide": 1 },
     },
+    barrierTerrain: "mountain",
   },
   desert: {
     terrainWeights: { plains: 0.55, mountain: 0.3, river: 0.15 },
@@ -69,6 +78,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
       herb: { "desert-sage": 7, "forest-herb": 2, "ice-moss": 1 },
       animal: { "lizard-hide": 7, "deer-hide": 2, "drake-hide": 1 }, // drake T2 (steel-knife)
     },
+    barrierTerrain: "mountain",
   },
   tundra: {
     terrainWeights: { ice: 0.5, mountain: 0.25, plains: 0.15, river: 0.1 },
@@ -80,6 +90,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
       herb: { "ice-moss": 7, "desert-sage": 2, "forest-herb": 1 },
       animal: { "wolf-pelt": 7, "deer-hide": 2, "drake-hide": 1 },
     },
+    barrierTerrain: "mountain",
   },
 };
 
