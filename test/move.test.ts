@@ -1,6 +1,6 @@
 // test/move.test.ts
 import { test, expect } from "bun:test";
-import { stepToward, moveCost } from "../src/engine/move";
+import { stepToward, moveCost, moveCostBreakdown } from "../src/engine/move";
 import { TERRAIN_COST, MIN_STEP } from "../src/data/constants";
 
 test("stepToward: steps one tile on each axis toward the target (8-dir)", () => {
@@ -70,4 +70,42 @@ test("moveCost: unknown transport behaves as on foot", () => {
 
 test("moveCost: gate + transport compose (enable then divide)", () => {
   expect(moveCost("mountain", "horse", ["climbing-pick"])).toBe(40); // horse ÷1 on mountain
+});
+
+test("moveCostBreakdown: plain terrain, no gear — base only, final matches moveCost", () => {
+  const b = moveCostBreakdown("plains", null, []);
+  expect(b.base).toBe(TERRAIN_COST.plains);
+  expect(b.discounts).toEqual([]);
+  expect(b.enabled).toBeUndefined();
+  expect(b.transport).toBeUndefined();
+  expect(b.final).toBe(moveCost("plains", null, []));
+});
+
+test("moveCostBreakdown: ice-cleats discount attributed, floor flagged", () => {
+  const b = moveCostBreakdown("ice", null, ["ice-cleats"]); // 20 - 15 = 5 = MIN_STEP
+  expect(b.discounts).toEqual([{ tool: "ice-cleats", amount: 15 }]);
+  expect(b.floored).toBe(true);
+  expect(b.final).toBe(MIN_STEP);
+});
+
+test("moveCostBreakdown: climbing-pick enables mountain", () => {
+  const b = moveCostBreakdown("mountain", null, ["climbing-pick"]);
+  expect(b.enabled).toEqual({ tool: "climbing-pick", to: 40 });
+  expect(b.final).toBe(40);
+});
+
+test("moveCostBreakdown: transport divisor captured (horse on plains)", () => {
+  const b = moveCostBreakdown("plains", "horse", []);
+  expect(b.transport).toEqual({ id: "horse", divisor: 2 });
+  expect(b.final).toBe(TERRAIN_COST.plains / 2);
+});
+
+test("moveCostBreakdown: final always equals moveCost across combos", () => {
+  const combos: [import("../src/data/constants").Terrain, string | null, string[]][] = [
+    ["mud", "horse", []], ["river", null, ["raft"]], ["mud", null, ["waders"]],
+    ["mountain", "wagon", ["climbing-pick"]], ["ice", "wagon", ["ice-cleats"]],
+  ];
+  for (const [t, tr, tls] of combos) {
+    expect(moveCostBreakdown(t, tr, tls).final).toBe(moveCost(t, tr, tls));
+  }
 });
