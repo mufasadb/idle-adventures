@@ -55,6 +55,7 @@ export function endExpedition(state: GameState, expedition: Expedition): GameSta
       ...expedition.loadout.food, // uneaten food banks back (pqp)
       ...(expedition.loadout.battleItems ?? []), // unused battle items bank back (bzd)
     ]),
+    maps: [...(state.maps ?? []), ...(expedition.carriedMaps ?? [])], // carried map drops bank as held maps (8ec) — same fate as the carry in every run-end path incl. defeat's soft fail (D26)
     loadout: emptyLoadout(),
     expedition: null,
     runs: (state.runs ?? 0) + 1, // advance the town's map offer for the next visit

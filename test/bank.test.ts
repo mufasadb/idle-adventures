@@ -62,3 +62,29 @@ test("endExpedition: banks carry + durables + potions + uneaten food (D26, pqp)"
   ]);
   expect(state.phase).toBe("expedition"); // pure — input untouched
 });
+
+test("endExpedition banks carried maps into state.maps (D26: they follow the carry's fate)", () => {
+  const state: GameState = {
+    seed: "g",
+    phase: "expedition",
+    bank: [],
+    loadout: emptyLoadout(),
+    maps: [{ mapSeed: "pocketed-1", biomeId: "desert", vintage: 0 }],
+    expedition: {
+      mapSeed: "m",
+      pos: { x: 1, y: 1 },
+      energy: 0,
+      hp: 5,
+      loadout: emptyLoadout(),
+      carry: [],
+      cleared: [],
+      carriedMaps: [{ mapSeed: "run:drop:1,2", biomeId: "tundra", vintage: 2 }],
+    },
+  };
+  const ended = endExpedition(state, state.expedition!);
+  expect(ended.maps).toEqual([
+    { mapSeed: "pocketed-1", biomeId: "desert", vintage: 0 },
+    { mapSeed: "run:drop:1,2", biomeId: "tundra", vintage: 2 },
+  ]);
+  expect(ended.phase).toBe("town");
+});

@@ -135,3 +135,15 @@ test("drop-map in town rejects", () => {
   const { events } = reduce(town, { type: "drop-map", mapSeed: "x" });
   expect(events).toContainEqual(expect.objectContaining({ reason: "not-on-expedition" }));
 });
+
+test("carried map banks on return and is embarkable+spent like a pocketed map", () => {
+  const { seed, poi } = humanoidFight(true);
+  const won = reduce(atMonster(seed, poi), { type: "fight" }).state;
+  const home = reduce(won, { type: "return" }).state;
+  const minted = `${seed}:drop:${poi.x},${poi.y}`;
+  expect(home.phase).toBe("town");
+  expect((home.maps ?? []).some((m) => m.mapSeed === minted)).toBe(true);
+  const out = reduce(home, { type: "embark", mapSeed: minted });
+  expect(out.state.phase).toBe("expedition");
+  expect((out.state.maps ?? []).some((m) => m.mapSeed === minted)).toBe(false); // spent
+});
