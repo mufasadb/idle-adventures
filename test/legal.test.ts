@@ -110,3 +110,17 @@ test("expeditionActions: a tier-locked node is not offered gather (D29 free)", (
   for (const a of actions) expect(accepts(state, a)).toBe(true); // nothing offered is rejected
   expect(actions.some((a) => a.type === "gather")).toBe(false); // the locked node is not workable
 });
+
+test("expeditionActions: drop-map offered per carried map (8ec)", () => {
+  const onMap = play("s", [{ type: "embark", mapSeed: OFFER_S }]).state;
+  const withMap: GameState = {
+    ...onMap,
+    expedition: {
+      ...onMap.expedition!,
+      carriedMaps: [{ mapSeed: "lm-1", biomeId: "desert", vintage: 0 }],
+    },
+  };
+  const actions = expeditionActions(withMap);
+  expect(actions).toContainEqual({ type: "drop-map", mapSeed: "lm-1" });
+  expect(expeditionActions(onMap).some((a) => a.type === "drop-map")).toBe(false);
+});

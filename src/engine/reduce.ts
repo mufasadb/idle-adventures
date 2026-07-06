@@ -35,6 +35,8 @@ export function reduce(
       return toggleAutoEat(state);
     case "drop":
       return drop(state, action.itemId);
+    case "drop-map":
+      return dropMap(state, action.mapSeed);
     case "fight":
       return fight(state);
     case "craft":
@@ -284,6 +286,24 @@ function drop(
   return {
     state: { ...state, expedition: { ...expedition, carry } },
     events: [{ type: "dropped", defId: dropped.defId, qty: dropped.qty }],
+  };
+}
+
+// Discard a carried map (8ec): frees its slot for the rest of the run. No
+// re-pickup — paper burns. Mirrors `drop` for loot stacks.
+function dropMap(
+  state: GameState,
+  mapSeed: string,
+): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) {
+    return rejected(state, "drop-map", "not-on-expedition");
+  }
+  const held = expedition.carriedMaps ?? [];
+  if (!held.some((m) => m.mapSeed === mapSeed)) return rejected(state, "drop-map", "map-not-carried");
+  return {
+    state: { ...state, expedition: { ...expedition, carriedMaps: held.filter((m) => m.mapSeed !== mapSeed) } },
+    events: [{ type: "map-discarded", mapSeed }],
   };
 }
 

@@ -80,6 +80,7 @@ export type Action =
   | { type: "eat" } // eat one food unit now → refill current energy toward max (dtv)
   | { type: "toggle-auto-eat" } // flip the waste-free "eat when hungry" auto-eat (dtv)
   | { type: "drop"; itemId: string }
+  | { type: "drop-map"; mapSeed: string } // discard a carried map mid-run (8ec) — frees its slot; no re-pickup
   | { type: "return" };
 
 // Closed set of every reason a reducer can reject an action (D30). Split out so
@@ -99,6 +100,7 @@ export type RejectionReason =
   | "tool-too-weak"
   | "carry-full"
   | "not-carried"
+  | "map-not-carried"
   | "no-monster"
   | "unaffordable"
   | "no-recipe"
@@ -154,6 +156,7 @@ export type GameEvent =
   | { type: "crafted"; recipeId: string; output: ItemStack }
   | { type: "pocketed-map"; mapSeed: string; biomeId: BiomeId }
   | { type: "map-dropped"; at: { x: number; y: number }; mapSeed: string; biomeId: BiomeId; hints: string[]; carried: boolean } // humanoid kill minted a map (8ec); carried=false → pack full, left behind
+  | { type: "map-discarded"; mapSeed: string } // drop-map (8ec): carried map thrown away mid-run
   | { type: "packed"; slot: LoadoutSlot; defId: string }
   | { type: "run-ended"; reason: string }
   | {

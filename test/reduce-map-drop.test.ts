@@ -115,3 +115,23 @@ test("carried maps debit gather/loot capacity by one stack each", () => {
     expect.objectContaining({ type: "action-rejected", reason: "carry-full" }),
   );
 });
+
+test("drop-map discards a carried map, freeing its slot; unknown seed rejects", () => {
+  const { seed, poi } = humanoidFight(true);
+  const before = atMonster(seed, poi, (s) => {
+    s.expedition!.carriedMaps = [{ mapSeed: "held-1", biomeId: "desert", vintage: 0 }];
+  });
+  const { state, events } = reduce(before, { type: "drop-map", mapSeed: "held-1" });
+  expect(state.expedition!.carriedMaps).toEqual([]);
+  expect(events).toEqual([{ type: "map-discarded", mapSeed: "held-1" }]);
+  const rej = reduce(state, { type: "drop-map", mapSeed: "held-1" });
+  expect(rej.events).toContainEqual(
+    expect.objectContaining({ type: "action-rejected", action: "drop-map", reason: "map-not-carried" }),
+  );
+});
+
+test("drop-map in town rejects", () => {
+  const town: GameState = { seed: "g", phase: "town", bank: [], loadout: emptyLoadout(), expedition: null };
+  const { events } = reduce(town, { type: "drop-map", mapSeed: "x" });
+  expect(events).toContainEqual(expect.objectContaining({ reason: "not-on-expedition" }));
+});

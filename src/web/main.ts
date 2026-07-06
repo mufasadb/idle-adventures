@@ -96,6 +96,7 @@ function fmt(e: GameEvent): string {
     case "map-dropped": return e.carried
       ? `🗺️ looted a ${name(e.biomeId)} map (takes 1 slot — banks home with you)`
       : `🗺️ a ${name(e.biomeId)} map dropped — pack full, left behind`;
+    case "map-discarded": return `🗺️ discarded a carried map`;
     case "packed": return `packed ${name(e.defId)} → ${e.slot}`;
     case "run-ended": return `— run ended (${e.reason}) —`;
     case "action-rejected": return `✗ ${e.action} rejected: ${e.reason}`;
