@@ -54,6 +54,10 @@ function fmtEvent(e: GameEvent): string {
     }
     case "crafted": return `✦ crafted ${e.output.qty}× ${e.output.defId}`;
     case "pocketed-map": return `📜 pocketed a ${e.biomeId} map`;
+    case "map-dropped": return e.carried
+      ? `🗺️ looted a ${e.biomeId} map (takes 1 carry slot — banks home with you)`
+      : `🗺️ a ${e.biomeId} map dropped — pack full, left behind`;
+    case "map-discarded": return `🗺️ discarded a carried map`;
     case "packed": return `packed ${e.defId} → ${e.slot}`;
     case "run-ended": return `— run ended (${e.reason})`;
     case "action-rejected": return `✗ ${e.action} rejected: ${e.reason}`;
@@ -70,6 +74,11 @@ const s = summarize(state);
 console.log("\n=== YOU ===");
 console.log(`phase: ${s.phase} · runs completed: ${state.runs ?? 0}`);
 if (s.expedition) console.log(`energy: ${s.expedition.energy}/${s.expedition.maxEnergy} · eat-when-hungry: ${s.expedition.autoEat ? "on" : "off"}${state.expedition?.loadout.equipment.tools.includes("tent") ? " · tent (food +50%)" : ""} · hp: ${s.expedition.hp} · pos (${s.expedition.pos.x},${s.expedition.pos.y}) · nodes cleared: ${s.expedition.cleared}`);
+if (state.expedition) {
+  // Carry + carried maps (8ec; si7.4 parity): maps cost a slot each mid-run.
+  const cmaps = state.expedition.carriedMaps ?? [];
+  console.log(`carry: ${state.expedition.carry.map((c) => `${c.qty}× ${c.defId}`).join(", ") || "(empty)"}${cmaps.length ? ` · carried maps (1 slot each, bank as held maps at run end): ${cmaps.map((m) => `${m.biomeId} — drop-map mapSeed="${m.mapSeed}" to free the slot`).join("; ")}` : ""}`);
+}
 console.log(`bank: ${s.bank.map((i) => `${i.qty}× ${i.defId}`).join(", ") || "(empty)"}`);
 // Show the ACTIVE loadout: on an expedition the equipped gear lives on
 // expedition.loadout (state.loadout is the town plan, empty mid-run).
