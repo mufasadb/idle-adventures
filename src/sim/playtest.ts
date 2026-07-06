@@ -45,6 +45,7 @@ function fmtEvent(e: GameEvent): string {
         : `☠ you were downed · run ends, haul kept`) + tail;
     }
     case "crafted": return `✦ crafted ${e.output.qty}× ${e.output.defId}`;
+    case "pocketed-map": return `📜 pocketed a ${e.biomeId} map`;
     case "packed": return `packed ${e.defId} → ${e.slot}`;
     case "run-ended": return `— run ended (${e.reason})`;
     case "action-rejected": return `✗ ${e.action} rejected: ${e.reason}`;
@@ -95,8 +96,14 @@ for (const a of legalActions(state)) console.log(JSON.stringify(a));
 function printTown(st: GameState): void {
   console.log("\n=== TOWN ===");
   const offer = candidateMaps(st.seed, st.runs ?? 0);
-  console.log("Maps on offer (choose one to embark; you can't return to a past one):");
-  for (const m of offer) console.log(`  • ${m.preview.headline}  →  embark mapSeed="${m.mapSeed}"`);
+  console.log("Maps on offer (embark = 'go nearby', free; or pocket to keep for later):");
+  for (const m of offer) console.log(`  • ${m.preview.headline}  →  embark mapSeed="${m.mapSeed}"  ·  pocket mapSeed="${m.mapSeed}"`);
+  // Held maps (xzx): pocketed snapshots that survive the offer rotating — embark
+  // spends one. "go nearby" runs a fresh offered map instead (nothing to spend).
+  const held = st.maps ?? [];
+  console.log("\nYour maps (held — embarking one SPENDS it; they outlast the offer rotating):");
+  if (held.length === 0) console.log("  (none — pocket a map above to keep it)");
+  for (const m of held) console.log(`  • ${m.biomeId} · ${(st.runs ?? 0) - m.vintage} runs old  →  embark mapSeed="${m.mapSeed}" (spends it)`);
   const affordable = new Set(
     legalActions(st).filter((a) => a.type === "craft").map((a) => (a as { recipeId: string }).recipeId),
   );

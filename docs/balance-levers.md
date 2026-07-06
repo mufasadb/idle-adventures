@@ -39,6 +39,7 @@ The POC ships with *feel-pass* values, not balanced ones. The discipline that ke
 - `GRID_SIZE` · `POI_DENSITY` · `POI_MIN_SPACING` · `POI_PLACEMENT_ATTEMPTS`
 - `NOISE_FREQUENCY` — Perlin sample step per tile; lower = larger, chunkier terrain regions
 - `BIOMES{id} → {terrainWeights, nodeTypeWeights, creatureTable, materialTable}` — a biome is a **generation profile only** (D21): consumed by `generateGrid(mapSeed, biomeId)`, never consulted at runtime. Biomes shift likelihoods, not rules. Start: woodland / desert / tundra; adding a biome = one data entry. (Subsumes the earlier flat `NOISE_THRESHOLDS` — thresholds now live per-biome in `terrainWeights`.)
+- **Held maps (D40, xzx, 2026-07-06):** `GameState.maps: MapItem[]` is the pocketed-map collection — no lever this pass (`pocket-map` has **no cost and no cap**: "go nearby" means you're never gated, so hoarding buys nothing). If hoarding ever needs friction, add a `MAX_HELD_MAPS` cap lever here; `vintage` (runs-at-pocket) is flavour-only today but is the natural hook for a future map-decay lever.
 - `CANDIDATE_MAP_COUNT` (3) · `PREVIEW_FIDELITY` — how much the map preview reveals beyond the biome-name headline (the master dial for how much preparation matters). Ships at **0** (biome-name headline only; `candidateMaps` returns empty `hints`); `town.previewHints` is structured so higher tiers — and a later **cartography** system (craftable/editable maps) — plug in without reshaping the preview.
 
 ## Levers we most expect to tune long-term
