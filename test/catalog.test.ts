@@ -20,6 +20,11 @@ test("slotOf: gating tools classify as tools", () => {
   expect(slotOf("raft")).toBe("tool");
 });
 
+test("slotOf: graded-movement gear classifies as tools", () => {
+  expect(slotOf("waders")).toBe("tool");
+  expect(slotOf("ice-cleats")).toBe("tool");
+});
+
 test("validForSlot: only accepts a defId in its own slot", () => {
   expect(validForSlot("helmet", "plate-helmet")).toBe(true);
   expect(validForSlot("chest", "plate-helmet")).toBe(false);
