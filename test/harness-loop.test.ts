@@ -4,7 +4,7 @@ import { legalActions } from "../src/sim/legal";
 import { play } from "../src/sim/play";
 import { newGame, candidateMaps } from "../src/engine/town";
 import { generateGrid, rollBiome } from "../src/engine/grid";
-import { GRID_SIZE } from "../src/data/constants";
+import { MAP_WIDTH, MAP_HEIGHT } from "../src/data/constants";
 import type { Action, GameState } from "../src/engine/types";
 import type { BiomeId } from "../src/data/constants";
 
@@ -29,9 +29,9 @@ function runLoop(seed: string, mapSeed: string, runs: number): { state: GameStat
   const gatherable = grid.pois.filter((p) => p.kind !== "monster" && p.material !== null);
 
   let gathered = false;
-  // up to GRID_SIZE*2 steps: move toward the nearest uncleared gatherable POI,
-  // gather when standing on one.
-  for (let step = 0; step < GRID_SIZE * 2 && state.expedition; step++) {
+  // up to MAP_WIDTH+MAP_HEIGHT steps: move toward the nearest uncleared
+  // gatherable POI, gather when standing on one.
+  for (let step = 0; step < MAP_WIDTH + MAP_HEIGHT && state.expedition; step++) {
     const legal = legalActions(state);
     for (const a of legal) expect(accepts(state, a)).toBe(true); // D29: no drift
     const here = state.expedition.pos;

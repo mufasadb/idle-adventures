@@ -1,7 +1,8 @@
 // Deterministic map generation (M1). A biome is a generation profile only
 // (D21): it is read here, at generation time, and never consulted again.
 import {
-  GRID_SIZE,
+  MAP_WIDTH,
+  MAP_HEIGHT,
   NOISE_FREQUENCY,
   BIOMES,
   BIOME_IDS,
@@ -72,9 +73,9 @@ export function generateGrid(mapSeed: string, biomeId: BiomeId): Grid {
 function buildGrid(mapSeed: string, biomeId: BiomeId): Grid {
   const biome = BIOMES[biomeId];
   const terrain: Terrain[][] = [];
-  for (let y = 0; y < GRID_SIZE; y++) {
+  for (let y = 0; y < MAP_HEIGHT; y++) {
     const row: Terrain[] = [];
-    for (let x = 0; x < GRID_SIZE; x++) {
+    for (let x = 0; x < MAP_WIDTH; x++) {
       // Sample mid-tile (the +0.5) so integer lattice points — where Perlin
       // is always 0.5 — don't line up with the tile grid.
       const noise = perlin2(mapSeed, (x + 0.5) * NOISE_FREQUENCY, (y + 0.5) * NOISE_FREQUENCY);
@@ -88,11 +89,11 @@ function buildGrid(mapSeed: string, biomeId: BiomeId): Grid {
   // LARGEST on-foot reachable region, so a bare loadout is never boxed into a
   // dead corner pocket (the food reachability guarantee starts here). Ties break
   // toward a seeded preferred x for determinism + variety.
-  const preferred = Math.floor(rand(mapSeed, "entry") * GRID_SIZE);
-  let entry = { x: preferred, y: GRID_SIZE - 1 };
+  const preferred = Math.floor(rand(mapSeed, "entry") * MAP_WIDTH);
+  let entry = { x: preferred, y: MAP_HEIGHT - 1 };
   let bestReach = -1;
-  for (let x = 0; x < GRID_SIZE; x++) {
-    const cand = { x, y: GRID_SIZE - 1 };
+  for (let x = 0; x < MAP_WIDTH; x++) {
+    const cand = { x, y: MAP_HEIGHT - 1 };
     const n = reachableTiles(terrain, cand);
     if (n > bestReach || (n === bestReach && Math.abs(x - preferred) < Math.abs(entry.x - preferred))) {
       bestReach = n;
@@ -111,8 +112,8 @@ function buildGrid(mapSeed: string, biomeId: BiomeId): Grid {
     attempt < POI_PLACEMENT_ATTEMPTS && positions.length < POI_DENSITY;
     attempt++
   ) {
-    const x = Math.floor(rand(mapSeed, "poi-x", attempt) * GRID_SIZE);
-    const y = Math.floor(rand(mapSeed, "poi-y", attempt) * GRID_SIZE);
+    const x = Math.floor(rand(mapSeed, "poi-x", attempt) * MAP_WIDTH);
+    const y = Math.floor(rand(mapSeed, "poi-y", attempt) * MAP_HEIGHT);
     if (x === entry.x && y === entry.y) continue; // entry tile stays clear (M2: embark lands here)
     const clear = positions.every(
       (p) => Math.max(Math.abs(p.x - x), Math.abs(p.y - y)) >= POI_MIN_SPACING,

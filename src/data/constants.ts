@@ -4,7 +4,11 @@
 // the real numbers for its system. See docs/balance-levers.md.
 
 // --- Map & perception (filled in M1) ---
-export const GRID_SIZE = 20; // tiles per side
+// 20×60 strip (e3j): the map outgrows one 300-energy tank so food buys reach
+// again. WIDTH is thumb-sized for phone portrait; HEIGHT is the long axis you
+// scroll — the whole reach economy hangs off this pair.
+export const MAP_WIDTH = 20; // tiles across
+export const MAP_HEIGHT = 60; // tiles along the strip
 export const NOISE_FREQUENCY = 0.15; // Perlin sample step per tile; lower = larger terrain regions
 export const POI_DENSITY = 18; // POIs per map — richer than one run can harvest (2026-07-05, qrl): forces "which region do I work?" (sim: ~91%→~55% cleared with 3 food slots). Was 12.
 export const POI_MIN_SPACING = 3; // min Chebyshev distance between POIs (spec: 3–4 tiles apart)

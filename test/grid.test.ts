@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { generateGrid, rollBiome } from "../src/engine/grid";
-import { GRID_SIZE, BIOME_IDS, TERRAINS, POI_DENSITY, POI_MIN_SPACING, NODE_TYPES, BIOMES, FOOD_REACH_MIN } from "../src/data/constants";
+import { MAP_WIDTH, MAP_HEIGHT, BIOME_IDS, TERRAINS, POI_DENSITY, POI_MIN_SPACING, NODE_TYPES, BIOMES, FOOD_REACH_MIN } from "../src/data/constants";
 import type { Terrain } from "../src/data/constants";
 import { costToReach } from "../src/engine/reach";
 
@@ -14,11 +14,11 @@ function terrainCounts(seed: string, biome: "woodland" | "desert" | "tundra") {
   return counts;
 }
 
-test("generateGrid: 20×20, row-major, fully terrained", () => {
+test("generateGrid: 20×60, row-major, fully terrained", () => {
   const grid = generateGrid("map-1", "woodland");
-  expect(grid.terrain.length).toBe(GRID_SIZE);
+  expect(grid.terrain.length).toBe(MAP_HEIGHT);
   for (const row of grid.terrain) {
-    expect(row.length).toBe(GRID_SIZE);
+    expect(row.length).toBe(MAP_WIDTH);
     for (const t of row) expect(TERRAINS).toContain(t);
   }
 });
@@ -50,8 +50,8 @@ test("generateGrid: terrain regions are coherent, not per-tile static", () => {
   const grid = generateGrid("coherence", "woodland");
   let same = 0;
   let pairs = 0;
-  for (let y = 0; y < GRID_SIZE; y++) {
-    for (let x = 1; x < GRID_SIZE; x++) {
+  for (let y = 0; y < MAP_HEIGHT; y++) {
+    for (let x = 1; x < MAP_WIDTH; x++) {
       pairs++;
       if (grid.terrain[y]![x] === grid.terrain[y]![x - 1]) same++;
     }
@@ -77,9 +77,9 @@ test("generateGrid: places POI_DENSITY POIs, in bounds, with valid kinds", () =>
     expect(grid.pois.length).toBe(POI_DENSITY);
     for (const poi of grid.pois) {
       expect(poi.x).toBeGreaterThanOrEqual(0);
-      expect(poi.x).toBeLessThan(GRID_SIZE);
+      expect(poi.x).toBeLessThan(MAP_WIDTH);
       expect(poi.y).toBeGreaterThanOrEqual(0);
-      expect(poi.y).toBeLessThan(GRID_SIZE);
+      expect(poi.y).toBeLessThan(MAP_HEIGHT);
       expect(NODE_TYPES).toContain(poi.kind);
     }
   }
@@ -201,7 +201,10 @@ test("generateGrid: reachability guard — every seed keeps >= FOOD_REACH_MIN fo
     // Guard only promises the minimum when the map actually has that much food.
     expect(reachableFood).toBeGreaterThanOrEqual(Math.min(FOOD_REACH_MIN, totalFood));
   }
-});
+// 120 seeds × costToReach over the 20×60 grid (e3j, was 20×20) exceeds bun's
+// default 5s test timeout on the min-scan Dijkstra; bump it rather than shrink
+// the sample size that gives the guard its statistical confidence.
+}, 20000);
 
 test("generateGrid: prizes trend farther to reach than food (statistical, across seeds)", () => {
   let prizeSum = 0, prizeN = 0, foodSum = 0, foodN = 0;
@@ -217,4 +220,4 @@ test("generateGrid: prizes trend farther to reach than food (statistical, across
     }
   }
   expect(prizeSum / prizeN).toBeGreaterThan(foodSum / foodN); // monsters farther than food on average
-});
+}, 20000);
