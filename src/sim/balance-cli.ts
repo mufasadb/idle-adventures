@@ -1,0 +1,138 @@
+// CLI for the balance sim (dbc): parse argv, call balance.ts, render pretty or
+// --json. `run` is exported (pure in/out) so tests never need a subprocess;
+// the import.meta.main block is the only side-effectful line. --write (tables)
+// lands in the artifacts step of this feature.
+import { KIT_PRESETS, resolveKit, simFight, simReach, simTables } from "./balance";
+import type { FightReport, ReachReport, TableData, KitSpec } from "./balance";
+import type { ItemStack } from "../engine/types";
+
+type Flags = { kit: string; overrides: KitSpec; vs?: string; seed?: string; json: boolean; write: boolean };
+
+function parseStacks(v: string): ItemStack[] {
+  return v.split(",").map((part) => {
+    const [defId, qty] = part.split(":");
+    if (!defId || !qty || !Number.isFinite(Number(qty))) throw new Error(`bad stack spec "${part}" — use defId:qty[,defId:qty]`);
+    return { defId, qty: Number(qty) };
+  });
+}
+
+function parseFlags(rest: string[]): Flags {
+  const f: Flags = { kit: "bare", overrides: {}, json: false, write: false };
+  for (let i = 0; i < rest.length; i++) {
+    const a = rest[i]!;
+    const next = (): string => {
+      const v = rest[++i];
+      if (v === undefined) throw new Error(`flag ${a} needs a value`);
+      return v;
+    };
+    if (a === "--json") f.json = true;
+    else if (a === "--write") f.write = true;
+    else if (a === "--kit") f.kit = next();
+    else if (a === "--vs") f.vs = next();
+    else if (a === "--seed") f.seed = next();
+    else if (a === "--weapon") f.overrides.weapon = next();
+    else if (a === "--armour") f.overrides.armour = next().split(",");
+    else if (a === "--tools") f.overrides.tools = next().split(",");
+    else if (a === "--transport") f.overrides.transport = next();
+    else if (a === "--potions") f.overrides.potions = parseStacks(next());
+    else if (a === "--battle-items") f.overrides.battleItems = parseStacks(next());
+    else throw new Error(`unknown flag: ${a}`);
+  }
+  return f;
+}
+
+function renderFight(r: FightReport): string {
+  const rows = r.rounds.map((x) => `  ${String(x.round).padStart(3)} │ you hit ${String(x.dmgDealt).padStart(5)} │ it hit ${String(x.dmgTaken).padStart(5)} │ it: ${String(x.monsterHp).padStart(5)} hp │ you: ${String(x.hp).padStart(5)} hp${x.quaffed ? " 🧪" : ""}`);
+  return [
+    `fight vs ${r.monster} (tier ${r.tier})`,
+    `round │ dealt │ taken │ monster │ you`,
+    ...rows,
+    r.victory ? `verdict: VICTORY — hpLost ${r.hpLost} (${r.hpLostPct}%), potions ${r.potionsUsed}, ${r.rounds.length} rounds` : `verdict: DEFEAT after ${r.rounds.length} rounds (potions ${r.potionsUsed})`,
+  ].join("\n");
+}
+
+function renderReach(r: ReachReport): string {
+  const rows = r.pois.map((p) => `  (${String(p.x).padStart(2)},${String(p.y).padStart(2)}) ${p.kind.padEnd(7)} ${(p.what ?? "—").padEnd(16)} ${p.cost === null ? "  unreachable" : `${String(p.cost).padStart(6)}e  ${p.tanks}x tank`}`);
+  return [
+    `reach on ${r.mapSeed} (${r.biomeId}) from (${r.entry.x},${r.entry.y})`,
+    ...rows,
+    `summary: ${r.summary.reachable}/${r.summary.pois} reachable · farthest ${r.summary.farthestCost}e = ${r.summary.farthestTanks}x tank`,
+  ].join("\n");
+}
+
+export function renderTablesMd(d: TableData): string {
+  const kitNames = Object.keys(d.kits);
+  const toll = [
+    `| monster (tier) | ${kitNames.join(" | ")} |`,
+    `|---|${kitNames.map(() => "---").join("|")}|`,
+    ...Object.keys(d.tolls).map((m) => {
+      const cells = kitNames.map((k) => {
+        const c = d.tolls[m]![k]!;
+        return c.victory ? `${c.hpLost} (${c.hpLostPct}%)` : `✗ dead r${c.rounds}`;
+      });
+      return `| ${m} (${d.monsters[m]!.tier}) | ${cells.join(" | ")} |`;
+    }),
+  ];
+  const mit = [
+    `| kit | melee | ranged | magic |`,
+    `|---|---|---|---|`,
+    ...kitNames.map((k) => `| ${k} | ${d.mitigation[k]!.melee}% | ${d.mitigation[k]!.ranged}% | ${d.mitigation[k]!.magic}% |`),
+  ];
+  return [
+    `<!-- ${d._generated} -->`,
+    `# Balance tables`,
+    ``,
+    `Raw fight tolls (no potions) per kit — cell = hpLost (of ${d.levers.PLAYER_BASE_HP} base HP). ✗ = defeat.`,
+    ``,
+    ...toll,
+    ``,
+    `## Damage reduction by armour kit (MITIGATION_K = ${d.levers.MITIGATION_K})`,
+    ``,
+    ...mit,
+    ``,
+  ].join("\n");
+}
+
+const USAGE = [
+  `usage: bun run sim <fight|reach|tables> [flags]`,
+  `  fight  --kit <${Object.keys(KIT_PRESETS).join("|")}> [--weapon --armour a,b --potions defId:qty --battle-items defId:qty] --vs <monsterId> [--json]`,
+  `  reach  --kit <...> [--tools a,b --transport t] --seed <mapSeed> [--json]`,
+  `  tables [--json] [--write]   (--write regenerates docs/balance/tables.{md,json})`,
+].join("\n");
+
+export function run(argv: string[]): { code: number; output: string } {
+  try {
+    const [cmd, ...rest] = argv;
+    if (!cmd) return { code: 1, output: USAGE };
+    const flags = parseFlags(rest);
+    if (cmd === "fight") {
+      if (!flags.vs) throw new Error("fight needs --vs <monsterId>");
+      const report = simFight(resolveKit(flags.kit, flags.overrides), flags.vs);
+      return { code: 0, output: flags.json ? JSON.stringify(report, null, 2) : renderFight(report) };
+    }
+    if (cmd === "reach") {
+      if (!flags.seed) throw new Error("reach needs --seed <mapSeed>");
+      const report = simReach(resolveKit(flags.kit, flags.overrides), flags.seed);
+      return { code: 0, output: flags.json ? JSON.stringify(report, null, 2) : renderReach(report) };
+    }
+    if (cmd === "tables") {
+      const data = simTables();
+      if (flags.write) return writeTables(data); // Task 2 wires this
+      return { code: 0, output: flags.json ? JSON.stringify(data, null, 2) : renderTablesMd(data) };
+    }
+    return { code: 1, output: `unknown command: ${cmd}\n${USAGE}` };
+  } catch (e) {
+    return { code: 1, output: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+// Task 2 replaces this stub with the real artifact writer.
+function writeTables(_data: TableData): { code: number; output: string } {
+  return { code: 1, output: "--write not wired yet (Task 2)" };
+}
+
+if (import.meta.main) {
+  const r = run(process.argv.slice(2));
+  console.log(r.output);
+  process.exitCode = r.code;
+}
