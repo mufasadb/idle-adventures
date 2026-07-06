@@ -1,40 +1,41 @@
-// Just-in-time food consumption (Phase 2, pqp — supersedes D23). Food is no
-// longer converted to energy wholly at embark; it's carried as inventory and
-// eaten unit-by-unit as energy is spent, freeing each unit's slot as it goes.
-// Uneaten food banks back on return (bank.ts), so there's no duplication.
-//
-// The model keeps `expedition.energy` meaning the TOTAL remaining energy (what
-// the player sees), with a single invariant maintained after every spend:
-//
-//     energy >= heldFoodEnergy(food)
-//
-// i.e. your remaining total can never be less than the energy still sealed in
-// uneaten food. When a spend pushes energy below that line, `digest` eats whole
-// units off the front until the invariant holds again. The energy of a unit you
-// bite into is already reflected in `energy` (the total); its leftover becomes
-// free "liberated" surplus (energy − heldFoodEnergy) that does NOT bank back —
-// you opened that ration. This is what makes the food↔loot squeeze temporal:
-// heavy and cramped early, roomy late.
+// Stamina food model (dtv — supersedes the just-in-time digest, pqp). Energy is
+// now CURRENT stamina on a max/current bar; food is a reserve you EAT to refill
+// toward max. `expedition.energy` is current stamina; move/gather drain it and an
+// optional waste-free auto-eat refills it from the packed food reserve. Uneaten
+// food banks back on return (bank.ts) — no duplication.
 import { FOOD_ENERGY, ENERGY_PER_FOOD } from "../data/constants";
 import type { ItemStack } from "./types";
 
+// Energy RESTORED by eating one unit of this food (before any tent multiplier).
 export function foodEnergyOf(defId: string): number {
   return FOOD_ENERGY[defId] ?? ENERGY_PER_FOOD;
 }
 
-// Total energy still sealed in uneaten food units.
+// Total energy still sealed in the uneaten food reserve (display: how much reach
+// is left to eat back). Not a spend cap anymore — just the reserve size.
 export function heldFoodEnergy(food: ItemStack[]): number {
   return food.reduce((sum, s) => sum + s.qty * foodEnergyOf(s.defId), 0);
 }
 
-// Eat whole food units off the FRONT until `energy >= heldFoodEnergy`. Pure —
-// returns the remaining (uneaten) food. Each removed unit frees one inventory
-// slot. Front-to-back mirrors the potion-quaff order (combat.ts).
-export function digest(food: ItemStack[], energy: number): ItemStack[] {
+// Eat whole food units off the FRONT to refill CURRENT energy toward maxEnergy,
+// but only while a full unit's restore fits (never overfills / wastes). tentMult
+// multiplies restore-per-unit (TENT_FOOD_MULTIPLIER with a tent equipped). Pure —
+// returns the remaining food + new energy. Front-to-back mirrors the potion-quaff
+// order (combat.ts).
+export function eatToRefill(
+  food: ItemStack[],
+  energy: number,
+  maxEnergy: number,
+  tentMult = 1,
+): { food: ItemStack[]; energy: number } {
   const next = food.map((s) => ({ ...s }));
-  while (next.length > 0 && energy < heldFoodEnergy(next)) {
+  let e = energy;
+  while (next.length > 0) {
+    const restore = foodEnergyOf(next[0]!.defId) * tentMult;
+    if (e + restore > maxEnergy) break; // would waste — stop
+    e += restore;
     next[0]!.qty -= 1;
     if (next[0]!.qty <= 0) next.shift();
   }
-  return next;
+  return { food: next, energy: e };
 }
