@@ -1,10 +1,12 @@
-// Movement math (M2). D21 guardrail: cost is terrain × transport ONLY —
-// this module's signatures make a biome lookup impossible by construction.
+// Movement math. GRADED model (svz): absolute terrain step-energy, minus any gear
+// discounts (or an enable that turns Infinity finite), floored at MIN_STEP, then
+// divided by the transport's per-terrain multiplier. Infinity = impassable.
+// D21 guardrail: cost is terrain × gear × transport ONLY — no biome lookup.
 import {
-  MOVE_BASE_COST,
   TERRAIN_COST,
   TERRAIN_GATE,
   TRANSPORT_MULTIPLIER,
+  MIN_STEP,
 } from "../data/constants";
 import type { Terrain } from "../data/constants";
 
@@ -19,22 +21,25 @@ export function stepToward(from: Coord, to: Coord): Coord {
 }
 
 // Energy cost of stepping ONTO `terrain` with `transport` + `tools` equipped.
-// Spec §10 / Phase 3: effective terrain cost is the MIN of base cost and any gate
-// an equipped tool confers, then base × terrain ÷ transport. Infinity = impassable.
+// Gear either ENABLES an impassable terrain (mountain → finite) or DISCOUNTS the
+// step; the result floors at MIN_STEP, then transport divides it per-terrain.
 export function moveCost(
   terrain: Terrain,
   transport: string | null,
   tools: string[] = [],
 ): number {
-  let terrainCost = TERRAIN_COST[terrain];
-  const gates = TERRAIN_GATE[terrain];
-  if (gates) {
+  let step = TERRAIN_COST[terrain];
+  const mods = TERRAIN_GATE[terrain];
+  if (mods) {
     for (const tool of tools) {
-      const gated = gates[tool];
-      if (gated !== undefined && gated < terrainCost) terrainCost = gated;
+      const m = mods[tool];
+      if (!m) continue;
+      if (m.enable !== undefined && !Number.isFinite(step)) step = m.enable;
+      if (m.discount) step -= m.discount;
     }
   }
-  const multiplier =
-    transport === null ? 1 : (TRANSPORT_MULTIPLIER[transport] ?? 1);
-  return (MOVE_BASE_COST * terrainCost) / multiplier;
+  step = Number.isFinite(step) ? Math.max(MIN_STEP, step) : Infinity;
+  const divisor =
+    transport === null ? 1 : (TRANSPORT_MULTIPLIER[transport]?.[terrain] ?? 1);
+  return step / divisor;
 }

@@ -92,39 +92,46 @@ export const MATERIAL_TIER: Record<string, number> = {
   "mithril-ore": 3,
 };
 
-// --- Energy economy (filled in M2) ---
-export const ENERGY_PER_FOOD = 8; // default energy per packed food item (fallback for FOOD_ENERGY). ff7 (2026-07-05): 10→8 so one food stack no longer buys half a map — max-food stops dominating. Do NOT drop below 8 (7 risks the forage-only tundra path).
-// Base energy floor (2026-07-05, qrl): embark energy = max(BASE_ENERGY_FLOOR,
-// packedFoodEnergy). Gives ~5 actions with no food — the recoverable-by-effort
-// fail state (spec §3), NOT a 0-energy dead-loop. See reduce.embark.
-export const BASE_ENERGY_FLOOR = 20;
-// Per-food energy (2026-07-04): tiered food gives more energy per item, so
-// progression EARNS slot efficiency against the firm carry squeeze. Absent = ENERGY_PER_FOOD.
+// --- Energy economy (filled in M2; rescaled ×10 for graded movement, svz) ---
+// Every energy-denominated lever sits on a ×10 scale so gear can shave meaningful
+// POINTS off a step (TERRAIN_GATE) without snapping to impassable — ratios are
+// preserved vs the old scale, so the economy feel is unchanged.
+export const ENERGY_PER_FOOD = 80; // default energy per packed food item (fallback for FOOD_ENERGY)
+// Base energy floor (qrl, ×10 svz): embark energy = max(BASE_ENERGY_FLOOR,
+// packedFoodEnergy). ~5 actions with no food — the recoverable-by-effort fail
+// state (spec §3), NOT a 0-energy dead-loop. See reduce.embark.
+export const BASE_ENERGY_FLOOR = 200;
+// Per-food energy (tiered): denser food gives more per item, earning slot efficiency
+// against the carry squeeze. Absent = ENERGY_PER_FOOD.
 export const FOOD_ENERGY: Record<string, number> = {
-  ration: 8, // ff7 (2026-07-05): 10→8
-  "trail-ration": 16, // ff7: 20→16 (stays 2× a ration — the T2 density edge)
+  ration: 80,
+  "trail-ration": 160, // stays 2× a ration — the T2 density edge
 };
-export const MOVE_BASE_COST = 1; // energy per tile on neutral ground, on foot
+export const MIN_STEP = 5; // a discounted step never costs less than this (svz)
+// Movement is GRADED (svz): TERRAIN_COST is ABSOLUTE step energy on a ×10 scale.
+// Gear subtracts point-discounts (TERRAIN_GATE), transport divides per-terrain.
+// Mountains stay the one hard gate (Infinity) until a tool ENABLES them.
 export const TERRAIN_COST: Record<Terrain, number> = {
-  plains: 1,
-  mud: 1.5,
-  ice: 2,
-  river: 3, // fordable but expensive
-  mountain: Infinity, // impassable (gating gear may cheapen this later)
-}; // cost multiplier per terrain stepped ONTO
-// Equipped tools that reduce/enable gated terrain (Phase 3, boo). Effective
-// terrain cost = MIN of base TERRAIN_COST and any gate value a currently-equipped
-// tool confers. Hard walls (mountain = Infinity) become finite only with the tool;
-// that gear costs a tool slot, so bringing it is a real loadout tradeoff.
-export const TERRAIN_GATE: Partial<Record<Terrain, Record<string, number>>> = {
-  mountain: { "climbing-pick": 4 }, // Infinity → 4: passable but expensive (detour-or-climb call)
-  river: { raft: 1 }, // 3 → 1: a cheap crossing where rivers wall you off
-}; // sparse: only gated terrains listed
-export const TRANSPORT_MULTIPLIER: Record<string, number> = {
-  horse: 1.5, // fast — divides move cost (spec §10: base × terrain ÷ transport)
-  wagon: 2.0, // T2 transport: halves move cost — the answer to ice-heavy tundra
-  mule: 0.8, // slow — but the hauler: biggest carry bonus + panniers-capable
-}; // keyed by transport defId; absent/on-foot = 1
+  plains: 10,
+  mud: 15,
+  ice: 20,
+  river: 30,
+  mountain: Infinity, // impassable — climbing-pick enables it (TERRAIN_GATE)
+}; // absolute energy per tile stepped ONTO, on foot, before gear/transport
+// Equipped tools that modify gated terrain (svz). `enable` makes an impassable
+// terrain finite (mountain only); `discount` subtracts from the step energy. Each
+// tool costs a tool slot, so bringing it is a real loadout tradeoff.
+export const TERRAIN_GATE: Partial<Record<Terrain, Record<string, { enable?: number; discount?: number }>>> = {
+  mountain: { "climbing-pick": { enable: 40 } }, // ∞ → 40 (crossable at 4× plains)
+  river: { raft: { discount: 20 } }, // 30 → 10 (≈ plains)
+  mud: { waders: { discount: 5 } }, // 15 → 10
+  ice: { "ice-cleats": { discount: 15 } }, // 20 → 5 (faster than plains — a tundra highway)
+};
+export const TRANSPORT_MULTIPLIER: Record<string, Partial<Record<Terrain, number>>> = {
+  horse: { plains: 2, mud: 1.2 }, // open-ground speed; ice/river/mountain default ÷1
+  wagon: { ice: 2, plains: 1.5, mud: 1.2 }, // the ice answer + general hauler
+  mule: { plains: 0.8, mud: 0.8, ice: 0.8, river: 0.8 }, // slow, but the big carrier (carry role unchanged)
+}; // per-terrain move-cost divisor by transport defId; absent terrain / on-foot = ÷1
 
 // Carry sources stack (zhn, spec §4.4): bringing transport adds a small carry
 // bonus on top of your backpack; a beast (horse/mule) can also wear panniers for
@@ -157,11 +164,11 @@ export const STACK_CAP = 5; // max qty per LOOT stack; overflow opens a new stac
 // D21: hardness/tool/yield are per NODE TYPE, never per biome. The biome only
 // flavours WHICH material a node yields — stamped at generation (D25).
 export const NODE_HARDNESS: Record<GatherableNodeType, number> = {
-  mining: 6,
-  wood: 4,
-  herb: 2,
-  animal: 4,
-}; // energy cost numerator: cost = hardness ÷ tool quality
+  mining: 60,
+  wood: 40,
+  herb: 20,
+  animal: 40,
+}; // energy cost numerator (×10 svz): cost = hardness ÷ tool quality
 export const NODE_TOOL: Record<GatherableNodeType, string | null> = {
   mining: "pick",
   wood: "axe",

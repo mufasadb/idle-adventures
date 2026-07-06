@@ -12,7 +12,7 @@ import {
   POI_MIN_SPACING,
   NOISE_FREQUENCY,
   ENERGY_PER_FOOD,
-  MOVE_BASE_COST,
+  MIN_STEP,
   TRANSPORT_MULTIPLIER,
   BASE_CARRY_SLOTS,
   STACK_CAP,
@@ -82,10 +82,10 @@ test("constants: biomes are visibly distinct profiles", () => {
 
 test("constants: M2 energy levers are filled", () => {
   expect(ENERGY_PER_FOOD).toBeGreaterThan(0);
-  expect(MOVE_BASE_COST).toBeGreaterThan(0);
+  expect(MIN_STEP).toBeGreaterThan(0);
   expect(TERRAIN_COST.ice).toBeGreaterThan(TERRAIN_COST.plains); // bead acceptance: ice > plains
   expect(Number.isFinite(TERRAIN_COST.mountain)).toBe(false); // impassable without gear
-  expect(TRANSPORT_MULTIPLIER.horse).toBeGreaterThan(1); // horse cheapens movement (divisor)
+  expect(TRANSPORT_MULTIPLIER.horse.plains!).toBeGreaterThan(1); // horse is fast on plains (per-terrain divisor)
 });
 
 test("constants: M3 carry + gathering levers are filled", () => {
