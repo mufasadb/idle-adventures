@@ -59,9 +59,9 @@ drops = the monster's `LOOT_TABLE` entries **plus** its category's
 per-entry `chance` logic in `rollLoot`. Loot can hang off a specific monster,
 a whole category, or both.
 
-Initial content: `humanoid: [{ defId: "map-scroll", qty: 1 }]` (other
-categories start empty — the existing per-monster tables already express
-beast/fae identity).
+Initial content: `humanoid: [{ defId: "map-scroll", qty: 1, chance: MAP_DROP_CHANCE }]`
+(other categories start empty — the existing per-monster tables already
+express beast/fae identity).
 
 ## 4. The map drop
 
@@ -72,9 +72,10 @@ rolled loot instead of adding a material stack.
   deterministically from `rand(state.seed, "map-drop", …, at.x, at.y)` — same
   namespaced-RNG discipline as everything else. `vintage = runs` at mint.
 - **Biome:** uniform random across all biomes, current biome included.
-- **Drop rate:** guaranteed (`MAP_DROP_CHANCE = 1.0`, a named lever in
-  `balance-levers.md`) — "humanoids = maps" stays perfectly legible; the cost
-  lives in inventory, not RNG.
+- **Drop rate:** regular but not guaranteed (`MAP_DROP_CHANCE = 0.5`, a named
+  lever in `balance-levers.md`) — humanoids reliably mean maps over a few
+  kills without every kill printing one; rolled deterministically like any
+  other `chance` entry.
 - **Preview at pickup:** the `map-dropped` event carries `biomeId` + the same
   `previewHints` the town offer shows, so the haul-it-home decision is
   informed. Map tiers surface here later.
