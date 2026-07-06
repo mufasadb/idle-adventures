@@ -380,6 +380,22 @@ export const LOOT_TABLE: Record<string, ItemStackSpec[]> = {
   "ancient-wyrm": [{ defId: "wyrm-scale", qty: 3 }, { defId: "dragonheart", qty: 1, chance: 0.2 }],
 }; // monster fixed loot drops (entries with `chance` roll deterministically in fightAt)
 
+// Category-level loot (8ec): rolled IN ADDITION to the monster's own LOOT_TABLE
+// entries, so loot can hang off a specific monster, a whole category, or both.
+// Humanoids are the map category: a regular-but-not-guaranteed map-scroll drop
+// (MAP_DROP_CHANCE lever). fightAt intercepts MAP_SCROLL_ID — it never enters
+// carry as a material; it mints a carried MapItem instead (spec §4).
+export const MAP_SCROLL_ID = "map-scroll";
+export const MAP_DROP_CHANCE = 0.5; // lever: humanoid map-drop rate (docs/balance-levers.md)
+export const CATEGORY_LOOT_TABLE: Record<MonsterCategory, ItemStackSpec[]> = {
+  beast: [],
+  humanoid: [{ defId: MAP_SCROLL_ID, qty: 1, chance: MAP_DROP_CHANCE }],
+  fae: [],
+  undead: [],
+  giant: [],
+  dragon: [],
+};
+
 // --- Consumable item catalogs (M5) ---
 // ENERGY_PER_FOOD / POTION_HEAL are flat, so these are single-item catalogs for
 // the POC; the list is what `pack`/`slotOf` validate a food/potion defId against.

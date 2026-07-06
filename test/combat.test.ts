@@ -185,3 +185,28 @@ test("explainMatchup: armour class vs incoming damage type classifies", () => {
   // no armour → neutral
   expect(explainMatchup(emptyLoadout(), "sand-raider").armourVsAttack).toBe("neutral");
 });
+
+// --- Category loot (8ec) ---
+import { rand } from "../src/engine/rng";
+import { MAP_DROP_CHANCE, MAP_SCROLL_ID } from "../src/data/constants";
+
+test("rollLoot merges category loot: humanoids roll a map-scroll at MAP_DROP_CHANCE", () => {
+  const at = { x: 1, y: 1 };
+  let seedHit = "", seedMiss = "";
+  for (let i = 0; i < 200 && (!seedHit || !seedMiss); i++) {
+    const s = `cat-loot-${i}`;
+    const roll = rand(s, "loot", "sand-raider", at.x, at.y, MAP_SCROLL_ID);
+    if (roll < MAP_DROP_CHANCE && !seedHit) seedHit = s;
+    if (roll >= MAP_DROP_CHANCE && !seedMiss) seedMiss = s;
+  }
+  const lootHit = rollLoot(seedHit, "sand-raider", at);
+  expect(lootHit).toContainEqual({ defId: MAP_SCROLL_ID, qty: 1 });
+  expect(lootHit).toContainEqual({ defId: "raider-supplies", qty: 1 }); // monster table still applies
+  const lootMiss = rollLoot(seedMiss, "sand-raider", at);
+  expect(lootMiss.some((s) => s.defId === MAP_SCROLL_ID)).toBe(false);
+});
+
+test("non-humanoid categories add no loot (empty category tables)", () => {
+  const loot = rollLoot("beast-seed", "forest-boar", { x: 3, y: 3 });
+  expect(loot).toEqual([{ defId: "boar-hide", qty: 2 }]);
+});
