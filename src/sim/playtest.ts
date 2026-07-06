@@ -37,6 +37,8 @@ function fmtEvent(e: GameEvent): string {
     case "moved": return `walked to (${e.to.x},${e.to.y}) on ${e.terrain} · −${e.cost}e → ${e.energy}e`;
     case "gathered": return `gathered ${e.qty}× ${e.material} · −${e.cost}e → ${e.energy}e`;
     case "dropped": return `dropped ${e.qty}× ${e.defId}`;
+    case "ate": return `🍖 ate ${e.defId} · +${e.restored}e → ${e.energy}e`;
+    case "auto-eat-toggled": return `eat-when-hungry ${e.on ? "on" : "off"}`;
     case "fought": {
       const lessons = matchupLessons(e.matchup, null);
       const tail = lessons.length ? ` · ${lessons.join(" · ")}` : "";
@@ -61,7 +63,7 @@ for (const e of events) console.log(fmtEvent(e));
 const s = summarize(state);
 console.log("\n=== YOU ===");
 console.log(`phase: ${s.phase} · runs completed: ${state.runs ?? 0}`);
-if (s.expedition) console.log(`energy: ${s.expedition.energy} · hp: ${s.expedition.hp} · pos (${s.expedition.pos.x},${s.expedition.pos.y}) · nodes cleared: ${s.expedition.cleared}`);
+if (s.expedition) console.log(`energy: ${s.expedition.energy}/${s.expedition.maxEnergy} · eat-when-hungry: ${s.expedition.autoEat ? "on" : "off"}${state.expedition?.loadout.equipment.tools.includes("tent") ? " · tent (food +50%)" : ""} · hp: ${s.expedition.hp} · pos (${s.expedition.pos.x},${s.expedition.pos.y}) · nodes cleared: ${s.expedition.cleared}`);
 console.log(`bank: ${s.bank.map((i) => `${i.qty}× ${i.defId}`).join(", ") || "(empty)"}`);
 // Show the ACTIVE loadout: on an expedition the equipped gear lives on
 // expedition.loadout (state.loadout is the town plan, empty mid-run).

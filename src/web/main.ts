@@ -13,7 +13,7 @@ import { slotOf } from "../engine/catalog";
 import { moveCost, moveCostBreakdown } from "../engine/move";
 import { carryCap } from "../engine/carry";
 import { heldFoodEnergy } from "../engine/food";
-import { RECIPE, MATERIAL_TIER, GRID_SIZE, BASE_ENERGY_FLOOR } from "../data/constants";
+import { RECIPE, MATERIAL_TIER, GRID_SIZE, MAX_ENERGY, TENT_FOOD_MULTIPLIER } from "../data/constants";
 import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons } from "../render/render";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, LoadoutSlot } from "../engine/types";
@@ -82,6 +82,8 @@ function fmt(e: GameEvent): string {
     case "moved": return `walked to (${e.to.x},${e.to.y}) on ${e.terrain} · −${round(e.cost)}e → ${round(e.energy)}e`;
     case "gathered": return `${GATHER_VERB[e.kind]?.past ?? "gathered"} ${e.qty}× ${name(e.material)} · −${round(e.cost)}e → ${round(e.energy)}e`;
     case "dropped": return `dropped ${e.qty}× ${name(e.defId)}`;
+    case "ate": return `🍖 ate ${name(e.defId)} · +${round(e.restored)}e → ${round(e.energy)}e`;
+    case "auto-eat-toggled": return `eat-when-hungry ${e.on ? "on" : "off"}`;
     case "fought": {
       const lessons = matchupLessons(e.matchup, null);
       const tail = lessons.length ? ` · ${lessons.join(" · ")}` : "";
@@ -238,7 +240,7 @@ function townView(): string {
             ${heldSeeds.has(m.mapSeed) ? `<span class="muted small">pocketed</span>` : `<button data-pocket="${m.mapSeed}">Pocket</button>`}
           </div>`).join("")}
       </div>
-      ${lo.food.length === 0 ? `<div class="warn">⚠ no food packed → only the base ${BASE_ENERGY_FLOOR} energy (a short run), and nothing to eat mid-run</div>` : ""}
+      ${lo.food.length === 0 ? `<div class="warn">⚠ no food packed → you embark at full ${MAX_ENERGY} energy but have nothing to eat mid-run — no way to refill your stamina</div>` : ""}
       <div class="muted small">Embark = "go nearby" (free). Pocket keeps a map to run later — it rotates out of the offer but stays yours.</div>
 
       <h2 style="margin-top:1rem">Your maps <span class="muted small">held — spent on embark</span></h2>
@@ -262,7 +264,7 @@ function townView(): string {
       ${equipRow("tools", eq.tools.map(name).join(", ") || null)}
       <div class="row"><span class="k">bag</span><span class="v">${inv.used}/${cap} slots</span></div>
       ${inv.html}
-      <div class="muted small">worn gear (ghosted) is free · each food / potion / battle-item / tool takes one slot — bring several tools to work different node types · food banks ≈ ${heldFoodEnergy(lo.food)} energy and burns down as you travel</div>
+      <div class="muted small">worn gear (ghosted) is free · each food / potion / battle-item / tool takes one slot — bring several tools to work different node types · you embark at ${MAX_ENERGY} energy; packed food holds ≈ ${heldFoodEnergy(lo.food)} energy of refills to eat back as you travel${eq.tools.includes("tent") ? ` · tent — food restores +${Math.round((TENT_FOOD_MULTIPLIER - 1) * 100)}%` : ""}</div>
     </section>
 
     <section>
@@ -404,8 +406,9 @@ function expeditionView(): string {
     cells += `<div class="${cls.join(" ")}" data-x="${x}" data-y="${y}" title="${title}">${ch}</div>`;
   }
 
+  const maxEnergy = exp.maxEnergy ?? MAX_ENERGY;
   const bars = `
-    <div class="bar"><span>Energy</span><div class="track"><div class="fill energy" style="width:${Math.min(100, exp.energy)}%"></div></div><b>${round(exp.energy)}</b></div>
+    <div class="bar"><span>Energy</span><div class="track"><div class="fill energy" style="width:${Math.min(100, (exp.energy / maxEnergy) * 100)}%"></div></div><b>${round(exp.energy)}/${maxEnergy}</b></div>
     <div class="bar"><span>HP</span><div class="track"><div class="fill hp" style="width:${Math.min(100, (exp.hp / 30) * 100)}%"></div></div><b>${round(exp.hp)}</b></div>`;
 
   const saving = pending
@@ -430,11 +433,13 @@ function expeditionView(): string {
       ${herePanel(grid, exp, legal)}
       <h2>Actions</h2>
       <div class="actions">
+        ${legal.some((a) => a.type === "eat") ? `<button data-act="eat">🍖 Eat${exp.loadout.equipment.tools.includes("tent") ? " (+50%)" : ""}</button>` : `<button disabled title="no food, or already full">🍖 Eat</button>`}
+        <button data-act="toggle-auto-eat">Eat when hungry: <b>${(exp.autoEat ?? true) ? "on" : "off"}</b></button>
         <button data-act="return">⏎ Return to town</button>
       </div>
       <h2>Bag <span class="muted small">${inv.used}/${cap} slots</span></h2>
       ${inv.html}
-      <div class="muted small">food (green) burns down as you travel — freeing slots for loot (gold). Potions purple · battle items red · tools grey · worn gear ghosted (free).</div>
+      <div class="muted small">food (green) is eaten to refill energy as you travel — freeing slots for loot (gold). Potions purple · battle items red · tools grey · worn gear ghosted (free).</div>
       ${exp.carry.length ? `<div class="bank" style="margin-top:.5rem">${exp.carry.map((s) => `<div class="bankitem"><span class="chip">${name(s.defId)} ×${s.qty}</span><button data-drop="${s.defId}">drop</button></div>`).join("")}</div>` : ""}
     </section>
   </div>
