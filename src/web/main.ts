@@ -10,7 +10,7 @@ import { legalActions } from "../sim/legal";
 import { generateGrid, rollBiome } from "../engine/grid";
 import type { Grid } from "../engine/grid";
 import { slotOf } from "../engine/catalog";
-import { moveCost } from "../engine/move";
+import { moveCost, moveCostBreakdown } from "../engine/move";
 import { carryCap } from "../engine/carry";
 import { heldFoodEnergy } from "../engine/food";
 import { RECIPE, MATERIAL_TIER, GRID_SIZE, BASE_ENERGY_FLOOR } from "../data/constants";
@@ -97,6 +97,24 @@ function fmt(e: GameEvent): string {
 }
 const round = (n: number) => Math.round(n * 10) / 10;
 const kk = (p: Pos) => `${p.x},${p.y}`;
+
+// Human breakdown of a single step's energy — surfaced as a path tile's hover
+// title so the horse/gear effect is visible: "plains 10e ÷2 (horse) = 5e".
+function stepExplain(bd: ReturnType<typeof moveCostBreakdown>): string {
+  if (!Number.isFinite(bd.base) && !bd.enabled) return `${bd.terrain} — impassable`;
+  const parts: string[] = [`${bd.terrain} ${Number.isFinite(bd.base) ? bd.base + "e" : "∞"}`];
+  if (bd.enabled) parts.push(`→ ${bd.enabled.to} (${name(bd.enabled.tool)})`);
+  for (const d of bd.discounts) parts.push(`− ${d.amount} (${name(d.tool)})`);
+  if (bd.transport) parts.push(`÷${bd.transport.divisor} (${name(bd.transport.id)})`);
+  return `${parts.join(" ")} = ${round(bd.final)}e`;
+}
+
+// Transport role hints (web copy only — mirrors TRANSPORT_MULTIPLIER intent).
+const TRANSPORT_ROLE: Record<string, string> = {
+  horse: "faster on open ground",
+  wagon: "faster on ice",
+  mule: "slow but hauls",
+};
 
 // --- A* pathfinding (UI convenience) -----------------------------------------
 // `blocked` = live-monster tiles routed AROUND (monsters block a tile until
@@ -224,7 +242,7 @@ function townView(): string {
       <h2>Loadout plan <button class="link" data-reset>reset</button></h2>
       ${equipRow("weapon", eq.weapon ? name(eq.weapon) : null)}
       ${equipRow("armour", [eq.helmet, eq.chest, eq.legs, eq.boots, eq.gloves].filter(Boolean).map((d) => name(d as string)).join(", ") || null)}
-      ${equipRow("transport", eq.transport ? name(eq.transport) : null)}
+      ${equipRow("transport", eq.transport ? `${name(eq.transport)}${TRANSPORT_ROLE[eq.transport] ? ` — ${TRANSPORT_ROLE[eq.transport]}` : ""}` : null)}
       ${eq.panniers ? equipRow("panniers", name(eq.panniers)) : ""}
       ${equipRow("backpack", eq.backpack ? name(eq.backpack) : "none")}
       ${equipRow("tools", eq.tools.map(name).join(", ") || null)}
@@ -334,13 +352,23 @@ function expeditionView(): string {
     const cls = ["tile", `terrain-${grid.terrain[y]![x]}`];
     if (poi && !isCleared) cls.push("poi", `poi-${poi.kind}`);
     if (isPlayer) cls.push("player");
-    if (pathSet.has(k)) cls.push("path");
+    const onPath = pathSet.has(k);
+    let stepBd: ReturnType<typeof moveCostBreakdown> | null = null;
+    if (onPath) {
+      cls.push("path");
+      stepBd = moveCostBreakdown(grid.terrain[y]![x]!, exp.loadout.equipment.transport, exp.loadout.equipment.tools);
+      if (stepBd.enabled) cls.push("path-enabled");
+      else if (stepBd.discounts.length) cls.push("path-tool");
+      else if (stepBd.transport) cls.push("path-transport");
+    }
     if (k === goalK) cls.push("path-goal");
     const locked = poi && !isCleared && poi.material && (MATERIAL_TIER[poi.material] ?? 1) > 1;
     if (locked) cls.push("locked");
     const ch = isPlayer ? PLAYER_CHAR : isCleared ? "·" : poi ? POI_CHAR[poi.kind] : TERRAIN_CHAR[grid.terrain[y]![x]!];
     const per = poi ? perceived.get(k) : undefined;
-    const title = poi
+    const title = stepBd
+      ? stepExplain(stepBd)
+      : poi
       ? (per && per.detail
           ? `${poi.kind} · ${flavorDetail(per.detail, poi.kind)}${locked ? ` (needs a better tool)` : ""}`
           : poi.kind === "monster" ? "a monster" : `a ${poi.kind} node`)
@@ -352,8 +380,12 @@ function expeditionView(): string {
     <div class="bar"><span>Energy</span><div class="track"><div class="fill energy" style="width:${Math.min(100, exp.energy)}%"></div></div><b>${round(exp.energy)}</b></div>
     <div class="bar"><span>HP</span><div class="track"><div class="fill hp" style="width:${Math.min(100, (exp.hp / 30) * 100)}%"></div></div><b>${round(exp.hp)}</b></div>`;
 
+  const saving = pending
+    ? pending.path.reduce((s, p) => s + moveCostBreakdown(grid.terrain[p.y]![p.x]!, null, []).final, 0) - pending.cost
+    : 0;
+  const savingClause = pending && Number.isFinite(saving) && saving > 0 ? ` · gear/transport saved ${round(saving)}e` : "";
   const pathBanner = pending
-    ? `<div class="pathbanner">${pending.fight ? `⚔ walk in &amp; <b>fight the ${name(pending.fight)}</b> · ` : ""}→ (${pending.goal.x},${pending.goal.y}): ${pending.path.length} tile${pending.path.length !== 1 ? "s" : ""}, <b class="${pending.cost > exp.energy ? "over" : ""}">−${round(pending.cost)} energy</b> · <button data-walk>${pending.fight ? "Fight ▶" : "Walk ▶"}</button> <button class="link" data-cancelpath>cancel</button></div>`
+    ? `<div class="pathbanner">${pending.fight ? `⚔ walk in &amp; <b>fight the ${name(pending.fight)}</b> · ` : ""}→ (${pending.goal.x},${pending.goal.y}): ${pending.path.length} tile${pending.path.length !== 1 ? "s" : ""}, <b class="${pending.cost > exp.energy ? "over" : ""}">−${round(pending.cost)} energy</b>${savingClause} · <button data-walk>${pending.fight ? "Fight ▶" : "Walk ▶"}</button> <button class="link" data-cancelpath>cancel</button></div>`
     : `<div class="pathbanner muted">Click a tile → previews the route + energy. Click <b>Walk</b> (or the tile again / right-click) to go. Monsters (<b>X</b>) block their tile — click one to fight, or route around.</div>`;
 
   const cap = carryCap(exp.loadout.equipment);
