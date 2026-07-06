@@ -7,6 +7,21 @@ import { emptyLoadout } from "../src/engine/loadout";
 import { MAX_ENERGY, MAP_WIDTH, MAP_HEIGHT, MATERIAL_TIER } from "../src/data/constants";
 import type { Action, GameState } from "../src/engine/types";
 
+// This harness routes around monster POIs by target selection (gatherable
+// nodes only), but the greedy nearest-target walk can still step onto a
+// monster tile it didn't intend to path through. si7.1: that no longer
+// resolves inline — it ENGAGES. Fight the engagement to resolution (win, lose,
+// or the run ends) so the harvest measurement isn't truncated by an
+// accidental block; a lost fight still ends the run exactly as before.
+function resolveWalkIn(state: GameState): GameState {
+  let s = state;
+  let guard = 0;
+  while (s.expedition?.combat && ++guard < 100) {
+    s = reduce(s, { type: "fight" }).state;
+  }
+  return s;
+}
+
 test("e3j structural: the strip out-ranges one energy tank (5 offered maps)", () => {
   // The farthest POI must cost more than MAX_ENERGY to even REACH on foot —
   // food (and forage routing) is the only way to work the deep half.
@@ -89,6 +104,7 @@ test("e3j report: starter-kit harvest fraction", () => {
     const r = reduce(state, { type: "move", to: { x: t.x, y: t.y } });
     if (r.events.some((e) => e.type === "action-rejected")) break; // exhausted / impassable
     state = r.state;
+    if (state.expedition?.combat) state = resolveWalkIn(state); // accidental walk-in: fight it out
     if (state.expedition && state.expedition.pos.x === here.x && state.expedition.pos.y === here.y) break; // wedged
   }
   if (state.expedition) state = reduce(state, { type: "return" }).state;

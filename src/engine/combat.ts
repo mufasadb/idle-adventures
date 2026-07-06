@@ -36,7 +36,7 @@ export type CombatResult = {
 
 // Sum the packed battle-item buffs (bzd). All are consumed at fight start, so
 // their damageAdd/mitigationAdd apply to THIS fight and nothing banks back.
-function battleBuff(battleItems: ItemStack[]): { damageAdd: number; mitigationAdd: number } {
+export function battleBuff(battleItems: ItemStack[]): { damageAdd: number; mitigationAdd: number } {
   let damageAdd = 0;
   let mitigationAdd = 0;
   for (const stack of battleItems) {
@@ -164,53 +164,87 @@ export function explainMatchup(loadout: Loadout, monsterId: string): Matchup {
   return { weaponVsHide, affinityFired, armourVsAttack };
 }
 
-export function resolveCombat(
+export type ExchangeResult = {
+  monsterHp: number;
+  hp: number;
+  potionsAfter: ItemStack[];
+  potionsUsed: number;
+  dmgDealt: number;
+  dmgTaken: number; // 0 when the strike killed before retaliation
+  victory: boolean;
+  defeated: boolean;
+};
+
+// One combat round (si7.1): player strike → if the monster lives, retaliation →
+// waste-tolerant auto-quaff at the threshold. Pure; the reducer holds the
+// engagement state between rounds, resolveCombat loops this for the atomic API.
+export function strikeExchange(
   loadout: Loadout,
   hp: number,
+  monsterHp: number,
   monsterId: string,
-): CombatResult {
-  const monster = MONSTERS[monsterId];
-  if (!monster) throw new Error(`unknown monster: ${monsterId}`);
-  // Battle items (bzd): consumed at fight start, buffing only this fight.
-  const buff = battleBuff(loadout.battleItems ?? []);
-  const dmgOut = playerDamage(loadout, monsterId) + buff.damageAdd;
-  const dmgIn = damageTaken(loadout, monsterId, buff.mitigationAdd);
-  let current = hp;
-  let monsterHp = MONSTER_TIER_HP_CURVE[monster.tier]!;
-  // Flat queue of potion defIds in stack order — quaffed front-to-back so heal
-  // amount tracks WHICH potion is drunk (2026-07-04 tiered consumables). The
-  // post-hoc consumption below drains the same stacks in the same order.
-  const potionQueue = loadout.potions.flatMap((p) => Array<string>(p.qty).fill(p.defId));
+  damageAdd = 0,
+  mitigationAdd = 0,
+  autoQuaff = true,
+): ExchangeResult {
+  const dmgDealt = playerDamage(loadout, monsterId) + damageAdd;
+  const potions = loadout.potions.map((p) => ({ ...p }));
   let potionsUsed = 0;
-  // Player strikes first. dmgOut ≥ CHIP_DAMAGE_MIN > 0 guarantees termination.
-  for (;;) {
-    monsterHp -= dmgOut;
-    if (monsterHp <= 0) break; // victory — monster dies before retaliating
-    current -= dmgIn;
-    if (current <= 0) {
-      current = 0; // soft-fail floor
-      break;
-    }
-    if (current <= AUTO_POTION_THRESHOLD * PLAYER_BASE_HP && potionsUsed < potionQueue.length) {
-      const heal = POTION_HEAL_BY[potionQueue[potionsUsed]!] ?? POTION_HEAL;
+  let current = hp;
+  const monsterAfter = monsterHp - dmgDealt;
+  let dmgTaken = 0;
+  if (monsterAfter > 0) {
+    dmgTaken = damageTaken(loadout, monsterId, mitigationAdd);
+    current -= dmgTaken;
+    if (current <= 0) current = 0; // soft-fail floor
+    else if (autoQuaff && current <= AUTO_POTION_THRESHOLD * PLAYER_BASE_HP && potions.length > 0) {
+      const heal = POTION_HEAL_BY[potions[0]!.defId] ?? POTION_HEAL;
       current = Math.min(PLAYER_BASE_HP, current + heal);
-      potionsUsed += 1;
+      potions[0]!.qty -= 1;
+      if (potions[0]!.qty <= 0) potions.shift();
+      potionsUsed = 1;
     }
-  }
-  const victory = monsterHp <= 0;
-  let toConsume = potionsUsed;
-  const potionsAfter: ItemStack[] = [];
-  for (const stack of loadout.potions) {
-    const take = Math.min(stack.qty, toConsume);
-    toConsume -= take;
-    if (stack.qty - take > 0) potionsAfter.push({ defId: stack.defId, qty: stack.qty - take });
   }
   return {
-    victory,
-    hpAfter: current,
-    hpLost: hp - current,
+    monsterHp: Math.max(0, monsterAfter),
+    hp: current,
+    potionsAfter: potions,
     potionsUsed,
-    potionsAfter,
-    battleItemsAfter: [], // all battle items consumed at fight start (bzd)
+    dmgDealt,
+    dmgTaken,
+    victory: monsterAfter <= 0,
+    defeated: monsterAfter > 0 && current <= 0,
   };
+}
+
+export function resolveCombat(loadout: Loadout, hp: number, monsterId: string): CombatResult {
+  const monster = MONSTERS[monsterId];
+  if (!monster) throw new Error(`unknown monster: ${monsterId}`);
+  const buff = battleBuff(loadout.battleItems ?? []);
+  let current = hp;
+  let monsterHp = MONSTER_TIER_HP_CURVE[monster.tier]!;
+  let potions = loadout.potions;
+  let potionsUsed = 0;
+  // dmgDealt ≥ CHIP_DAMAGE_MIN > 0 guarantees termination (monster HP strictly
+  // decreases each round).
+  for (;;) {
+    const round = strikeExchange(
+      { ...loadout, potions }, current, monsterHp, monsterId,
+      buff.damageAdd, buff.mitigationAdd, true,
+    );
+    current = round.hp;
+    monsterHp = round.monsterHp;
+    potions = round.potionsAfter;
+    potionsUsed += round.potionsUsed;
+    if (round.victory || round.defeated) {
+      return {
+        victory: round.victory,
+        hpAfter: current,
+        hpLost: hp - current,
+        potionsUsed,
+        potionsAfter: potions,
+        battleItemsAfter: [],
+      };
+    }
+  }
 }

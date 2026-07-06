@@ -4,13 +4,13 @@ import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
 import { addToCarry, freeCarryStacks, freeLootStacks, usedSlots, carryCap } from "./carry";
 import { toolQualityFor } from "./tools";
-import { resolveCombat, rollLoot, explainMatchup } from "./combat";
+import { strikeExchange, battleBuff, rollLoot, explainMatchup, damageTaken } from "./combat";
 import { eatToRefill, foodEnergyOf } from "./food";
 import { endExpedition, subtractStacks } from "./bank";
 import { craft as applyRecipe } from "./craft";
 import { packItem, reserveLoadout } from "./pack";
 import { candidateMaps, previewHints } from "./town";
-import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD } from "../data/constants";
+import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 
 // Pure reducer. M2 fills embark/move; M3 fills gather/drop; M4 fills fight; remaining cases are no-op stubs:
@@ -39,6 +39,12 @@ export function reduce(
       return dropMap(state, action.mapSeed);
     case "fight":
       return fight(state);
+    case "flee":
+      return flee(state);
+    case "quaff":
+      return quaff(state);
+    case "toggle-auto-quaff":
+      return toggleAutoQuaff(state);
     case "craft":
       return craftAction(state, action.recipeId);
     case "pack":
@@ -147,6 +153,7 @@ function returnHome(state: GameState): { state: GameState; events: GameEvent[] }
   if (state.phase !== "expedition" || !expedition) {
     return rejected(state, "return", "not-on-expedition");
   }
+  if (expedition.combat) return rejected(state, "return", "engaged");
   return {
     state: endExpedition(state, expedition),
     events: [{ type: "run-ended", reason: "returned" }],
@@ -175,6 +182,7 @@ function move(
   if (state.phase !== "expedition" || !expedition) {
     return rejected(state, "move", "not-on-expedition");
   }
+  if (expedition.combat) return rejected(state, "move", "engaged");
   const from = expedition.pos;
   const step = stepToward(from, to);
   if (step.x === from.x && step.y === from.y) {
@@ -190,7 +198,7 @@ function move(
   const poiAtStep = grid.pois.find((p) => p.x === step.x && p.y === step.y);
   const stepCleared = expedition.cleared.some((c) => c.x === step.x && c.y === step.y);
   if (poiAtStep && poiAtStep.kind === "monster" && poiAtStep.creature !== null && !stepCleared) {
-    return fightAt(state, expedition, step, poiAtStep.creature, "move", true);
+    return engage(state, expedition, step, poiAtStep.creature, "move", true);
   }
   const terrain = grid.terrain[step.y]![step.x]!;
   const cost = moveCost(terrain, expedition.loadout.equipment.transport, expedition.loadout.equipment.tools);
@@ -211,6 +219,7 @@ function gather(state: GameState): { state: GameState; events: GameEvent[] } {
   if (state.phase !== "expedition" || !expedition) {
     return rejected(state, "gather", "not-on-expedition");
   }
+  if (expedition.combat) return rejected(state, "gather", "engaged");
   const { pos } = expedition;
   const grid = generateGrid(expedition.mapSeed, rollBiome(expedition.mapSeed));
   const poi = grid.pois.find((p) => p.x === pos.x && p.y === pos.y);
@@ -306,6 +315,7 @@ function drop(
   if (state.phase !== "expedition" || !expedition) {
     return rejected(state, "drop", "not-on-expedition");
   }
+  if (expedition.combat) return rejected(state, "drop", "engaged");
   // Only carry is droppable — packed food/potions are slot ballast (D23).
   const index = expedition.carry.findIndex((stack) => stack.defId === itemId);
   if (index === -1) return rejected(state, "drop", "not-carried");
@@ -327,6 +337,7 @@ function dropMap(
   if (state.phase !== "expedition" || !expedition) {
     return rejected(state, "drop-map", "not-on-expedition");
   }
+  if (expedition.combat) return rejected(state, "drop-map", "engaged");
   const held = expedition.carriedMaps ?? [];
   if (!held.some((m) => m.mapSeed === mapSeed)) return rejected(state, "drop-map", "map-not-carried");
   return {
@@ -335,26 +346,11 @@ function dropMap(
   };
 }
 
-function fight(state: GameState): { state: GameState; events: GameEvent[] } {
-  const expedition = state.expedition;
-  if (state.phase !== "expedition" || !expedition) {
-    return rejected(state, "fight", "not-on-expedition");
-  }
-  const { pos } = expedition;
-  const grid = generateGrid(expedition.mapSeed, rollBiome(expedition.mapSeed));
-  const poi = grid.pois.find((p) => p.x === pos.x && p.y === pos.y);
-  const alreadyCleared = expedition.cleared.some((c) => c.x === pos.x && c.y === pos.y);
-  if (!poi || poi.kind !== "monster" || alreadyCleared || poi.creature === null) {
-    return rejected(state, "fight", "no-monster");
-  }
-  return fightAt(state, expedition, pos, poi.creature, "fight", false);
-}
-
-// Shared combat resolution at a tile. `fight` uses it to stand and fight the
-// monster you're on; `move` uses it when you walk INTO a live monster (monsters
-// block a tile until beaten — routing around them is the choice, 2026-07-05).
-// moveOnWin=true relocates you onto the cleared tile after a win.
-function fightAt(
+// Start an engagement (si7.1, replaces atomic fightAt): the fit-check still
+// runs BEFORE any blood (rejecting is free), battle items are consumed NOW and
+// their buffs ride the Engagement for all its rounds. No exchange here — the
+// player sees the forecast before the first swing.
+function engage(
   state: GameState,
   expedition: Expedition,
   at: { x: number; y: number },
@@ -362,71 +358,158 @@ function fightAt(
   action: "fight" | "move",
   moveOnWin: boolean,
 ): { state: GameState; events: GameEvent[] } {
-  // Roll the actual drops up front (deterministic, t07): the fit-check reserves
-  // space only for loot that WILL drop, so an unrolled 20% rare never blocks.
   const rolled = rollLoot(state.seed, creature, at);
-  // Map scrolls (8ec) never enter carry as materials — they mint a carried
-  // MapItem on victory. The fit check covers MATERIAL loot only: the map is an
-  // optional pickup (left behind if the pack is full), never a reason to
-  // refuse a fight.
-  const mapDrops = rolled.filter((s) => s.defId === MAP_SCROLL_ID);
   const loot = rolled.filter((s) => s.defId !== MAP_SCROLL_ID);
-  // Pre-fight fit check: rejecting is free, so the player can drop and retry
-  // instead of losing loot (or HP) to a full pack.
   const maxStacks = freeLootStacks(expedition.loadout, expedition.carriedMaps);
   let carryWithLoot: typeof expedition.carry | null = expedition.carry;
   for (const stack of loot) {
     carryWithLoot = addToCarry(carryWithLoot, stack.defId, stack.qty, maxStacks);
     if (carryWithLoot === null) return rejected(state, action, "carry-full");
   }
-  const result = resolveCombat(expedition.loadout, expedition.hp, creature);
-  const fought: GameEvent = {
-    type: "fought",
-    at: { x: at.x, y: at.y },
-    creature,
-    victory: result.victory,
-    hpLost: result.hpLost,
-    potionsUsed: result.potionsUsed,
-    loot: result.victory ? loot : [],
-    hp: result.hpAfter,
-    matchup: explainMatchup(expedition.loadout, creature),
+  const buff = battleBuff(expedition.loadout.battleItems ?? []);
+  const monsterHp = MONSTER_TIER_HP_CURVE[MONSTERS[creature]!.tier]!;
+  return {
+    state: {
+      ...state,
+      expedition: {
+        ...expedition,
+        loadout: { ...expedition.loadout, battleItems: [] }, // consumed at engagement start (bzd)
+        combat: {
+          at: { x: at.x, y: at.y }, creature, monsterHp, moveOnWin,
+          damageAdd: buff.damageAdd, mitigationAdd: buff.mitigationAdd,
+          startHp: expedition.hp, potionsUsed: 0,
+        },
+      },
+    },
+    events: [{ type: "engaged", at: { x: at.x, y: at.y }, creature, monsterHp }],
   };
-  if (!result.victory) {
-    // Soft fail (D26): run ends, carry is kept — banked with the durables.
-    const ended = endExpedition(state, {
-      ...expedition,
-      loadout: { ...expedition.loadout, potions: result.potionsAfter, battleItems: result.battleItemsAfter },
-    });
-    return { state: ended, events: [fought, { type: "run-ended", reason: "defeated" }] };
+}
+
+function fight(state: GameState): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) return rejected(state, "fight", "not-on-expedition");
+  const combat = expedition.combat;
+  if (!combat) {
+    // Not engaged: engage the live monster on the CURRENT tile (as before).
+    const { pos } = expedition;
+    const grid = generateGrid(expedition.mapSeed, rollBiome(expedition.mapSeed));
+    const poi = grid.pois.find((p) => p.x === pos.x && p.y === pos.y);
+    const alreadyCleared = expedition.cleared.some((c) => c.x === pos.x && c.y === pos.y);
+    if (!poi || poi.kind !== "monster" || alreadyCleared || poi.creature === null) {
+      return rejected(state, "fight", "no-monster");
+    }
+    return engage(state, expedition, pos, poi.creature, "fight", false);
+  }
+  // Engaged: one exchange.
+  const round = strikeExchange(
+    expedition.loadout, expedition.hp, combat.monsterHp, combat.creature,
+    combat.damageAdd, combat.mitigationAdd, expedition.autoQuaff ?? true,
+  );
+  const potionsUsed = combat.potionsUsed + round.potionsUsed;
+  const exchanged: GameEvent = {
+    type: "exchanged", creature: combat.creature, dmgDealt: round.dmgDealt,
+    dmgTaken: round.dmgTaken, monsterHp: round.monsterHp, hp: round.hp, potionsUsed,
+  };
+  const loadout = { ...expedition.loadout, potions: round.potionsAfter };
+  const fought = (victory: boolean): GameEvent => ({
+    type: "fought", at: { x: combat.at.x, y: combat.at.y }, creature: combat.creature,
+    victory, hpLost: combat.startHp - round.hp, potionsUsed,
+    loot: victory ? rollLoot(state.seed, combat.creature, combat.at).filter((s) => s.defId !== MAP_SCROLL_ID) : [],
+    hp: round.hp, matchup: explainMatchup(expedition.loadout, combat.creature),
+  });
+  if (round.defeated) {
+    const ended = endExpedition(state, { ...expedition, loadout });
+    return { state: ended, events: [exchanged, fought(false), { type: "run-ended", reason: "defeated" }] };
+  }
+  if (!round.victory) {
+    return {
+      state: { ...state, expedition: { ...expedition, hp: round.hp, loadout, combat: { ...combat, monsterHp: round.monsterHp, potionsUsed } } },
+      events: [exchanged],
+    };
+  }
+  // Victory: apply loot/maps/cleared/relocation exactly as the old fightAt did.
+  const rolled = rollLoot(state.seed, combat.creature, combat.at);
+  const mapDrops = rolled.filter((s) => s.defId === MAP_SCROLL_ID);
+  const loot = rolled.filter((s) => s.defId !== MAP_SCROLL_ID);
+  const maxStacks = freeLootStacks(loadout, expedition.carriedMaps);
+  let carryWithLoot: typeof expedition.carry = expedition.carry;
+  for (const stack of loot) {
+    carryWithLoot = addToCarry(carryWithLoot, stack.defId, stack.qty, maxStacks)!; // fit-checked at engage; carry can't change while engaged
   }
   const carriedMaps = expedition.carriedMaps ?? [];
   let mapsAfter = carriedMaps;
   const mapEvents: GameEvent[] = [];
   if (mapDrops.length > 0) {
-    // Mint (8ec): seed is namespaced by run-map + tile, so the drop is replayable
-    // (D14) and the biome falls out of rollBiome — uniform, and embark re-derives
-    // it from the seed exactly like an offered map (D21).
-    const mapSeed = `${expedition.mapSeed}:drop:${at.x},${at.y}`;
+    const mapSeed = `${expedition.mapSeed}:drop:${combat.at.x},${combat.at.y}`;
     const biomeId = rollBiome(mapSeed);
-    const carried = carryWithLoot.length + carriedMaps.length < freeCarryStacks(expedition.loadout);
+    const carried = carryWithLoot.length + carriedMaps.length < freeCarryStacks(loadout);
     if (carried) mapsAfter = [...carriedMaps, { mapSeed, biomeId, vintage: state.runs ?? 0 }];
-    mapEvents.push({ type: "map-dropped", at: { x: at.x, y: at.y }, mapSeed, biomeId, hints: previewHints(mapSeed, biomeId), carried });
+    mapEvents.push({ type: "map-dropped", at: { x: combat.at.x, y: combat.at.y }, mapSeed, biomeId, hints: previewHints(mapSeed, biomeId), carried });
   }
   return {
     state: {
       ...state,
       expedition: {
         ...expedition,
-        pos: moveOnWin ? { x: at.x, y: at.y } : expedition.pos,
-        hp: result.hpAfter,
-        loadout: { ...expedition.loadout, potions: result.potionsAfter, battleItems: result.battleItemsAfter },
-        carry: carryWithLoot,
-        cleared: [...expedition.cleared, { x: at.x, y: at.y }],
+        pos: combat.moveOnWin ? { x: combat.at.x, y: combat.at.y } : expedition.pos,
+        hp: round.hp, loadout, carry: carryWithLoot,
+        cleared: [...expedition.cleared, { x: combat.at.x, y: combat.at.y }],
         carriedMaps: mapsAfter,
+        combat: undefined,
       },
     },
-    events: [fought, ...mapEvents],
+    events: [exchanged, fought(true), ...mapEvents],
   };
+}
+
+function flee(state: GameState): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) return rejected(state, "flee", "not-on-expedition");
+  const combat = expedition.combat;
+  if (!combat) return rejected(state, "flee", "not-engaged");
+  // The standing price of bailing (si7.1): one parting hit BEFORE you're clear —
+  // always affordable before the exchange that would kill you, never free.
+  const partingHit = damageTaken(expedition.loadout, combat.creature, combat.mitigationAdd);
+  const hp = Math.max(0, expedition.hp - partingHit);
+  const fled: GameEvent = { type: "fled", creature: combat.creature, partingHit, hp };
+  if (hp <= 0) {
+    const ended = endExpedition(state, { ...expedition, combat: undefined });
+    return { state: ended, events: [fled, { type: "run-ended", reason: "defeated" }] };
+  }
+  return { state: { ...state, expedition: { ...expedition, hp, combat: undefined } }, events: [fled] };
+}
+
+function quaff(state: GameState): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) return rejected(state, "quaff", "not-on-expedition");
+  const combat = expedition.combat;
+  if (!combat) return rejected(state, "quaff", "not-engaged");
+  const potions = expedition.loadout.potions;
+  if (potions.length === 0 || expedition.hp >= PLAYER_BASE_HP) return rejected(state, "quaff", "insufficient");
+  const front = potions[0]!;
+  const heal = POTION_HEAL_BY[front.defId] ?? POTION_HEAL;
+  const hp = Math.min(PLAYER_BASE_HP, expedition.hp + heal);
+  const next = potions.map((p) => ({ ...p }));
+  next[0]!.qty -= 1;
+  if (next[0]!.qty <= 0) next.shift();
+  return {
+    state: {
+      ...state,
+      expedition: {
+        ...expedition, hp,
+        loadout: { ...expedition.loadout, potions: next },
+        combat: { ...combat, potionsUsed: combat.potionsUsed + 1 },
+      },
+    },
+    events: [{ type: "quaffed", defId: front.defId, healed: hp - expedition.hp, hp }],
+  };
+}
+
+function toggleAutoQuaff(state: GameState): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) return rejected(state, "toggle-auto-quaff", "not-on-expedition");
+  const on = !(expedition.autoQuaff ?? true);
+  return { state: { ...state, expedition: { ...expedition, autoQuaff: on } }, events: [{ type: "auto-quaff-toggled", on }] };
 }
 
 // Restore-per-food multiplier for this loadout: a tent (durable "camp" tool)
@@ -459,6 +542,7 @@ function eat(state: GameState): { state: GameState; events: GameEvent[] } {
   if (state.phase !== "expedition" || !expedition) {
     return rejected(state, "eat", "not-on-expedition");
   }
+  if (expedition.combat) return rejected(state, "eat", "engaged");
   const maxEnergy = expedition.maxEnergy ?? MAX_ENERGY;
   const food = expedition.loadout.food;
   if (food.length === 0 || expedition.energy >= maxEnergy) {

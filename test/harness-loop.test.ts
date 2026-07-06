@@ -11,6 +11,20 @@ import type { BiomeId } from "../src/data/constants";
 const accepts = (s: GameState, a: Action) =>
   reduce(s, a).events.every((e) => e.type !== "action-rejected");
 
+// This driver targets non-monster gatherable POIs, but the greedy walk can
+// still step onto a monster tile en route. si7.1: that ENGAGES rather than
+// resolving inline (accepts() sees no rejection, so the walk "succeeds" into
+// an engagement instead of a step). Fight it out so the loop doesn't read a
+// resolved engagement as "no progress" and wedge.
+function resolveWalkIn(state: GameState): GameState {
+  let s = state;
+  let guard = 0;
+  while (s.expedition?.combat && ++guard < 100) {
+    s = reduce(s, { type: "fight" }).state;
+  }
+  return s;
+}
+
 // Greedy driver: pack a mining loadout, embark on `mapSeed`, walk to the nearest
 // gatherable POI and gather, then return. Returns the full run + whether it
 // gathered. Every action goes through reduce; legalActions is asserted en route.
@@ -58,7 +72,9 @@ function runLoop(seed: string, mapSeed: string, runs: number): { state: GameStat
     if (!accepts(state, move)) break; // blocked (impassable/exhausted)
     const before = here;
     state = reduce(state, move).state;
-    const after = state.expedition!.pos;
+    if (state.expedition?.combat) state = resolveWalkIn(state); // accidental walk-in: fight it out
+    if (!state.expedition) break; // engagement lost, run ended
+    const after = state.expedition.pos;
     if (after.x === before.x && after.y === before.y) break; // no progress
   }
 

@@ -106,19 +106,31 @@ test("resolveCombat: silver sword beats the werewolf cheaper than a plain sword"
 });
 
 test("resolveCombat: auto-potions quaff at the threshold and are consumed in stack order", () => {
-  // si7.1: % mitigation steepened tier-3 dmgIn (14×6/(6+0)=14/hit vs a bare
-  // sword) enough that starting at 12 HP now dies on the FIRST hit, before the
-  // auto-quaff check ever runs. Start at PLAYER_BASE_HP so the threshold is
-  // actually crossed mid-fight (hit1: 30-14=16 > 15 threshold, no heal; hit2:
-  // 16-14=2 ≤ 15 → quaffs one potion to 12; hit3: 12-14 < 0 → still a loss, but
-  // potionsUsed=1 exercises the path this test is for).
-  const loadout = armed("sword", { potions: [{ defId: "healing-potion", qty: 2 }] });
-  const noPotions = resolveCombat(armed("sword"), PLAYER_BASE_HP, "ice-troll"); // tier 3 hits hard
-  const withPotions = resolveCombat(loadout, PLAYER_BASE_HP, "ice-troll");
-  expect(withPotions.potionsUsed).toBeGreaterThan(0);
-  expect(withPotions.potionsAfter.reduce((s, p) => s + p.qty, 0)).toBe(2 - withPotions.potionsUsed);
-  // potions keep you alive longer / end better than without
-  expect(withPotions.hpAfter).toBeGreaterThanOrEqual(noPotions.hpAfter);
+  // Re-picked (si7.1 task 3 review): the OLD ice-troll bare-kit scenario went
+  // vacuous once the steepened tier-3 curve made both hpAfter clamp to 0
+  // (0 >= 0 always passes, potions or not). werewolf (tier 2, HP curve 16,
+  // dmgOut=3.75/hit sword, dmgIn=8/hit unarmoured) is the real case: it's a
+  // LOSS bare-kit and a WIN with potions —
+  //
+  //   no potions: R1 mHp 16→12.25, hp 30→22 · R2 mHp→8.5, hp→14 (≤15 threshold
+  //   but no potions to quaff) · R3 mHp→4.75, hp→6 · R4 mHp→1 (still >0), hp
+  //   6-8=-2→clamped 0 → defeated (loss).
+  //
+  //   3 potions: R1 same, hp→22 · R2 mHp→8.5, hp 22-8=14 ≤15 threshold → quaff
+  //   (10 heal) → hp 24, potionsUsed=1 · R3 mHp→4.75, hp 24-8=16 · R4 mHp→1
+  //   (still >0), hp 16-8=8 ≤15 → quaff → hp 18, potionsUsed=1 · R5 dmgDealt
+  //   3.75 vs monsterHp 1 → monster dies (victory), no retaliation, hp stays
+  //   18. Net: potionsUsed=2, victory flips false→true, hpAfter 0→18.
+  const noPotions = resolveCombat(armed("sword"), PLAYER_BASE_HP, "werewolf");
+  const withPotions = resolveCombat(armed("sword", { potions: [{ defId: "healing-potion", qty: 3 }] }), PLAYER_BASE_HP, "werewolf");
+  expect(noPotions.victory).toBe(false);
+  expect(noPotions.hpAfter).toBe(0);
+  expect(withPotions.victory).toBe(true);
+  expect(withPotions.potionsUsed).toBe(2);
+  expect(withPotions.potionsAfter.reduce((s, p) => s + p.qty, 0)).toBe(3 - withPotions.potionsUsed);
+  expect(withPotions.hpAfter).toBe(18);
+  // potions are what turned this loss into a win — a real assertion, not 0≥0.
+  expect(withPotions.hpAfter).toBeGreaterThan(noPotions.hpAfter);
 });
 
 test("resolveCombat: defeat clamps to 0", () => {

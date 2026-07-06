@@ -100,6 +100,11 @@ function fmt(e: GameEvent): string {
     case "packed": return `packed ${name(e.defId)} → ${e.slot}`;
     case "run-ended": return `— run ended (${e.reason}) —`;
     case "action-rejected": return `✗ ${e.action} rejected: ${e.reason}`;
+    case "engaged": return `⚔ engaged the ${name(e.creature)}`;
+    case "exchanged": return `⚔ traded blows with the ${e.creature} — dealt ${round(e.dmgDealt)}, took ${round(e.dmgTaken)} · ${round(e.hp)}hp left`;
+    case "fled": return `🏃 fled the ${name(e.creature)} · −${round(e.partingHit)}hp → ${round(e.hp)}hp`;
+    case "quaffed": return `🧪 quaffed ${name(e.defId)} · +${round(e.healed)}hp → ${round(e.hp)}hp`;
+    case "auto-quaff-toggled": return `auto-quaff ${e.on ? "on" : "off"}`;
   }
 }
 const round = (n: number) => Math.round(n * 10) / 10;
