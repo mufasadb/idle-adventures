@@ -16,7 +16,7 @@ import { heldFoodEnergy } from "../engine/food";
 import { RECIPE, MATERIAL_TIER, GRID_SIZE, MAX_ENERGY, TENT_FOOD_MULTIPLIER } from "../data/constants";
 import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons } from "../render/render";
 import { perceive } from "../engine/perceive";
-import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, LoadoutSlot } from "../engine/types";
+import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, LoadoutSlot, MapItem } from "../engine/types";
 
 // Per-node verb so the UI reads right: you don't "mine" an animal.
 const GATHER_VERB: Record<string, { label: string; past: string; noun: string }> = {
@@ -192,7 +192,7 @@ function draw(): void {
 function slotBox(cls: string, label: string, q: string): string {
   return `<div class="slot ${cls}" title="${label}${q}">${label}${q ? `<span class="q">${q}</span>` : ""}</div>`;
 }
-function realSlots(loadout: Loadout, carry: ItemStack[]): string[] {
+function realSlots(loadout: Loadout, carry: ItemStack[], maps: MapItem[] = []): string[] {
   const boxes: string[] = [];
   const units = (items: ItemStack[], cls: string) => {
     for (const it of items) for (let i = 0; i < it.qty; i++) boxes.push(slotBox(cls, name(it.defId), ""));
@@ -202,6 +202,7 @@ function realSlots(loadout: Loadout, carry: ItemStack[]): string[] {
   units(loadout.battleItems ?? [], "battle");
   for (const t of loadout.equipment.tools) boxes.push(slotBox("tool", name(t), ""));
   for (const s of carry) boxes.push(slotBox("loot", name(s.defId), `×${s.qty}`));
+  for (const m of maps) boxes.push(slotBox("loot", `🗺️ ${name(m.biomeId)} map`, "")); // carried maps (8ec): 1 slot each
   return boxes;
 }
 function wornGhosts(eq: Equipment): string[] {
@@ -209,8 +210,8 @@ function wornGhosts(eq: Equipment): string[] {
   return worn.map((d) => `<div class="slot ghost" title="${name(d)} — worn, no slot">${name(d)}</div>`);
 }
 // Returns { used, html }. used = real filled slots (ghosts excluded).
-function inventoryGrid(loadout: Loadout, carry: ItemStack[], cap: number): { used: number; html: string } {
-  const real = realSlots(loadout, carry);
+function inventoryGrid(loadout: Loadout, carry: ItemStack[], cap: number, maps: MapItem[] = []): { used: number; html: string } {
+  const real = realSlots(loadout, carry, maps);
   const boxes = [...real];
   while (boxes.length < cap) boxes.push(`<div class="slot empty">·</div>`);
   const ghosts = wornGhosts(loadout.equipment);
@@ -437,7 +438,7 @@ function expeditionView(): string {
     : `<div class="pathbanner muted">Click a tile → previews the route + energy. Click <b>Walk</b> (or the tile again / right-click) to go. Monsters (<b>X</b>) block their tile — click one to fight, or route around.</div>`;
 
   const cap = carryCap(exp.loadout.equipment);
-  const inv = inventoryGrid(exp.loadout, exp.carry, cap);
+  const inv = inventoryGrid(exp.loadout, exp.carry, cap, exp.carriedMaps ?? []);
   return `
   <header><h1>${rollBiome(exp.mapSeed)} expedition</h1><span class="muted">pos (${exp.pos.x},${exp.pos.y})</span><button class="link" data-newgame>new game</button></header>
   <div class="cols">
@@ -458,6 +459,7 @@ function expeditionView(): string {
       ${inv.html}
       <div class="muted small">food (green) is eaten to refill energy as you travel — freeing slots for loot (gold). Potions purple · battle items red · tools grey · worn gear ghosted (free).</div>
       ${exp.carry.length ? `<div class="bank" style="margin-top:.5rem">${exp.carry.map((s) => `<div class="bankitem"><span class="chip">${name(s.defId)} ×${s.qty}</span><button data-drop="${s.defId}">drop</button></div>`).join("")}</div>` : ""}
+      ${(exp.carriedMaps ?? []).length ? `<div class="bank" style="margin-top:.5rem">${(exp.carriedMaps ?? []).map((m) => `<div class="bankitem"><span class="chip" title="1 slot — banks as a held map when the run ends">🗺️ ${name(m.biomeId)} map</span><button data-drop-map="${m.mapSeed}">drop</button></div>`).join("")}</div>` : ""}
     </section>
   </div>
   ${logView()}`;
@@ -474,6 +476,7 @@ function wire(): void {
   app.querySelectorAll<HTMLElement>("[data-craft]").forEach((el) => el.onclick = () => apply({ type: "craft", recipeId: el.dataset.craft! }));
   app.querySelectorAll<HTMLElement>("[data-pack]").forEach((el) => el.onclick = () => apply({ type: "pack", slot: el.dataset.slot as LoadoutSlot, itemId: el.dataset.pack! }));
   app.querySelectorAll<HTMLElement>("[data-drop]").forEach((el) => el.onclick = () => apply({ type: "drop", itemId: el.dataset.drop! }));
+  app.querySelectorAll<HTMLElement>("[data-drop-map]").forEach((el) => el.onclick = () => apply({ type: "drop-map", mapSeed: el.dataset.dropMap! }));
   app.querySelectorAll<HTMLElement>("[data-act]").forEach((el) => el.onclick = () => { pending = null; apply({ type: el.dataset.act! } as Action); });
   const reset = app.querySelector<HTMLElement>("[data-reset]"); if (reset) reset.onclick = () => planReset();
   const cancel = app.querySelector<HTMLElement>("[data-cancelpath]"); if (cancel) cancel.onclick = () => { pending = null; draw(); };
