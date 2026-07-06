@@ -61,9 +61,12 @@ console.log("\n=== YOU ===");
 console.log(`phase: ${s.phase} · runs completed: ${state.runs ?? 0}`);
 if (s.expedition) console.log(`energy: ${s.expedition.energy} · hp: ${s.expedition.hp} · pos (${s.expedition.pos.x},${s.expedition.pos.y}) · nodes cleared: ${s.expedition.cleared}`);
 console.log(`bank: ${s.bank.map((i) => `${i.qty}× ${i.defId}`).join(", ") || "(empty)"}`);
-const eq = s.loadout.equipment;
+// Show the ACTIVE loadout: on an expedition the equipped gear lives on
+// expedition.loadout (state.loadout is the town plan, empty mid-run).
+const active = state.expedition?.loadout ?? s.loadout;
+const eq = active.equipment;
 const worn = [eq.weapon, eq.helmet, eq.chest, eq.legs, eq.boots, eq.gloves, eq.transport, eq.backpack, eq.panniers, ...eq.tools].filter(Boolean);
-console.log(`equipped: ${worn.join(", ") || "(nothing)"} · food: ${s.loadout.food.map((f) => `${f.qty}× ${f.defId}`).join(", ") || "none"} · potions: ${s.loadout.potions.map((p) => `${p.qty}× ${p.defId}`).join(", ") || "none"}${s.loadout.battleItems?.length ? ` · battle: ${s.loadout.battleItems.map((b) => `${b.qty}× ${b.defId}`).join(", ")}` : ""}`);
+console.log(`equipped: ${worn.join(", ") || "(nothing)"} · food: ${active.food.map((f) => `${f.qty}× ${f.defId}`).join(", ") || "none"} · potions: ${active.potions.map((p) => `${p.qty}× ${p.defId}`).join(", ") || "none"}${active.battleItems?.length ? ` · battle: ${active.battleItems.map((b) => `${b.qty}× ${b.defId}`).join(", ")}` : ""}`);
 
 if (s.phase === "town") printTown(state);
 else printExpedition(state);

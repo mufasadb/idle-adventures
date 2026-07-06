@@ -27,7 +27,7 @@ Tell them: *"There is an ultimate, rare end-game artifact to obtain. Figure out 
 
 1. **Decide the fleet.** Default **3 agents**, each on a different base seed (so maps/offers differ). Scale up for a thorough pass, down for a quick check.
 2. **Dispatch each agent** (parallel, in one message) with: the interface rules above, the hard no-lookups rule, the goal, and "report your playthrough: what you did, what you figured out, how far you got, where you got stuck." **Do NOT include the evaluation questions** — they must play unbiased.
-3. **When an agent finishes, `SendMessage` it the questions** (below) using its agent id. Its context is intact, so it reflects on the real playthrough it just had — this is why we interrogate *after*, not up front (a subagent can't be reopened once fully closed, but SendMessage continues it). Keep each agent's answers.
+3. **When an agent finishes, interrogate it with the questions** (below). Preferred: `SendMessage` the agent id so it reflects with its playthrough context intact. **If SendMessage isn't available in the harness** (it wasn't on 2026-07-06), fall back: dispatch a fresh *reflection* agent per playthrough, handing it that agent's own full playthrough report as "your lived experience" + the questions. Either way, ask *after* they play (unbiased) and keep each agent's answers. Independent judgment across the fleet is the point.
 4. **Aggregate** all agents' answers + playthroughs into a findings doc at `docs/<date>-playtest-findings.md` (mirror the style of any existing `*-playtest-findings.md`): the verdict (iterate / pivot / ship), the strongest signals across agents, and concrete lever/mechanic follow-ups. File beads for the real follow-ups.
 
 ## The questions (ask verbatim, only after they've played)
