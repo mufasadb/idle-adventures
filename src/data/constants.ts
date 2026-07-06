@@ -96,13 +96,18 @@ export const MATERIAL_TIER: Record<string, number> = {
 // Every energy-denominated lever sits on a ×10 scale so gear can shave meaningful
 // POINTS off a step (TERRAIN_GATE) without snapping to impassable — ratios are
 // preserved vs the old scale, so the economy feel is unchanged.
-export const ENERGY_PER_FOOD = 80; // default energy per packed food item (fallback for FOOD_ENERGY)
-// Base energy floor (qrl, ×10 svz): embark energy = max(BASE_ENERGY_FLOOR,
-// packedFoodEnergy). ~5 actions with no food — the recoverable-by-effort fail
-// state (spec §3), NOT a 0-energy dead-loop. See reduce.embark.
-export const BASE_ENERGY_FLOOR = 200;
-// Per-food energy (tiered): denser food gives more per item, earning slot efficiency
-// against the carry squeeze. Absent = ENERGY_PER_FOOD.
+export const ENERGY_PER_FOOD = 80; // default energy RESTORED per food unit eaten (fallback for FOOD_ENERGY)
+// Stamina model (2026-07-06, dtv — supersedes BASE_ENERGY_FLOOR/qrl): energy is
+// now current STAMINA on a max/current bar. You embark at MAX_ENERGY regardless
+// of food; move/gather drain current energy; eating a food unit refills toward
+// max (FOOD_ENERGY × tentMult). MAX_ENERGY is the base ceiling (gear-raisable
+// later — a future progression axis). See reduce.embark / food.eatToRefill.
+export const MAX_ENERGY = 300;
+// A tent (durable "camp" tool) multiplies energy restored per food unit — each
+// ration goes further, so food is a stronger reach investment. Tunable.
+export const TENT_FOOD_MULTIPLIER = 1.5;
+// Per-food RESTORE (tiered): denser food restores more per unit eaten, earning
+// slot efficiency against the carry squeeze. Absent = ENERGY_PER_FOOD.
 export const FOOD_ENERGY: Record<string, number> = {
   ration: 80,
   "trail-ration": 160, // stays 2× a ration — the T2 density edge
@@ -189,6 +194,7 @@ export const TOOL_CAPABILITY: Record<string, string> = {
   raft: "ford", // gating capability for rivers (boo)
   waders: "wade", // graded-movement gear (svz); NODE_TOOL never asks for it
   "ice-cleats": "trek",
+  tent: "camp", // stamina gear (dtv): multiplies food restore; NODE_TOOL never asks for "camp", so no gather impact
 }; // tool defId → capability; tiered tools (M5: "iron-pick": "pick") are data-only
 export const TOOL_QUALITY: Record<string, number> = {
   pick: 1,
@@ -204,6 +210,7 @@ export const TOOL_QUALITY: Record<string, number> = {
   raft: 1,
   waders: 1,
   "ice-cleats": 1,
+  tent: 1, // quality irrelevant to camping; present to satisfy the catalog invariant
 }; // gather-cost divisor AND tier gate (quality == max MATERIAL_TIER gatherable)
 export const GATHER_YIELD: Record<GatherableNodeType, number> = {
   mining: 3,
@@ -402,6 +409,7 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   raft: { inputs: [{ defId: "pine-log", qty: 2 }, { defId: "deer-hide", qty: 1 }], output: { defId: "raft", qty: 1 } }, // discounts rivers (30 → 10)
   waders: { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "pine-log", qty: 1 }], output: { defId: "waders", qty: 1 } }, // discounts mud (15 → 10)
   "ice-cleats": { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "wolf-pelt", qty: 1 }], output: { defId: "ice-cleats", qty: 1 } }, // glide on ice (20 → 5)
+  tent: { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "pine-log", qty: 2 }], output: { defId: "tent", qty: 1 } }, // camp gear (dtv): food restores +50% energy
   // Backpack — carry upgrades. `starter` is your FIRST pack (you start bare):
   // cheap, one hunt's worth of hide. Then leather (5), large-pack (7, T2).
   starter: { inputs: [{ defId: "deer-hide", qty: 1 }], output: { defId: "starter", qty: 1 } },

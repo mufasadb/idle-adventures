@@ -1,7 +1,7 @@
 // Run-end banking (D26; food rule updated by pqp): carry + durable loadout
 // (equipment, tools, transport, backpack) + unspent potions + UNEATEN food go
-// home. Food now banks back — it's carried and eaten just-in-time (food.digest),
-// never pre-converted, so returning it is not duplication (supersedes D23).
+// home. Food banks back — it's carried and eaten to refill stamina (food.eatToRefill,
+// dtv/D41), never pre-converted, so returning it is not duplication (supersedes D23).
 // Used by fight's soft-fail (M4) and return (M5).
 import type { GameState, Expedition, ItemStack } from "./types";
 import { emptyLoadout } from "./loadout";

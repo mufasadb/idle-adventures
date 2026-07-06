@@ -28,12 +28,14 @@ export type Loadout = {
 export type Expedition = {
   mapSeed: string;
   pos: { x: number; y: number };
-  energy: number; // from packed food; spent on move/gather
+  energy: number; // CURRENT stamina (dtv): starts at maxEnergy on embark, drained by move/gather, refilled by eating food
   hp: number; // drained by combat, refilled by potions
   loadout: Loadout;
   carry: ItemStack[]; // capped by backpack slots
   cleared: { x: number; y: number }[]; // POIs consumed this run (D24): gathered nodes; M4 adds defeated monsters
   // grid regenerated from mapSeed on demand, not stored
+  maxEnergy?: number; // stamina ceiling (dtv): set to MAX_ENERGY at embark (gear-raisable later). Optional/absent = MAX_ENERGY (old saves, terse test states); reads guard with `?? MAX_ENERGY`.
+  autoEat?: boolean; // "eat when hungry" (dtv): waste-free auto-eat after each spend. Set true at embark; toggle-auto-eat flips it. Optional/absent = true; reads guard with `?? true`.
 };
 
 // A pocketed map (xzx): a single-use snapshot of an offered map you chose to keep.
@@ -74,6 +76,8 @@ export type Action =
   | { type: "move"; to: { x: number; y: number } } // steps ONE tile toward target
   | { type: "gather" }
   | { type: "fight" }
+  | { type: "eat" } // eat one food unit now → refill current energy toward max (dtv)
+  | { type: "toggle-auto-eat" } // flip the waste-free "eat when hungry" auto-eat (dtv)
   | { type: "drop"; itemId: string }
   | { type: "return" };
 
@@ -133,6 +137,8 @@ export type GameEvent =
       energy: number; // remaining after the gather
     }
   | { type: "dropped"; defId: string; qty: number }
+  | { type: "ate"; defId: string; restored: number; energy: number } // ate one food unit (dtv): restored energy, new current
+  | { type: "auto-eat-toggled"; on: boolean } // flipped "eat when hungry" (dtv)
   | {
       type: "fought";
       at: { x: number; y: number };

@@ -16,7 +16,7 @@ export function consumableSlots(loadout: Loadout): number {
 }
 
 // Free carry stacks for loot after consumables + tools take their slots (pqp):
-// food/potions burn down over the run (food.digest), so this grows as you go.
+// food is eaten to refill stamina over the run (food.eatToRefill, dtv), so this grows as you go.
 // Single source for gather/fight (M3/M4) and pack (M5).
 export function freeCarryStacks(loadout: Loadout): number {
   return carryCap(loadout.equipment) - consumableSlots(loadout);

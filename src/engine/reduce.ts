@@ -5,12 +5,12 @@ import { stepToward, moveCost } from "./move";
 import { addToCarry, freeCarryStacks } from "./carry";
 import { toolQualityFor } from "./tools";
 import { resolveCombat, rollLoot, explainMatchup } from "./combat";
-import { digest } from "./food";
+import { eatToRefill, foodEnergyOf } from "./food";
 import { endExpedition, subtractStacks } from "./bank";
 import { craft as applyRecipe } from "./craft";
 import { packItem, reserveLoadout } from "./pack";
 import { candidateMaps } from "./town";
-import { ENERGY_PER_FOOD, FOOD_ENERGY, BASE_ENERGY_FLOOR, PLAYER_BASE_HP, GRID_SIZE, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, MATERIAL_TIER } from "../data/constants";
+import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, PLAYER_BASE_HP, GRID_SIZE, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, MATERIAL_TIER } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 
 // Pure reducer. M2 fills embark/move; M3 fills gather/drop; M4 fills fight; remaining cases are no-op stubs:
@@ -29,6 +29,10 @@ export function reduce(
       return move(state, action.to);
     case "gather":
       return gather(state);
+    case "eat":
+      return eat(state);
+    case "toggle-auto-eat":
+      return toggleAutoEat(state);
     case "drop":
       return drop(state, action.itemId);
     case "fight":
@@ -73,15 +77,10 @@ function embark(
   const bank = subtractStacks(state.bank, reserved);
   if (bank === null) return rejected(state, "embark", "unaffordable");
   const grid = generateGrid(mapSeed, rollBiome(mapSeed));
-  // Per-food energy (2026-07-04): each stack contributes its defId's energy;
-  // tiered food (trail-ration) is denser, so a better-fed player fights the squeeze.
-  const foodEnergy = state.loadout.food.reduce(
-    (sum, stack) => sum + stack.qty * (FOOD_ENERGY[stack.defId] ?? ENERGY_PER_FOOD),
-    0,
-  );
-  // Base energy floor (2026-07-05, qrl): no-food embarks still get ~5 actions —
-  // a recoverable fail state, not a 0-energy dead-loop (spec §3/§4.5).
-  const energy = Math.max(BASE_ENERGY_FLOOR, foodEnergy);
+  // Stamina model (dtv): current energy starts at MAX_ENERGY regardless of packed
+  // food — food is a reserve you EAT to refill toward max mid-run, not the source
+  // of the whole budget. autoEat (default on) refills waste-free after each spend.
+  const energy = MAX_ENERGY;
   return {
     state: {
       ...state,
@@ -93,6 +92,8 @@ function embark(
         mapSeed,
         pos: grid.entry,
         energy,
+        maxEnergy: MAX_ENERGY,
+        autoEat: true,
         hp: PLAYER_BASE_HP,
         loadout: state.loadout,
         carry: [],
@@ -192,14 +193,13 @@ function move(
   const cost = moveCost(terrain, expedition.loadout.equipment.transport, expedition.loadout.equipment.tools);
   if (!Number.isFinite(cost)) return rejected(state, "move", "impassable");
   if (cost > expedition.energy) return rejected(state, "move", "exhausted");
-  const energy = expedition.energy - cost;
-  const food = digest(expedition.loadout.food, energy); // eat just-in-time, free slots (pqp)
+  const fed = autoRefill(expedition, expedition.energy - cost); // drain, then waste-free auto-eat (dtv)
   return {
     state: {
       ...state,
-      expedition: { ...expedition, pos: step, energy, loadout: { ...expedition.loadout, food } },
+      expedition: { ...expedition, pos: step, energy: fed.energy, loadout: { ...expedition.loadout, food: fed.food } },
     },
-    events: [{ type: "moved", from, to: step, terrain, cost, energy }],
+    events: [{ type: "moved", from, to: step, terrain, cost, energy: fed.energy }],
   };
 }
 
@@ -232,10 +232,12 @@ function gather(state: GameState): { state: GameState; events: GameEvent[] } {
   }
   const cost = NODE_HARDNESS[kind] / quality;
   if (cost > expedition.energy) return rejected(state, "gather", "exhausted");
-  // Pay energy first — eating food frees its slot, which can make room for this
-  // gather's loot (pqp): the fit-check runs against the post-digest inventory.
-  const energy = expedition.energy - cost;
-  const loadout = { ...expedition.loadout, food: digest(expedition.loadout.food, energy) };
+  // Pay energy first, then waste-free auto-eat (dtv). Eating a food unit frees its
+  // slot, which can make room for this gather's loot: the fit-check runs against
+  // the post-eat inventory.
+  const fed = autoRefill(expedition, expedition.energy - cost);
+  const energy = fed.energy;
+  const loadout = { ...expedition.loadout, food: fed.food };
   const maxStacks = freeCarryStacks(loadout);
   const qty = GATHER_YIELD[kind];
   const carry = addToCarry(expedition.carry, poi.material, qty, maxStacks);
@@ -355,6 +357,69 @@ function fightAt(
       },
     },
     events: [fought],
+  };
+}
+
+// Restore-per-food multiplier for this loadout: a tent (durable "camp" tool)
+// stretches each ration (dtv). NODE_TOOL never asks for "camp", so no gather impact.
+function tentMultOf(expedition: Expedition): number {
+  return expedition.loadout.equipment.tools.includes("tent") ? TENT_FOOD_MULTIPLIER : 1;
+}
+
+// Drain-then-refill helper for move/gather: given the post-spend current energy,
+// run waste-free auto-eat if the toggle is on (dtv). Returns the food reserve +
+// new current energy. autoEat/maxEnergy default via the optional-field guards.
+function autoRefill(
+  expedition: Expedition,
+  energy: number,
+): { food: Expedition["loadout"]["food"]; energy: number } {
+  if (!(expedition.autoEat ?? true)) return { food: expedition.loadout.food, energy };
+  return eatToRefill(
+    expedition.loadout.food,
+    energy,
+    expedition.maxEnergy ?? MAX_ENERGY,
+    tentMultOf(expedition),
+  );
+}
+
+// Eat one food unit NOW (dtv): the player's manual refill, even if slightly
+// wasteful (unlike the waste-free auto-eat). Rejects when there's no food or you're
+// already at max. Restore = foodEnergyOf × tentMult, clamped to max.
+function eat(state: GameState): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) {
+    return rejected(state, "eat", "not-on-expedition");
+  }
+  const maxEnergy = expedition.maxEnergy ?? MAX_ENERGY;
+  const food = expedition.loadout.food;
+  if (food.length === 0 || expedition.energy >= maxEnergy) {
+    return rejected(state, "eat", "insufficient");
+  }
+  const front = food[0]!;
+  const restore = foodEnergyOf(front.defId) * tentMultOf(expedition);
+  const energy = Math.min(maxEnergy, expedition.energy + restore);
+  const nextFood = food.map((s) => ({ ...s }));
+  nextFood[0]!.qty -= 1;
+  if (nextFood[0]!.qty <= 0) nextFood.shift();
+  return {
+    state: {
+      ...state,
+      expedition: { ...expedition, energy, loadout: { ...expedition.loadout, food: nextFood } },
+    },
+    events: [{ type: "ate", defId: front.defId, restored: energy - expedition.energy, energy }],
+  };
+}
+
+// Flip the waste-free "eat when hungry" auto-eat (dtv). Pure toggle; no eating here.
+function toggleAutoEat(state: GameState): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) {
+    return rejected(state, "toggle-auto-eat", "not-on-expedition");
+  }
+  const on = !(expedition.autoEat ?? true);
+  return {
+    state: { ...state, expedition: { ...expedition, autoEat: on } },
+    events: [{ type: "auto-eat-toggled", on }],
   };
 }
 
