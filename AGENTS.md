@@ -1,5 +1,9 @@
 # Agent Instructions
 
+**Project context lives in two places — read them before touching code:**
+- `CLAUDE.md` — design pointers, git/sync policy, Architecture Overview (what lives where), Conventions & Patterns.
+- `docs/working-on-this-codebase.md` — the working rules: quality gates, engine-purity non-negotiables, harness invariants (which tests must never be edited to pass), test idioms, and how to run the web/console surfaces.
+
 This project uses **bd** (beads) for issue tracking. Run `bd prime` for full workflow context.
 
 > **Architecture in one line:** Issues live in a local Dolt database
