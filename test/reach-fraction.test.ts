@@ -3,6 +3,7 @@ import { reduce } from "../src/engine/reduce";
 import { newGame, candidateMaps } from "../src/engine/town";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import { costToReach } from "../src/engine/reach";
+import { emptyLoadout } from "../src/engine/loadout";
 import { MAX_ENERGY, MAP_WIDTH, MAP_HEIGHT, MATERIAL_TIER } from "../src/data/constants";
 import type { Action, GameState } from "../src/engine/types";
 
@@ -97,4 +98,98 @@ test("e3j report: starter-kit harvest fraction", () => {
   );
   // Structural ceiling only: even a perfect starter run must not clear most of the map.
   expect(fraction).toBeLessThan(0.6);
+});
+
+test("e3j report: geared-kit harvest fraction", () => {
+  const c = candidateMaps("rf", 0)[0]!;
+  // Hand-build a stocked bank (spec §6 parity) instead of relying on newGame's
+  // starter bank — a geared+provisioned run should harvest much more of the map.
+  let state: GameState = {
+    seed: "rf",
+    phase: "town",
+    bank: [
+      { defId: "leather", qty: 1 },
+      { defId: "horse", qty: 1 },
+      { defId: "pick", qty: 1 },
+      { defId: "knife", qty: 1 },
+      { defId: "ice-cleats", qty: 1 },
+      { defId: "climbing-pick", qty: 1 },
+      { defId: "ration", qty: 6 },
+      { defId: "tent", qty: 1 },
+    ],
+    loadout: emptyLoadout(),
+    expedition: null,
+    runs: 0,
+  };
+  const act = (a: Action) => reduce(state, a);
+  for (const a of [
+    { type: "pack", slot: "backpack", itemId: "leather" } as const,
+    { type: "pack", slot: "transport", itemId: "horse" } as const,
+    { type: "pack", slot: "tool", itemId: "pick" } as const,
+    { type: "pack", slot: "tool", itemId: "knife" } as const,
+    { type: "pack", slot: "tool", itemId: "ice-cleats" } as const,
+    { type: "pack", slot: "tool", itemId: "climbing-pick" } as const,
+    { type: "pack", slot: "tool", itemId: "tent" } as const,
+    { type: "pack", slot: "food", itemId: "ration" } as const,
+    { type: "pack", slot: "food", itemId: "ration" } as const,
+    { type: "pack", slot: "food", itemId: "ration" } as const,
+    { type: "pack", slot: "food", itemId: "ration" } as const,
+    { type: "pack", slot: "food", itemId: "ration" } as const,
+    { type: "pack", slot: "food", itemId: "ration" } as const,
+  ]) {
+    const r = act(a);
+    state = r.state;
+    expect(r.events.some((e) => e.type === "action-rejected")).toBe(false);
+  }
+  state = act({ type: "embark", mapSeed: c.mapSeed }).state;
+  expect(state.phase).toBe("expedition");
+  const grid = generateGrid(c.mapSeed, rollBiome(c.mapSeed));
+  // Target ALL gatherable kinds/tiers this kit can work: pick + knife (no axe,
+  // so still skip wood), tier ≤ tool quality 1 — same filter as the starter test.
+  const gatherable = grid.pois.filter(
+    (p) =>
+      (p.kind === "herb" || p.kind === "mining" || p.kind === "animal") &&
+      p.material !== null &&
+      (MATERIAL_TIER[p.material] ?? 1) === 1,
+  );
+  let cleared = 0;
+  const skipped = new Set<string>();
+  for (let step = 0; step < (MAP_WIDTH + MAP_HEIGHT) * 4 && state.expedition; step++) {
+    const exp = state.expedition;
+    const here = exp.pos;
+    const targets = gatherable.filter(
+      (p) =>
+        !exp.cleared.some((q) => q.x === p.x && q.y === p.y) &&
+        !skipped.has(`${p.x},${p.y}`),
+    );
+    if (targets.length === 0) break;
+    targets.sort(
+      (a, b) =>
+        Math.max(Math.abs(a.x - here.x), Math.abs(a.y - here.y)) -
+        Math.max(Math.abs(b.x - here.x), Math.abs(b.y - here.y)),
+    );
+    const t = targets[0]!;
+    if (t.x === here.x && t.y === here.y) {
+      const r = reduce(state, { type: "gather" });
+      state = r.state;
+      if (!r.events.some((e) => e.type === "gathered")) {
+        skipped.add(`${t.x},${t.y}`);
+        continue;
+      }
+      cleared++;
+      state = reduce(state, { type: "drop", itemId: t.material! }).state;
+      continue;
+    }
+    const r = reduce(state, { type: "move", to: { x: t.x, y: t.y } });
+    if (r.events.some((e) => e.type === "action-rejected")) break;
+    state = r.state;
+    if (state.expedition && state.expedition.pos.x === here.x && state.expedition.pos.y === here.y) break;
+  }
+  if (state.expedition) state = reduce(state, { type: "return" }).state;
+  const fraction = cleared / grid.pois.length;
+  console.log(
+    `[e3j] geared-kit harvest: ${cleared}/${grid.pois.length} POIs (${(100 * fraction).toFixed(0)}%) (target ~50%)`,
+  );
+  // Structural ceiling only: even a perfect geared run must not clear the whole map.
+  expect(fraction).toBeLessThan(0.9);
 });

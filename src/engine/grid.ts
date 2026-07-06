@@ -170,16 +170,30 @@ function buildGrid(mapSeed: string, biomeId: BiomeId): Grid {
   // LARGEST on-foot reachable region, so a bare loadout is never boxed into a
   // dead corner pocket (the food reachability guarantee starts here). Ties break
   // toward a seeded preferred x for determinism + variety.
+  // Constraint (e3j final review): the entry tile itself MUST be walkable — you
+  // must be able to return to it. Skip impassable bottom-row candidates; without
+  // this, a bottom-row wall tile adjacent to the one walkable component can tie
+  // (or beat) every real candidate and strand the player on a tile they can leave
+  // but never re-enter.
   const preferred = Math.floor(rand(mapSeed, "entry") * MAP_WIDTH);
   let entry = { x: preferred, y: MAP_HEIGHT - 1 };
   let bestReach = -1;
   for (let x = 0; x < MAP_WIDTH; x++) {
+    if (!walkableTerrain(terrain[MAP_HEIGHT - 1]![x]!)) continue;
     const cand = { x, y: MAP_HEIGHT - 1 };
     const n = reachableTiles(terrain, cand);
     if (n > bestReach || (n === bestReach && Math.abs(x - preferred) < Math.abs(entry.x - preferred))) {
       bestReach = n;
       entry = cand;
     }
+  }
+  // Fallback: the ENTIRE bottom row was unwalkable. Carve the preferred-x tile to
+  // native walkable terrain and re-run connectivity so it joins the main
+  // component, then use it as entry.
+  if (bestReach === -1) {
+    entry = { x: preferred, y: MAP_HEIGHT - 1 };
+    terrain[entry.y]![entry.x] = carveTerrainOf(biome);
+    carveConnectivity(terrain, biome);
   }
   // Phase 3 (b91): place POIs in two steps so we can bias value against terrain.
   // (a) Collect accepted POSITIONS via seeded rejection sampling — walk a
@@ -196,6 +210,12 @@ function buildGrid(mapSeed: string, biomeId: BiomeId): Grid {
     const x = Math.floor(rand(mapSeed, "poi-x", attempt) * MAP_WIDTH);
     const y = Math.floor(rand(mapSeed, "poi-y", attempt) * MAP_HEIGHT);
     if (x === entry.x && y === entry.y) continue; // entry tile stays clear (M2: embark lands here)
+    // Walls carry no nodes (e3j final review): reject unwalkable candidates so
+    // the value-vs-reach pairing never strands its highest-value specs on
+    // impassable terrain (mountain-top content can return deliberately with a
+    // future cartography/climbing pass). 2000 attempts on ~1000 walkable tiles
+    // cannot starve the POI_DENSITY budget.
+    if (!walkableTerrain(terrain[y]![x]!)) continue;
     const clear = positions.every(
       (p) => Math.max(Math.abs(p.x - x), Math.abs(p.y - y)) >= POI_MIN_SPACING,
     );

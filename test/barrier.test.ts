@@ -44,6 +44,8 @@ test("connectivity: every walkable tile is one component (30 seeds)", () => {
     }
     expect(start).not.toBeNull();
     expect(flood(grid.terrain, start!)).toBe(total);
+    // e3j final review: entry must be walkable — you must be able to return to it.
+    expect(walkable(grid.terrain[grid.entry.y]![grid.entry.x]!)).toBe(true);
   }
 });
 
