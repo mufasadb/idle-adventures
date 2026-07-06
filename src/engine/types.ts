@@ -36,6 +36,10 @@ export type Expedition = {
   // grid regenerated from mapSeed on demand, not stored
 };
 
+// A pocketed map (xzx): a single-use snapshot of an offered map you chose to keep.
+// vintage = `runs` when pocketed — flavour only ("N runs old"), no mechanic.
+export type MapItem = { mapSeed: string; biomeId: BiomeId; vintage: number };
+
 export type GameState = {
   seed: string;
   phase: "town" | "expedition";
@@ -43,6 +47,7 @@ export type GameState = {
   loadout: Loadout; // town-side staging (D22): pack (M5) edits it, embark consumes it
   expedition: Expedition | null;
   runs?: number; // completed expeditions — advances the candidate-map offer so town shows FRESH maps each visit (not the same 3 forever). Optional/absent = 0 (old saves, terse test states); reads guard with `?? 0`.
+  maps?: MapItem[]; // held maps (xzx): pocketed from the offer, consumed on embark. Optional/absent = [] (old saves, terse test states); reads guard with `?? []`.
 };
 
 // Loadout slots an action can target when packing.
@@ -65,6 +70,7 @@ export type Action =
   | { type: "craft"; recipeId: string }
   | { type: "pack"; slot: LoadoutSlot; itemId: string }
   | { type: "embark"; mapSeed: string }
+  | { type: "pocket-map"; mapSeed: string }
   | { type: "move"; to: { x: number; y: number } } // steps ONE tile toward target
   | { type: "gather" }
   | { type: "fight" }
@@ -95,7 +101,8 @@ export type RejectionReason =
   | "wrong-slot"
   | "insufficient"
   | "already-packed"
-  | "no-slot";
+  | "no-slot"
+  | "already-pocketed";
 
 // Events are a render byproduct emitted by reduce. Named GameEvent (not Event)
 // to avoid colliding with the DOM Event global, which engine code must not use.
@@ -138,6 +145,7 @@ export type GameEvent =
       matchup: Matchup; // post-fight RPS/affinity lesson facts (9u9.2)
     }
   | { type: "crafted"; recipeId: string; output: ItemStack }
+  | { type: "pocketed-map"; mapSeed: string; biomeId: BiomeId }
   | { type: "packed"; slot: LoadoutSlot; defId: string }
   | { type: "run-ended"; reason: string }
   | {

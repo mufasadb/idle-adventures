@@ -23,6 +23,8 @@ export function reduce(
   switch (action.type) {
     case "embark":
       return embark(state, action.mapSeed);
+    case "pocket-map":
+      return pocketMap(state, action.mapSeed);
     case "move":
       return move(state, action.to);
     case "gather":
@@ -59,8 +61,13 @@ function embark(
   // offering (candidateMaps rotates with runs). legalActions already restricts to
   // these; validating here makes reduce the source of truth (D29) so no driver can
   // farm a favourable seed by hand-building the action.
+  // A map is embarkable if the town is CURRENTLY offering it ("go nearby" — a
+  // fresh map, not consumed) OR you're holding it (a pocketed map, xzx — spent on
+  // embark). A seed that's neither is not-offered, so the farm loop stays closed.
   const offered = candidateMaps(state.seed, state.runs ?? 0).map((m) => m.mapSeed);
-  if (!offered.includes(mapSeed)) return rejected(state, "embark", "not-offered");
+  const held = state.maps ?? [];
+  const wasHeld = held.some((m) => m.mapSeed === mapSeed);
+  if (!offered.includes(mapSeed) && !wasHeld) return rejected(state, "embark", "not-offered");
   // D28: settle the plan against the bank — debit everything the loadout pulls.
   const reserved = reserveLoadout(state.loadout);
   const bank = subtractStacks(state.bank, reserved);
@@ -81,6 +88,7 @@ function embark(
       phase: "expedition",
       bank,
       loadout: emptyLoadout(),
+      maps: wasHeld ? held.filter((m) => m.mapSeed !== mapSeed) : held, // spend the held map (xzx)
       expedition: {
         mapSeed,
         pos: grid.entry,
@@ -94,6 +102,26 @@ function embark(
     events: [
       { type: "embarked", mapSeed, biomeId: grid.biomeId, pos: grid.entry, energy },
     ],
+  };
+}
+
+// Pocket an offered map (xzx): keep a single-use snapshot to run later, even after
+// the offer rotates. No cost, no cap — "go nearby" means you're never stuck, so
+// hoarding buys nothing. Dedupe by mapSeed; must be in the current offer.
+function pocketMap(
+  state: GameState,
+  mapSeed: string,
+): { state: GameState; events: GameEvent[] } {
+  if (state.phase !== "town") return rejected(state, "pocket-map", "not-in-town");
+  const offer = candidateMaps(state.seed, state.runs ?? 0);
+  const found = offer.find((m) => m.mapSeed === mapSeed);
+  if (!found) return rejected(state, "pocket-map", "not-offered");
+  const maps = state.maps ?? [];
+  if (maps.some((m) => m.mapSeed === mapSeed)) return rejected(state, "pocket-map", "already-pocketed");
+  const item = { mapSeed: found.mapSeed, biomeId: found.biomeId, vintage: state.runs ?? 0 };
+  return {
+    state: { ...state, maps: [...maps, item] },
+    events: [{ type: "pocketed-map", mapSeed, biomeId: found.biomeId }],
   };
 }
 

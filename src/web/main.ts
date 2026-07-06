@@ -90,6 +90,7 @@ function fmt(e: GameEvent): string {
         : `☠ the ${name(e.creature)} downed you · run ends, haul kept`) + tail;
     }
     case "crafted": return `✦ crafted ${e.output.qty}× ${name(e.output.defId)}`;
+    case "pocketed-map": return `📜 pocketed a ${name(e.biomeId)} map`;
     case "packed": return `packed ${name(e.defId)} → ${e.slot}`;
     case "run-ended": return `— run ended (${e.reason}) —`;
     case "action-rejected": return `✗ ${e.action} rejected: ${e.reason}`;
