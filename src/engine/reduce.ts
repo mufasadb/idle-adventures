@@ -418,7 +418,7 @@ function fight(state: GameState): { state: GameState; events: GameEvent[] } {
     hp: round.hp, matchup: explainMatchup(expedition.loadout, combat.creature),
   });
   if (round.defeated) {
-    const ended = endExpedition(state, { ...expedition, loadout });
+    const ended = endExpedition(state, { ...expedition, loadout, combat: undefined });
     return { state: ended, events: [exchanged, fought(false), { type: "run-ended", reason: "defeated" }] };
   }
   if (!round.victory) {

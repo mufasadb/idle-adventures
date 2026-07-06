@@ -21,6 +21,7 @@ import {
 import { RECIPE, MAP_WIDTH, MAP_HEIGHT } from "../data/constants";
 import { moveCostBreakdown } from "../engine/move";
 import { costToReach } from "../engine/reach";
+import { damageTaken, playerDamage } from "../engine/combat";
 import type { Action, GameEvent, GameState } from "../engine/types";
 
 // Optional `--reach` flag: an OPT-IN query that prints the gear-adjusted energy
@@ -139,6 +140,12 @@ function printExpedition(st: GameState): void {
   const grid = generateGrid(exp.mapSeed, rollBiome(exp.mapSeed));
   const seen = new Map(perceive(grid, exp.pos, exp.loadout.equipment.tools).map((p) => [`${p.x},${p.y}`, p]));
   const cleared = new Set(exp.cleared.map((c) => `${c.x},${c.y}`));
+  if (exp.combat) {
+    const c = exp.combat;
+    const dmgOut = playerDamage(exp.loadout, c.creature) + c.damageAdd;
+    const dmgIn = damageTaken(exp.loadout, c.creature, c.mitigationAdd);
+    console.log(`\n=== ENGAGED: ${c.creature} — ${c.monsterHp} HP · you hit ${dmgOut}, it hits ${dmgIn} · actions: fight | flee | quaff | toggle-auto-quaff ===`);
+  }
   console.log("\n=== MAP (▲ you · letters = node kinds · detail only resolves near you) ===");
   const rows: string[] = [];
   for (let y = 0; y < MAP_HEIGHT; y++) {

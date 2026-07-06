@@ -13,7 +13,8 @@ import { slotOf } from "../engine/catalog";
 import { moveCost, moveCostBreakdown } from "../engine/move";
 import { carryCap } from "../engine/carry";
 import { heldFoodEnergy } from "../engine/food";
-import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER } from "../data/constants";
+import { damageTaken, playerDamage } from "../engine/combat";
+import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS } from "../data/constants";
 import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons } from "../render/render";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, LoadoutSlot, MapItem } from "../engine/types";
@@ -351,10 +352,15 @@ function herePanel(grid: Grid, exp: NonNullable<GameState["expedition"]>, legal:
     // You're standing on it, so it's always within perception range.
     const per = perceive(grid, exp.pos, exp.loadout.equipment.tools).find((p) => p.x === poi.x && p.y === poi.y);
     const desc = flavorDetail(per?.detail ?? null, "monster");
+    // Pre-engagement forecast: no battle-item buffs applied yet (those land at
+    // engage), so this previews the bare-kit trade — say so in the title.
+    const dmgOut = playerDamage(exp.loadout, poi.creature);
+    const dmgIn = damageTaken(exp.loadout, poi.creature, 0);
     return `<div class="here monster">
       <b>Here:</b> a <b>${name(poi.creature!)}</b> — <i>${desc}</i>.
       It's static: it won't touch you unless you Fight. You can just walk past it.
-      ${canFight ? `<button data-act="fight">⚔ Fight the ${name(poi.creature!)}</button>` : `<span class="warn">can't fight (bag full for its loot?)</span>`}
+      <div class="forecast" title="bare-kit forecast — battle items buff you once you engage">you'd hit for <b>${round(dmgOut)}</b> · it'd hit for <b>${round(dmgIn)}</b></div>
+      ${canFight ? `<button data-act="fight">⚔ Engage the ${name(poi.creature!)}</button>` : `<span class="warn">can't fight (bag full for its loot?)</span>`}
     </div>`;
   }
   // gatherable node
@@ -367,6 +373,32 @@ function herePanel(grid: Grid, exp: NonNullable<GameState["expedition"]>, legal:
     ${canGather ? `<button data-act="gather">${verb.label} it</button>`
       : locked ? `🔒 <span class="warn">your tool is too weak — needs a tier-${tier} tool to work ${name(poi.material!)}</span>`
       : `<span class="warn">can't ${verb.past.replace(/ed$/, "")} (no tool / bag full)</span>`}
+  </div>`;
+}
+
+// The engagement panel replaces herePanel while a live fight is in progress
+// (exp.combat set): monster HP bar, per-round forecast (the honest race —
+// toKill vs toDie, no potion double-count), and Fight/Flee/Potion/auto-quaff.
+function engagementPanel(exp: NonNullable<GameState["expedition"]>, legal: Action[]): string {
+  const c = exp.combat!;
+  const maxHp = MONSTER_TIER_HP_CURVE[MONSTERS[c.creature]!.tier]!;
+  const dmgOut = playerDamage(exp.loadout, c.creature) + c.damageAdd;
+  const dmgIn = damageTaken(exp.loadout, c.creature, c.mitigationAdd);
+  const toKill = Math.ceil(c.monsterHp / dmgOut);
+  const hpPool = exp.hp; // potions extend this — the forecast shows the raw race
+  const toDie = Math.ceil(hpPool / dmgIn);
+  const winning = toKill <= toDie;
+  const canQuaff = legal.some((a) => a.type === "quaff");
+  return `<div class="here monster engagement">
+    <b>⚔ Engaged: ${name(c.creature)}</b>
+    <div class="bar"><span>Its HP</span><div class="track"><div class="fill monster" style="width:${(c.monsterHp / maxHp) * 100}%"></div></div><b>${round(c.monsterHp)}/${maxHp}</b></div>
+    <div class="forecast">you hit for <b>${round(dmgOut)}</b> · it hits for <b>${round(dmgIn)}</b> · <b class="${winning ? "good" : "over"}">${winning ? `kill in ${toKill}` : `it kills you first (~${toDie} rounds)`}</b>${exp.loadout.potions.length ? ` · ${exp.loadout.potions.reduce((n, p) => n + p.qty, 0)} potion(s) extend that` : ""}</div>
+    <div class="actions">
+      <button data-act="fight">⚔ Fight (1 round)</button>
+      <button data-act="flee" title="disengage — take one parting hit (${round(dmgIn)})">🏃 Flee (−${round(dmgIn)} HP)</button>
+      ${canQuaff ? `<button data-act="quaff">🧪 Potion</button>` : `<button disabled title="no potions, or full HP">🧪 Potion</button>`}
+      <button data-act="toggle-auto-quaff">Auto-potion: <b>${(exp.autoQuaff ?? true) ? "on" : "off"}</b></button>
+    </div>
   </div>`;
 }
 
@@ -453,7 +485,7 @@ function expeditionView(): string {
       <div class="gridscroll"><div class="grid" style="grid-template-columns:repeat(${MAP_WIDTH}, 1.4rem);">${cells}</div></div>
     </section>
     <section>
-      ${herePanel(grid, exp, legal)}
+      ${exp.combat ? engagementPanel(exp, legal) : herePanel(grid, exp, legal)}
       <h2>Actions</h2>
       <div class="actions">
         ${legal.some((a) => a.type === "eat") ? `<button data-act="eat">🍖 Eat${exp.loadout.equipment.tools.includes("tent") ? " (+50%)" : ""}</button>` : `<button disabled title="no food, or already full">🍖 Eat</button>`}
