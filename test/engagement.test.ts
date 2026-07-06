@@ -4,14 +4,18 @@ import { emptyLoadout } from "../src/engine/loadout";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import type { Poi } from "../src/engine/grid";
 import { damageTaken } from "../src/engine/combat";
-import { PLAYER_BASE_HP } from "../src/data/constants";
+import { PLAYER_BASE_HP, MAP_HEIGHT, MONSTERS } from "../src/data/constants";
 import type { GameState, GameEvent } from "../src/engine/types";
 
+// Tier-1 only (landing-fix robustness): the bare-sword victory-loop test below
+// assumes a winnable matchup. Filtering to tier 1 keeps that assumption true
+// even if future seed/data shifts move which monster a scan lands on first —
+// a tier-3+ find could otherwise flip the loop to a defeat.
 function monsterMap(): { seed: string; poi: Poi } {
   for (let i = 0; i < 400; i++) {
     const seed = `eng-scan-${i}`;
     const grid = generateGrid(seed, rollBiome(seed));
-    const poi = grid.pois.find((p) => p.kind === "monster" && p.creature !== null);
+    const poi = grid.pois.find((p) => p.kind === "monster" && p.creature !== null && MONSTERS[p.creature!]?.tier === 1);
     if (poi) return { seed, poi };
   }
   throw new Error("no monster POI in scan range");
@@ -105,8 +109,8 @@ test("quaff heals mid-engagement without an exchange; rejects outside one", () =
 test("move onto a live monster engages (moveOnWin) instead of resolving", () => {
   const { seed, poi } = monsterMap();
   const s = onMonster(seed, poi);
-  s.expedition!.pos = { x: poi.x, y: poi.y + 1 }; // stand adjacent (may be off-map bottom edge — scan guarantees? see note below)
-  if (poi.y + 1 >= 60) return; // adjacency fallback: skip pathological placement (documented)
+  s.expedition!.pos = { x: poi.x, y: poi.y + 1 }; // stand adjacent (may be off-map bottom edge — see check below)
+  if (poi.y + 1 >= MAP_HEIGHT) throw new Error(`pathological POI placement: y=${poi.y} has no tile below (MAP_HEIGHT=${MAP_HEIGHT}) — re-seed monsterMap`);
   const { state, events } = reduce(s, { type: "move", to: { x: poi.x, y: poi.y } });
   expect(types(events)).toEqual(["engaged"]);
   expect(state.expedition!.pos).toEqual({ x: poi.x, y: poi.y + 1 }); // did not move

@@ -59,14 +59,15 @@ test("expeditionActions: offers return (always) + some moves, never craft/pack",
   ]).state;
   const actions = expeditionActions(onMap);
   for (const a of actions) expect(accepts(onMap, a)).toBe(true);
-  expect(actions).toContainEqual({ type: "return" }); // always legal (bead note a)
+  expect(actions).toContainEqual({ type: "return" }); // legal here (un-engaged); engaged, return rejects and flee is the out (D43)
   expect(actions.some((a) => a.type === "move")).toBe(true); // at least one legal neighbour
   expect(actions.some((a) => a.type === "craft" || a.type === "pack")).toBe(false);
 });
 
-test("expeditionActions: return is offered even at zero energy (never a dead end)", () => {
+test("expeditionActions: return is offered even at zero energy (never a dead end, un-engaged)", () => {
   // Drain to a genuine 0 (stamina model, dtv): moves are all unaffordable and
-  // (with no food to eat back) return must still stand.
+  // (with no food to eat back) return must still stand. (Un-engaged only — while
+  // engaged, return rejects and flee is the always-available out, D43.)
   const embarked = play("s", [{ type: "embark", mapSeed: OFFER_S }]).state;
   const zero: GameState = { ...embarked, expedition: { ...embarked.expedition!, energy: 0, loadout: { ...embarked.expedition!.loadout, food: [] } } };
   expect(expeditionActions(zero)).toContainEqual({ type: "return" });
@@ -123,4 +124,41 @@ test("expeditionActions: drop-map offered per carried map (8ec)", () => {
   const actions = expeditionActions(withMap);
   expect(actions).toContainEqual({ type: "drop-map", mapSeed: "lm-1" });
   expect(expeditionActions(onMap).some((a) => a.type === "drop-map")).toBe(false);
+});
+
+// Engaged legalActions (si7.1, D43): while engaged, flee is the ALWAYS-available
+// out — return, move, gather, eat, drop, drop-map must all disappear. This pins
+// that claim at the surface drivers actually consume (legalActions), not just at
+// the reducer's rejection behaviour (engagement.test.ts covers that separately).
+test("legalActions: engaged offers flee + quaff + toggle-auto-quaff, never move/gather/eat/return/drop/drop-map", () => {
+  let seed = "";
+  let poi: Poi | undefined;
+  for (let i = 0; i < 400 && !poi; i++) {
+    const s = `legal-eng-${i}`;
+    const g = generateGrid(s, rollBiome(s));
+    poi = g.pois.find((p) => p.kind === "monster" && p.creature !== null);
+    if (poi) seed = s;
+  }
+  expect(poi).toBeTruthy();
+  const loadout = emptyLoadout();
+  loadout.equipment.weapon = "sword";
+  loadout.potions = [{ defId: "potion", qty: 1 }];
+  const stood: GameState = {
+    seed: "g", phase: "expedition", bank: [], loadout: emptyLoadout(),
+    expedition: {
+      mapSeed: seed, pos: { x: poi!.x, y: poi!.y }, energy: 300,
+      hp: 15, loadout, carry: [], cleared: [],
+    },
+  };
+  const engaged = reduce(stood, { type: "fight" }).state; // one fight call: engage, no exchange yet
+  expect(engaged.expedition!.combat).toBeDefined();
+
+  const actions = legalActions(engaged);
+  expect(actions).toContainEqual({ type: "flee" });
+  expect(actions).toContainEqual({ type: "quaff" });
+  expect(actions).toContainEqual({ type: "toggle-auto-quaff" });
+  const forbidden = ["move", "gather", "eat", "return", "drop", "drop-map"];
+  for (const a of actions) expect(forbidden).not.toContain(a.type);
+  // D29 acceptance check: everything legalActions offers, reduce genuinely accepts
+  for (const a of actions) expect(accepts(engaged, a)).toBe(true);
 });

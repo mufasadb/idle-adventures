@@ -413,7 +413,8 @@ function fight(state: GameState): { state: GameState; events: GameEvent[] } {
   const loadout = { ...expedition.loadout, potions: round.potionsAfter };
   const fought = (victory: boolean): GameEvent => ({
     type: "fought", at: { x: combat.at.x, y: combat.at.y }, creature: combat.creature,
-    victory, hpLost: combat.startHp - round.hp, potionsUsed,
+    // quaffing above startHp reads as 0 lost, not negative
+    victory, hpLost: Math.max(0, combat.startHp - round.hp), potionsUsed,
     loot: victory ? rollLoot(state.seed, combat.creature, combat.at).filter((s) => s.defId !== MAP_SCROLL_ID) : [],
     hp: round.hp, matchup: explainMatchup(expedition.loadout, combat.creature),
   });
