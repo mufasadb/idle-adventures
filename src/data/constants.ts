@@ -17,9 +17,9 @@ export const NOISE_FREQUENCY = 0.15; // Perlin sample step per tile; lower = lar
 // literally unreachable barefoot — mountains are cost-walls, not prisons).
 export const BARRIER_NOISE_FREQUENCY = 0.06; // ≪ NOISE_FREQUENCY → chunky ridges, not speckle
 export const BARRIER_THRESHOLD = 0.68; // the "how walled is the world" dial: lower = more maze
-export const POI_DENSITY = 18; // POIs per map — richer than one run can harvest (2026-07-05, qrl): forces "which region do I work?" (sim: ~91%→~55% cleared with 3 food slots). Was 12.
+export const POI_DENSITY = 60; // POIs per 20×60 map (e3j): ~3× area × slightly denser — a geared+provisioned run should harvest ~half and CHOOSE which half. Was 18 on 20×20.
 export const POI_MIN_SPACING = 3; // min Chebyshev distance between POIs (spec: 3–4 tiles apart)
-export const POI_PLACEMENT_ATTEMPTS = 400; // seeded rejection-sampling budget per map
+export const POI_PLACEMENT_ATTEMPTS = 2000; // seeded rejection-sampling budget per map (scaled with density, e3j)
 export const FOOD_REACH_MIN = 2; // Phase 3 (b91): min forageable (herb/animal) nodes that must sit on finite on-foot cost-to-reach tiles; else generateGrid falls back to unbiased placement so a bare loadout is never walled off from food
 // Perception (9u9.2): node KIND is always visible; a node's qualitative identity
 // (species/material/tier/dmg+armour type — never the fight outcome) resolves only
