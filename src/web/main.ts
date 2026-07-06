@@ -248,7 +248,7 @@ function townView(): string {
       ${equipRow("tools", eq.tools.map(name).join(", ") || null)}
       <div class="row"><span class="k">bag</span><span class="v">${inv.used}/${cap} slots</span></div>
       ${inv.html}
-      <div class="muted small">worn gear (ghosted) is free · each food / potion / battle-item / tool takes one slot · food banks ≈ ${heldFoodEnergy(lo.food)} energy and burns down as you travel</div>
+      <div class="muted small">worn gear (ghosted) is free · each food / potion / battle-item / tool takes one slot — bring several tools to work different node types · food banks ≈ ${heldFoodEnergy(lo.food)} energy and burns down as you travel</div>
     </section>
 
     <section>
@@ -266,24 +266,38 @@ function townView(): string {
     </section>
 
     <section>
-      <h2>Recipe book <span class="muted small">everything craftable · ingredients named, sources not</span></h2>
+      <h2>Recipe book <span class="muted small">one line per output · each ingredient path listed below it</span></h2>
       <div class="craftlist">
         ${(() => {
           const affordable = new Set(craftable.map((a) => a.recipeId));
-          const ids = Object.keys(RECIPE).sort((a, b) => {
-            const av = affordable.has(a) ? 0 : 1, bv = affordable.has(b) ? 0 : 1;
-            return av - bv; // affordable first, else stable insertion order
+          // group recipe ids by the defId they output, preserving insertion order
+          const byOutput = new Map<string, string[]>();
+          for (const id of Object.keys(RECIPE)) {
+            const out = RECIPE[id]!.output.defId;
+            (byOutput.get(out) ?? byOutput.set(out, []).get(out)!).push(id);
+          }
+          // outputs with any affordable path first, else stable insertion order
+          const outputs = [...byOutput.keys()].sort((a, b) => {
+            const av = byOutput.get(a)!.some((id) => affordable.has(id)) ? 0 : 1;
+            const bv = byOutput.get(b)!.some((id) => affordable.has(id)) ? 0 : 1;
+            return av - bv;
           });
-          return ids.map((id) => {
-            const r = RECIPE[id]!;
-            const cost = r.inputs.map((i) => `${i.qty}× ${name(i.defId)}`).join(" + ");
-            const can = affordable.has(id);
-            const out = `${r.output.qty}× ${name(r.output.defId)}`;
-            return `<div class="craftitem${can ? "" : " locked"}">${
-              can
-                ? `<button data-craft="${id}">${out}</button>`
-                : `<span class="craftname">${out}</span>`
-            }<span class="muted small">${cost}</span></div>`;
+          return outputs.map((out) => {
+            const ids = byOutput.get(out)!;
+            const qty = RECIPE[ids[0]!]!.output.qty;
+            const anyCan = ids.some((id) => affordable.has(id));
+            const paths = ids.map((id) => {
+              const r = RECIPE[id]!;
+              const ing = r.inputs.map((i) => `${i.qty}× ${name(i.defId)}`).join(" + ");
+              const can = affordable.has(id);
+              return `<div class="craftpath${can ? "" : " locked"}">← ${ing}${
+                can ? ` <button data-craft="${id}">craft ✓</button>` : ""
+              }</div>`;
+            }).join("");
+            return `<div class="craftgroup${anyCan ? "" : " locked"}">
+              <div class="craftname">${qty}× ${name(out)}</div>
+              ${paths}
+            </div>`;
           }).join("");
         })()}
       </div>
