@@ -56,11 +56,11 @@ test("move: steps one tile onto the target terrain and pays its cost", () => {
   const grid = generateGrid(seed, "woodland");
   const { from, to } = findStep(grid, "mud");
   const cost = moveCost("mud", null);
-  const { state, events } = reduce(expeditionState(seed, from, 10), { type: "move", to });
+  const { state, events } = reduce(expeditionState(seed, from, 200), { type: "move", to });
   expect(state.expedition!.pos).toEqual(to);
-  expect(state.expedition!.energy).toBe(10 - cost);
+  expect(state.expedition!.energy).toBe(200 - cost);
   expect(events).toEqual([
-    { type: "moved", from, to, terrain: "mud", cost, energy: 10 - cost },
+    { type: "moved", from, to, terrain: "mud", cost, energy: 200 - cost },
   ]);
 });
 
@@ -97,13 +97,13 @@ test("move: ice step drains more energy than plains step (bead acceptance)", () 
   const tundraGrid = generateGrid(tundraSeed, rollBiome(tundraSeed));
   const ice = findStep(tundraGrid, "ice");
   const iceSpent =
-    10 - reduce(expeditionState(tundraSeed, ice.from, 10), { type: "move", to: ice.to }).state.expedition!.energy;
+    200 - reduce(expeditionState(tundraSeed, ice.from, 200), { type: "move", to: ice.to }).state.expedition!.energy;
 
   const woodSeed = seedFor("woodland");
   const woodGrid = generateGrid(woodSeed, rollBiome(woodSeed));
   const plains = findStep(woodGrid, "plains");
   const plainsSpent =
-    10 - reduce(expeditionState(woodSeed, plains.from, 10), { type: "move", to: plains.to }).state.expedition!.energy;
+    200 - reduce(expeditionState(woodSeed, plains.from, 200), { type: "move", to: plains.to }).state.expedition!.energy;
 
   expect(iceSpent).toBeGreaterThan(plainsSpent);
 });
@@ -137,18 +137,18 @@ test("move: climbing-pick lets you step onto a mountain (finite cost, not reject
   const { from, to } = findStep(grid, "mountain");
 
   // On foot the same step is impassable (mirrors the impassable test's combo).
-  const onFoot = reduce(expeditionState(seed, from, 10), { type: "move", to });
+  const onFoot = reduce(expeditionState(seed, from, 200), { type: "move", to });
   expect(onFoot.events).toEqual([
     { type: "action-rejected", action: "move", reason: "impassable" },
   ]);
 
-  // With a climbing-pick equipped, mountain becomes finite (gate cost 4).
-  const withPick = expeditionState(seed, from, 10);
+  // With a climbing-pick equipped, mountain becomes finite (enable = 40).
+  const withPick = expeditionState(seed, from, 200);
   withPick.expedition!.loadout.equipment.tools = ["climbing-pick"];
   const climbed = reduce(withPick, { type: "move", to });
   expect(climbed.state.expedition!.pos).toEqual(to);
   expect(climbed.events).toEqual([
-    { type: "moved", from, to, terrain: "mountain", cost: 4, energy: 6 },
+    { type: "moved", from, to, terrain: "mountain", cost: 40, energy: 160 },
   ]);
 });
 

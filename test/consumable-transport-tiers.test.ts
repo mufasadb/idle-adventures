@@ -17,7 +17,7 @@ function town(bank: { defId: string; qty: number }[]): GameState {
 }
 
 test("embark: trail-ration yields 2× a ration's energy/item (per-food lever, ff7)", () => {
-  // qty 3 so both clear BASE_ENERGY_FLOOR (20) and the per-item ratio is visible.
+  // qty 3 so both clear BASE_ENERGY_FLOOR (200) and the per-item ratio is visible.
   const withRation = reduce(
     { ...town([{ defId: "ration", qty: 3 }]), loadout: { ...emptyLoadout(), food: [{ defId: "ration", qty: 3 }] } },
     { type: "embark", mapSeed: OFFER_T },
@@ -26,8 +26,8 @@ test("embark: trail-ration yields 2× a ration's energy/item (per-food lever, ff
     { ...town([{ defId: "trail-ration", qty: 3 }]), loadout: { ...emptyLoadout(), food: [{ defId: "trail-ration", qty: 3 }] } },
     { type: "embark", mapSeed: OFFER_T },
   ).state;
-  expect(withRation.expedition!.energy).toBe(24); // 3 × 8
-  expect(withTrail.expedition!.energy).toBe(48); // 3 × 16 — same slots, double energy
+  expect(withRation.expedition!.energy).toBe(240); // 3 × 80
+  expect(withTrail.expedition!.energy).toBe(480); // 3 × 160 — same slots, double energy
 });
 
 test("combat: a greater-potion heals 20 where a potion heals 10", () => {
@@ -47,9 +47,9 @@ test("combat: a greater-potion heals 20 where a potion heals 10", () => {
   expect(b.hpAfter).toBeGreaterThan(a.hpAfter); // greater potions sustain more per quaff
 });
 
-test("move: a wagon halves cost (÷2.0) — cheaper than a horse (÷1.5)", () => {
-  expect(moveCost("ice", "wagon")).toBeLessThan(moveCost("ice", "horse"));
-  expect(moveCost("plains", "wagon")).toBe(moveCost("plains", null) / 2);
+test("move: transport is terrain-specific — wagon wins on ice, horse wins on open ground (svz)", () => {
+  expect(moveCost("ice", "wagon")).toBeLessThan(moveCost("ice", "horse")); // wagon halves ice; horse gets no ice help
+  expect(moveCost("plains", "horse")).toBeLessThan(moveCost("plains", "wagon")); // horse ÷2 vs wagon ÷1.5 on plains
 });
 
 test("backpack: large-pack (16) tops the leather (12) / starter (8) ladder", () => {

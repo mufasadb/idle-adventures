@@ -161,7 +161,9 @@ test("gather: packed food is slot ballast — full slots reject the gather (D23)
     defId: `ration-${i}`,
     qty: 1,
   }));
-  const { events } = reduce(standingOn(seed, poi, { tools: ["pick"], food }), {
+  // energy above the held food (BASE_CARRY_SLOTS × ENERGY_PER_FOOD) so it stays
+  // ballast rather than being eaten just-in-time (which would free slots, pqp).
+  const { events } = reduce(standingOn(seed, poi, { tools: ["pick"], food, energy: 1000 }), {
     type: "gather",
   });
   expect(events).toEqual([

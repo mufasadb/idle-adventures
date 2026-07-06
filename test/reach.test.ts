@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { costToReach } from "../src/engine/reach";
-import { GRID_SIZE } from "../src/data/constants";
+import { GRID_SIZE, TERRAIN_COST } from "../src/data/constants";
 import type { Terrain } from "../src/data/constants";
 
 // costToReach expects a full GRID_SIZE grid, so build a plains field and drop
@@ -13,7 +13,7 @@ test("costToReach: entry is 0, neighbors cost one plains step", () => {
   const g = plainsGrid();
   const cost = costToReach(g, { x: 5, y: 5 });
   expect(cost[5]![5]).toBe(0);
-  expect(cost[5]![6]).toBe(1); // one plains step (8-dir; diagonal same cost here)
+  expect(cost[5]![6]).toBe(TERRAIN_COST.plains); // one plains step (8-dir; diagonal same cost here)
 });
 
 test("costToReach: a full mountain wall makes the far side Infinity on foot", () => {
