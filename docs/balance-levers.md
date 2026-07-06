@@ -8,9 +8,10 @@ The POC ships with *feel-pass* values, not balanced ones. The discipline that ke
 - `ENERGY_PER_FOOD` — default energy per food item (fallback for `FOOD_ENERGY`)
 - `FOOD_ENERGY{foodDefId}` (2026-07-04; ff7 2026-07-05: cut to `ration` 8 / `trail-ration` 16) — per-food energy; tiered food stays 2× denser so progression earns slot efficiency. `ENERGY_PER_FOOD` (fallback) 10→8 too. Do NOT drop below 8 (7 risks the forage-only tundra path). Absent = `ENERGY_PER_FOOD`
 - `BASE_ENERGY_FLOOR` (2026-07-05, qrl) — embark energy = `max(BASE_ENERGY_FLOOR, packedFoodEnergy)`; a no-food embark still gets ~5 actions, so starvation is recoverable-by-effort, not a 0-energy dead-loop (spec §3/§4.5)
-- `MOVE_BASE_COST` — energy per tile on neutral ground
-- `TERRAIN_COST{plains, mud, ice, river, mountain}` — per-terrain multiplier; `Infinity` = impassable without gear (mountain, until gating gear exists)
-- `TRANSPORT_MULTIPLIER{horse, wagon, mule, …}` — move-cost **divisor** (spec §10: base × terrain ÷ transport): >1 faster than foot (horse ÷1.5, wagon ÷2.0 — the answer to ice-heavy tundra), <1 slower (mule); carry bonuses arrive with M3/M5
+- `TERRAIN_COST{plains 10, mud 15, ice 20, river 30, mountain ∞}` — **absolute** step energy on a ×10 scale (svz, graded movement); `Infinity` = the one hard gate (mountain), enabled by `climbing-pick`
+- `MIN_STEP` (5) — floor: a discounted step never costs less than this
+- `TERRAIN_GATE{terrain → toolDefId → {enable?, discount?}}` — gear modifiers: `enable` turns an impassable terrain finite (climbing-pick/mountain → 40); `discount` subtracts points (raft/river −20, waders/mud −5, ice-cleats/ice −15 → glide). Each tool = one slot
+- `TRANSPORT_MULTIPLIER{transport → terrain → divisor}` — **per-terrain** move-cost divisor (svz): horse fast on open ground (plains ÷2), wagon the ice answer (ice ÷2), mule slow-but-hauler (÷0.8); absent terrain / on-foot = ÷1
 
 **Carry** — loot vs supplies tension (UNIT-based since Phase 2 / pqp)
 - `BASE_CARRY_SLOTS` — inventory slots with NO backpack (**6** since pqp) · `BACKPACK_SLOTS{tier}` — total slots per backpack (replaces the base): `starter` 8 / `leather` 12 / `large-pack` 16 · `STACK_CAP` — max qty per **loot** stack (**5**); consumables/tools do NOT stack
