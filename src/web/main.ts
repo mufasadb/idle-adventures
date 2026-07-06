@@ -407,8 +407,21 @@ function expeditionView(): string {
   }
 
   const maxEnergy = exp.maxEnergy ?? MAX_ENERGY;
+  // When a walk is pending, split the energy bar: the part you'll KEEP after the
+  // walk (green) + the part it'll SPEND (orange, red if it would strand you).
+  const pendCost = pending ? pending.cost : 0;
+  const overBudget = pending ? pending.cost > exp.energy : false;
+  const spend = Math.min(pendCost, exp.energy);
+  const keep = exp.energy - spend;
+  const pct = (v: number) => Math.min(100, (v / maxEnergy) * 100);
+  const energyFill = pending
+    ? `<div class="fill energy" style="width:${pct(keep)}%"></div><div class="fill spend${overBudget ? " over" : ""}" style="width:${pct(spend)}%"></div>`
+    : `<div class="fill energy" style="width:${pct(exp.energy)}%"></div>`;
+  const energyLabel = pending
+    ? `${round(exp.energy)}/${maxEnergy} → <b class="${overBudget ? "over" : ""}">${round(Math.max(0, exp.energy - pendCost))}</b>${overBudget ? " ⚠ strands you" : ""}`
+    : `${round(exp.energy)}/${maxEnergy}`;
   const bars = `
-    <div class="bar"><span>Energy</span><div class="track"><div class="fill energy" style="width:${Math.min(100, (exp.energy / maxEnergy) * 100)}%"></div></div><b>${round(exp.energy)}/${maxEnergy}</b></div>
+    <div class="bar"><span>Energy</span><div class="track">${energyFill}</div><b>${energyLabel}</b></div>
     <div class="bar"><span>HP</span><div class="track"><div class="fill hp" style="width:${Math.min(100, (exp.hp / 30) * 100)}%"></div></div><b>${round(exp.hp)}</b></div>`;
 
   const saving = pending

@@ -83,9 +83,11 @@
       /* bars */
       .bar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; font-size: 0.85rem; }
       .bar span { width: 3.5rem; color: #8a8a95; }
-      .track { width: 220px; height: 0.7rem; background: #24242c; border-radius: 4px; overflow: hidden; }
+      .track { width: 220px; height: 0.7rem; background: #24242c; border-radius: 4px; overflow: hidden; display: flex; }
       .fill { height: 100%; }
       .fill.energy { background: #6bbf59; }
+      .fill.spend { background: #d98a2b; }        /* a pending walk will spend this much */
+      .fill.spend.over { background: #c03838; }    /* the walk would strand you (cost > energy) */
       .fill.hp { background: #c03838; }
 
       /* log */

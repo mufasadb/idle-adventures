@@ -20,11 +20,17 @@ import {
 } from "../render/render";
 import { RECIPE, GRID_SIZE } from "../data/constants";
 import { moveCostBreakdown } from "../engine/move";
+import { costToReach } from "../engine/reach";
 import type { Action, GameEvent, GameState } from "../engine/types";
 
-const [seed, actionsArg] = process.argv.slice(2);
+// Optional `--reach` flag: an OPT-IN query that prints the gear-adjusted energy
+// cost to reach each node (one Dijkstra covers the whole map) — run it only when
+// weighing a long walk, so the default render stays cheap.
+const rawArgs = process.argv.slice(2);
+const reachFlag = rawArgs.includes("--reach");
+const [seed, actionsArg] = rawArgs.filter((a) => a !== "--reach");
 if (!seed) {
-  console.error("usage: bun run playtest <seed> '[actions json]'");
+  console.error("usage: bun run playtest <seed> '[actions json]' [--reach]");
   process.exit(1);
 }
 const actions: Action[] = actionsArg ? (JSON.parse(actionsArg) as Action[]) : [];
@@ -145,5 +151,23 @@ function printExpedition(st: GameState): void {
       const tierHint = p.kind !== "monster" && p.detail!.tier > 1 ? ` (needs a tier-${p.detail!.tier} tool)` : "";
       console.log(`  (${p.x},${p.y}) ${flavorDetail(p.detail, p.kind)}${tierHint}`);
     }
+  }
+  if (reachFlag) {
+    // Gear-adjusted energy to reach every node, plus the on-foot delta so the
+    // routing benefit of your transport/tools is legible. One Dijkstra each.
+    const withGear = costToReach(grid.terrain, exp.pos, exp.loadout.equipment.transport, exp.loadout.equipment.tools);
+    const onFoot = costToReach(grid.terrain, exp.pos, null, []);
+    console.log(`\n=== REACH (energy to walk to each node from ${exp.pos.x},${exp.pos.y}; you have ${exp.energy} energy) ===`);
+    for (const poi of grid.pois) {
+      if (cleared.has(`${poi.x},${poi.y}`)) continue;
+      const c = withGear[poi.y]![poi.x]!;
+      if (!Number.isFinite(c)) { console.log(`  (${poi.x},${poi.y}) ${poi.kind} — unreachable on foot (needs gear to cross)`); continue; }
+      const foot = onFoot[poi.y]![poi.x]!;
+      const delta = Number.isFinite(foot) && foot !== c ? ` (${c < foot ? "−" : "+"}${Math.abs(Math.round(foot - c))}e vs on foot)` : "";
+      const afford = c > exp.energy ? " ⚠ more than you have" : "";
+      console.log(`  (${poi.x},${poi.y}) ${poi.kind} — reach ${Math.round(c)}e${delta}${afford}`);
+    }
+  } else {
+    console.log("\nTip: append --reach to the command to see the gear-adjusted energy cost to reach each node before committing to a long walk.");
   }
 }
