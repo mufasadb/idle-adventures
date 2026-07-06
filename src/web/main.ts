@@ -220,6 +220,8 @@ function townView(): string {
   const cap = carryCap(eq);
   const inv = inventoryGrid(lo, [], cap);
   const offer = candidateMaps(state.seed, state.runs ?? 0);
+  const heldMaps = state.maps ?? [];
+  const heldSeeds = new Set(heldMaps.map((m) => m.mapSeed));
   const equipRow = (label: string, val: string | null) =>
     `<div class="row"><span class="k">${label}</span><span class="v">${val ?? "<span class='muted'>—</span>"}</span></div>`;
 
@@ -233,10 +235,21 @@ function townView(): string {
           <div class="mapcard">
             <b>${m.preview.headline}</b>
             <button data-embark="${m.mapSeed}">Embark ▶</button>
+            ${heldSeeds.has(m.mapSeed) ? `<span class="muted small">pocketed</span>` : `<button data-pocket="${m.mapSeed}">Pocket</button>`}
           </div>`).join("")}
       </div>
       ${lo.food.length === 0 ? `<div class="warn">⚠ no food packed → only the base ${BASE_ENERGY_FLOOR} energy (a short run), and nothing to eat mid-run</div>` : ""}
-      <div class="muted small">Pick a biome to work this run. The offer rotates every time you return.</div>
+      <div class="muted small">Embark = "go nearby" (free). Pocket keeps a map to run later — it rotates out of the offer but stays yours.</div>
+
+      <h2 style="margin-top:1rem">Your maps <span class="muted small">held — spent on embark</span></h2>
+      ${heldMaps.length ? `<div class="mapoffer">
+        ${heldMaps.map((m) => `
+          <div class="mapcard">
+            <b>${name(m.biomeId)}</b>
+            <span class="muted small">${(state.runs ?? 0) - m.vintage} runs old</span>
+            <button data-embark="${m.mapSeed}">Embark ▶ (spend)</button>
+          </div>`).join("")}
+      </div>` : `<div class="muted small">(none — pocket a map to keep it for later)</div>`}
     </section>
 
     <section>
@@ -435,6 +448,7 @@ function logView(): string {
 // --- wiring: attach handlers after each render -------------------------------
 function wire(): void {
   app.querySelectorAll<HTMLElement>("[data-embark]").forEach((el) => el.onclick = () => apply({ type: "embark", mapSeed: el.dataset.embark! }));
+  app.querySelectorAll<HTMLElement>("[data-pocket]").forEach((el) => el.onclick = () => apply({ type: "pocket-map", mapSeed: el.dataset.pocket! }));
   app.querySelectorAll<HTMLElement>("[data-craft]").forEach((el) => el.onclick = () => apply({ type: "craft", recipeId: el.dataset.craft! }));
   app.querySelectorAll<HTMLElement>("[data-pack]").forEach((el) => el.onclick = () => apply({ type: "pack", slot: el.dataset.slot as LoadoutSlot, itemId: el.dataset.pack! }));
   app.querySelectorAll<HTMLElement>("[data-drop]").forEach((el) => el.onclick = () => apply({ type: "drop", itemId: el.dataset.drop! }));
