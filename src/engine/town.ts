@@ -31,8 +31,9 @@ export function newGame(seed: string): GameState {
 
 // PREVIEW_FIDELITY (0 for the POC) scales hints beyond the biome-name headline.
 // Structured so higher tiers — and a later cartography system (craftable/editable
-// maps) — plug in here without reshaping the return type.
-function previewHints(_mapSeed: string, _biomeId: BiomeId): string[] {
+// maps) — plug in here without reshaping the return type. Exported for the
+// map-dropped event (8ec): a dropped map previews exactly like an offered one.
+export function previewHints(_mapSeed: string, _biomeId: BiomeId): string[] {
   if (PREVIEW_FIDELITY <= 0) return [];
   return []; // higher-fidelity whispers land here when the lever is raised
 }

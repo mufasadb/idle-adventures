@@ -2,15 +2,15 @@ import type { GameState, Action, GameEvent, LoadoutSlot, RejectionReason, Expedi
 import { generateGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
-import { addToCarry, freeCarryStacks } from "./carry";
+import { addToCarry, freeCarryStacks, freeLootStacks } from "./carry";
 import { toolQualityFor } from "./tools";
 import { resolveCombat, rollLoot, explainMatchup } from "./combat";
 import { eatToRefill, foodEnergyOf } from "./food";
 import { endExpedition, subtractStacks } from "./bank";
 import { craft as applyRecipe } from "./craft";
 import { packItem, reserveLoadout } from "./pack";
-import { candidateMaps } from "./town";
-import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, PLAYER_BASE_HP, GRID_SIZE, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, MATERIAL_TIER } from "../data/constants";
+import { candidateMaps, previewHints } from "./town";
+import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, PLAYER_BASE_HP, GRID_SIZE, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, MATERIAL_TIER, MAP_SCROLL_ID } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 
 // Pure reducer. M2 fills embark/move; M3 fills gather/drop; M4 fills fight; remaining cases are no-op stubs:
@@ -98,6 +98,7 @@ function embark(
         loadout: state.loadout,
         carry: [],
         cleared: [],
+        carriedMaps: [],
       },
     },
     events: [
@@ -238,7 +239,7 @@ function gather(state: GameState): { state: GameState; events: GameEvent[] } {
   const fed = autoRefill(expedition, expedition.energy - cost);
   const energy = fed.energy;
   const loadout = { ...expedition.loadout, food: fed.food };
-  const maxStacks = freeCarryStacks(loadout);
+  const maxStacks = freeLootStacks(loadout, expedition.carriedMaps);
   const qty = GATHER_YIELD[kind];
   const carry = addToCarry(expedition.carry, poi.material, qty, maxStacks);
   if (carry === null) return rejected(state, "gather", "carry-full");
@@ -315,10 +316,16 @@ function fightAt(
 ): { state: GameState; events: GameEvent[] } {
   // Roll the actual drops up front (deterministic, t07): the fit-check reserves
   // space only for loot that WILL drop, so an unrolled 20% rare never blocks.
-  const loot = rollLoot(state.seed, creature, at);
+  const rolled = rollLoot(state.seed, creature, at);
+  // Map scrolls (8ec) never enter carry as materials — they mint a carried
+  // MapItem on victory. The fit check covers MATERIAL loot only: the map is an
+  // optional pickup (left behind if the pack is full), never a reason to
+  // refuse a fight.
+  const mapDrops = rolled.filter((s) => s.defId === MAP_SCROLL_ID);
+  const loot = rolled.filter((s) => s.defId !== MAP_SCROLL_ID);
   // Pre-fight fit check: rejecting is free, so the player can drop and retry
   // instead of losing loot (or HP) to a full pack.
-  const maxStacks = freeCarryStacks(expedition.loadout);
+  const maxStacks = freeLootStacks(expedition.loadout, expedition.carriedMaps);
   let carryWithLoot: typeof expedition.carry | null = expedition.carry;
   for (const stack of loot) {
     carryWithLoot = addToCarry(carryWithLoot, stack.defId, stack.qty, maxStacks);
@@ -344,6 +351,19 @@ function fightAt(
     });
     return { state: ended, events: [fought, { type: "run-ended", reason: "defeated" }] };
   }
+  const carriedMaps = expedition.carriedMaps ?? [];
+  let mapsAfter = carriedMaps;
+  const mapEvents: GameEvent[] = [];
+  if (mapDrops.length > 0) {
+    // Mint (8ec): seed is namespaced by run-map + tile, so the drop is replayable
+    // (D14) and the biome falls out of rollBiome — uniform, and embark re-derives
+    // it from the seed exactly like an offered map (D21).
+    const mapSeed = `${expedition.mapSeed}:drop:${at.x},${at.y}`;
+    const biomeId = rollBiome(mapSeed);
+    const carried = carryWithLoot.length + carriedMaps.length < freeCarryStacks(expedition.loadout);
+    if (carried) mapsAfter = [...carriedMaps, { mapSeed, biomeId, vintage: state.runs ?? 0 }];
+    mapEvents.push({ type: "map-dropped", at: { x: at.x, y: at.y }, mapSeed, biomeId, hints: previewHints(mapSeed, biomeId), carried });
+  }
   return {
     state: {
       ...state,
@@ -354,9 +374,10 @@ function fightAt(
         loadout: { ...expedition.loadout, potions: result.potionsAfter, battleItems: result.battleItemsAfter },
         carry: carryWithLoot,
         cleared: [...expedition.cleared, { x: at.x, y: at.y }],
+        carriedMaps: mapsAfter,
       },
     },
-    events: [fought],
+    events: [fought, ...mapEvents],
   };
 }
 

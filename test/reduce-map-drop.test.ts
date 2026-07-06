@@ -1,0 +1,117 @@
+// Humanoid map drops (8ec): fightAt mints a carried MapItem; carried maps cost
+// a slot each and bank as held maps at run end.
+import { test, expect } from "bun:test";
+import { reduce } from "../src/engine/reduce";
+import { emptyLoadout } from "../src/engine/loadout";
+import { generateGrid, rollBiome } from "../src/engine/grid";
+import type { Poi } from "../src/engine/grid";
+import { rand } from "../src/engine/rng";
+import {
+  MAP_DROP_CHANCE,
+  MAP_SCROLL_ID,
+  PLAYER_BASE_HP,
+  BASE_CARRY_SLOTS,
+  STACK_CAP,
+} from "../src/data/constants";
+import type { GameState, MapItem } from "../src/engine/types";
+
+// Find a map with a tier-1 humanoid the base sword build beats, where the
+// map-scroll roll PASSES (drop=true) or FAILS (drop=false) on the game seed "g".
+function humanoidFight(drop: boolean): { seed: string; poi: Poi } {
+  for (let i = 0; i < 2000; i++) {
+    const seed = `8ec-scan-${i}`;
+    const grid = generateGrid(seed, rollBiome(seed));
+    const poi = grid.pois.find(
+      (p) => p.kind === "monster" && (p.creature === "sand-raider" || p.creature === "forest-bandit"),
+    );
+    if (!poi) continue;
+    const roll = rand("g", "loot", poi.creature!, poi.x, poi.y, MAP_SCROLL_ID);
+    if (roll < MAP_DROP_CHANCE === drop) return { seed, poi };
+  }
+  throw new Error("no suitable humanoid map in scan range");
+}
+
+function atMonster(seed: string, poi: Poi, mutate?: (s: GameState) => void): GameState {
+  const loadout = emptyLoadout();
+  loadout.equipment.weapon = "sword";
+  const state: GameState = {
+    seed: "g",
+    phase: "expedition",
+    bank: [],
+    loadout: emptyLoadout(),
+    runs: 3,
+    expedition: {
+      mapSeed: seed,
+      pos: { x: poi.x, y: poi.y },
+      energy: 50,
+      hp: PLAYER_BASE_HP,
+      loadout,
+      carry: [],
+      cleared: [],
+    },
+  };
+  mutate?.(state);
+  return state;
+}
+
+test("humanoid victory mints a carried map: deterministic seed, biome from rollBiome, vintage=runs", () => {
+  const { seed, poi } = humanoidFight(true);
+  const { state, events } = reduce(atMonster(seed, poi), { type: "fight" });
+  const expectedSeed = `${seed}:drop:${poi.x},${poi.y}`;
+  expect(state.expedition!.carriedMaps ?? []).toEqual([
+    { mapSeed: expectedSeed, biomeId: rollBiome(expectedSeed), vintage: 3 },
+  ]);
+  expect(events).toContainEqual({
+    type: "map-dropped",
+    at: { x: poi.x, y: poi.y },
+    mapSeed: expectedSeed,
+    biomeId: rollBiome(expectedSeed),
+    hints: [],
+    carried: true,
+  });
+  // the scroll never enters carry as a material, and fought.loot excludes it
+  expect(state.expedition!.carry.some((s) => s.defId === MAP_SCROLL_ID)).toBe(false);
+  const fought = events.find((e) => e.type === "fought") as { loot: { defId: string }[] };
+  expect(fought.loot.some((s) => s.defId === MAP_SCROLL_ID)).toBe(false);
+});
+
+test("no roll, no map", () => {
+  const { seed, poi } = humanoidFight(false);
+  const { state, events } = reduce(atMonster(seed, poi), { type: "fight" });
+  expect(state.expedition!.carriedMaps ?? []).toEqual([]);
+  expect(events.some((e) => e.type === "map-dropped")).toBe(false);
+});
+
+test("full pack: map left behind (carried:false), fight unaffected", () => {
+  const { seed, poi } = humanoidFight(true);
+  const before = atMonster(seed, poi, (s) => {
+    // fill all but one free slot with distinct full stacks: the fight's material
+    // loot takes the last stack, leaving no free slot for the map
+    s.expedition!.carry = Array.from({ length: BASE_CARRY_SLOTS - 1 }, (_, i) => ({
+      defId: `filler-${i}`,
+      qty: STACK_CAP,
+    }));
+  });
+  const { state, events } = reduce(before, { type: "fight" });
+  const dropped = events.find((e) => e.type === "map-dropped") as { carried: boolean } | undefined;
+  expect(dropped?.carried).toBe(false);
+  expect(state.expedition!.carriedMaps ?? []).toEqual([]);
+  expect(events.some((e) => e.type === "fought")).toBe(true);
+});
+
+test("carried maps debit gather/loot capacity by one stack each", () => {
+  const { seed, poi } = humanoidFight(true);
+  const held: MapItem[] = Array.from({ length: BASE_CARRY_SLOTS }, (_, i) => ({
+    mapSeed: `m${i}`,
+    biomeId: "desert",
+    vintage: 0,
+  }));
+  const before = atMonster(seed, poi, (s) => {
+    s.expedition!.carriedMaps = held;
+  });
+  // all slots eaten by maps → the fight's material loot can't fit → carry-full
+  const { events } = reduce(before, { type: "fight" });
+  expect(events).toContainEqual(
+    expect.objectContaining({ type: "action-rejected", reason: "carry-full" }),
+  );
+});
