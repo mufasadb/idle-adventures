@@ -22,6 +22,12 @@ export function freeCarryStacks(loadout: Loadout): number {
   return carryCap(loadout.equipment) - consumableSlots(loadout);
 }
 
+// Loot capacity after carried maps take their slots (8ec): each carried map
+// costs one slot for the run. Gather + fightAt size their stack budget here.
+export function freeLootStacks(loadout: Loadout, carriedMaps: { mapSeed: string }[] | undefined): number {
+  return freeCarryStacks(loadout) - (carriedMaps ?? []).length;
+}
+
 // Backpack tier total. The backpack REPLACES the base (it IS your storage), it
 // doesn't add to it. Transport/panniers layer ON TOP via carryCap (zhn).
 export function slotCap(backpack: string | null): number {

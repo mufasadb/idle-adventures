@@ -12,6 +12,7 @@ import {
   MONSTER_TIER_HP_CURVE,
   MONSTER_TIER_DMG_CURVE,
   LOOT_TABLE,
+  CATEGORY_LOOT_TABLE,
   POTION_HEAL,
   POTION_HEAL_BY,
   AUTO_POTION_THRESHOLD,
@@ -58,7 +59,14 @@ export function rollLoot(
   at: { x: number; y: number },
 ): ItemStack[] {
   const loot: ItemStack[] = [];
-  for (const entry of LOOT_TABLE[creature] ?? []) {
+  // Category entries (8ec) roll alongside the monster's own; the rand key
+  // already includes defId, so monster + category drops stay independent.
+  // Unknown test creatures fall back to the empty beast table.
+  const entries = [
+    ...(LOOT_TABLE[creature] ?? []),
+    ...(CATEGORY_LOOT_TABLE[MONSTERS[creature]?.category ?? "beast"] ?? []),
+  ];
+  for (const entry of entries) {
     if (
       entry.chance !== undefined &&
       rand(seed, "loot", creature, at.x, at.y, entry.defId) >= entry.chance

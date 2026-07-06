@@ -59,6 +59,8 @@ export function expeditionActions(state: GameState): Action[] {
   candidates.push({ type: "toggle-auto-eat" });
   // drop each carried stack
   for (const stack of carry) candidates.push({ type: "drop", itemId: stack.defId });
+  // drop each carried map (8ec)
+  for (const m of state.expedition.carriedMaps ?? []) candidates.push({ type: "drop-map", mapSeed: m.mapSeed });
   // return is always legal — a 0-energy run is never a dead end (bead note a)
   candidates.push({ type: "return" });
   return candidates.filter((a) => accepts(state, a));

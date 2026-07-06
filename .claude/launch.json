@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["--port", "3457", "./src/web/index.html"],
+      "port": 3457
+    }
+  ]
+}
