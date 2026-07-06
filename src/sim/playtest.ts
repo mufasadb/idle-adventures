@@ -19,6 +19,7 @@ import {
   PLAYER_CHAR,
 } from "../render/render";
 import { RECIPE, GRID_SIZE } from "../data/constants";
+import { moveCostBreakdown } from "../engine/move";
 import type { Action, GameEvent, GameState } from "../engine/types";
 
 const [seed, actionsArg] = process.argv.slice(2);
@@ -67,6 +68,23 @@ const active = state.expedition?.loadout ?? s.loadout;
 const eq = active.equipment;
 const worn = [eq.weapon, eq.helmet, eq.chest, eq.legs, eq.boots, eq.gloves, eq.transport, eq.backpack, eq.panniers, ...eq.tools].filter(Boolean);
 console.log(`equipped: ${worn.join(", ") || "(nothing)"} · food: ${active.food.map((f) => `${f.qty}× ${f.defId}`).join(", ") || "none"} · potions: ${active.potions.map((p) => `${p.qty}× ${p.defId}`).join(", ") || "none"}${active.battleItems?.length ? ` · battle: ${active.battleItems.map((b) => `${b.qty}× ${b.defId}`).join(", ")}` : ""}`);
+// Make transport/gating gear legible: what it does to a step's cost (mirrors the web).
+{
+  const notes: string[] = [];
+  if (eq.transport) {
+    const withT = moveCostBreakdown("plains", eq.transport, []).final;
+    const onFoot = moveCostBreakdown("plains", null, []).final;
+    if (withT !== onFoot) notes.push(`${eq.transport}: plains ${withT}e vs ${onFoot}e on foot`);
+  }
+  for (const gate of [["climbing-pick", "mountain"], ["raft", "river"], ["waders", "mud"], ["ice-cleats", "ice"]] as const) {
+    if (!eq.tools.includes(gate[0])) continue;
+    const bd = moveCostBreakdown(gate[1], null, eq.tools);
+    const bare = moveCostBreakdown(gate[1], null, []).final;
+    if (bd.enabled) notes.push(`${gate[0]}: ${gate[1]} ∞ → ${bd.final}e`);
+    else if (bd.final !== bare) notes.push(`${gate[0]}: ${gate[1]} ${bare}e → ${bd.final}e`);
+  }
+  if (notes.length) console.log(`  gear effect: ${notes.join(" · ")}`);
+}
 
 if (s.phase === "town") printTown(state);
 else printExpedition(state);
@@ -89,6 +107,7 @@ function printTown(st: GameState): void {
     const ing = r.inputs.map((i) => `${i.qty}× ${i.defId}`).join(" + ");
     console.log(`  ${affordable.has(id) ? "✓" : "·"} ${r.output.qty}× ${r.output.defId}  ←  ${ing}`);
   }
+  console.log("\nTip: tools each take one bag slot — you can pack several (pick + axe + knife + …).");
 }
 
 function printExpedition(st: GameState): void {
@@ -113,6 +132,9 @@ function printExpedition(st: GameState): void {
   const nearby = [...seen.values()].filter((p) => p.detail && !cleared.has(`${p.x},${p.y}`));
   if (nearby.length) {
     console.log("\nWhat you can make out nearby:");
-    for (const p of nearby) console.log(`  (${p.x},${p.y}) ${flavorDetail(p.detail, p.kind)}`);
+    for (const p of nearby) {
+      const tierHint = p.kind !== "monster" && p.detail!.tier > 1 ? ` (needs a tier-${p.detail!.tier} tool)` : "";
+      console.log(`  (${p.x},${p.y}) ${flavorDetail(p.detail, p.kind)}${tierHint}`);
+    }
   }
 }
