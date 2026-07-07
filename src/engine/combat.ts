@@ -1,6 +1,7 @@
 // Deterministic combat (M4, D11). Pure math — no RNG: the outcome is a
 // function of (loadout, hp, monsterId). Spyglass "pre-computes the exact
 // outcome" by literally calling this.
+// ⚠ balance surface: changing this requires `bun run sim:tables` (test/balance-tables.test.ts enforces)
 import {
   DMG_ARMOUR_MATRIX,
   PLAYER_BASE_HP,

@@ -260,6 +260,7 @@ export const CHIP_DAMAGE_MIN = 1; // floor on damage both directions; HP always 
 // by MITIGATION_K/(K + D) where D = Σ(defense ÷ matrix). Armour REDUCES the
 // toll (full iron plate ≈ −50%, mithril ≈ −70%) but never floors it to chip —
 // the M7 F1 "plate floors the whole bestiary" collapse dies here.
+// ⚠ balance surface: changing this requires `bun run sim:tables` (test/balance-tables.test.ts enforces)
 export const MITIGATION_K = 6;
 export const POTION_HEAL = 10; // default HP restored per potion use (fallback for POTION_HEAL_BY)
 // Per-potion heal (2026-07-04): tiered potions restore more, gated by a T2
@@ -271,12 +272,14 @@ export const POTION_HEAL_BY: Record<string, number> = {
 export const AUTO_POTION_THRESHOLD = 0.5; // fraction of base HP to auto-quaff at
 export const UNARMED_DAMAGE = 1; // damage when wielding no weapon
 
+// ⚠ balance surface: changing this requires `bun run sim:tables` (test/balance-tables.test.ts enforces)
 export const MONSTER_TIER_HP_CURVE: Record<number, number> = {
   1: 8,
   2: 16,
   3: 28,
   4: 54, // tier-4 boss: 9 mithril-sword strikes → 8 retaliations — exactly the 3-greater-potion gate (D34 recalibrated, si7.1)
 }; // monster base HP by tier
+// ⚠ balance surface: changing this requires `bun run sim:tables` (test/balance-tables.test.ts enforces)
 export const MONSTER_TIER_DMG_CURVE: Record<number, number> = {
   1: 4,
   2: 8,
@@ -292,6 +295,7 @@ export const MONSTER_TIER_DMG_CURVE: Record<number, number> = {
 // up can beat the Wyrm without the full mithril grind — at a real inventory-slot
 // cost (pqp). resolveCombat sums damageAdd into dmgOut and mitigationAdd into
 // mitigation. Absent defId = no buff.
+// ⚠ balance surface: changing this requires `bun run sim:tables` (test/balance-tables.test.ts enforces)
 export const COMBAT_BUFF: Record<string, { damageAdd?: number; mitigationAdd?: number }> = {
   "elixir-of-power": { damageAdd: 2 }, // from dust-vampire's vampire-ash
   "warding-draught": { mitigationAdd: 3 }, // from ice-troll's troll-hide
@@ -299,6 +303,7 @@ export const COMBAT_BUFF: Record<string, { damageAdd?: number; mitigationAdd?: n
 
 export const AFFINITY_MULTIPLIER = 2; // hidden affinity effect, e.g. silver↔werewolf
 export type Affinity = { monsterTag: string; itemTag: string };
+// ⚠ balance surface: changing this requires `bun run sim:tables` (test/balance-tables.test.ts enforces)
 export const AFFINITIES: Affinity[] = [
   { monsterTag: "werewolf", itemTag: "silver" },
   { monsterTag: "fae", itemTag: "iron" },
@@ -312,6 +317,7 @@ export const AFFINITIES: Affinity[] = [
 // stay in `tags`.
 export type MonsterCategory = "beast" | "humanoid" | "fae" | "undead" | "giant" | "dragon";
 export type Monster = { tier: number; dmgType: DmgType; armourType: ArmourType; category: MonsterCategory; tags: string[] };
+// ⚠ balance surface: changing this requires `bun run sim:tables` (test/balance-tables.test.ts enforces)
 export const MONSTERS: Record<string, Monster> = {
   werewolf: { tier: 2, dmgType: "melee", armourType: "light", category: "beast", tags: ["werewolf", "beast"] },
   "fae-sprite": { tier: 1, dmgType: "magic", armourType: "robe", category: "fae", tags: ["fae"] },
@@ -339,6 +345,7 @@ export const MONSTERS: Record<string, Monster> = {
 }; // monster combat stats and loot triggers
 
 export type Weapon = { dmgType: DmgType; damage: number; tags: string[] };
+// ⚠ balance surface: changing this requires `bun run sim:tables` (test/balance-tables.test.ts enforces)
 export const WEAPONS: Record<string, Weapon> = {
   // T1 (damage 3) — starter/basic, matrix + affinity choices live here early
   sword: { dmgType: "melee", damage: 3, tags: [] },
@@ -358,6 +365,7 @@ export const WEAPONS: Record<string, Weapon> = {
 }; // weapon damage type and affinity tags. Damage scales modestly (3/4/6) so armour type still matters vs a tier-up weapon
 
 export type ArmourSlot = "helmet" | "chest" | "legs" | "boots" | "gloves";
+// ⚠ balance surface: changing this requires `bun run sim:tables` (test/balance-tables.test.ts enforces)
 export const ARMOUR: Record<string, { armourType: ArmourType; defense: number; slot: ArmourSlot }> = {
   "plate-helmet": { armourType: "plate", defense: 1, slot: "helmet" }, // iron plate Σ6 (cut 2026-07-05): protective but doesn't floor tier-3
   "plate-chest": { armourType: "plate", defense: 2, slot: "chest" },

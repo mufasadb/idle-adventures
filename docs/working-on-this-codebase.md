@@ -22,6 +22,7 @@ All three green before every commit. Lint enforces the engine-purity boundary (n
 
 - `test/harness-sustainability.test.ts` passes **UN-EDITED**. If your change reds it, your levers are wrong — adjust them until it greens. Editing the harness to pass is landing a lie.
 - Pinned design gates: `test/combat-toll.test.ts` (toll bands; Wyrm = 3 greater-potions win / 2 die; wyrmfang farmability), `test/barrier.test.ts` (walkable-tile connectivity + walkable entry across seeds), `test/roster.test.ts` (type-spread + Wyrm rarity), `test/reach-fraction.test.ts` structural asserts (farthest POI > `MAX_ENERGY`). Their thresholds encode approved design decisions — a red pin means your change broke a decision, not that the test needs "updating."
+- `test/balance-tables.test.ts` — the committed docs/balance/ tables must match simTables(); red means a combat-affecting change landed without `bun run sim:tables`. Regenerate and commit the table diff — reading that diff is how a tuning change gets reviewed.
 
 ## Test idioms
 
