@@ -28,19 +28,22 @@ test("resolveKit: unknown ids fail fast naming the valid set", () => {
 });
 
 // The composition can't drift from the engine: simFight's verdict must equal
-// resolveCombat's for every kit × monster × potion combination we sweep.
-test("simFight matches resolveCombat across kits × monsters × potions", () => {
+// resolveCombat's for every kit × monster × potion × battle item combination we sweep.
+test("simFight matches resolveCombat across kits × monsters × potions × battle items", () => {
   const monsters = ["forest-boar", "giant-scorpion", "ice-troll", "ancient-wyrm"];
   const potionSets: { defId: string; qty: number }[][] = [[], [{ defId: "greater-potion", qty: 3 }]];
+  const battleItemSets: { defId: string; qty: number }[][] = [[], [{ defId: "elixir-of-power", qty: 1 }, { defId: "warding-draught", qty: 1 }]];
   for (const kitName of Object.keys(KIT_PRESETS)) {
     for (const m of monsters) {
       for (const potions of potionSets) {
-        const kit = resolveKit(kitName, { potions });
-        const report = simFight(kit, m);
-        const atomic = resolveCombat(kit, PLAYER_BASE_HP, m);
-        expect({ victory: report.victory, hpLost: report.hpLost, potionsUsed: report.potionsUsed })
-          .toEqual({ victory: atomic.victory, hpLost: atomic.hpLost, potionsUsed: atomic.potionsUsed });
-        expect(report.rounds.length).toBeGreaterThan(0);
+        for (const battleItems of battleItemSets) {
+          const kit = resolveKit(kitName, { potions, battleItems });
+          const report = simFight(kit, m);
+          const atomic = resolveCombat(kit, PLAYER_BASE_HP, m);
+          expect({ victory: report.victory, hpLost: report.hpLost, potionsUsed: report.potionsUsed })
+            .toEqual({ victory: atomic.victory, hpLost: atomic.hpLost, potionsUsed: atomic.potionsUsed });
+          expect(report.rounds.length).toBeGreaterThan(0);
+        }
       }
     }
   }
