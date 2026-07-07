@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { craft } from "../src/engine/craft";
-import { RECIPE, ARMOUR, WEAPONS, TOOL_CAPABILITY, BACKPACK_SLOTS, TRANSPORT_MULTIPLIER, FOOD, POTION, BATTLE_ITEM, PANNIERS } from "../src/data/constants";
+import { RECIPE, ARMOUR, WEAPONS, TOOL_CAPABILITY, BACKPACK_SLOTS, TRANSPORT_MULTIPLIER, FOOD, POTION, BATTLE_ITEM, PANNIERS, AMMO } from "../src/data/constants";
 import { slotOf } from "../src/engine/catalog";
 
 test("craft: consumes inputs and yields output (bead acceptance)", () => {
@@ -29,12 +29,17 @@ test("craft: does not mutate the input bank", () => {
   expect(bank).toEqual(before);
 });
 
-test("recipes: every output is a real equippable/consumable defId", () => {
+test("recipes: every output is a real equippable/consumable defId — or a crafted intermediate another recipe consumes", () => {
   const known = (d: string) =>
     d in WEAPONS || d in ARMOUR || d in TOOL_CAPABILITY || d in BACKPACK_SLOTS ||
-    d in TRANSPORT_MULTIPLIER || FOOD.includes(d) || POTION.includes(d) || BATTLE_ITEM.includes(d) || PANNIERS.includes(d);
+    d in TRANSPORT_MULTIPLIER || FOOD.includes(d) || POTION.includes(d) || BATTLE_ITEM.includes(d) || PANNIERS.includes(d) || AMMO.includes(d);
+  // Crafted intermediates (D45 ranged-combat spec, 2026-07-07): `bowstring` is the
+  // first recipe OUTPUT that is itself a material — legal iff some other recipe
+  // consumes it (otherwise it'd be a dead-end craft).
+  const isIntermediate = (d: string) =>
+    Object.values(RECIPE).some((r) => r.inputs.some((i) => i.defId === d));
   for (const [id, recipe] of Object.entries(RECIPE)) {
-    expect(known(recipe.output.defId)).toBe(true);
+    expect(known(recipe.output.defId) || isIntermediate(recipe.output.defId)).toBe(true);
     expect(recipe.output.qty).toBeGreaterThan(0);
     expect(recipe.inputs.length).toBeGreaterThan(0);
     // recipe id conventionally matches its output for gear — optionally with a

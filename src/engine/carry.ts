@@ -1,18 +1,21 @@
 // Carry-slot accounting. Loot stacks hold STACK_CAP each; consumables and tools
 // each occupy ONE slot per unit (Phase 2, pqp — no stacking for consumables).
-import { BASE_CARRY_SLOTS, BACKPACK_SLOTS, STACK_CAP, TRANSPORT_CARRY, BEAST_TRANSPORTS, PANNIERS_SLOTS } from "../data/constants";
+import { BASE_CARRY_SLOTS, BACKPACK_SLOTS, STACK_CAP, TRANSPORT_CARRY, BEAST_TRANSPORTS, PANNIERS_SLOTS, AMMO, ARROW_STACK_CAP } from "../data/constants";
 import { isGear } from "./catalog";
 import type { ItemStack, Loadout, Equipment } from "./types";
 
 // Gear takes one slot PER PIECE in carry (82r) — consistent with tools costing a
 // slot each in the loadout — so a spare sword is a real slot commitment. Loot
-// keeps stacking to STACK_CAP.
+// keeps stacking to STACK_CAP. Ammo (D45) stacks deep — ARROW_STACK_CAP per slot,
+// so a slot of arrows ≈ 20 shots.
 export function stackCapOf(defId: string): number {
+  if (AMMO.includes(defId)) return ARROW_STACK_CAP;
   return isGear(defId) ? 1 : STACK_CAP;
 }
 
 // Inventory slots consumed by non-loot items (pqp): each food unit, each potion
-// unit, and each tool is one slot. Loot (carry) stacks take the rest.
+// unit, and each tool is one slot. Ammo (D45) is the exception: it stacks, so it
+// costs ceil(units/ARROW_STACK_CAP) slots. Loot (carry) stacks take the rest.
 export function consumableSlots(loadout: Loadout): number {
   const units = (stacks: ItemStack[]) => stacks.reduce((n, s) => n + s.qty, 0);
   return (
@@ -20,6 +23,7 @@ export function consumableSlots(loadout: Loadout): number {
     units(loadout.potions) +
     units(loadout.battleItems ?? []) +
     units(loadout.spares ?? []) + // spare gear (82r): 1 slot per piece, town-side; expanded into carry at embark
+    (loadout.ammo ?? []).reduce((n, s) => n + Math.ceil(s.qty / stackCapOf(s.defId)), 0) + // ammo (D45): stacked slots
     loadout.equipment.tools.length
   );
 }

@@ -13,8 +13,8 @@ import { slotOf } from "../engine/catalog";
 import { moveCost, moveCostBreakdown } from "../engine/move";
 import { carryCap } from "../engine/carry";
 import { heldFoodEnergy } from "../engine/food";
-import { damageTaken, playerDamage } from "../engine/combat";
-import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY } from "../data/constants";
+import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
+import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP } from "../data/constants";
 import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons } from "../render/render";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, LoadoutSlot, MapItem } from "../engine/types";
@@ -40,7 +40,7 @@ const seed = params.get("seed") ?? "play";
 const SAVE_KEY = `idle-adv:${seed}`;
 
 type Pos = { x: number; y: number };
-type Pending = { goal: Pos; path: Pos[]; cost: number; fight?: string } | null;
+type Pending = { goal: Pos; path: Pos[]; cost: number; fight?: string; shoot?: boolean } | null; // shoot (D45): the goal is adjacent + a ranged engage is legal
 
 let state: GameState = load() ?? newGame(seed);
 let log: string[] = loadLog();
@@ -101,8 +101,10 @@ function fmt(e: GameEvent): string {
     case "packed": return `packed ${name(e.defId)} → ${e.slot}`;
     case "run-ended": return `— run ended (${e.reason}) —`;
     case "action-rejected": return `✗ ${e.action} rejected: ${e.reason}`;
-    case "engaged": return `⚔ engaged the ${name(e.creature)}`;
-    case "exchanged": return `⚔ traded blows with the ${e.creature} — dealt ${round(e.dmgDealt)}, took ${round(e.dmgTaken)} · ${round(e.hp)}hp left`;
+    case "engaged": return e.ranged
+      ? `🏹 engaged the ${name(e.creature)} from a tile away — your opener lands before it can answer`
+      : `⚔ engaged the ${name(e.creature)}`;
+    case "exchanged": return `⚔ traded blows with the ${e.creature} — dealt ${round(e.dmgDealt)}, took ${round(e.dmgTaken)} · ${round(e.hp)}hp left${e.arrowSpent ? " · 🏹 −1 arrow" : ""}`;
     case "fled": return `🏃 fled the ${name(e.creature)} · −${round(e.partingHit)}hp → ${round(e.hp)}hp`;
     case "quaffed": return `🧪 quaffed ${name(e.defId)} · +${round(e.healed)}hp → ${round(e.hp)}hp${e.energy !== undefined ? ` · −${QUAFF_ENERGY}e → ${round(e.energy)}e` : ""}`;
     case "auto-quaff-toggled": return `auto-quaff ${e.on ? "on" : "off"}`;
@@ -209,6 +211,12 @@ function realSlots(loadout: Loadout, carry: ItemStack[], maps: MapItem[] = []): 
   units(loadout.potions, "potion");
   units(loadout.battleItems ?? [], "battle");
   units(loadout.spares ?? [], "tool"); // spare gear (82r): 1 slot per piece, grey like tools; expands into carry at embark
+  // ammo (D45): the one deep-stacking consumable — one box per ARROW_STACK_CAP slot, shown ×qty like loot
+  for (const it of loadout.ammo ?? []) {
+    for (let rest = it.qty; rest > 0; rest -= ARROW_STACK_CAP) {
+      boxes.push(slotBox("ammo", name(it.defId), `×${Math.min(rest, ARROW_STACK_CAP)}`));
+    }
+  }
   for (const t of loadout.equipment.tools) boxes.push(slotBox("tool", name(t), ""));
   for (const s of carry) boxes.push(slotBox("loot", name(s.defId), `×${s.qty}`));
   for (const m of maps) boxes.push(slotBox("loot", `🗺️ ${name(m.biomeId)} map`, "")); // carried maps (8ec): 1 slot each
@@ -394,10 +402,13 @@ function engagementPanel(exp: NonNullable<GameState["expedition"]>, legal: Actio
   const toDie = Math.ceil(hpPool / dmgIn);
   const winning = toKill <= toDie;
   const canQuaff = legal.some((a) => a.type === "quaff");
+  // Quiver readout (D45): a wielded bow spends an arrow per round; empty = club.
+  const arrows = (exp.loadout.ammo ?? []).reduce((n, s) => n + s.qty, 0);
+  const quiver = wieldsRanged(exp.loadout) ? ` · 🏹 ${arrows} arrow${arrows === 1 ? "" : "s"}${arrows === 0 ? " — swinging it like a club!" : ""}` : "";
   return `<div class="here monster engagement">
     <b>⚔ Engaged: ${name(c.creature)}</b>
     <div class="bar"><span>Its HP</span><div class="track"><div class="fill monster" style="width:${(c.monsterHp / maxHp) * 100}%"></div></div><b>${round(c.monsterHp)}/${maxHp}</b></div>
-    <div class="forecast">you hit for <b>${round(dmgOut)}</b> · it hits for <b>${round(dmgIn)}</b> · <b class="${winning ? "good" : "over"}">${winning ? `kill in ${toKill}` : `it kills you first (~${toDie} rounds)`}</b>${exp.loadout.potions.length ? ` · ${exp.loadout.potions.reduce((n, p) => n + p.qty, 0)} potion(s) extend that` : ""}</div>
+    <div class="forecast">you hit for <b>${round(dmgOut)}</b> · it hits for <b>${round(dmgIn)}</b> · <b class="${winning ? "good" : "over"}">${winning ? `kill in ${toKill}` : `it kills you first (~${toDie} rounds)`}</b>${exp.loadout.potions.length ? ` · ${exp.loadout.potions.reduce((n, p) => n + p.qty, 0)} potion(s) extend that` : ""}${quiver}</div>
     <div class="actions">
       <button data-act="fight">⚔ Fight (1 round)</button>
       <button data-act="flee" title="disengage — take one parting hit (${round(dmgIn)})">🏃 Flee (−${round(dmgIn)} HP)</button>
@@ -486,7 +497,7 @@ function expeditionView(): string {
       })()
     : "";
   const pathBanner = pending
-    ? `<div class="pathbanner">${pending.fight ? `⚔ walk in &amp; <b>fight the ${name(pending.fight)}</b> · ` : ""}→ (${pending.goal.x},${pending.goal.y}): ${pending.path.length} tile${pending.path.length !== 1 ? "s" : ""}, <b class="${pending.cost > exp.energy ? "over" : ""}">−${round(pending.cost)} energy</b>${savingClause}${forecastClause} · <button data-walk>${pending.fight ? "Fight ▶" : "Walk ▶"}</button> <button class="link" data-cancelpath>cancel</button></div>`
+    ? `<div class="pathbanner">${pending.fight ? `⚔ walk in &amp; <b>fight the ${name(pending.fight)}</b> · ` : ""}→ (${pending.goal.x},${pending.goal.y}): ${pending.path.length} tile${pending.path.length !== 1 ? "s" : ""}, <b class="${pending.cost > exp.energy ? "over" : ""}">−${round(pending.cost)} energy</b>${savingClause}${forecastClause} · <button data-walk>${pending.fight ? "Fight ▶" : "Walk ▶"}</button> ${pending.shoot ? `<button data-shoot title="engage from here with your bow — your opener lands before it can answer, and you don't step in">🏹 Shoot</button> ` : ""}<button class="link" data-cancelpath>cancel</button></div>`
     : `<div class="pathbanner muted">Click a tile → previews the route + energy. Click <b>Walk</b> (or the tile again / right-click) to go. Monsters (<b>X</b>) block their tile — click one to fight, or route around.</div>`;
 
   const cap = carryCap(exp.loadout.equipment);
@@ -537,6 +548,8 @@ function wire(): void {
   const reset = app.querySelector<HTMLElement>("[data-reset]"); if (reset) reset.onclick = () => planReset();
   const cancel = app.querySelector<HTMLElement>("[data-cancelpath]"); if (cancel) cancel.onclick = () => { pending = null; draw(); };
   const walk = app.querySelector<HTMLElement>("[data-walk]"); if (walk) walk.onclick = () => { if (pending) confirmWalk(pending.path); };
+  // Shoot (D45): ranged engage on the pending goal — stays put, spends no energy
+  const shoot = app.querySelector<HTMLElement>("[data-shoot]"); if (shoot) shoot.onclick = () => { if (pending) { const at = pending.goal; pending = null; apply({ type: "fight", at }); } };
   app.querySelectorAll<HTMLElement>("[data-newgame]").forEach((el) => el.onclick = () => { if (confirm("Start a new game? This wipes the current run.")) newRun(); });
   app.querySelectorAll<HTMLElement>(".tile[data-x]").forEach((el) => {
     const handler = (ev: Event) => { ev.preventDefault(); onTileClick({ x: Number(el.dataset.x), y: Number(el.dataset.y) }); };
@@ -558,7 +571,10 @@ function onTileClick(to: Pos): void {
   if (!found || found.path.length === 0) { pending = null; note("✗ can't reach that tile (walled off / blocked by a monster)"); return; }
   const goalPoi = grid.pois.find((p) => kk(p) === kk(to));
   const fight = goalPoi?.kind === "monster" && goalPoi.creature && !cleared.has(kk(to)) ? goalPoi.creature : undefined;
-  pending = { goal: to, path: found.path, cost: found.cost, fight };
+  // Shoot affordance (D45): an adjacent live monster with a bow + arrows offers
+  // a ranged engage alongside the walk-in — legality straight from reduce (D29).
+  const shoot = fight !== undefined && legalActions(state).some((a) => a.type === "fight" && a.at !== undefined && a.at.x === to.x && a.at.y === to.y);
+  pending = { goal: to, path: found.path, cost: found.cost, fight, shoot };
   draw();
 }
 

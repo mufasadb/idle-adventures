@@ -4,7 +4,7 @@ import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
 import { addToCarry, freeCarryStacks, freeLootStacks, usedSlots, carryCap } from "./carry";
 import { toolQualityFor } from "./tools";
-import { strikeExchange, battleBuff, rollLoot, explainMatchup, damageTaken } from "./combat";
+import { strikeExchange, battleBuff, rollLoot, explainMatchup, damageTaken, wieldsRanged, hasAmmo } from "./combat";
 import { eatToRefill, foodEnergyOf } from "./food";
 import { endExpedition, subtractStacks } from "./bank";
 import { craft as applyRecipe } from "./craft";
@@ -40,7 +40,7 @@ export function reduce(
     case "drop-map":
       return dropMap(state, action.mapSeed);
     case "fight":
-      return fight(state);
+      return fight(state, action.at);
     case "flee":
       return flee(state);
     case "quaff":
@@ -370,6 +370,7 @@ function engage(
   creature: string,
   action: "fight" | "move",
   moveOnWin: boolean,
+  ranged = false, // D45: engaged from an adjacent tile with a bow — grants the opener
 ): { state: GameState; events: GameEvent[] } {
   const rolled = rollLoot(state.seed, creature, at);
   const loot = rolled.filter((s) => s.defId !== MAP_SCROLL_ID);
@@ -391,21 +392,37 @@ function engage(
           at: { x: at.x, y: at.y }, creature, monsterHp, moveOnWin,
           damageAdd: buff.damageAdd, mitigationAdd: buff.mitigationAdd,
           startHp: expedition.hp, potionsUsed: 0,
+          ...(ranged ? { ranged: true, opener: true } : {}), // D45: first exchange skips its retaliation
         },
       },
     },
-    events: [{ type: "engaged", at: { x: at.x, y: at.y }, creature, monsterHp }],
+    events: [{ type: "engaged", at: { x: at.x, y: at.y }, creature, monsterHp, ...(ranged ? { ranged: true } : {}) }],
   };
 }
 
-function fight(state: GameState): { state: GameState; events: GameEvent[] } {
+function fight(state: GameState, at?: { x: number; y: number }): { state: GameState; events: GameEvent[] } {
   const expedition = state.expedition;
   if (state.phase !== "expedition" || !expedition) return rejected(state, "fight", "not-on-expedition");
   const combat = expedition.combat;
   if (!combat) {
-    // Not engaged: engage the live monster on the CURRENT tile (as before).
     const { pos } = expedition;
     const grid = generateGrid(expedition.mapSeed, rollBiome(expedition.mapSeed));
+    if (at !== undefined) {
+      // Ranged engage (D45): `at` must be an ADJACENT (8-neighbour) live monster
+      // tile, with a bow wielded and ≥1 arrow held. Engages without stepping in
+      // (moveOnWin false — you never relocate onto a tile you shot from afar).
+      const adjacent = Math.max(Math.abs(at.x - pos.x), Math.abs(at.y - pos.y)) === 1;
+      const poi = grid.pois.find((p) => p.x === at.x && p.y === at.y);
+      const targetCleared = expedition.cleared.some((c) => c.x === at.x && c.y === at.y);
+      if (!adjacent || !poi || poi.kind !== "monster" || targetCleared || poi.creature === null) {
+        return rejected(state, "fight", "no-monster");
+      }
+      if (!wieldsRanged(expedition.loadout) || !hasAmmo(expedition.loadout)) {
+        return rejected(state, "fight", "missing-tool");
+      }
+      return engage(state, expedition, at, poi.creature, "fight", false, true);
+    }
+    // Not engaged, no target: engage the live monster on the CURRENT tile (as before).
     const poi = grid.pois.find((p) => p.x === pos.x && p.y === pos.y);
     const alreadyCleared = expedition.cleared.some((c) => c.x === pos.x && c.y === pos.y);
     if (!poi || poi.kind !== "monster" || alreadyCleared || poi.creature === null) {
@@ -413,17 +430,33 @@ function fight(state: GameState): { state: GameState; events: GameEvent[] } {
     }
     return engage(state, expedition, pos, poi.creature, "fight", false);
   }
-  // Engaged: one exchange.
+  // Engaged: one exchange. A `fight at` aimed at a DIFFERENT tile mid-engagement
+  // is rejected (you're locked in); re-targeting the engaged monster just swings.
+  if (at !== undefined && (at.x !== combat.at.x || at.y !== combat.at.y)) {
+    return rejected(state, "fight", "engaged");
+  }
+  // Arrow economy (D45): a wielded bow with ammo shoots — and spends — one arrow
+  // per exchange, walk-in fights included (the bow always shoots if it can).
+  // Arrows-out: playerDamage degrades the bow to UNARMED_DAMAGE (a club).
+  const spendsArrow = wieldsRanged(expedition.loadout) && hasAmmo(expedition.loadout);
   const round = strikeExchange(
     expedition.loadout, expedition.hp, combat.monsterHp, combat.creature,
     combat.damageAdd, combat.mitigationAdd, expedition.autoQuaff ?? true,
+    combat.opener ?? false, // ranged opener (D45): skip the monster's FIRST retaliation
   );
+  let ammo = expedition.loadout.ammo ?? [];
+  if (spendsArrow) {
+    ammo = ammo.map((s) => ({ ...s }));
+    ammo[0]!.qty -= 1; // front stack, FIFO — mirrors potions/food
+    if (ammo[0]!.qty <= 0) ammo.shift();
+  }
   const potionsUsed = combat.potionsUsed + round.potionsUsed;
   const exchanged: GameEvent = {
     type: "exchanged", creature: combat.creature, dmgDealt: round.dmgDealt,
     dmgTaken: round.dmgTaken, monsterHp: round.monsterHp, hp: round.hp, potionsUsed,
+    ...(spendsArrow ? { arrowSpent: true } : {}),
   };
-  const loadout = { ...expedition.loadout, potions: round.potionsAfter };
+  const loadout = { ...expedition.loadout, potions: round.potionsAfter, ammo };
   const fought = (victory: boolean): GameEvent => ({
     type: "fought", at: { x: combat.at.x, y: combat.at.y }, creature: combat.creature,
     // quaffing above startHp reads as 0 lost, not negative
@@ -437,7 +470,7 @@ function fight(state: GameState): { state: GameState; events: GameEvent[] } {
   }
   if (!round.victory) {
     return {
-      state: { ...state, expedition: { ...expedition, hp: round.hp, loadout, combat: { ...combat, monsterHp: round.monsterHp, potionsUsed } } },
+      state: { ...state, expedition: { ...expedition, hp: round.hp, loadout, combat: { ...combat, monsterHp: round.monsterHp, potionsUsed, opener: false } } }, // opener spent after the first exchange (D45)
       events: [exchanged],
     };
   }

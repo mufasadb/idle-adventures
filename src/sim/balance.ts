@@ -10,6 +10,7 @@ import {
   TRANSPORT_MULTIPLIER,
   POTION,
   BATTLE_ITEM,
+  AMMO,
   MONSTER_TIER_HP_CURVE,
   MONSTER_TIER_DMG_CURVE,
   PLAYER_BASE_HP,
@@ -36,6 +37,7 @@ export type KitSpec = {
   transport?: string;
   potions?: ItemStack[];
   battleItems?: ItemStack[];
+  ammo?: ItemStack[]; // arrows (D45): a bow kit needs ammo or playerDamage degrades it to a club
 };
 
 // Named kits are SIM FIXTURES (tooling shorthand), not game levers — they live
@@ -82,6 +84,8 @@ export function resolveKit(name: string, overrides: KitSpec = {}): Loadout {
   l.potions = (spec.potions ?? []).map((s) => ({ ...s }));
   for (const s of spec.battleItems ?? []) known(s.defId, BATTLE_ITEM, "battle item");
   l.battleItems = (spec.battleItems ?? []).map((s) => ({ ...s }));
+  for (const s of spec.ammo ?? []) known(s.defId, AMMO, "ammo");
+  l.ammo = (spec.ammo ?? []).map((s) => ({ ...s }));
   return l;
 }
 

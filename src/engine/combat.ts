@@ -82,8 +82,21 @@ export function rollLoot(
 
 const ARMOUR_SLOTS = ["helmet", "chest", "legs", "boots", "gloves"] as const;
 
+// Ranged style helpers (D45). A "bow" is any weapon whose dmgType is ranged —
+// data-driven, so future ranged weapons join the ammo economy for free.
+export function wieldsRanged(loadout: Loadout): boolean {
+  const w = loadout.equipment.weapon;
+  return w !== null && WEAPONS[w]?.dmgType === "ranged";
+}
+export function hasAmmo(loadout: Loadout): boolean {
+  return (loadout.ammo ?? []).some((s) => s.qty > 0);
+}
+
 // Damage per player strike: weapon × visible matrix (vs the monster's hide
 // class) × hidden affinity (×AFFINITY_MULTIPLIER on any tag pairing).
+// Arrows-out (D45): a ranged weapon with no ammo held swings as a club —
+// UNARMED_DAMAGE, no matrix, no tags — so an empty quiver never soft-locks a
+// fight; it just makes ammo a pack-time judgment.
 export function playerDamage(loadout: Loadout, monsterId: string): number {
   const monster = MONSTERS[monsterId];
   if (!monster) throw new Error(`unknown monster: ${monsterId}`);
@@ -92,10 +105,11 @@ export function playerDamage(loadout: Loadout, monsterId: string): number {
   // degrades to bare hands rather than throwing — same spirit as unknown
   // armour pieces contributing 0 mitigation.
   const weapon = weaponId === null ? undefined : WEAPONS[weaponId];
-  const base = weapon
+  const clubbed = weapon?.dmgType === "ranged" && !hasAmmo(loadout); // D45 arrows-out
+  const base = weapon && !clubbed
     ? weapon.damage * DMG_ARMOUR_MATRIX[weapon.dmgType][monster.armourType]
     : UNARMED_DAMAGE;
-  const tags = weapon?.tags ?? [];
+  const tags = clubbed ? [] : weapon?.tags ?? [];
   const affine = AFFINITIES.some(
     (a) => monster.tags.includes(a.monsterTag) && tags.includes(a.itemTag),
   );
@@ -179,6 +193,8 @@ export type ExchangeResult = {
 // One combat round (si7.1): player strike → if the monster lives, retaliation →
 // waste-tolerant auto-quaff at the threshold. Pure; the reducer holds the
 // engagement state between rounds, resolveCombat loops this for the atomic API.
+// skipRetaliation (D45): the ranged opener — the monster's answer to THIS round
+// is skipped (dmgTaken 0); melee callers never set it, so melee math is untouched.
 export function strikeExchange(
   loadout: Loadout,
   hp: number,
@@ -187,6 +203,7 @@ export function strikeExchange(
   damageAdd = 0,
   mitigationAdd = 0,
   autoQuaff = true,
+  skipRetaliation = false,
 ): ExchangeResult {
   const dmgDealt = playerDamage(loadout, monsterId) + damageAdd;
   const potions = loadout.potions.map((p) => ({ ...p }));
@@ -195,7 +212,7 @@ export function strikeExchange(
   const monsterAfter = monsterHp - dmgDealt;
   let dmgTaken = 0;
   if (monsterAfter > 0) {
-    dmgTaken = damageTaken(loadout, monsterId, mitigationAdd);
+    if (!skipRetaliation) dmgTaken = damageTaken(loadout, monsterId, mitigationAdd);
     current -= dmgTaken;
     if (current <= 0) current = 0; // soft-fail floor
     else if (autoQuaff && current <= AUTO_POTION_THRESHOLD * PLAYER_BASE_HP && potions.length > 0) {

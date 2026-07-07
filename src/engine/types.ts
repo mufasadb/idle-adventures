@@ -24,6 +24,7 @@ export type Loadout = {
   potions: ItemStack[];
   battleItems: ItemStack[]; // combat consumables (bzd): buff a single fight, consumed at fight start
   spares?: ItemStack[]; // spare gear packed into carry slots (82r): 1 slot per piece; expanded into expedition.carry at embark. Optional/absent = [] (old saves, terse test states); reads guard with `?? []`.
+  ammo?: ItemStack[]; // arrows (D45): spent 1/exchange while a bow is wielded; stacks ARROW_STACK_CAP per slot (consumableSlots counts ceil); unspent ammo banks back at run end. Optional/absent = []; reads guard with `?? []`.
 };
 
 // A pocketed map (xzx): a single-use snapshot of an offered map you chose to keep.
@@ -42,6 +43,8 @@ export type Engagement = {
   mitigationAdd: number;
   startHp: number; // for the terminal fought event's hpLost
   potionsUsed: number; // accumulated across rounds + manual quaffs
+  ranged?: boolean; // engaged from an adjacent tile with a bow (D45). Optional/absent = false; reads guard with `?? false`.
+  opener?: boolean; // ranged opener pending (D45): the FIRST exchange skips the monster's retaliation, then this clears. Optional/absent = false; reads guard with `?? false`.
 };
 
 export type Expedition = {
@@ -85,7 +88,8 @@ export type LoadoutSlot =
   | "food"
   | "potion"
   | "battle-item"
-  | "spare"; // spare gear into carry slots (82r): any gear defId, 1 slot per piece
+  | "spare" // spare gear into carry slots (82r): any gear defId, 1 slot per piece
+  | "ammo"; // arrows (D45): packed like potions, but slots count ceil(units/ARROW_STACK_CAP)
 
 export type Action =
   | { type: "craft"; recipeId: string }
@@ -94,7 +98,7 @@ export type Action =
   | { type: "pocket-map"; mapSeed: string }
   | { type: "move"; to: { x: number; y: number } } // steps ONE tile toward target
   | { type: "gather" }
-  | { type: "fight" } // engage the monster on your tile, or run ONE exchange when engaged (si7.1)
+  | { type: "fight"; at?: { x: number; y: number } } // engage the monster on your tile, or run ONE exchange when engaged (si7.1); `at` = an ADJACENT live monster tile to engage at range with a wielded bow + ≥1 arrow (D45)
   | { type: "flee" } // disengage at the cost of one parting hit (si7.1)
   | { type: "quaff" } // drink one potion: mid-engagement (no exchange, si7.1) or on the map for QUAFF_ENERGY (82r)
   | { type: "don"; itemId: string } // equip a carried gear piece into its slot, displacing the worn one to carry (82r)
@@ -168,8 +172,8 @@ export type GameEvent =
   | { type: "dropped"; defId: string; qty: number }
   | { type: "ate"; defId: string; restored: number; energy: number } // ate one food unit (dtv): restored energy, new current
   | { type: "auto-eat-toggled"; on: boolean } // flipped "eat when hungry" (dtv)
-  | { type: "engaged"; at: { x: number; y: number }; creature: string; monsterHp: number }
-  | { type: "exchanged"; creature: string; dmgDealt: number; dmgTaken: number; monsterHp: number; hp: number; potionsUsed: number }
+  | { type: "engaged"; at: { x: number; y: number }; creature: string; monsterHp: number; ranged?: boolean } // ranged (D45): engaged from an adjacent tile with a bow — the first exchange skips its retaliation
+  | { type: "exchanged"; creature: string; dmgDealt: number; dmgTaken: number; monsterHp: number; hp: number; potionsUsed: number; arrowSpent?: boolean } // arrowSpent (D45): present when this exchange shot an arrow
   | { type: "fled"; creature: string; partingHit: number; hp: number }
   | { type: "quaffed"; defId: string; healed: number; hp: number; energy?: number } // energy present only when spent (out-of-combat quaff, 82r)
   | { type: "auto-quaff-toggled"; on: boolean }

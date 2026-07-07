@@ -62,6 +62,7 @@ export function endExpedition(state: GameState, expedition: Expedition): GameSta
       ...expedition.loadout.potions,
       ...foodHome, // uneaten food banks back (pqp); fresh forage stales (e3j)
       ...(expedition.loadout.battleItems ?? []), // unused battle items bank back (bzd)
+      ...(expedition.loadout.ammo ?? []), // unspent arrows bank back (D45)
     ]),
     maps: [...(state.maps ?? []), ...(expedition.carriedMaps ?? [])], // carried map drops bank as held maps (8ec) — same fate as the carry in every run-end path incl. defeat's soft fail (D26)
     loadout: emptyLoadout(),

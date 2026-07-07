@@ -37,6 +37,7 @@ export function reserveLoadout(loadout: Loadout): ItemStack[] {
   for (const stack of potions) out.push({ defId: stack.defId, qty: stack.qty });
   for (const stack of loadout.battleItems ?? []) out.push({ defId: stack.defId, qty: stack.qty });
   for (const stack of loadout.spares ?? []) out.push({ defId: stack.defId, qty: stack.qty }); // spare gear (82r)
+  for (const stack of loadout.ammo ?? []) out.push({ defId: stack.defId, qty: stack.qty }); // arrows (D45)
   return out;
 }
 
@@ -89,6 +90,8 @@ export function packItem(
   // food / potion / battle-item / spare gear: one unit = one slot, no stacking
   // (pqp; spares 82r). Packing 5 rations takes 5 slots — the visible, live
   // food-vs-loot commitment; a spare sword competes with those same slots.
+  // Ammo (D45) packs the same way but consumableSlots counts it as
+  // ceil(units/ARROW_STACK_CAP) — the one deep-stacking consumable.
   const candidate: Loadout =
     slot === "food"
       ? { ...loadout, food: addConsumable(loadout.food, itemId) }
@@ -96,7 +99,9 @@ export function packItem(
         ? { ...loadout, potions: addConsumable(loadout.potions, itemId) }
         : slot === "spare"
           ? { ...loadout, spares: addConsumable(loadout.spares ?? [], itemId) }
-          : { ...loadout, battleItems: addConsumable(loadout.battleItems, itemId) };
+          : slot === "ammo"
+            ? { ...loadout, ammo: addConsumable(loadout.ammo ?? [], itemId) }
+            : { ...loadout, battleItems: addConsumable(loadout.battleItems, itemId) };
   if (consumableSlots(candidate) > cap) return { ok: false, reason: "no-slot" };
   if (reservedQty(candidate, itemId) > bankQty(bank, itemId)) {
     return { ok: false, reason: "insufficient" };

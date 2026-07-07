@@ -46,11 +46,15 @@ export function expeditionActions(state: GameState): Action[] {
   const { pos, carry } = state.expedition;
   const candidates: Action[] = [];
   // move: the 8 neighbouring tiles as step targets (reduce filters
-  // out-of-bounds / impassable / exhausted)
+  // out-of-bounds / impassable / exhausted). Un-engaged, each neighbour is also
+  // a `fight at` candidate — ranged engage (D45); reduce filters non-monster /
+  // no-bow / no-ammo per D29.
+  const engaged = state.expedition.combat !== undefined;
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
       if (dx === 0 && dy === 0) continue;
       candidates.push({ type: "move", to: { x: pos.x + dx, y: pos.y + dy } });
+      if (!engaged) candidates.push({ type: "fight", at: { x: pos.x + dx, y: pos.y + dy } });
     }
   }
   // tile-contextual actions

@@ -33,9 +33,14 @@ test("playerDamage: affinity needs BOTH tags — silver does nothing to a boar",
 });
 
 test("playerDamage: weapon type reads the monster's armour through the matrix", () => {
+  // Premise update (D45 ranged-combat spec, 2026-07-07): a bow now needs ammo
+  // held or it degrades to UNARMED_DAMAGE — arm it with arrows so this still
+  // measures the matrix, not the empty quiver.
+  const bow = armed("bow");
+  bow.ammo = [{ defId: "arrows", qty: 5 }];
   // giant-scorpion is plate: magic (1.5×) should out-damage ranged (0.5×)
   expect(playerDamage(armed("fire-staff"), "giant-scorpion")).toBeGreaterThan(
-    playerDamage(armed("bow"), "giant-scorpion"),
+    playerDamage(bow, "giant-scorpion"),
   );
 });
 

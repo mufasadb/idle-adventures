@@ -62,9 +62,9 @@ export const BIOMES: Record<BiomeId, Biome> = {
     creatureTable: { "forest-boar": 5, "forest-bandit": 4, "shell-beetle": 4, "fae-sprite": 3, werewolf: 2 },
     materialTable: {
       mining: { "iron-ore": 7, "copper-ore": 2, "silver-ore": 1 }, // silver present (D27) but T2-gated
-      wood: { "oak-log": 7, "pine-log": 2, "ironwood-log": 1 }, // ironwood T2 (iron-axe)
-      herb: { "forest-herb": 7, berries: 4, "desert-sage": 2, "ice-moss": 1 },
-      animal: { "deer-hide": 7, "wolf-pelt": 2, "lizard-hide": 1 },
+      wood: { "oak-log": 5, "pine-log": 2, "ironwood-log": 1, stringybark: 3 }, // ironwood T2 (iron-axe); stringybark (D45) = bowstring source, woodland is bow country (oak rebalanced 7→5)
+      herb: { "forest-herb": 7, berries: 4, "desert-sage": 2, "ice-moss": 1, flint: 2 }, // flint (D45): foraged from creek beds, bare hands — arrowheads without a pick
+      animal: { "deer-hide": 7, "wolf-pelt": 2, "lizard-hide": 1, feather: 2 }, // feather (D45): fletching from birds (knife)
     },
     barrierTerrain: "mountain",
   },
@@ -75,8 +75,8 @@ export const BIOMES: Record<BiomeId, Biome> = {
     materialTable: {
       mining: { "copper-ore": 7, "iron-ore": 2, "coal": 1 }, // coal T2 (iron-pick) — desert is a fuel source
       wood: { "cactus-wood": 7, "oak-log": 2, "pine-log": 1 },
-      herb: { "desert-sage": 7, "forest-herb": 2, berries: 1, "ice-moss": 1 },
-      animal: { "lizard-hide": 7, "deer-hide": 2, "drake-hide": 1 }, // drake T2 (steel-knife)
+      herb: { "desert-sage": 7, "forest-herb": 2, berries: 1, "ice-moss": 1, flint: 3 }, // flint country (D45): scree + dry creek beds
+      animal: { "lizard-hide": 7, "deer-hide": 2, "drake-hide": 1, feather: 2 }, // drake T2 (steel-knife); feather (D45)
     },
     barrierTerrain: "mountain",
   },
@@ -87,9 +87,9 @@ export const BIOMES: Record<BiomeId, Biome> = {
     creatureTable: { "snow-wolf": 5, "ice-crab": 4, "snow-marauder": 3, "frost-fae": 2, "ice-troll": 1, "ancient-wyrm": 1 },
     materialTable: {
       mining: { "silver-ore": 5, "coal": 2, "iron-ore": 2, "mithril-ore": 1 }, // silver T2 + coal T2 + mithril T3: tundra is the deep-tier mine
-      wood: { "pine-log": 7, "oak-log": 2, "ironwood-log": 1 },
-      herb: { "ice-moss": 7, "desert-sage": 2, berries: 1, "forest-herb": 1 },
-      animal: { "wolf-pelt": 7, "deer-hide": 2, "drake-hide": 1 },
+      wood: { "pine-log": 7, "oak-log": 2, "ironwood-log": 1, stringybark: 1 }, // stringybark rare here (D45) — bow country is woodland
+      herb: { "ice-moss": 7, "desert-sage": 2, berries: 1, "forest-herb": 1, flint: 1 }, // flint scarce under the ice (D45)
+      animal: { "wolf-pelt": 7, "deer-hide": 2, "drake-hide": 1, feather: 2 }, // feather (D45)
     },
     barrierTerrain: "mountain",
   },
@@ -275,7 +275,17 @@ export const AUTO_POTION_THRESHOLD = 0.5; // fraction of base HP to auto-quaff a
 // si7.1 combat balance was calibrated with it).
 export const QUAFF_ENERGY = 2; // energy to drink a potion OUTSIDE an engagement
 export const DON_DOFF_ENERGY = 2; // energy to don/doff one piece of gear on the map
-export const UNARMED_DAMAGE = 1; // damage when wielding no weapon
+export const UNARMED_DAMAGE = 1; // damage when wielding no weapon — ALSO a bow with no arrows left (D45: arrows-out = a club, never a soft-lock)
+
+// --- Ranged combat (D45): bow + ammo, the pick-free power path ---
+// Arrows are the one consumable that STACKS in the loadout: ARROW_STACK_CAP per
+// inventory slot (consumableSlots counts ceil(units/cap)), so a slot of arrows
+// ≈ 20 shots — a real slot cost with light bookkeeping. Every combat exchange
+// while wielding a bow with ammo spends 1 arrow (front stack, FIFO).
+// ⚠ balance surface: arrow supply gates bow damage — changing this requires `bun run sim:tables` if kits carry ammo (test/balance-tables.test.ts enforces)
+export const ARROW_STACK_CAP = 20; // arrows per inventory slot; raise = cheaper ammo logistics, lower = tighter ammo-vs-food-vs-loot squeeze
+export const ARROWS_PER_CRAFT = 10; // arrows per craft batch — "three different things to grab, so it should give you quite a lot of them" (user, 2026-07-07)
+export const AMMO: string[] = ["arrows"]; // ammo catalog (slotOf → "ammo"); packed like potions, spent per exchange
 
 // ⚠ balance surface: changing this requires `bun run sim:tables` (test/balance-tables.test.ts enforces)
 export const MONSTER_TIER_HP_CURVE: Record<number, number> = {
@@ -500,14 +510,17 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   horse: { inputs: [{ defId: "deer-hide", qty: 3 }, { defId: "oak-log", qty: 2 }], output: { defId: "horse", qty: 1 } },
   wagon: { inputs: [{ defId: "ironwood-log", qty: 2 }, { defId: "iron-ore", qty: 2 }], output: { defId: "wagon", qty: 1 } }, // T2: ironwood → iron-axe
   panniers: { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "panniers", qty: 1 } }, // saddlebags — extra carry, needs a beast (zhn)
+  // Ranged line (D45) — fully pick-free: bark → string, wood+flint+feather → arrows.
+  bowstring: { inputs: [{ defId: "stringybark", qty: 2 }], output: { defId: "bowstring", qty: 1 } }, // bark strips twist into cord
+  arrows: { inputs: [{ defId: "pine-log", qty: 1 }, { defId: "flint", qty: 1 }, { defId: "feather", qty: 1 }], output: { defId: "arrows", qty: ARROWS_PER_CRAFT } }, // three cheap inputs, generous batch
   // Weapons — T1
   "iron-sword": { inputs: [{ defId: "iron-ore", qty: 3 }], output: { defId: "iron-sword", qty: 1 } },
-  bow: { inputs: [{ defId: "oak-log", qty: 2 }, { defId: "deer-hide", qty: 1 }], output: { defId: "bow", qty: 1 } },
+  bow: { inputs: [{ defId: "oak-log", qty: 2 }, { defId: "bowstring", qty: 1 }], output: { defId: "bow", qty: 1 } }, // D45 rework: bowstring replaces deer-hide — the whole bow line stays pick-free (starter axe)
   "fire-staff": { inputs: [{ defId: "pine-log", qty: 2 }, { defId: "fae-dust", qty: 1 }], output: { defId: "fire-staff", qty: 1 } },
   // Weapons — T2 (each needs a T2 material → all sit behind the iron-pick/iron-axe/steel-knife tier)
   "silver-sword": { inputs: [{ defId: "silver-ore", qty: 3 }], output: { defId: "silver-sword", qty: 1 } }, // werewolf affinity; silver T2, best-farmed in tundra
   "steel-sword": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "steel-sword", qty: 1 } },
-  "composite-bow": { inputs: [{ defId: "ironwood-log", qty: 2 }, { defId: "deer-hide", qty: 1 }], output: { defId: "composite-bow", qty: 1 } }, // ironwood T2 → iron-axe
+  "composite-bow": { inputs: [{ defId: "ironwood-log", qty: 2 }, { defId: "bowstring", qty: 1 }], output: { defId: "composite-bow", qty: 1 } }, // D45 rework: bowstring replaces deer-hide; ironwood T2 (iron-axe) — the TOP bow crosses into mining, the style never requires it
   "inferno-staff": { inputs: [{ defId: "fae-dust", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "inferno-staff", qty: 1 } },
   // Weapons — T3 (mithril → steel-pick)
   "mithril-sword": { inputs: [{ defId: "mithril-ore", qty: 3 }], output: { defId: "mithril-sword", qty: 1 } },
