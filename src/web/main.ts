@@ -15,7 +15,7 @@ import { carryCap } from "../engine/carry";
 import { heldFoodEnergy } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
 import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP } from "../data/constants";
-import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons } from "../render/render";
+import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint } from "../render/render";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, LoadoutSlot, MapItem } from "../engine/types";
 
@@ -263,6 +263,7 @@ function townView(): string {
           </div>`).join("")}
       </div>
       ${lo.food.length === 0 ? `<div class="warn">⚠ no food packed → you embark at full ${MAX_ENERGY} energy but have nothing to eat mid-run — no way to refill your stamina</div>` : ""}
+      ${wieldsRanged(lo) && !(lo.ammo ?? []).length ? `<div class="warn">⚠ bow packed with NO ARROWS → it will swing like a club (1 dmg). Pack arrows to shoot.</div>` : ""}
       <div class="muted small">Embark = "go nearby" (free). Pocket keeps a map to run later — it rotates out of the offer but stays yours.</div>
 
       <h2 style="margin-top:1rem">Your maps <span class="muted small">held — spent on embark</span></h2>
@@ -334,8 +335,9 @@ function townView(): string {
                 can ? ` <button data-craft="${id}">craft ✓</button>` : ""
               }</div>`;
             }).join("");
+            const hint = weaponHint(out); // 57l: weapon-class hint — the bow died 3/3 to invisibility
             return `<div class="craftgroup${anyCan ? "" : " locked"}">
-              <div class="craftname">${qty}× ${name(out)}</div>
+              <div class="craftname">${qty}× ${name(out)}${hint ? ` <span class="muted small">· ${hint}</span>` : ""}</div>
               ${paths}
             </div>`;
           }).join("");

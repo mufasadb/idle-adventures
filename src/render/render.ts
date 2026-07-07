@@ -1,6 +1,7 @@
 import type { GameState } from "../engine/types";
 import { generateGrid, rollBiome } from "../engine/grid";
 import type { Grid } from "../engine/grid";
+import { WEAPONS } from "../data/constants";
 import type { Terrain, NodeType, DmgType, ArmourType } from "../data/constants";
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
@@ -22,6 +23,21 @@ const HIDE_FLAVOR: Record<ArmourType, string> = {
   robe: "a soft, unarmoured shape",
 };
 const SIZE_FLAVOR = ["", "a small", "a fair-sized", "a large", "a towering"]; // by tier 1-4
+
+// Weapon-class mechanical hint (57l, playtest v3): ONE clause saying what a
+// weapon class DOES — all three blind agents abandoned the bow line because
+// its payoff was invisible while melee's numbers print in every fight log.
+// Qualitative matrix character + the ranged verb; never numbers. Data-driven
+// off WEAPONS.dmgType so future weapons get a hint for free.
+const WEAPON_CLASS_HINT: Record<DmgType, string> = {
+  melee: "melee — steady steel; strongest against soft, unarmoured hides",
+  ranged: "ranged — strike FIRST from a tile away (needs arrows; empty quiver = a club); flies true against soft hides, blunted by plate",
+  magic: "magic — burns through plate and scale, fizzles against soft robes",
+};
+export function weaponHint(defId: string): string | null {
+  const w = WEAPONS[defId];
+  return w ? WEAPON_CLASS_HINT[w.dmgType] : null;
+}
 
 // Vague human text from perception facts. `detail === null` → kind only.
 export function flavorDetail(detail: PoiDetail | null, kind: NodeType): string {

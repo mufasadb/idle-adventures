@@ -14,6 +14,7 @@ import { perceive } from "../engine/perceive";
 import {
   flavorDetail,
   matchupLessons,
+  weaponHint,
   TERRAIN_CHAR,
   POI_CHAR,
   PLAYER_CHAR,
@@ -22,7 +23,7 @@ import { RECIPE, MAP_WIDTH, MAP_HEIGHT } from "../data/constants";
 import { moveCostBreakdown } from "../engine/move";
 import { usedSlots, carryCap } from "../engine/carry";
 import { costToReach } from "../engine/reach";
-import { damageTaken, playerDamage } from "../engine/combat";
+import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
 import type { Action, GameEvent, GameState } from "../engine/types";
 
 // Optional `--reach` flag: an OPT-IN query that prints the gear-adjusted energy
@@ -78,7 +79,7 @@ for (const e of events) console.log(fmtEvent(e));
 const s = summarize(state);
 console.log("\n=== YOU ===");
 console.log(`phase: ${s.phase} · runs completed: ${state.runs ?? 0}`);
-if (s.expedition) console.log(`energy: ${s.expedition.energy}/${s.expedition.maxEnergy} · eat-when-hungry: ${s.expedition.autoEat ? "on" : "off"}${state.expedition?.loadout.equipment.tools.includes("tent") ? " · tent (food +50%)" : ""} · hp: ${s.expedition.hp} · pos (${s.expedition.pos.x},${s.expedition.pos.y}) · nodes cleared: ${s.expedition.cleared}`);
+if (s.expedition) console.log(`energy: ${s.expedition.energy}/${s.expedition.maxEnergy} · eat-when-hungry: ${s.expedition.autoEat ? "on" : "off"}${state.expedition?.loadout.equipment.tools.includes("tent") ? " · tent (food +50%)" : ""} · hp: ${s.expedition.hp} · pos (${s.expedition.pos.x},${s.expedition.pos.y}) · nodes cleared: ${s.expedition.cleared} · auto-potion-in-fights: ${(state.expedition?.autoQuaff ?? true) ? "on" : "off"}`);
 if (state.expedition) {
   // Carry + carried maps (8ec; si7.4 parity): maps cost a slot each mid-run.
   const cmaps = state.expedition.carriedMaps ?? [];
@@ -93,7 +94,7 @@ console.log(`bank: ${s.bank.map((i) => `${i.qty}× ${i.defId}`).join(", ") || "(
 const active = state.expedition?.loadout ?? s.loadout;
 const eq = active.equipment;
 const worn = [eq.weapon, eq.helmet, eq.chest, eq.legs, eq.boots, eq.gloves, eq.transport, eq.backpack, eq.panniers, ...eq.tools].filter(Boolean);
-console.log(`equipped: ${worn.join(", ") || "(nothing)"} · food: ${active.food.map((f) => `${f.qty}× ${f.defId}`).join(", ") || "none"} · potions: ${active.potions.map((p) => `${p.qty}× ${p.defId}`).join(", ") || "none"}${active.battleItems?.length ? ` · battle: ${active.battleItems.map((b) => `${b.qty}× ${b.defId}`).join(", ")}` : ""}${active.spares?.length ? ` · spare gear (1 slot each, don mid-run to swap): ${active.spares.map((sp) => `${sp.qty}× ${sp.defId}`).join(", ")}` : ""}${active.ammo?.length ? ` · arrows: ${active.ammo.reduce((n, a) => n + a.qty, 0)} (a wielded bow shoots one per combat exchange; empty quiver = the bow swings like a club)` : ""}`);
+console.log(`equipped: ${worn.join(", ") || "(nothing)"} · food: ${active.food.map((f) => `${f.qty}× ${f.defId}`).join(", ") || "none"} · potions: ${active.potions.map((p) => `${p.qty}× ${p.defId}`).join(", ") || "none"}${active.battleItems?.length ? ` · battle: ${active.battleItems.map((b) => `${b.qty}× ${b.defId}`).join(", ")}` : ""}${active.spares?.length ? ` · spare gear (1 slot each, don mid-run to swap): ${active.spares.map((sp) => `${sp.qty}× ${sp.defId}`).join(", ")}` : ""}${active.ammo?.length ? ` · arrows: ${active.ammo.reduce((n, a) => n + a.qty, 0)} (a wielded bow shoots one per combat exchange; empty quiver = the bow swings like a club)` : wieldsRanged(active) ? " · arrows: 0 — ⚠ NO ARROWS: your bow swings like a CLUB (1 dmg). Craft arrows to shoot." : ""}`);
 // Make transport/gating gear legible: what it does to a step's cost (mirrors the web).
 {
   const notes: string[] = [];
@@ -139,7 +140,9 @@ function printTown(st: GameState): void {
     const ing = r.inputs.map((i) => `${i.qty}× ${i.defId}`).join(" + ");
     // 2g7.7: print the EXACT recipeId — several recipes share an output defId
     // (ration vs ration-sage …), and crafting the wrong id was a silent rake.
-    console.log(`  ${affordable.has(id) ? "✓" : "·"} ${r.output.qty}× ${r.output.defId}  ←  ${ing}  ·  craft recipeId="${id}"`);
+    // 57l: weapon rows get their class hint — the bow died 3/3 to invisibility.
+    const hint = weaponHint(r.output.defId);
+    console.log(`  ${affordable.has(id) ? "✓" : "·"} ${r.output.qty}× ${r.output.defId}  ←  ${ing}  ·  craft recipeId="${id}"${hint ? `  ·  ${hint}` : ""}`);
   }
   console.log("\nTip: tools each take one bag slot — you can pack several (pick + axe + knife + …).");
 }
@@ -154,7 +157,11 @@ function printExpedition(st: GameState): void {
     const r1 = (n: number) => Math.round(n * 10) / 10; // c5l: % mitigation makes these floats — round for the console
     const dmgOut = r1(playerDamage(exp.loadout, c.creature) + c.damageAdd);
     const dmgIn = r1(damageTaken(exp.loadout, c.creature, c.mitigationAdd));
-    console.log(`\n=== ENGAGED: ${c.creature} — ${c.monsterHp} HP · you hit ${dmgOut}, it hits ${dmgIn} · actions: fight | flee | quaff | toggle-auto-quaff ===`);
+    // 57l: quiver state in the fight header — a clubbed bow must be legible mid-fight.
+    const quiver = wieldsRanged(exp.loadout)
+      ? (() => { const n = (exp.loadout.ammo ?? []).reduce((s, a) => s + a.qty, 0); return n > 0 ? ` · 🏹 ${n} arrows` : " · 🏹 NO ARROWS — bow is a club!"; })()
+      : "";
+    console.log(`\n=== ENGAGED: ${c.creature} — ${c.monsterHp} HP · you hit ${dmgOut}, it hits ${dmgIn}${quiver} · actions: fight | flee | quaff | toggle-auto-quaff ===`);
   }
   console.log("\n=== MAP (▲ you · letters = node kinds · detail only resolves near you) ===");
   const rows: string[] = [];
