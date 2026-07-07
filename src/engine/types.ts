@@ -23,6 +23,7 @@ export type Loadout = {
   food: ItemStack[];
   potions: ItemStack[];
   battleItems: ItemStack[]; // combat consumables (bzd): buff a single fight, consumed at fight start
+  spares?: ItemStack[]; // spare gear packed into carry slots (82r): 1 slot per piece; expanded into expedition.carry at embark. Optional/absent = [] (old saves, terse test states); reads guard with `?? []`.
 };
 
 // A pocketed map (xzx): a single-use snapshot of an offered map you chose to keep.
@@ -83,7 +84,8 @@ export type LoadoutSlot =
   | "panniers"
   | "food"
   | "potion"
-  | "battle-item";
+  | "battle-item"
+  | "spare"; // spare gear into carry slots (82r): any gear defId, 1 slot per piece
 
 export type Action =
   | { type: "craft"; recipeId: string }
@@ -94,7 +96,9 @@ export type Action =
   | { type: "gather" }
   | { type: "fight" } // engage the monster on your tile, or run ONE exchange when engaged (si7.1)
   | { type: "flee" } // disengage at the cost of one parting hit (si7.1)
-  | { type: "quaff" } // drink one potion mid-engagement, no exchange (si7.1; absorbs 82r's manual potion)
+  | { type: "quaff" } // drink one potion: mid-engagement (no exchange, si7.1) or on the map for QUAFF_ENERGY (82r)
+  | { type: "don"; itemId: string } // equip a carried gear piece into its slot, displacing the worn one to carry (82r)
+  | { type: "doff"; itemId: string } // unequip a worn piece / remove a tool to carry (82r)
   | { type: "toggle-auto-quaff" } // flip auto-potion-at-threshold (si7.1)
   | { type: "eat" } // eat one food unit now → refill current energy toward max (dtv)
   | { type: "toggle-auto-eat" } // flip the waste-free "eat when hungry" auto-eat (dtv)
@@ -130,7 +134,8 @@ export type RejectionReason =
   | "no-slot"
   | "already-pocketed"
   | "engaged"
-  | "not-engaged";
+  | "not-engaged"
+  | "not-worn"; // doff of a defId that isn't currently equipped (82r)
 
 // Events are a render byproduct emitted by reduce. Named GameEvent (not Event)
 // to avoid colliding with the DOM Event global, which engine code must not use.
@@ -166,8 +171,10 @@ export type GameEvent =
   | { type: "engaged"; at: { x: number; y: number }; creature: string; monsterHp: number }
   | { type: "exchanged"; creature: string; dmgDealt: number; dmgTaken: number; monsterHp: number; hp: number; potionsUsed: number }
   | { type: "fled"; creature: string; partingHit: number; hp: number }
-  | { type: "quaffed"; defId: string; healed: number; hp: number }
+  | { type: "quaffed"; defId: string; healed: number; hp: number; energy?: number } // energy present only when spent (out-of-combat quaff, 82r)
   | { type: "auto-quaff-toggled"; on: boolean }
+  | { type: "donned"; defId: string; slot: LoadoutSlot; displaced: string | null; energy: number } // equipped from carry (82r)
+  | { type: "doffed"; defId: string; slot: LoadoutSlot; energy: number } // unequipped to carry (82r)
   | {
       type: "fought";
       at: { x: number; y: number };

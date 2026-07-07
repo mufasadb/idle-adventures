@@ -1,4 +1,4 @@
-import type { GameState, Action, GameEvent, LoadoutSlot, RejectionReason, Expedition } from "./types";
+import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot, RejectionReason, Expedition } from "./types";
 import { generateGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
@@ -8,9 +8,11 @@ import { strikeExchange, battleBuff, rollLoot, explainMatchup, damageTaken } fro
 import { eatToRefill, foodEnergyOf } from "./food";
 import { endExpedition, subtractStacks } from "./bank";
 import { craft as applyRecipe } from "./craft";
-import { packItem, reserveLoadout } from "./pack";
+import { packItem, reserveLoadout, EQUIP_SLOTS } from "./pack";
+import type { EquipSlot } from "./pack";
+import { slotOf, isGear } from "./catalog";
 import { candidateMaps, previewHints } from "./town";
-import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY } from "../data/constants";
+import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 
 // Pure reducer. M2 fills embark/move; M3 fills gather/drop; M4 fills fight; remaining cases are no-op stubs:
@@ -45,6 +47,10 @@ export function reduce(
       return quaff(state);
     case "toggle-auto-quaff":
       return toggleAutoQuaff(state);
+    case "don":
+      return don(state, action.itemId);
+    case "doff":
+      return doff(state, action.itemId);
     case "craft":
       return craftAction(state, action.recipeId);
     case "pack":
@@ -89,6 +95,13 @@ function embark(
   // food — food is a reserve you EAT to refill toward max mid-run, not the source
   // of the whole budget. autoEat (default on) refills waste-free after each spend.
   const energy = MAX_ENERGY;
+  // Spare gear (82r): packed spares expand into carry as ONE PIECE PER STACK
+  // (stackCapOf gear = 1), and the expedition loadout's spares clear so the
+  // slots aren't double-counted (consumableSlots vs carry.length — 1:1 move).
+  const carry: ItemStack[] = [];
+  for (const s of state.loadout.spares ?? []) {
+    for (let i = 0; i < s.qty; i++) carry.push({ defId: s.defId, qty: 1 });
+  }
   return {
     state: {
       ...state,
@@ -103,8 +116,8 @@ function embark(
         maxEnergy: MAX_ENERGY,
         autoEat: true,
         hp: PLAYER_BASE_HP,
-        loadout: state.loadout,
-        carry: [],
+        loadout: { ...state.loadout, spares: [] },
+        carry,
         cleared: [],
         carriedMaps: [],
       },
@@ -480,19 +493,35 @@ function flee(state: GameState): { state: GameState; events: GameEvent[] } {
   return { state: { ...state, expedition: { ...expedition, hp, combat: undefined } }, events: [fled] };
 }
 
+// Drink one potion. Mid-engagement: no exchange, no energy — its cost is tempo
+// (si7.1). On the map (82r): heal between fights for QUAFF_ENERGY, so patching
+// up before the next monster is a real (small) budget call.
 function quaff(state: GameState): { state: GameState; events: GameEvent[] } {
   const expedition = state.expedition;
   if (state.phase !== "expedition" || !expedition) return rejected(state, "quaff", "not-on-expedition");
   const combat = expedition.combat;
-  if (!combat) return rejected(state, "quaff", "not-engaged");
   const potions = expedition.loadout.potions;
   if (potions.length === 0 || expedition.hp >= PLAYER_BASE_HP) return rejected(state, "quaff", "insufficient");
+  if (!combat && QUAFF_ENERGY > expedition.energy) return rejected(state, "quaff", "exhausted");
   const front = potions[0]!;
   const heal = POTION_HEAL_BY[front.defId] ?? POTION_HEAL;
   const hp = Math.min(PLAYER_BASE_HP, expedition.hp + heal);
   const next = potions.map((p) => ({ ...p }));
   next[0]!.qty -= 1;
   if (next[0]!.qty <= 0) next.shift();
+  if (!combat) {
+    const fed = autoRefill({ ...expedition, loadout: { ...expedition.loadout, potions: next } }, expedition.energy - QUAFF_ENERGY);
+    return {
+      state: {
+        ...state,
+        expedition: {
+          ...expedition, hp, energy: fed.energy,
+          loadout: { ...expedition.loadout, potions: next, food: fed.food },
+        },
+      },
+      events: [{ type: "quaffed", defId: front.defId, healed: hp - expedition.hp, hp, energy: fed.energy }],
+    };
+  }
   return {
     state: {
       ...state,
@@ -511,6 +540,98 @@ function toggleAutoQuaff(state: GameState): { state: GameState; events: GameEven
   if (state.phase !== "expedition" || !expedition) return rejected(state, "toggle-auto-quaff", "not-on-expedition");
   const on = !(expedition.autoQuaff ?? true);
   return { state: { ...state, expedition: { ...expedition, autoQuaff: on } }, events: [{ type: "auto-quaff-toggled", on }] };
+}
+
+// Remove ONE unit of defId from carry (gear stacks are qty 1 via stackCapOf, but
+// this is written generically). Returns null when the defId isn't carried.
+function removeOneFromCarry(carry: ItemStack[], defId: string): ItemStack[] | null {
+  const idx = carry.findIndex((s) => s.defId === defId);
+  if (idx === -1) return null;
+  return carry
+    .map((s, i) => (i === idx ? { ...s, qty: s.qty - 1 } : s))
+    .filter((s) => s.qty > 0);
+}
+
+// Shared don/doff plumbing (82r): the pre-fight prep actions. Both are rejected
+// mid-engagement (the agency is BEFORE stepping onto the monster, not mid-swing)
+// and cost DON_DOFF_ENERGY. The candidate (equipment + carry) must fit its OWN
+// capacity — carryCap of the candidate equipment — which makes backpack /
+// transport / panniers swaps safe with no special cases: you can't doff the
+// horse while the panniers capacity it enables is holding your loot.
+function donDoffChecks(
+  state: GameState,
+  action: "don" | "doff",
+): { expedition: Expedition } | { rejected: { state: GameState; events: GameEvent[] } } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) return { rejected: rejected(state, action, "not-on-expedition") };
+  if (expedition.combat) return { rejected: rejected(state, action, "engaged") };
+  if (DON_DOFF_ENERGY > expedition.energy) return { rejected: rejected(state, action, "exhausted") };
+  return { expedition };
+}
+
+function don(state: GameState, itemId: string): { state: GameState; events: GameEvent[] } {
+  const checks = donDoffChecks(state, "don");
+  if ("rejected" in checks) return checks.rejected;
+  const expedition = checks.expedition;
+  const slot = slotOf(itemId);
+  if (!isGear(itemId) || slot === null) return rejected(state, "don", "wrong-slot");
+  const carryLess = removeOneFromCarry(expedition.carry, itemId);
+  if (carryLess === null) return rejected(state, "don", "not-carried");
+  const worn = expedition.loadout.equipment;
+  let equipment: typeof worn;
+  let carryNext = carryLess;
+  let displaced: string | null = null;
+  if (slot === "tool") {
+    if (worn.tools.includes(itemId)) return rejected(state, "don", "already-packed");
+    equipment = { ...worn, tools: [...worn.tools, itemId] };
+  } else {
+    displaced = worn[slot as EquipSlot];
+    equipment = { ...worn, [slot as EquipSlot]: itemId };
+    if (displaced !== null) carryNext = [...carryNext, { defId: displaced, qty: 1 }];
+  }
+  const loadout = { ...expedition.loadout, equipment };
+  if (usedSlots(loadout, carryNext, expedition.carriedMaps) > carryCap(equipment)) {
+    return rejected(state, "don", "carry-full");
+  }
+  const fed = autoRefill({ ...expedition, loadout }, expedition.energy - DON_DOFF_ENERGY);
+  return {
+    state: {
+      ...state,
+      expedition: { ...expedition, energy: fed.energy, loadout: { ...loadout, food: fed.food }, carry: carryNext },
+    },
+    events: [{ type: "donned", defId: itemId, slot, displaced, energy: fed.energy }],
+  };
+}
+
+function doff(state: GameState, itemId: string): { state: GameState; events: GameEvent[] } {
+  const checks = donDoffChecks(state, "doff");
+  if ("rejected" in checks) return checks.rejected;
+  const expedition = checks.expedition;
+  const worn = expedition.loadout.equipment;
+  let equipment: typeof worn;
+  let slot: LoadoutSlot;
+  if (worn.tools.includes(itemId)) {
+    slot = "tool";
+    equipment = { ...worn, tools: worn.tools.filter((t) => t !== itemId) };
+  } else {
+    const eqSlot = EQUIP_SLOTS.find((s) => worn[s] === itemId);
+    if (eqSlot === undefined) return rejected(state, "doff", "not-worn");
+    slot = eqSlot;
+    equipment = { ...worn, [eqSlot]: null };
+  }
+  const carryNext = [...expedition.carry, { defId: itemId, qty: 1 }];
+  const loadout = { ...expedition.loadout, equipment };
+  if (usedSlots(loadout, carryNext, expedition.carriedMaps) > carryCap(equipment)) {
+    return rejected(state, "doff", "carry-full");
+  }
+  const fed = autoRefill({ ...expedition, loadout }, expedition.energy - DON_DOFF_ENERGY);
+  return {
+    state: {
+      ...state,
+      expedition: { ...expedition, energy: fed.energy, loadout: { ...loadout, food: fed.food }, carry: carryNext },
+    },
+    events: [{ type: "doffed", defId: itemId, slot, energy: fed.energy }],
+  };
 }
 
 // Restore-per-food multiplier for this loadout: a tent (durable "camp" tool)

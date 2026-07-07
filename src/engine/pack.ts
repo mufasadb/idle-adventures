@@ -3,7 +3,7 @@
 // so it never exceeds holdings. The bank is only debited at embark. There is no
 // unpack action — reduce a mis-planned consumable by embarking and re-planning.
 import type { ItemStack, Loadout, LoadoutSlot } from "./types";
-import { slotOf } from "./catalog";
+import { validForSlot } from "./catalog";
 import { carryCap, consumableSlots } from "./carry";
 
 // Add one unit of a consumable, merging into an existing same-defId stack
@@ -15,8 +15,9 @@ function addConsumable(list: ItemStack[], defId: string): ItemStack[] {
 }
 
 // Single-occupancy equipment slots keyed exactly by LoadoutSlot name.
-const EQUIP_SLOTS = ["weapon", "helmet", "chest", "legs", "boots", "gloves", "transport", "backpack", "panniers"] as const;
-type EquipSlot = (typeof EQUIP_SLOTS)[number];
+// Exported for don/doff (82r), which swaps the same slots mid-run.
+export const EQUIP_SLOTS = ["weapon", "helmet", "chest", "legs", "boots", "gloves", "transport", "backpack", "panniers"] as const;
+export type EquipSlot = (typeof EQUIP_SLOTS)[number];
 
 // Every defId the plan reserves from the bank (each equipment piece ×1, each
 // tool ×1, transport, backpack, plus food/potion stack quantities). This is the
@@ -35,6 +36,7 @@ export function reserveLoadout(loadout: Loadout): ItemStack[] {
   for (const stack of food) out.push({ defId: stack.defId, qty: stack.qty });
   for (const stack of potions) out.push({ defId: stack.defId, qty: stack.qty });
   for (const stack of loadout.battleItems ?? []) out.push({ defId: stack.defId, qty: stack.qty });
+  for (const stack of loadout.spares ?? []) out.push({ defId: stack.defId, qty: stack.qty }); // spare gear (82r)
   return out;
 }
 
@@ -56,7 +58,7 @@ export function packItem(
 ):
   | { ok: true; loadout: Loadout }
   | { ok: false; reason: "wrong-slot" | "insufficient" | "already-packed" | "no-slot" } {
-  if (slotOf(itemId) !== slot) return { ok: false, reason: "wrong-slot" };
+  if (!validForSlot(slot, itemId)) return { ok: false, reason: "wrong-slot" };
 
   // Equipment: overwrite the slot. Affordability is checked against the CANDIDATE
   // loadout, so replacing frees the old occupant's reservation.
@@ -84,14 +86,17 @@ export function packItem(
     return { ok: true, loadout: candidate };
   }
 
-  // food / potion / battle-item: one unit = one slot, no stacking (pqp). Packing
-  // 5 rations takes 5 slots — the visible, live food-vs-loot commitment.
+  // food / potion / battle-item / spare gear: one unit = one slot, no stacking
+  // (pqp; spares 82r). Packing 5 rations takes 5 slots — the visible, live
+  // food-vs-loot commitment; a spare sword competes with those same slots.
   const candidate: Loadout =
     slot === "food"
       ? { ...loadout, food: addConsumable(loadout.food, itemId) }
       : slot === "potion"
         ? { ...loadout, potions: addConsumable(loadout.potions, itemId) }
-        : { ...loadout, battleItems: addConsumable(loadout.battleItems, itemId) };
+        : slot === "spare"
+          ? { ...loadout, spares: addConsumable(loadout.spares ?? [], itemId) }
+          : { ...loadout, battleItems: addConsumable(loadout.battleItems, itemId) };
   if (consumableSlots(candidate) > cap) return { ok: false, reason: "no-slot" };
   if (reservedQty(candidate, itemId) > bankQty(bank, itemId)) {
     return { ok: false, reason: "insufficient" };

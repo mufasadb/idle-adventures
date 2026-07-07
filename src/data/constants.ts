@@ -270,6 +270,11 @@ export const POTION_HEAL_BY: Record<string, number> = {
   "greater-potion": 20,
 };
 export const AUTO_POTION_THRESHOLD = 0.5; // fraction of base HP to auto-quaff at
+// On-map item use (82r): using items outside combat "just costs energy" — about
+// one plains step each. In-combat quaff stays energy-free (its cost is tempo;
+// si7.1 combat balance was calibrated with it).
+export const QUAFF_ENERGY = 2; // energy to drink a potion OUTSIDE an engagement
+export const DON_DOFF_ENERGY = 2; // energy to don/doff one piece of gear on the map
 export const UNARMED_DAMAGE = 1; // damage when wielding no weapon
 
 // ⚠ balance surface: changing this requires `bun run sim:tables` (test/balance-tables.test.ts enforces)

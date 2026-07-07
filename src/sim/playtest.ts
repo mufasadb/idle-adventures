@@ -20,6 +20,7 @@ import {
 } from "../render/render";
 import { RECIPE, MAP_WIDTH, MAP_HEIGHT } from "../data/constants";
 import { moveCostBreakdown } from "../engine/move";
+import { usedSlots, carryCap } from "../engine/carry";
 import { costToReach } from "../engine/reach";
 import { damageTaken, playerDamage } from "../engine/combat";
 import type { Action, GameEvent, GameState } from "../engine/types";
@@ -60,6 +61,9 @@ function fmtEvent(e: GameEvent): string {
       : `🗺️ a ${e.biomeId} map dropped — pack full, left behind`;
     case "map-discarded": return `🗺️ discarded a carried map`;
     case "packed": return `packed ${e.defId} → ${e.slot}`;
+    case "quaffed": return `🧪 quaffed ${e.defId} · +${e.healed}hp → ${e.hp}hp${e.energy !== undefined ? ` · energy → ${e.energy}e` : ""}`;
+    case "donned": return `🧤 donned ${e.defId}${e.displaced ? ` (stowed ${e.displaced} in the bag)` : ""} · energy → ${e.energy}e`;
+    case "doffed": return `🎒 doffed ${e.defId} to the bag (takes a slot) · energy → ${e.energy}e`;
     case "run-ended": return `— run ended (${e.reason})`;
     case "action-rejected": return `✗ ${e.action} rejected: ${e.reason}`;
     default: return JSON.stringify(e);
@@ -79,6 +83,9 @@ if (state.expedition) {
   // Carry + carried maps (8ec; si7.4 parity): maps cost a slot each mid-run.
   const cmaps = state.expedition.carriedMaps ?? [];
   console.log(`carry: ${state.expedition.carry.map((c) => `${c.qty}× ${c.defId}`).join(", ") || "(empty)"}${cmaps.length ? ` · carried maps (1 slot each, bank as held maps at run end): ${cmaps.map((m) => `${m.biomeId} — drop-map mapSeed="${m.mapSeed}" to free the slot`).join("; ")}` : ""}`);
+  // Bag occupancy (si7.4 parity): the web shows used/cap; the console must too —
+  // new line, never reshape the carry line above (drivers parse it).
+  console.log(`bag: ${usedSlots(state.expedition.loadout, state.expedition.carry, cmaps)}/${carryCap(state.expedition.loadout.equipment)} slots used (each food/potion/battle-item/tool/spare-gear unit + each loot stack + each carried map = 1 slot)`);
 }
 console.log(`bank: ${s.bank.map((i) => `${i.qty}× ${i.defId}`).join(", ") || "(empty)"}`);
 // Show the ACTIVE loadout: on an expedition the equipped gear lives on
@@ -86,7 +93,7 @@ console.log(`bank: ${s.bank.map((i) => `${i.qty}× ${i.defId}`).join(", ") || "(
 const active = state.expedition?.loadout ?? s.loadout;
 const eq = active.equipment;
 const worn = [eq.weapon, eq.helmet, eq.chest, eq.legs, eq.boots, eq.gloves, eq.transport, eq.backpack, eq.panniers, ...eq.tools].filter(Boolean);
-console.log(`equipped: ${worn.join(", ") || "(nothing)"} · food: ${active.food.map((f) => `${f.qty}× ${f.defId}`).join(", ") || "none"} · potions: ${active.potions.map((p) => `${p.qty}× ${p.defId}`).join(", ") || "none"}${active.battleItems?.length ? ` · battle: ${active.battleItems.map((b) => `${b.qty}× ${b.defId}`).join(", ")}` : ""}`);
+console.log(`equipped: ${worn.join(", ") || "(nothing)"} · food: ${active.food.map((f) => `${f.qty}× ${f.defId}`).join(", ") || "none"} · potions: ${active.potions.map((p) => `${p.qty}× ${p.defId}`).join(", ") || "none"}${active.battleItems?.length ? ` · battle: ${active.battleItems.map((b) => `${b.qty}× ${b.defId}`).join(", ")}` : ""}${active.spares?.length ? ` · spare gear (1 slot each, don mid-run to swap): ${active.spares.map((sp) => `${sp.qty}× ${sp.defId}`).join(", ")}` : ""}`);
 // Make transport/gating gear legible: what it does to a step's cost (mirrors the web).
 {
   const notes: string[] = [];
@@ -164,8 +171,11 @@ function printExpedition(st: GameState): void {
   if (nearby.length) {
     console.log("\nWhat you can make out nearby:");
     for (const p of nearby) {
+      // si7.4 parity: the web telegraphs walk-in combat; tell the console player
+      // too (suffix hint, mirroring tierHint — drivers parse these lines).
       const tierHint = p.kind !== "monster" && p.detail!.tier > 1 ? ` (needs a tier-${p.detail!.tier} tool)` : "";
-      console.log(`  (${p.x},${p.y}) ${flavorDetail(p.detail, p.kind)}${tierHint}`);
+      const fightHint = p.kind === "monster" ? ` (step onto it to fight — needs a free loot slot)` : "";
+      console.log(`  (${p.x},${p.y}) ${flavorDetail(p.detail, p.kind)}${tierHint}${fightHint}`);
     }
   }
   if (reachFlag) {

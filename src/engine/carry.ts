@@ -1,7 +1,15 @@
 // Carry-slot accounting. Loot stacks hold STACK_CAP each; consumables and tools
 // each occupy ONE slot per unit (Phase 2, pqp — no stacking for consumables).
 import { BASE_CARRY_SLOTS, BACKPACK_SLOTS, STACK_CAP, TRANSPORT_CARRY, BEAST_TRANSPORTS, PANNIERS_SLOTS } from "../data/constants";
+import { isGear } from "./catalog";
 import type { ItemStack, Loadout, Equipment } from "./types";
+
+// Gear takes one slot PER PIECE in carry (82r) — consistent with tools costing a
+// slot each in the loadout — so a spare sword is a real slot commitment. Loot
+// keeps stacking to STACK_CAP.
+export function stackCapOf(defId: string): number {
+  return isGear(defId) ? 1 : STACK_CAP;
+}
 
 // Inventory slots consumed by non-loot items (pqp): each food unit, each potion
 // unit, and each tool is one slot. Loot (carry) stacks take the rest.
@@ -11,6 +19,7 @@ export function consumableSlots(loadout: Loadout): number {
     units(loadout.food) +
     units(loadout.potions) +
     units(loadout.battleItems ?? []) +
+    units(loadout.spares ?? []) + // spare gear (82r): 1 slot per piece, town-side; expanded into carry at embark
     loadout.equipment.tools.length
   );
 }
@@ -67,17 +76,18 @@ export function addToCarry(
   qty: number,
   maxStacks: number,
 ): ItemStack[] | null {
+  const cap = stackCapOf(defId);
   let remaining = qty;
   const next = carry.map((stack) => {
-    if (stack.defId !== defId || stack.qty >= STACK_CAP || remaining === 0) {
+    if (stack.defId !== defId || stack.qty >= cap || remaining === 0) {
       return stack;
     }
-    const take = Math.min(STACK_CAP - stack.qty, remaining);
+    const take = Math.min(cap - stack.qty, remaining);
     remaining -= take;
     return { defId, qty: stack.qty + take };
   });
   while (remaining > 0) {
-    const take = Math.min(STACK_CAP, remaining);
+    const take = Math.min(cap, remaining);
     next.push({ defId, qty: take });
     remaining -= take;
   }

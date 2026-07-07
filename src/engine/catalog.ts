@@ -16,6 +16,16 @@ export function slotOf(defId: string): LoadoutSlot | null {
   return null;
 }
 
+// Gear = anything worn/wielded (durable); consumables (food/potion/battle-item)
+// are not. Drives the "spare" pack slot and per-piece carry stacking (82r).
+const GEAR_SLOTS: readonly LoadoutSlot[] = ["weapon", "helmet", "chest", "legs", "boots", "gloves", "tool", "transport", "backpack", "panniers"];
+
+export function isGear(defId: string): boolean {
+  const slot = slotOf(defId);
+  return slot !== null && GEAR_SLOTS.includes(slot);
+}
+
 export function validForSlot(slot: LoadoutSlot, defId: string): boolean {
+  if (slot === "spare") return isGear(defId); // spares accept any gear defId (82r)
   return slotOf(defId) === slot;
 }

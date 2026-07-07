@@ -14,7 +14,7 @@ import { moveCost, moveCostBreakdown } from "../engine/move";
 import { carryCap } from "../engine/carry";
 import { heldFoodEnergy } from "../engine/food";
 import { damageTaken, playerDamage } from "../engine/combat";
-import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS } from "../data/constants";
+import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY } from "../data/constants";
 import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons } from "../render/render";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, LoadoutSlot, MapItem } from "../engine/types";
@@ -104,8 +104,10 @@ function fmt(e: GameEvent): string {
     case "engaged": return `⚔ engaged the ${name(e.creature)}`;
     case "exchanged": return `⚔ traded blows with the ${e.creature} — dealt ${round(e.dmgDealt)}, took ${round(e.dmgTaken)} · ${round(e.hp)}hp left`;
     case "fled": return `🏃 fled the ${name(e.creature)} · −${round(e.partingHit)}hp → ${round(e.hp)}hp`;
-    case "quaffed": return `🧪 quaffed ${name(e.defId)} · +${round(e.healed)}hp → ${round(e.hp)}hp`;
+    case "quaffed": return `🧪 quaffed ${name(e.defId)} · +${round(e.healed)}hp → ${round(e.hp)}hp${e.energy !== undefined ? ` · −${QUAFF_ENERGY}e → ${round(e.energy)}e` : ""}`;
     case "auto-quaff-toggled": return `auto-quaff ${e.on ? "on" : "off"}`;
+    case "donned": return `🧤 donned ${name(e.defId)}${e.displaced ? ` (stowed ${name(e.displaced)})` : ""} · −${DON_DOFF_ENERGY}e → ${round(e.energy)}e`;
+    case "doffed": return `🎒 doffed ${name(e.defId)} to the bag · −${DON_DOFF_ENERGY}e → ${round(e.energy)}e`;
   }
 }
 const round = (n: number) => Math.round(n * 10) / 10;
@@ -206,6 +208,7 @@ function realSlots(loadout: Loadout, carry: ItemStack[], maps: MapItem[] = []): 
   units(loadout.food, "food");
   units(loadout.potions, "potion");
   units(loadout.battleItems ?? [], "battle");
+  units(loadout.spares ?? [], "tool"); // spare gear (82r): 1 slot per piece, grey like tools; expands into carry at embark
   for (const t of loadout.equipment.tools) boxes.push(slotBox("tool", name(t), ""));
   for (const s of carry) boxes.push(slotBox("loot", name(s.defId), `×${s.qty}`));
   for (const m of maps) boxes.push(slotBox("loot", `🗺️ ${name(m.biomeId)} map`, "")); // carried maps (8ec): 1 slot each
@@ -283,10 +286,12 @@ function townView(): string {
       <div class="bank">
         ${state.bank.map((s) => {
           const slot = slotOf(s.defId);
-          const canPack = slot !== null && legal.some((a) => a.type === "pack" && a.itemId === s.defId);
+          const canPack = slot !== null && legal.some((a) => a.type === "pack" && a.slot === slot && a.itemId === s.defId);
+          const canSpare = legal.some((a) => a.type === "pack" && a.slot === "spare" && a.itemId === s.defId);
           return `<div class="bankitem">
             <span class="chip">${name(s.defId)} ×${s.qty}</span>
             ${canPack ? `<button data-pack="${s.defId}" data-slot="${slot}">pack</button>` : `<span class="muted small">${slot ?? "material"}</span>`}
+            ${canSpare ? `<button data-pack="${s.defId}" data-slot="spare" title="a SPARE in the bag (1 slot) — don it mid-run to swap gear">+spare</button>` : ""}
           </div>`;
         }).join("")}
       </div>
@@ -499,13 +504,15 @@ function expeditionView(): string {
       <h2>Actions</h2>
       <div class="actions">
         ${legal.some((a) => a.type === "eat") ? `<button data-act="eat">🍖 Eat${exp.loadout.equipment.tools.includes("tent") ? " (+50%)" : ""}</button>` : `<button disabled title="no food, or already full">🍖 Eat</button>`}
+        ${legal.some((a) => a.type === "quaff") ? `<button data-act="quaff" title="drink a potion here (−${QUAFF_ENERGY}e)">🧪 Potion (−${QUAFF_ENERGY}e)</button>` : `<button disabled title="no potions, full HP, or too tired">🧪 Potion</button>`}
         <button data-act="toggle-auto-eat">Eat when hungry: <b>${(exp.autoEat ?? true) ? "on" : "off"}</b></button>
         <button data-act="return">⏎ Return to town</button>
       </div>
       <h2>Bag <span class="muted small">${inv.used}/${cap} slots</span></h2>
       ${inv.html}
       <div class="muted small">food (green) is eaten to refill energy as you travel — freeing slots for loot (gold). Potions purple · battle items red · tools grey · worn gear ghosted (free).</div>
-      ${exp.carry.length ? `<div class="bank" style="margin-top:.5rem">${exp.carry.map((s) => `<div class="bankitem"><span class="chip">${name(s.defId)} ×${s.qty}</span><button data-drop="${s.defId}">drop</button></div>`).join("")}</div>` : ""}
+      ${exp.carry.length ? `<div class="bank" style="margin-top:.5rem">${exp.carry.map((s) => `<div class="bankitem"><span class="chip">${name(s.defId)} ×${s.qty}</span>${legal.some((a) => a.type === "don" && a.itemId === s.defId) ? `<button data-don="${s.defId}" title="equip it (−${DON_DOFF_ENERGY}e; swaps the worn piece into the bag)">don</button>` : ""}<button data-drop="${s.defId}">drop</button></div>`).join("")}</div>` : ""}
+      ${(() => { const doffable = legal.filter((a) => a.type === "doff").map((a) => (a as { itemId: string }).itemId); return doffable.length ? `<div class="bank" style="margin-top:.5rem">${doffable.map((id) => `<div class="bankitem"><span class="chip" title="worn">${name(id)} (worn)</span><button data-doff="${id}" title="stow it in the bag (−${DON_DOFF_ENERGY}e; takes a slot)">doff</button></div>`).join("")}</div>` : ""; })()}
       ${(exp.carriedMaps ?? []).length ? `<div class="bank" style="margin-top:.5rem">${(exp.carriedMaps ?? []).map((m) => `<div class="bankitem"><span class="chip" title="1 slot — banks as a held map when the run ends">🗺️ ${name(m.biomeId)} map</span><button data-drop-map="${m.mapSeed}">drop</button></div>`).join("")}</div>` : ""}
     </section>
   </div>
@@ -523,6 +530,8 @@ function wire(): void {
   app.querySelectorAll<HTMLElement>("[data-craft]").forEach((el) => el.onclick = () => apply({ type: "craft", recipeId: el.dataset.craft! }));
   app.querySelectorAll<HTMLElement>("[data-pack]").forEach((el) => el.onclick = () => apply({ type: "pack", slot: el.dataset.slot as LoadoutSlot, itemId: el.dataset.pack! }));
   app.querySelectorAll<HTMLElement>("[data-drop]").forEach((el) => el.onclick = () => apply({ type: "drop", itemId: el.dataset.drop! }));
+  app.querySelectorAll<HTMLElement>("[data-don]").forEach((el) => el.onclick = () => apply({ type: "don", itemId: el.dataset.don! }));
+  app.querySelectorAll<HTMLElement>("[data-doff]").forEach((el) => el.onclick = () => apply({ type: "doff", itemId: el.dataset.doff! }));
   app.querySelectorAll<HTMLElement>("[data-drop-map]").forEach((el) => el.onclick = () => apply({ type: "drop-map", mapSeed: el.dataset.dropMap! }));
   app.querySelectorAll<HTMLElement>("[data-act]").forEach((el) => el.onclick = () => { pending = null; apply({ type: el.dataset.act! } as Action); });
   const reset = app.querySelector<HTMLElement>("[data-reset]"); if (reset) reset.onclick = () => planReset();

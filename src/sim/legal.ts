@@ -6,7 +6,7 @@
 import type { Action, GameState } from "../engine/types";
 import { reduce } from "../engine/reduce";
 import { RECIPE } from "../data/constants";
-import { slotOf } from "../engine/catalog";
+import { slotOf, isGear } from "../engine/catalog";
 import { candidateMaps } from "../engine/town";
 
 // An action is legal iff reducing it emits no rejection. reduce is pure + cheap.
@@ -21,10 +21,12 @@ export function townActions(state: GameState): Action[] {
   for (const recipeId of Object.keys(RECIPE)) {
     candidates.push({ type: "craft", recipeId });
   }
-  // pack: every bank item into the slot its defId belongs to
+  // pack: every bank item into the slot its defId belongs to; gear can also
+  // pack as a SPARE into a carry slot (82r)
   for (const stack of state.bank) {
     const slot = slotOf(stack.defId);
     if (slot !== null) candidates.push({ type: "pack", slot, itemId: stack.defId });
+    if (isGear(stack.defId)) candidates.push({ type: "pack", slot: "spare", itemId: stack.defId });
   }
   // embark: each candidate map the town is offering (rotates with state.runs)
   for (const map of candidateMaps(state.seed, state.runs ?? 0)) {
@@ -62,6 +64,16 @@ export function expeditionActions(state: GameState): Action[] {
   candidates.push({ type: "toggle-auto-eat" });
   // drop each carried stack
   for (const stack of carry) candidates.push({ type: "drop", itemId: stack.defId });
+  // don each carried gear piece; doff each worn piece + tool (82r) — reduce
+  // filters engaged / exhausted / capacity, per D29
+  for (const stack of carry) {
+    if (isGear(stack.defId)) candidates.push({ type: "don", itemId: stack.defId });
+  }
+  const worn = state.expedition.loadout.equipment;
+  for (const piece of [worn.weapon, worn.helmet, worn.chest, worn.legs, worn.boots, worn.gloves, worn.transport, worn.backpack, worn.panniers]) {
+    if (piece !== null) candidates.push({ type: "doff", itemId: piece });
+  }
+  for (const tool of worn.tools) candidates.push({ type: "doff", itemId: tool });
   // drop each carried map (8ec)
   for (const m of state.expedition.carriedMaps ?? []) candidates.push({ type: "drop-map", mapSeed: m.mapSeed });
   // return is always legal when un-engaged — a 0-energy run is never a dead end

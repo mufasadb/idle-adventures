@@ -4,7 +4,7 @@ import { emptyLoadout } from "../src/engine/loadout";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import type { Poi } from "../src/engine/grid";
 import { damageTaken } from "../src/engine/combat";
-import { PLAYER_BASE_HP, MAP_HEIGHT, MONSTERS } from "../src/data/constants";
+import { PLAYER_BASE_HP, MAP_HEIGHT, MONSTERS, QUAFF_ENERGY } from "../src/data/constants";
 import type { GameState, GameEvent } from "../src/engine/types";
 
 // Tier-1 only (landing-fix robustness): the bare-sword victory-loop test below
@@ -96,14 +96,27 @@ test("flee at low HP can soft-fail the run", () => {
   expect(state.phase).toBe("town");
 });
 
-test("quaff heals mid-engagement without an exchange; rejects outside one", () => {
+test("quaff heals mid-engagement without an exchange; works on the map for energy (82r)", () => {
   const { seed, poi } = monsterMap();
   const engaged = reduce(onMonster(seed, poi, { hp: 10, potions: [{ defId: "potion", qty: 1 }] }), { type: "fight" }).state;
   const { state, events } = reduce(engaged, { type: "quaff" });
   expect(events[0]).toMatchObject({ type: "quaffed", defId: "potion", healed: 10, hp: 20 });
   expect(state.expedition!.combat!.monsterHp).toBe(engaged.expedition!.combat!.monsterHp); // no exchange
-  const outside = reduce(onMonster(seed, poi, { potions: [{ defId: "potion", qty: 1 }] }), { type: "quaff" });
-  expect(outside.events[0]).toMatchObject({ type: "action-rejected", reason: "not-engaged" });
+  expect((events[0] as { energy?: number }).energy).toBeUndefined(); // in-combat quaff spends no energy (its cost is tempo)
+  // Out of combat (82r): quaff heals between fights and costs QUAFF_ENERGY.
+  const hurt = onMonster(seed, poi, { hp: 10, potions: [{ defId: "potion", qty: 1 }] });
+  hurt.expedition!.autoEat = false; // keep the energy arithmetic bare
+  const before = hurt.expedition!.energy;
+  const outside = reduce(hurt, { type: "quaff" });
+  expect(outside.events[0]).toMatchObject({ type: "quaffed", defId: "potion", healed: 10, hp: 20, energy: before - QUAFF_ENERGY });
+  expect(outside.state.expedition!.energy).toBe(before - QUAFF_ENERGY);
+  expect(outside.state.expedition!.combat).toBeUndefined();
+  // Full HP still rejects; an exhausted player can't quaff on the map.
+  const full = reduce(onMonster(seed, poi, { potions: [{ defId: "potion", qty: 1 }] }), { type: "quaff" });
+  expect(full.events[0]).toMatchObject({ type: "action-rejected", reason: "insufficient" });
+  const tired = onMonster(seed, poi, { hp: 10, potions: [{ defId: "potion", qty: 1 }] });
+  tired.expedition!.energy = QUAFF_ENERGY - 1;
+  expect(reduce(tired, { type: "quaff" }).events[0]).toMatchObject({ type: "action-rejected", reason: "exhausted" });
 });
 
 test("move onto a live monster engages (moveOnWin) instead of resolving", () => {
