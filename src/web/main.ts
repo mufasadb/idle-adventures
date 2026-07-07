@@ -104,7 +104,7 @@ function fmt(e: GameEvent): string {
     case "engaged": return e.ranged
       ? `🏹 engaged the ${name(e.creature)} from a tile away — your opener lands before it can answer`
       : `⚔ engaged the ${name(e.creature)}`;
-    case "exchanged": return `⚔ traded blows with the ${e.creature} — dealt ${round(e.dmgDealt)}, took ${round(e.dmgTaken)} · ${round(e.hp)}hp left${e.arrowSpent ? " · 🏹 −1 arrow" : ""}`;
+    case "exchanged": return `⚔ traded blows with the ${name(e.creature)} — dealt ${round(e.dmgDealt)}, took ${round(e.dmgTaken)} · ${round(e.hp)}hp left${e.arrowSpent ? " · 🏹 −1 arrow" : ""}`;
     case "fled": return `🏃 fled the ${name(e.creature)} · −${round(e.partingHit)}hp → ${round(e.hp)}hp`;
     case "quaffed": return `🧪 quaffed ${name(e.defId)} · +${round(e.healed)}hp → ${round(e.hp)}hp${e.energy !== undefined ? ` · −${QUAFF_ENERGY}e → ${round(e.energy)}e` : ""}`;
     case "auto-quaff-toggled": return `auto-quaff ${e.on ? "on" : "off"}`;
@@ -398,8 +398,7 @@ function engagementPanel(exp: NonNullable<GameState["expedition"]>, legal: Actio
   const dmgOut = playerDamage(exp.loadout, c.creature) + c.damageAdd;
   const dmgIn = damageTaken(exp.loadout, c.creature, c.mitigationAdd);
   const toKill = Math.ceil(c.monsterHp / dmgOut);
-  const hpPool = exp.hp; // potions extend this — the forecast shows the raw race
-  const toDie = Math.ceil(hpPool / dmgIn);
+  const toDie = Math.ceil(exp.hp / dmgIn); // raw race — potions extend it (noted in the forecast line)
   const winning = toKill <= toDie;
   const canQuaff = legal.some((a) => a.type === "quaff");
   // Quiver readout (D45): a wielded bow spends an arrow per round; empty = club.
@@ -411,7 +410,7 @@ function engagementPanel(exp: NonNullable<GameState["expedition"]>, legal: Actio
     <div class="forecast">you hit for <b>${round(dmgOut)}</b> · it hits for <b>${round(dmgIn)}</b> · <b class="${winning ? "good" : "over"}">${winning ? `kill in ${toKill}` : `it kills you first (~${toDie} rounds)`}</b>${exp.loadout.potions.length ? ` · ${exp.loadout.potions.reduce((n, p) => n + p.qty, 0)} potion(s) extend that` : ""}${quiver}</div>
     <div class="actions">
       <button data-act="fight">⚔ Fight (1 round)</button>
-      <button data-act="flee" title="disengage — take one parting hit (${round(dmgIn)})">🏃 Flee (−${round(dmgIn)} HP)</button>
+      <button data-act="flee" title="disengage — take one parting hit (${round(dmgIn)}); battle items consumed at the start of this fight are lost">🏃 Flee (−${round(dmgIn)} HP)</button>
       ${canQuaff ? `<button data-act="quaff">🧪 Potion</button>` : `<button disabled title="no potions, or full HP">🧪 Potion</button>`}
       <button data-act="toggle-auto-quaff">Auto-potion: <b>${(exp.autoQuaff ?? true) ? "on" : "off"}</b></button>
     </div>

@@ -5,9 +5,16 @@ import type { DmgType, ArmourType } from "../src/data/constants";
 
 test("every biome's tier-1/2 band covers the full type spread", () => {
   for (const id of BIOME_IDS) {
-    const reachable = Object.keys(BIOMES[id].creatureTable).filter((c) => MONSTERS[c]!.tier <= 2);
-    const dmg = new Set<DmgType>(reachable.map((c) => MONSTERS[c]!.dmgType));
-    const hide = new Set<ArmourType>(reachable.map((c) => MONSTERS[c]!.armourType));
+    // Resolve defs up front with a named failure (c5l): a creatureTable typo
+    // reads "unknown creature X in woodland", not a bare undefined-access throw.
+    const defs = Object.keys(BIOMES[id].creatureTable).map((c) => {
+      const m = MONSTERS[c];
+      if (!m) throw new Error(`unknown creature ${c} in ${id}`);
+      return m;
+    });
+    const reachable = defs.filter((m) => m.tier <= 2);
+    const dmg = new Set<DmgType>(reachable.map((m) => m.dmgType));
+    const hide = new Set<ArmourType>(reachable.map((m) => m.armourType));
     expect(dmg.size).toBe(3); // melee + ranged + magic incoming
     expect(hide.size).toBe(3); // plate + light + robe hides
   }

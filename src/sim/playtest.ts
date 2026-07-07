@@ -137,7 +137,9 @@ function printTown(st: GameState): void {
   for (const id of ids) {
     const r = RECIPE[id]!;
     const ing = r.inputs.map((i) => `${i.qty}× ${i.defId}`).join(" + ");
-    console.log(`  ${affordable.has(id) ? "✓" : "·"} ${r.output.qty}× ${r.output.defId}  ←  ${ing}`);
+    // 2g7.7: print the EXACT recipeId — several recipes share an output defId
+    // (ration vs ration-sage …), and crafting the wrong id was a silent rake.
+    console.log(`  ${affordable.has(id) ? "✓" : "·"} ${r.output.qty}× ${r.output.defId}  ←  ${ing}  ·  craft recipeId="${id}"`);
   }
   console.log("\nTip: tools each take one bag slot — you can pack several (pick + axe + knife + …).");
 }
@@ -149,8 +151,9 @@ function printExpedition(st: GameState): void {
   const cleared = new Set(exp.cleared.map((c) => `${c.x},${c.y}`));
   if (exp.combat) {
     const c = exp.combat;
-    const dmgOut = playerDamage(exp.loadout, c.creature) + c.damageAdd;
-    const dmgIn = damageTaken(exp.loadout, c.creature, c.mitigationAdd);
+    const r1 = (n: number) => Math.round(n * 10) / 10; // c5l: % mitigation makes these floats — round for the console
+    const dmgOut = r1(playerDamage(exp.loadout, c.creature) + c.damageAdd);
+    const dmgIn = r1(damageTaken(exp.loadout, c.creature, c.mitigationAdd));
     console.log(`\n=== ENGAGED: ${c.creature} — ${c.monsterHp} HP · you hit ${dmgOut}, it hits ${dmgIn} · actions: fight | flee | quaff | toggle-auto-quaff ===`);
   }
   console.log("\n=== MAP (▲ you · letters = node kinds · detail only resolves near you) ===");
@@ -183,6 +186,7 @@ function printExpedition(st: GameState): void {
       console.log(`  (${p.x},${p.y}) ${flavorDetail(p.detail, p.kind)}${tierHint}${fightHint}${shootHint}`);
     }
   }
+  console.log("\nTip: move steps ONE tile straight toward `to` — it does NOT route around walls; an impassable/no-step rejection means pick a different neighbouring tile yourself."); // 2g7.7: was learned by punishment
   if (reachFlag) {
     // Gear-adjusted energy to reach every node, plus the on-foot delta so the
     // routing benefit of your transport/tools is legible. One Dijkstra each.

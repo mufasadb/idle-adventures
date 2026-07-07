@@ -457,11 +457,16 @@ function fight(state: GameState, at?: { x: number; y: number }): { state: GameSt
     ...(spendsArrow ? { arrowSpent: true } : {}),
   };
   const loadout = { ...expedition.loadout, potions: round.potionsAfter, ammo };
+  // One roll, shared by the event and the carry apply (c5l): rollLoot is
+  // deterministic so the old double call couldn't drift — but only by accident.
+  const rolled = rollLoot(state.seed, combat.creature, combat.at);
+  const mapDrops = rolled.filter((s) => s.defId === MAP_SCROLL_ID);
+  const loot = rolled.filter((s) => s.defId !== MAP_SCROLL_ID);
   const fought = (victory: boolean): GameEvent => ({
     type: "fought", at: { x: combat.at.x, y: combat.at.y }, creature: combat.creature,
     // quaffing above startHp reads as 0 lost, not negative
     victory, hpLost: Math.max(0, combat.startHp - round.hp), potionsUsed,
-    loot: victory ? rollLoot(state.seed, combat.creature, combat.at).filter((s) => s.defId !== MAP_SCROLL_ID) : [],
+    loot: victory ? loot : [],
     hp: round.hp, matchup: explainMatchup(expedition.loadout, combat.creature),
   });
   if (round.defeated) {
@@ -475,9 +480,6 @@ function fight(state: GameState, at?: { x: number; y: number }): { state: GameSt
     };
   }
   // Victory: apply loot/maps/cleared/relocation exactly as the old fightAt did.
-  const rolled = rollLoot(state.seed, combat.creature, combat.at);
-  const mapDrops = rolled.filter((s) => s.defId === MAP_SCROLL_ID);
-  const loot = rolled.filter((s) => s.defId !== MAP_SCROLL_ID);
   const maxStacks = freeLootStacks(loadout, expedition.carriedMaps);
   let carryWithLoot: typeof expedition.carry = expedition.carry;
   for (const stack of loot) {
