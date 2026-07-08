@@ -90,7 +90,9 @@ function embark(
   const reserved = reserveLoadout(state.loadout);
   const bank = subtractStacks(state.bank, reserved);
   if (bank === null) return rejected(state, "embark", "unaffordable");
-  const grid = generateGrid(mapSeed, rollBiome(mapSeed));
+  const heldMap = held.find((m) => m.mapSeed === mapSeed);
+  const mapTier = heldMap?.tier ?? 1;
+  const grid = generateGrid(mapSeed, rollBiome(mapSeed), mapTier);
   // Stamina model (dtv): current energy starts at MAX_ENERGY regardless of packed
   // food — food is a reserve you EAT to refill toward max mid-run, not the source
   // of the whole budget. autoEat (default on) refills waste-free after each spend.
@@ -111,6 +113,7 @@ function embark(
       maps: wasHeld ? held.filter((m) => m.mapSeed !== mapSeed) : held, // spend the held map (xzx)
       expedition: {
         mapSeed,
+        mapTier,
         pos: grid.entry,
         energy,
         maxEnergy: MAX_ENERGY,
@@ -204,7 +207,7 @@ function move(
   if (step.x < 0 || step.x >= MAP_WIDTH || step.y < 0 || step.y >= MAP_HEIGHT) {
     return rejected(state, "move", "out-of-bounds");
   }
-  const grid = generateGrid(expedition.mapSeed, rollBiome(expedition.mapSeed));
+  const grid = generateGrid(expedition.mapSeed, rollBiome(expedition.mapSeed), expedition.mapTier ?? 1);
   // Walking INTO a live monster is a fight, not a step (2026-07-05): monsters
   // block their tile until beaten, so pathing through one is a real choice
   // (fight it, or route around). No energy cost — combat spends HP, not energy.
@@ -406,7 +409,7 @@ function fight(state: GameState, at?: { x: number; y: number }): { state: GameSt
   const combat = expedition.combat;
   if (!combat) {
     const { pos } = expedition;
-    const grid = generateGrid(expedition.mapSeed, rollBiome(expedition.mapSeed));
+    const grid = generateGrid(expedition.mapSeed, rollBiome(expedition.mapSeed), expedition.mapTier ?? 1);
     if (at !== undefined) {
       // Ranged engage (D45): `at` must be an ADJACENT (8-neighbour) live monster
       // tile, with a bow wielded and ≥1 arrow held. Engages without stepping in
