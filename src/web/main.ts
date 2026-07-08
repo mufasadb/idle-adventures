@@ -11,10 +11,11 @@ import { generateGrid, rollBiome } from "../engine/grid";
 import type { Grid } from "../engine/grid";
 import { slotOf } from "../engine/catalog";
 import { moveCost, moveCostBreakdown } from "../engine/move";
+import { costToReach } from "../engine/reach";
 import { carryCap } from "../engine/carry";
 import { heldFoodEnergy } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
-import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP } from "../data/constants";
+import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, TERRAIN_GATE } from "../data/constants";
 import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint } from "../render/render";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, LoadoutSlot, MapItem, RejectionReason } from "../engine/types";
@@ -45,6 +46,7 @@ type Pending = { goal: Pos; path: Pos[]; cost: number; fight?: string; shoot?: b
 let state: GameState = load() ?? newGame(seed);
 let log: string[] = loadLog();
 let pending: Pending = null; // a proposed walk awaiting a confirm click
+let hint: string | null = null; // transient path banner when a click can't be routed (si7.5)
 const app = document.querySelector<HTMLDivElement>("#app")!;
 
 // --- persistence: survive a page refresh (the run isn't lost) ----------------
@@ -110,6 +112,7 @@ function repackLast(): void {
 
 // --- action plumbing: one funnel so every interaction goes through reduce ----
 function apply(action: Action): void {
+  hint = null; // any committed action clears a stale walled-off notice
   const prevLoadout = state.loadout; // embark consumes this plan — stash it for repack
   const { state: next, events } = reduce(state, action);
   if (action.type === "embark" && !events.some((e) => e.type === "action-rejected")) saveLastPlan(prevLoadout);
@@ -583,6 +586,8 @@ function expeditionView(): string {
     ? `<div class="pathbanner engaged">⚔ <b>ENGAGED — the ${name(exp.combat.creature)}</b> · fight or flee in the panel below ↓</div>`
     : pending
     ? `<div class="pathbanner">${pending.fight ? `⚔ walk in &amp; <b>fight the ${name(pending.fight)}</b> · ` : ""}→ (${pending.goal.x},${pending.goal.y}): ${pending.path.length} tile${pending.path.length !== 1 ? "s" : ""}, <b class="${pending.cost > exp.energy ? "over" : ""}">−${round(pending.cost)} energy</b>${savingClause}${forecastClause} · <button data-walk>${pending.fight ? "Fight ▶" : "Walk ▶"}</button> ${pending.shoot ? `<button data-shoot title="engage from here with your bow — your opener lands before it can answer, and you don't step in">🏹 Shoot</button> ` : ""}<button class="link" data-cancelpath>cancel</button></div>`
+    : hint
+    ? `<div class="pathbanner"><b class="over">✗ ${hint}</b></div>`
     : `<div class="pathbanner muted">Click a tile → previews the route + energy. Click <b>Walk</b> (or the tile again / right-click) to go. Monsters (<b>X</b>) block their tile — click one to fight, or route around.</div>`;
 
   const cap = carryCap(exp.loadout.equipment);
@@ -644,7 +649,27 @@ function wire(): void {
   });
 }
 
+// Why did A* find no route to a clicked tile? (si7.5) — replaces the old generic
+// "walled off / blocked by a monster" with a reasoned cause. Data-driven from
+// TERRAIN_GATE via reach.ts (pure): (1) if the tile IS terrain-reachable with the
+// current kit, only a monster on the sole route can have blocked A*; (2) else, try
+// each gate tool the player lacks — if adding it makes reach finite, name it (only
+// climbing-pick enables mountains today; raft merely discounts a river, so it never
+// surfaces here); (3) otherwise the tile is sealed behind impassable terrain.
+function unreachableReason(grid: Grid, from: Pos, goal: Pos): string {
+  const eq = state.expedition!.loadout.equipment;
+  const reach = (tools: string[]) => costToReach(grid.terrain, from, eq.transport, tools)[goal.y]![goal.x]!;
+  if (Number.isFinite(reach(eq.tools))) {
+    return "a monster sits on the only route — fight through it, or find a way around";
+  }
+  const gateTools = [...new Set(Object.values(TERRAIN_GATE).flatMap((g) => Object.keys(g ?? {})))];
+  const enablers = gateTools.filter((tool) => !eq.tools.includes(tool) && Number.isFinite(reach([...eq.tools, tool])));
+  if (enablers.length) return `walled off — a ${enablers.map(name).join(" or ")} would open a route`;
+  return "no route exists — that tile is sealed behind impassable terrain";
+}
+
 function onTileClick(to: Pos): void {
+  hint = null;
   const exp = state.expedition;
   if (!exp) return;
   if (to.x === exp.pos.x && to.y === exp.pos.y) { pending = null; draw(); return; } // click self = cancel
@@ -654,7 +679,7 @@ function onTileClick(to: Pos): void {
   // live monsters block the route (you fight what you walk into) — routed around
   const blocked = new Set(grid.pois.filter((p) => p.kind === "monster" && p.creature && !cleared.has(kk(p))).map(kk));
   const found = findPath(grid, exp.pos, to, exp.loadout.equipment.transport, exp.loadout.equipment.tools, blocked);
-  if (!found || found.path.length === 0) { pending = null; note("✗ can't reach that tile (walled off / blocked by a monster)"); return; }
+  if (!found || found.path.length === 0) { pending = null; hint = unreachableReason(grid, exp.pos, to); draw(); return; }
   const goalPoi = grid.pois.find((p) => kk(p) === kk(to));
   const fight = goalPoi?.kind === "monster" && goalPoi.creature && !cleared.has(kk(to)) ? goalPoi.creature : undefined;
   // Shoot affordance (D45): an adjacent live monster with a bow + arrows offers
