@@ -13,6 +13,7 @@ export type PoiDetail = {
   armourType?: ArmourType;
   creature?: string;
   material?: string;
+  magnitude?: number;
 };
 export type PerceivedPoi = { x: number; y: number; kind: NodeType; detail: PoiDetail | null };
 
@@ -35,7 +36,7 @@ export function perceive(grid: Grid, playerPos: Coord, tools: string[]): Perceiv
       detail = { tier: m.tier, dmgType: m.dmgType, armourType: m.armourType, creature: p.creature };
     } else {
       const tier = p.material ? (MATERIAL_TIER[p.material] ?? 1) : 1;
-      detail = { tier, ...(p.material ? { material: p.material } : {}) };
+      detail = { tier, ...(p.material ? { material: p.material } : {}), ...(p.magnitude ? { magnitude: p.magnitude } : {}) };
     }
     return { x: p.x, y: p.y, kind: p.kind, detail };
   });

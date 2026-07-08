@@ -304,7 +304,7 @@ function realSlots(loadout: Loadout, carry: ItemStack[], maps: MapItem[] = []): 
   }
   for (const t of loadout.equipment.tools) boxes.push(slotBox("tool", name(t), ""));
   for (const s of carry) boxes.push(slotBox("loot", name(s.defId), `×${s.qty}`));
-  for (const m of maps) boxes.push(slotBox("loot", `🗺️ ${name(m.biomeId)} map`, "")); // carried maps (8ec): 1 slot each
+  for (const m of maps) boxes.push(slotBox("loot", `🗺️ T${m.tier ?? 1} ${name(m.biomeId)} map`, "")); // carried maps (8ec): 1 slot each
   return boxes;
 }
 function wornGhosts(eq: Equipment): string[] {
@@ -355,7 +355,7 @@ function townView(): string {
       ${heldMaps.length ? `<div class="mapoffer">
         ${heldMaps.map((m) => `
           <div class="mapcard">
-            <b>${name(m.biomeId)}</b>
+            <b>T${m.tier ?? 1} ${name(m.biomeId)} map</b>
             <span class="muted small">${(state.runs ?? 0) - m.vintage} runs old</span>
             <button data-embark="${m.mapSeed}">Embark ▶ (spend)</button>
           </div>`).join("")}
@@ -614,7 +614,7 @@ function expeditionView(): string {
       <div class="muted small">food (green) is eaten to refill energy as you travel — freeing slots for loot (gold). Potions purple · battle items red · tools grey · worn gear ghosted (free).</div>
       ${exp.carry.length ? `<div class="bank" style="margin-top:.5rem">${exp.carry.map((s) => `<div class="bankitem"><span class="chip">${name(s.defId)} ×${s.qty}</span>${legal.some((a) => a.type === "don" && a.itemId === s.defId) ? `<button data-don="${s.defId}" title="equip it (−${DON_DOFF_ENERGY}e; swaps the worn piece into the bag)">don</button>` : ""}<button data-drop="${s.defId}">drop</button></div>`).join("")}</div>` : ""}
       ${(() => { const doffable = legal.filter((a) => a.type === "doff").map((a) => (a as { itemId: string }).itemId); return doffable.length ? `<div class="bank" style="margin-top:.5rem">${doffable.map((id) => `<div class="bankitem"><span class="chip" title="worn">${name(id)} (worn)</span><button data-doff="${id}" title="stow it in the bag (−${DON_DOFF_ENERGY}e; takes a slot)">doff</button></div>`).join("")}</div>` : ""; })()}
-      ${(exp.carriedMaps ?? []).length ? `<div class="bank" style="margin-top:.5rem">${(exp.carriedMaps ?? []).map((m) => `<div class="bankitem"><span class="chip" title="1 slot — banks as a held map when the run ends">🗺️ ${name(m.biomeId)} map</span><button data-drop-map="${m.mapSeed}">drop</button></div>`).join("")}</div>` : ""}
+      ${(exp.carriedMaps ?? []).length ? `<div class="bank" style="margin-top:.5rem">${(exp.carriedMaps ?? []).map((m) => `<div class="bankitem"><span class="chip" title="1 slot — banks as a held map when the run ends">🗺️ T${m.tier ?? 1} ${name(m.biomeId)} map</span><button data-drop-map="${m.mapSeed}">drop</button></div>`).join("")}</div>` : ""}
     </section>
   </div>
   ${logView()}`;

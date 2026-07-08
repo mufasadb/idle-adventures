@@ -83,7 +83,7 @@ if (s.expedition) console.log(`energy: ${s.expedition.energy}/${s.expedition.max
 if (state.expedition) {
   // Carry + carried maps (8ec; si7.4 parity): maps cost a slot each mid-run.
   const cmaps = state.expedition.carriedMaps ?? [];
-  console.log(`carry: ${state.expedition.carry.map((c) => `${c.qty}× ${c.defId}`).join(", ") || "(empty)"}${cmaps.length ? ` · carried maps (1 slot each, bank as held maps at run end): ${cmaps.map((m) => `${m.biomeId} — drop-map mapSeed="${m.mapSeed}" to free the slot`).join("; ")}` : ""}`);
+  console.log(`carry: ${state.expedition.carry.map((c) => `${c.qty}× ${c.defId}`).join(", ") || "(empty)"}${cmaps.length ? ` · carried maps (1 slot each, bank as held maps at run end): ${cmaps.map((m) => `T${m.tier ?? 1} ${m.biomeId} map — drop-map mapSeed="${m.mapSeed}" to free the slot`).join("; ")}` : ""}`);
   // Bag occupancy (si7.4 parity): the web shows used/cap; the console must too —
   // new line, never reshape the carry line above (drivers parse it).
   console.log(`bag: ${usedSlots(state.expedition.loadout, state.expedition.carry, cmaps)}/${carryCap(state.expedition.loadout.equipment)} slots used (each food/potion/battle-item/tool/spare-gear unit + each loot stack + each carried map = 1 slot)`);
@@ -129,7 +129,7 @@ function printTown(st: GameState): void {
   const held = st.maps ?? [];
   console.log("\nYour maps (held — embarking one SPENDS it; they outlast the offer rotating):");
   if (held.length === 0) console.log("  (none — pocket a map above to keep it)");
-  for (const m of held) console.log(`  • ${m.biomeId} · ${(st.runs ?? 0) - m.vintage} runs old  →  embark mapSeed="${m.mapSeed}" (spends it)`);
+  for (const m of held) console.log(`  • T${m.tier ?? 1} ${m.biomeId} map · ${(st.runs ?? 0) - m.vintage} runs old  →  embark mapSeed="${m.mapSeed}" (spends it)`);
   const affordable = new Set(
     legalActions(st).filter((a) => a.type === "craft").map((a) => (a as { recipeId: string }).recipeId),
   );

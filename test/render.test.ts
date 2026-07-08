@@ -93,3 +93,11 @@ test("matchupLessons: surfaces affinity + weapon-vs-hide + armour result", () =>
   const none = matchupLessons({ weaponVsHide: 1, affinityFired: false, armourVsAttack: "neutral" }, "sword");
   expect(none.length).toBe(0); // nothing notable → no noise
 });
+
+test("flavorDetail names node magnitude variants", () => {
+  expect(flavorDetail({ tier: 1, material: "iron-ore", magnitude: 2 }, "mining")).toBe("iron-ore cluster");
+  expect(flavorDetail({ tier: 1, material: "iron-ore", magnitude: 3 }, "mining")).toBe("iron-ore cave");
+  expect(flavorDetail({ tier: 1, material: "berries", magnitude: 2 }, "herb")).toBe("berries patch");
+  // base (magnitude 1/absent) unchanged
+  expect(flavorDetail({ tier: 1, material: "iron-ore" }, "mining")).toBe("iron-ore");
+});

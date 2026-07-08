@@ -39,6 +39,14 @@ export function weaponHint(defId: string): string | null {
   return w ? WEAPON_CLASS_HINT[w.dmgType] : null;
 }
 
+const MAGNITUDE_SUFFIX: Record<NodeType, Record<number, string>> = {
+  mining: { 2: "cluster", 3: "cave" },
+  wood:   { 2: "stand", 3: "grove" },
+  herb:   { 2: "patch", 3: "thicket" },
+  animal: { 2: "herd", 3: "warren" },
+  monster: {},
+};
+
 // Vague human text from perception facts. `detail === null` → kind only.
 export function flavorDetail(detail: PoiDetail | null, kind: NodeType): string {
   if (detail === null) return kind === "monster" ? "a monster" : `a ${kind} node`;
@@ -48,7 +56,9 @@ export function flavorDetail(detail: PoiDetail | null, kind: NodeType): string {
     const tell = detail.dmgType ? `; ${DMG_FLAVOR[detail.dmgType]}` : "";
     return `${size} creature — ${hide}${tell}`;
   }
-  return detail.material ?? `a ${kind} node`;
+  const mat = detail.material ?? `a ${kind} node`;
+  const suffix = detail.magnitude ? MAGNITUDE_SUFFIX[kind]?.[detail.magnitude] : undefined;
+  return suffix ? `${mat} ${suffix}` : mat;
 }
 
 // 0-2 salient post-fight lessons; empty when nothing notable happened. `weaponId`
