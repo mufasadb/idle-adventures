@@ -4,9 +4,10 @@
 // embark carries only the chosen mapSeed.
 import type { GameState } from "./types";
 import type { BiomeId } from "../data/constants";
+import type { Grid } from "./grid";
 import { emptyLoadout } from "./loadout";
-import { rollBiome } from "./grid";
-import { CANDIDATE_MAP_COUNT, PREVIEW_FIDELITY } from "../data/constants";
+import { rollBiome, generateGrid } from "./grid";
+import { CANDIDATE_MAP_COUNT, PREVIEW_FIDELITY, EPITHETS, MONSTERS } from "../data/constants";
 
 // Modest, functional starter kit: enough to run a real first expedition. You
 // start with NO backpack (bare BASE_CARRY_SLOTS) — the "starter" pack is your
@@ -36,6 +37,37 @@ export function newGame(seed: string): GameState {
 export function previewHints(_mapSeed: string, _biomeId: BiomeId): string[] {
   if (PREVIEW_FIDELITY <= 0) return [];
   return []; // higher-fidelity whispers land here when the lever is raised
+}
+
+// Map epithet (q2k): the highest-priority EPITHETS label a map's generated
+// content earns, or null (most maps). Tally POI materials / node-kinds / the
+// max creature tier, then walk EPITHETS in order — first match wins. Reads the
+// (memoized) grid, so calling it per offer each town render is cheap. Pure and
+// deterministic in (mapSeed, biomeId, mapTier). Labels only — never a number.
+export function epithetForGrid(grid: Grid): string | null {
+  const materialCounts = new Map<string, number>();
+  const nodeTypeCounts = new Map<string, number>();
+  let maxCreatureTier = 0;
+  for (const p of grid.pois) {
+    nodeTypeCounts.set(p.kind, (nodeTypeCounts.get(p.kind) ?? 0) + 1);
+    if (p.material) materialCounts.set(p.material, (materialCounts.get(p.material) ?? 0) + 1);
+    if (p.creature) maxCreatureTier = Math.max(maxCreatureTier, MONSTERS[p.creature]?.tier ?? 0);
+  }
+  const total = grid.pois.length;
+  for (const { label, test } of EPITHETS) {
+    if ("material" in test) {
+      if ((materialCounts.get(test.material) ?? 0) >= test.minCount) return label;
+    } else if ("creatureTierAtLeast" in test) {
+      if (maxCreatureTier >= test.creatureTierAtLeast) return label;
+    } else if (total > 0 && (nodeTypeCounts.get(test.nodeType) ?? 0) / total >= test.minShare) {
+      return label;
+    }
+  }
+  return null;
+}
+
+export function mapEpithet(mapSeed: string, biomeId: BiomeId, mapTier = 1): string | null {
+  return epithetForGrid(generateGrid(mapSeed, biomeId, mapTier));
 }
 
 // The town's offer for the CURRENT visit. `runs` (GameState.runs) advances the

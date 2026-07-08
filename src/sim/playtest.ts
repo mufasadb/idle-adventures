@@ -8,7 +8,7 @@
 import { play } from "./play";
 import { legalActions } from "./legal";
 import { summarize } from "./report";
-import { candidateMaps } from "../engine/town";
+import { candidateMaps, mapEpithet } from "../engine/town";
 import { expeditionGrid } from "../engine/grid";
 import { perceive } from "../engine/perceive";
 import {
@@ -123,13 +123,13 @@ function printTown(st: GameState): void {
   console.log("\n=== TOWN ===");
   const offer = candidateMaps(st.seed, st.runs ?? 0);
   console.log("Maps on offer (embark = 'go nearby', free; or pocket to keep for later):");
-  for (const m of offer) console.log(`  • ${m.preview.headline}  →  embark mapSeed="${m.mapSeed}"  ·  pocket mapSeed="${m.mapSeed}"`);
+  for (const m of offer) { const e = mapEpithet(m.mapSeed, m.biomeId); console.log(`  • ${m.preview.headline}${e ? ` of ${e}` : ""}  →  embark mapSeed="${m.mapSeed}"  ·  pocket mapSeed="${m.mapSeed}"`); }
   // Held maps (xzx): pocketed snapshots that survive the offer rotating — embark
   // spends one. "go nearby" runs a fresh offered map instead (nothing to spend).
   const held = st.maps ?? [];
   console.log("\nYour maps (held — embarking one SPENDS it; they outlast the offer rotating):");
   if (held.length === 0) console.log("  (none — pocket a map above to keep it)");
-  for (const m of held) console.log(`  • T${m.tier ?? 1} ${m.biomeId} map · ${(st.runs ?? 0) - m.vintage} runs old  →  embark mapSeed="${m.mapSeed}" (spends it)`);
+  for (const m of held) { const e = mapEpithet(m.mapSeed, m.biomeId, m.tier ?? 1); console.log(`  • T${m.tier ?? 1} ${m.biomeId} map${e ? ` of ${e}` : ""} · ${(st.runs ?? 0) - m.vintage} runs old  →  embark mapSeed="${m.mapSeed}" (spends it)`); }
   const affordable = new Set(
     legalActions(st).filter((a) => a.type === "craft").map((a) => (a as { recipeId: string }).recipeId),
   );

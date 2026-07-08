@@ -109,6 +109,30 @@ export const MATERIAL_TIER: Record<string, number> = {
   seal: 2, // tundra animal (m0a): large prey — knife required at T2
 };
 
+// --- Map epithets (q2k): a map whose generated content crosses a notability
+// threshold gets an EPITHET appended to its display name ("a woodland map of
+// carbon", "of the ancients"). Ordered — FIRST match wins; most maps match
+// nothing (thresholds keep it notable). Tests are DATA-declarative (no closures
+// in a lever) and evaluated in engine/town.ts:epithetForGrid.
+//   • { material, minCount }       — >= minCount POIs yield this material defId
+//   • { creatureTierAtLeast }      — some monster POI is at least this MONSTERS[].tier
+//   • { nodeType, minShare }       — this node kind is >= minShare of all POIs
+// Labels are the SHARED naming vocabulary cxq's inks/affixes draw from (one
+// table: q2k READS a rolled map, cxq WRITES one). Labels stay QUALITATIVE —
+// a number must never leak (a perception guard, enforced by test).
+export type EpithetTest =
+  | { material: string; minCount: number }
+  | { creatureTierAtLeast: number }
+  | { nodeType: NodeType; minShare: number };
+export type Epithet = { id: string; label: string; test: EpithetTest };
+export const EPITHETS: Epithet[] = [
+  { id: "ancients", label: "the ancients", test: { creatureTierAtLeast: 3 } }, // a T3+ terror lairs here (troll/vampire/wyrm) — the spawn-lottery tell (playtest v3 §2)
+  { id: "gleaming", label: "gleaming", test: { material: "mithril-ore", minCount: 2 } }, // a mithril vein, not a fleck
+  { id: "carbon", label: "carbon", test: { material: "coal", minCount: 4 } }, // a real coal seam
+  { id: "the-hunt", label: "the hunt", test: { nodeType: "monster", minShare: 0.4 } }, // monster-dense — a hunting ground
+  { id: "plenty", label: "plenty", test: { nodeType: "herb", minShare: 0.45 } }, // forage-rich
+];
+
 // --- Energy economy (filled in M2; rescaled ×10 for graded movement, svz) ---
 // Every energy-denominated lever sits on a ×10 scale so gear can shave meaningful
 // POINTS off a step (TERRAIN_GATE) without snapping to impassable — ratios are

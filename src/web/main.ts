@@ -4,7 +4,7 @@
 // what's offered, so the UI can never diverge from what the engine accepts.
 // Pathing (A*) is a UI convenience — it only proposes a sequence of `move`
 // actions; each step is still validated by `reduce`.
-import { newGame, candidateMaps } from "../engine/town";
+import { newGame, candidateMaps, mapEpithet } from "../engine/town";
 import { reduce } from "../engine/reduce";
 import { legalActions } from "../sim/legal";
 import { expeditionGrid, rollBiome } from "../engine/grid";
@@ -16,6 +16,7 @@ import { carryCap } from "../engine/carry";
 import { heldFoodEnergy } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
 import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, TERRAIN_GATE } from "../data/constants";
+import type { BiomeId } from "../data/constants";
 import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint } from "../render/render";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, LoadoutSlot, MapItem, RejectionReason } from "../engine/types";
@@ -321,6 +322,12 @@ function inventoryGrid(loadout: Loadout, carry: ItemStack[], cap: number, maps: 
   return { used: real.length, html: `<div class="slots">${boxes.join("")}</div>${ghostStrip}` };
 }
 
+// q2k: append a notability epithet to a map's name ("… of carbon"), or nothing.
+function epithetSuffix(mapSeed: string, biomeId: BiomeId, tier = 1): string {
+  const e = mapEpithet(mapSeed, biomeId, tier);
+  return e ? ` <span class="muted">of ${e}</span>` : "";
+}
+
 function townView(): string {
   const legal = legalActions(state);
   const craftable = legal.filter((a): a is Extract<Action, { type: "craft" }> => a.type === "craft");
@@ -342,7 +349,7 @@ function townView(): string {
       <div class="mapoffer">
         ${offer.map((m) => `
           <div class="mapcard">
-            <b>${m.preview.headline}</b>
+            <b>${m.preview.headline}${epithetSuffix(m.mapSeed, m.biomeId)}</b>
             <button data-embark="${m.mapSeed}">Embark ▶</button>
             ${heldSeeds.has(m.mapSeed) ? `<span class="muted small">pocketed</span>` : `<button data-pocket="${m.mapSeed}">Pocket</button>`}
           </div>`).join("")}
@@ -355,7 +362,7 @@ function townView(): string {
       ${heldMaps.length ? `<div class="mapoffer">
         ${heldMaps.map((m) => `
           <div class="mapcard">
-            <b>T${m.tier ?? 1} ${name(m.biomeId)} map</b>
+            <b>T${m.tier ?? 1} ${name(m.biomeId)} map${epithetSuffix(m.mapSeed, m.biomeId, m.tier ?? 1)}</b>
             <span class="muted small">${(state.runs ?? 0) - m.vintage} runs old</span>
             <button data-embark="${m.mapSeed}">Embark ▶ (spend)</button>
           </div>`).join("")}
