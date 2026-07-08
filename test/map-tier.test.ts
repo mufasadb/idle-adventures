@@ -55,3 +55,25 @@ test("miniboss gate: ice-troll absent at T1, present by T2 (tundra)", () => {
   expect(t1).toBe(false);
   expect(t2).toBe(true);
 }, 30000);
+
+test("magnitude: T1 gatherable nodes are all base (undefined magnitude)", () => {
+  for (let i = 0; i < 50; i++) {
+    const seed = `mag1-${i}`;
+    for (const p of generateGrid(seed, rollBiome(seed), 1).pois) {
+      if (p.kind !== "monster") expect(p.magnitude ?? 1).toBe(1);
+    }
+  }
+});
+
+test("magnitude: higher tiers produce rich variants; monsters never carry it", () => {
+  let rich = 0, monsterWithMag = 0;
+  for (let i = 0; i < 100; i++) {
+    const seed = `mag5-${i}`;
+    for (const p of generateGrid(seed, rollBiome(seed), 5).pois) {
+      if (p.kind === "monster" && p.magnitude !== undefined) monsterWithMag++;
+      if (p.kind !== "monster" && (p.magnitude ?? 1) >= 2) rich++;
+    }
+  }
+  expect(rich).toBeGreaterThan(0);
+  expect(monsterWithMag).toBe(0);
+});

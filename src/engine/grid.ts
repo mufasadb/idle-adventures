@@ -18,6 +18,7 @@ import {
   MAP_TIER_CREATURE_ADD,
   POI_DENSITY_BY_TIER,
   TERRAIN_WEIGHT_TIER_SHIFT,
+  NODE_MAGNITUDE_WEIGHTS,
 } from "../data/constants";
 import type { Terrain, NodeType, BiomeId, Biome } from "../data/constants";
 import { rand, weightedPick } from "./rng";
@@ -47,6 +48,13 @@ export type Grid = {
 export function rollBiome(mapSeed: string): BiomeId {
   const i = Math.floor(rand(mapSeed, "biome") * BIOME_IDS.length);
   return BIOME_IDS[i] ?? BIOME_IDS[0]!;
+}
+
+// Roll a node's magnitude class from the tier's distribution (2yn). Numeric keys sorted
+// for determinism, like rollMaterial. Returns 1 (base) when the table is {1:1}.
+function rollMagnitude(table: Record<number, number>, roll: number): number {
+  const order = Object.keys(table).map(Number).sort((a, b) => a - b).map(String);
+  return Number(weightedPick(table as unknown as Record<string, number>, order, roll));
 }
 
 // Roll a POI's material from the biome's weighted table (D27). Keys are sorted
@@ -271,7 +279,11 @@ function buildGrid(mapSeed: string, biomeId: BiomeId, mapTier: number): Grid {
       kind === "monster"
         ? null
         : rollMaterial(biome.materialTable[kind], rand(mapSeed, "poi-material", i));
-    return { kind, material, creature };
+    const magnitude =
+      kind === "monster"
+        ? undefined
+        : rollMagnitude(NODE_MAGNITUDE_WEIGHTS[mapTier] ?? { 1: 1 }, rand(mapSeed, "poi-magnitude", i));
+    return { kind, material, creature, magnitude };
   });
   // (c) Value score: monster (combat reward) > higher-tier material > basic forage.
   const value = (s: { kind: NodeType; material: string | null }): number => {
@@ -298,7 +310,8 @@ function buildGrid(mapSeed: string, biomeId: BiomeId, mapTier: number): Grid {
   const pois: Poi[] = specOrder.map((si, k) => {
     const p = positions[posOrder[k]!]!;
     const s = specs[si]!;
-    return { x: p.x, y: p.y, kind: s.kind, material: s.material, creature: s.creature };
+    return { x: p.x, y: p.y, kind: s.kind, material: s.material, creature: s.creature,
+             ...(s.magnitude && s.magnitude > 1 ? { magnitude: s.magnitude } : {}) };
   });
   return { biomeId, terrain, pois, entry };
 }
