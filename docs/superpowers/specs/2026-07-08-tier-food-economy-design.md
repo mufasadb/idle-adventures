@@ -110,20 +110,29 @@ long-term home but is **not** in POC scope.
 
 ### 5. Balance targets + sim (the core deliverable)
 
-- **Named levers:**
-  - `HARVEST_FRACTION_TIER_TARGET` ≈ 0.60 — fraction of a tier-matched map's POIs
-    harvestable with tier-appropriate food.
-  - `HARVEST_FRACTION_BASE_TARGET` ≈ 0.30 — same map, base rations only. Half of
-    tier — bring-cheap-food visibly under-values the map. (Choice of *which* ~60%
-    stays a live player decision; the sim measures the reachable ceiling, not a route.)
-- **New harvest-fraction sim report** in `src/sim/balance.ts`, sibling to `simReach` /
-  `mapTierReport`. Per tier, over the standard seeded sample (5 seeds × 3 biomes like
-  `mapTierReport`), it computes the fraction of POIs reachable-and-affordable given a
-  food loadout, for two loadouts: tier-matched food vs base rations. Pinned by a test
-  (`test/harvest-fraction.test.ts`, modeled on `reach-fraction.test.ts`) asserting the
-  two fractions bracket the named targets.
-- **Regeneration:** if the report is committed as JSON (like `tier-table.json`), wire
-  it to `bun run sim:tables` and add the staleness gate, matching 2yn's precedent.
+**Calibration note (added 2026-07-08, after controller feasibility probes).** The
+harvest-fraction is measured by a *reference player* — a headless greedy walker, not a
+human. Probes established that even a monster-aware, cost-optimal-greedy walker caps
+tier-food harvest at **~50%** on a tier-matched map: the ceiling is the map's energy
+economy (the far half out-ranges your tank), not walker cleverness, and provisioning
+past ~9 food units *collapses* (flee-damage death / slot pressure). So the literal 60%
+is **not a point any reference player reliably occupies**. What *is* rock-solid and is
+the real design contract: **tier-appropriate food harvests ≈2× what base rations do.**
+
+- The reference walker is **monster-aware**: it routes *around* live monster tiles
+  (Dijkstra over passable, monster-free tiles; walks the waypoints) and never engages —
+  a realistic unarmed forager, and the reason it survives to spend its whole energy
+  budget. This upgrades `src/sim/harvest.ts`'s walker (Task 4 shipped the simpler
+  nearest-neighbour version).
+- **Named levers, calibrated to the instrument:**
+  - `HARVEST_FRACTION_TIER_TARGET` ≈ **0.50** — tier-matched food on a tier map.
+  - `HARVEST_FRACTION_BASE_TARGET` ≈ **0.25** — same map, base rations only.
+  - `60/30` is retained in prose as the **design aspiration**; the no-optimal-router
+    reference player is a conservative floor (a real player harvests more) — the **2×
+    ratio** is the invariant. Which ~half the player takes stays a live routing choice.
+- **Hard gate** — `test/harvest-fraction.test.ts` (modeled on `reach-fraction.test.ts`),
+  over a seeded sample, asserts on tier-matched maps: `base ≈ BASE_TARGET (±band)`,
+  `tier ≥ ~0.45`, **and `tier ≥ 1.8 × base`** (bring-cheap-food visibly ≈halves the map).
 - Lands with docs: a `decisions.md` D-row (next is **D47**; cite this spec) and a
   `balance-levers.md` update naming every new lever.
 
@@ -162,8 +171,11 @@ loadout, an unrelated sense.
   gatherable/craftable at their tier.
 - New `ENERGY_CAP_BONUS` gear axis raises `maxEnergy` at embark (tent-pattern,
   additive).
-- Sim report proves: tier food ≈60% POI harvest on tier-matched maps, base rations
-  ≈30%; levers named; `decisions.md` D47 + `balance-levers.md` updated.
+- Sim proves the calibrated contract: on tier-matched maps a monster-aware reference
+  player harvests `tier ≥ ~0.45` with tier food and `≈0.25` with base rations, with
+  `tier ≥ 1.8 × base`; levers named (`HARVEST_FRACTION_TIER_TARGET` ≈ 0.50 /
+  `_BASE_TARGET` ≈ 0.25); `decisions.md` D47 + `balance-levers.md` updated (incl. the
+  calibration rationale: 60/30 is the design aspiration, the reference floor is ~50/25).
 - Playtest console + web expose food-density hints no worse than current (recipe
   book / gather flavor) — no legibility regression.
 - Sustainability harness stays green after the trail-ration rebase.
