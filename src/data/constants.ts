@@ -121,6 +121,13 @@ export const MAX_ENERGY = 300;
 // A tent (durable "camp" tool) multiplies energy restored per food unit — each
 // ration goes further, so food is a stronger reach investment. Tunable.
 export const TENT_FOOD_MULTIPLIER = 1.5;
+// Energy-capacity gear (si7.2): a durable tool that RAISES the stamina ceiling
+// (maxEnergy) additively at embark, so denser tier food stays whole-unit
+// auto-eatable (eatToRefill only eats a unit that fits under max). One proof
+// line for the POC (canteen +100 → 300→400); biome-tier variants are m0a.
+export const ENERGY_CAP_BONUS: Record<string, number> = {
+  canteen: 100,
+};
 // Per-food RESTORE (tiered): denser food restores more per unit eaten, earning
 // slot efficiency against the carry squeeze. Absent = ENERGY_PER_FOOD.
 export const FOOD_ENERGY: Record<string, number> = {
@@ -219,6 +226,7 @@ export const TOOL_CAPABILITY: Record<string, string> = {
   waders: "wade", // graded-movement gear (svz); NODE_TOOL never asks for it
   "ice-cleats": "trek",
   tent: "camp", // stamina gear (dtv): multiplies food restore; NODE_TOOL never asks for "camp", so no gather impact
+  canteen: "provision", // stamina gear (si7.2): raises maxEnergy; NODE_TOOL never asks for "provision", so no gather impact
 }; // tool defId → capability; tiered tools (M5: "iron-pick": "pick") are data-only
 export const TOOL_QUALITY: Record<string, number> = {
   pick: 1,
@@ -235,6 +243,7 @@ export const TOOL_QUALITY: Record<string, number> = {
   waders: 1,
   "ice-cleats": 1,
   tent: 1, // quality irrelevant to camping; present to satisfy the catalog invariant
+  canteen: 1, // quality irrelevant to capacity; present to satisfy the catalog invariant
 }; // gather-cost divisor AND tier gate (quality == max MATERIAL_TIER gatherable)
 export const GATHER_YIELD: Record<GatherableNodeType, number> = {
   mining: 3,
@@ -500,6 +509,7 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   waders: { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "pine-log", qty: 1 }], output: { defId: "waders", qty: 1 } }, // discounts mud (15 → 10)
   "ice-cleats": { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "wolf-pelt", qty: 1 }], output: { defId: "ice-cleats", qty: 1 } }, // glide on ice (20 → 5)
   tent: { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "pine-log", qty: 2 }], output: { defId: "tent", qty: 1 } }, // camp gear (dtv): food restores +50% energy
+  canteen: { inputs: [{ defId: "copper-ore", qty: 2 }, { defId: "deer-hide", qty: 1 }], output: { defId: "canteen", qty: 1 } }, // provision gear (si7.2): +maxEnergy; a copper sink
   // Backpack — carry upgrades. `starter` is your FIRST pack (you start bare):
   // cheap, one hunt's worth of hide. Then leather (5), large-pack (7, T2).
   starter: { inputs: [{ defId: "deer-hide", qty: 1 }], output: { defId: "starter", qty: 1 } },

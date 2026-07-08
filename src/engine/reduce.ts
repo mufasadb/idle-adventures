@@ -1,4 +1,4 @@
-import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot, RejectionReason, Expedition } from "./types";
+import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot, RejectionReason, Expedition, Equipment } from "./types";
 import { generateGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
@@ -12,7 +12,7 @@ import { packItem, reserveLoadout, EQUIP_SLOTS } from "./pack";
 import type { EquipSlot } from "./pack";
 import { slotOf, isGear } from "./catalog";
 import { candidateMaps, previewHints } from "./town";
-import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX } from "../data/constants";
+import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 
 // Pure reducer. M2 fills embark/move; M3 fills gather/drop; M4 fills fight; remaining cases are no-op stubs:
@@ -96,7 +96,9 @@ function embark(
   // Stamina model (dtv): current energy starts at MAX_ENERGY regardless of packed
   // food — food is a reserve you EAT to refill toward max mid-run, not the source
   // of the whole budget. autoEat (default on) refills waste-free after each spend.
-  const energy = MAX_ENERGY;
+  // Capacity gear (si7.2): canteen and future tools raise the ceiling additively.
+  const maxEnergy = MAX_ENERGY + energyCapOf(state.loadout.equipment);
+  const energy = maxEnergy;
   // Spare gear (82r): packed spares expand into carry as ONE PIECE PER STACK
   // (stackCapOf gear = 1), and the expedition loadout's spares clear so the
   // slots aren't double-counted (consumableSlots vs carry.length — 1:1 move).
@@ -116,7 +118,7 @@ function embark(
         mapTier,
         pos: grid.entry,
         energy,
-        maxEnergy: MAX_ENERGY,
+        maxEnergy,
         autoEat: true,
         hp: PLAYER_BASE_HP,
         loadout: { ...state.loadout, spares: [] },
@@ -678,6 +680,12 @@ function doff(state: GameState, itemId: string): { state: GameState; events: Gam
 // stretches each ration (dtv). NODE_TOOL never asks for "camp", so no gather impact.
 function tentMultOf(expedition: Expedition): number {
   return expedition.loadout.equipment.tools.includes("tent") ? TENT_FOOD_MULTIPLIER : 1;
+}
+
+// Sum of ENERGY_CAP_BONUS over equipped tools (si7.2): the flat maxEnergy raise
+// from capacity gear. Mirrors tentMultOf's read-gear-on-demand pattern.
+export function energyCapOf(equipment: Equipment): number {
+  return equipment.tools.reduce((sum, t) => sum + (ENERGY_CAP_BONUS[t] ?? 0), 0);
 }
 
 // Drain-then-refill helper for move/gather: given the post-spend current energy,
