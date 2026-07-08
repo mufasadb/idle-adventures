@@ -62,8 +62,8 @@ export const BIOMES: Record<BiomeId, Biome> = {
     creatureTable: { "forest-boar": 5, "forest-bandit": 4, "shell-beetle": 4, "fae-sprite": 3, werewolf: 2 },
     materialTable: {
       mining: { "iron-ore": 7, "copper-ore": 2, "silver-ore": 1 }, // silver present (D27) but T2-gated
-      wood: { "oak-log": 5, "pine-log": 2, "ironwood-log": 1, stringybark: 3 }, // ironwood T2 (iron-axe); stringybark (D45) = bowstring source, woodland is bow country (oak rebalanced 7→5)
-      herb: { "forest-herb": 7, berries: 4, "desert-sage": 2, "ice-moss": 1, flint: 2 }, // flint (D45): foraged from creek beds, bare hands — arrowheads without a pick
+      wood: { "oak-log": 5, "pine-log": 2, "ironwood-log": 1, stringybark: 3, apple: 2 }, // ironwood T2 (iron-axe); stringybark (D45) = bowstring source, woodland is bow country (oak rebalanced 7→5); apple (m0a) fresh fruit from orchard — material defId = food defId so gather routes to food
+      herb: { "forest-herb": 7, berries: 4, "desert-sage": 2, "ice-moss": 1, flint: 2, thistle: 1 }, // flint (D45): foraged from creek beds, bare hands — arrowheads without a pick; thistle (m0a) T1 herb
       animal: { "deer-hide": 7, "wolf-pelt": 2, "lizard-hide": 1, feather: 2 }, // feather (D45): fletching from birds (knife)
     },
     barrierTerrain: "mountain",
@@ -73,7 +73,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
     nodeTypeWeights: { mining: 0.4, monster: 0.25, herb: 0.15, wood: 0.1, animal: 0.1 },
     creatureTable: { "sand-raider": 5, "mirage-wisp": 4, "giant-scorpion": 3 },
     materialTable: {
-      mining: { "copper-ore": 7, "iron-ore": 2, "coal": 1 }, // coal T2 (iron-pick) — desert is a fuel source
+      mining: { "copper-ore": 7, "iron-ore": 2, "coal": 1, salt: 2 }, // coal T2 (iron-pick) — desert is a fuel source; salt (m0a) T2 evaporite
       wood: { "cactus-wood": 7, "oak-log": 2, "pine-log": 1 },
       herb: { "desert-sage": 7, "forest-herb": 2, berries: 1, "ice-moss": 1, flint: 3 }, // flint country (D45): scree + dry creek beds
       animal: { "lizard-hide": 7, "deer-hide": 2, "drake-hide": 1, feather: 2 }, // drake T2 (steel-knife); feather (D45)
@@ -87,8 +87,8 @@ export const BIOMES: Record<BiomeId, Biome> = {
     materialTable: {
       mining: { "silver-ore": 5, "coal": 2, "iron-ore": 2, "mithril-ore": 1 }, // silver T2 + coal T2 + mithril T3: tundra is the deep-tier mine
       wood: { "pine-log": 7, "oak-log": 2, "ironwood-log": 1, stringybark: 1 }, // stringybark rare here (D45) — bow country is woodland
-      herb: { "ice-moss": 7, "desert-sage": 2, berries: 1, "forest-herb": 1, flint: 1 }, // flint scarce under the ice (D45)
-      animal: { "wolf-pelt": 7, "deer-hide": 2, "drake-hide": 1, feather: 2 }, // feather (D45)
+      herb: { "ice-moss": 7, "desert-sage": 2, berries: 1, "forest-herb": 1, flint: 1, thistle: 2 }, // thistle (m0a) T2 herb; flint scarce under the ice (D45)
+      animal: { "wolf-pelt": 7, "deer-hide": 2, "drake-hide": 1, feather: 2, seal: 2 }, // seal (m0a) T2 large prey; feather (D45)
     },
     barrierTerrain: "mountain",
   },
@@ -105,6 +105,8 @@ export const MATERIAL_TIER: Record<string, number> = {
   "ironwood-log": 2,
   "drake-hide": 2,
   "mithril-ore": 3,
+  salt: 2, // desert mining (m0a): evaporite deposits — pick required
+  seal: 2, // tundra animal (m0a): large prey — knife required at T2
 };
 
 // --- Energy economy (filled in M2; rescaled ×10 for graded movement, svz) ---
@@ -136,6 +138,7 @@ export const FOOD_ENERGY: Record<string, number> = {
   berries: 30, // fresh forage (e3j): weak-but-immediate — eat on the trail or lose them to staleness
   jam: 120, // processed stale-berries — hauling the harvest home beats eating it raw (1.5 rations/slot)
   pemmican: 240, // tier-food line (si7.2): dense trail food (meat + berries). Auto-eat (least-dense-first, m0a) leaves it as a RESERVE; you cash it in with a manual `eat` (over-eats up to foodEnergy×tentMult, may exceed maxEnergy). No tent-safe density cap needed (m0a).
+  apple: 40, // fresh forage (m0a): woodland orchard fruit — weak-but-immediate, stales to bruised-apple
 };
 
 // Fresh→processed food (e3j): fresh forage eaten on-map is good NOW; hauled
@@ -143,7 +146,7 @@ export const FOOD_ENERGY: Record<string, number> = {
 // town-crafts into denser food (jam). Stale forms are materials — slotOf never
 // returns "food" for them — so they can't be packed back out: "old berries"
 // enforce themselves with no extra rule.
-export const FRESH_TO_STALE: Record<string, string> = { berries: "stale-berries" };
+export const FRESH_TO_STALE: Record<string, string> = { berries: "stale-berries", apple: "bruised-apple" };
 export const MIN_STEP = 5; // a discounted step never costs less than this (svz)
 // Movement is GRADED (svz): TERRAIN_COST is ABSOLUTE step energy on a ×10 scale.
 // Gear subtracts point-discounts (TERRAIN_GATE), transport divides per-terrain.
@@ -471,7 +474,7 @@ export const CATEGORY_LOOT_TABLE: Record<MonsterCategory, ItemStackSpec[]> = {
 // --- Consumable item catalogs (M5) ---
 // ENERGY_PER_FOOD / POTION_HEAL are flat, so these are single-item catalogs for
 // the POC; the list is what `pack`/`slotOf` validate a food/potion defId against.
-export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican"];
+export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican", "apple"];
 export const POTION: string[] = ["potion", "greater-potion"];
 export const BATTLE_ITEM: string[] = ["elixir-of-power", "warding-draught"]; // combat consumables (bzd); COMBAT_BUFF keys
 
