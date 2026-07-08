@@ -139,6 +139,8 @@ export const FOOD_ENERGY: Record<string, number> = {
   jam: 120, // processed stale-berries — hauling the harvest home beats eating it raw (1.5 rations/slot)
   pemmican: 240, // tier-food line (si7.2): dense trail food (meat + berries). Auto-eat (least-dense-first, m0a) leaves it as a RESERVE; you cash it in with a manual `eat` (over-eats up to foodEnergy×tentMult, may exceed maxEnergy). No tent-safe density cap needed (m0a).
   apple: 40, // fresh forage (m0a): woodland orchard fruit — weak-but-immediate, stales to bruised-apple
+  "smoked-venison": 200, // m0a: woodland cured meat — a manual-over-eat reserve under a tent
+  "blubber-stew": 160, // m0a: tundra rendered fat + moss
 };
 
 // Fresh→processed food (e3j): fresh forage eaten on-map is good NOW; hauled
@@ -474,7 +476,7 @@ export const CATEGORY_LOOT_TABLE: Record<MonsterCategory, ItemStackSpec[]> = {
 // --- Consumable item catalogs (M5) ---
 // ENERGY_PER_FOOD / POTION_HEAL are flat, so these are single-item catalogs for
 // the POC; the list is what `pack`/`slotOf` validate a food/potion defId against.
-export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican", "apple"];
+export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican", "apple", "smoked-venison", "blubber-stew"];
 export const POTION: string[] = ["potion", "greater-potion"];
 export const BATTLE_ITEM: string[] = ["elixir-of-power", "warding-draught"]; // combat consumables (bzd); COMBAT_BUFF keys
 
@@ -580,6 +582,11 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   // T3 combat consumables (bzd) — the exclusive reward for fighting T3 monsters
   "elixir-of-power": { inputs: [{ defId: "vampire-ash", qty: 2 }], output: { defId: "elixir-of-power", qty: 1 } }, // +2 dmg, one fight
   "warding-draught": { inputs: [{ defId: "troll-hide", qty: 2 }], output: { defId: "warding-draught", qty: 1 } }, // +3 mitigation, one fight
+  // m0a: mid-game tier foods — dense reserves that reward routing cross-biome materials
+  "smoked-venison": { inputs: [{ defId: "rich-venison", qty: 1 }, { defId: "salt", qty: 1 }], output: { defId: "smoked-venison", qty: 1 } }, // m0a: woodland tier-food (elk meat + desert salt — cross-biome pull)
+  "blubber-stew": { inputs: [{ defId: "seal-blubber", qty: 1 }, { defId: "ice-moss", qty: 1 }], output: { defId: "blubber-stew", qty: 1 } }, // m0a: tundra tier-food
+  "apple-jam": { inputs: [{ defId: "bruised-apple", qty: 3 }], output: { defId: "jam", qty: 1 } }, // m0a: staled orchard fruit → jam (mirrors stale-berries→jam)
+  "elixir-of-power-thistle": { inputs: [{ defId: "thistle", qty: 2 }, { defId: "djinn-ember", qty: 1 }], output: { defId: "elixir-of-power", qty: 1 } }, // m0a: breaks the vampire-only gate on the battle-item line
   // Boss capstone (D34)
   "dragonscale-cuirass": { inputs: [{ defId: "wyrm-scale", qty: 3 }], output: { defId: "dragonscale-cuirass", qty: 1 } },
   wyrmfang: { inputs: [{ defId: "dragonheart", qty: 1 }], output: { defId: "wyrmfang", qty: 1 } },
