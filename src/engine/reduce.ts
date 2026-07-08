@@ -12,7 +12,7 @@ import { packItem, reserveLoadout, EQUIP_SLOTS } from "./pack";
 import type { EquipSlot } from "./pack";
 import { slotOf, isGear } from "./catalog";
 import { candidateMaps, previewHints } from "./town";
-import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY } from "../data/constants";
+import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 
 // Pure reducer. M2 fills embark/move; M3 fills gather/drop; M4 fills fight; remaining cases are no-op stubs:
@@ -234,7 +234,7 @@ function gather(state: GameState): { state: GameState; events: GameEvent[] } {
   }
   if (expedition.combat) return rejected(state, "gather", "engaged");
   const { pos } = expedition;
-  const grid = generateGrid(expedition.mapSeed, rollBiome(expedition.mapSeed));
+  const grid = generateGrid(expedition.mapSeed, rollBiome(expedition.mapSeed), expedition.mapTier ?? 1);
   const poi = grid.pois.find((p) => p.x === pos.x && p.y === pos.y);
   const alreadyCleared = expedition.cleared.some(
     (c) => c.x === pos.x && c.y === pos.y,
@@ -263,7 +263,7 @@ function gather(state: GameState): { state: GameState; events: GameEvent[] } {
   const fed = autoRefill(expedition, expedition.energy - cost);
   const energy = fed.energy;
   const loadout = { ...expedition.loadout, food: fed.food };
-  const qty = GATHER_YIELD[kind];
+  const qty = GATHER_YIELD[kind] * (NODE_MAGNITUDE_YIELD[poi.magnitude ?? 1] ?? 1);
   // Fresh forage (e3j): a yield that IS food (FOOD catalog) joins the food
   // reserve at the FRONT — eaten before packed food, since fresh stales on
   // return while rations bank back. One slot per unit, like packed food.

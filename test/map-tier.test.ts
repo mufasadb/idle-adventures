@@ -2,9 +2,12 @@ import { test, expect } from "bun:test";
 import {
   MAP_TIER_MAX, MATERIAL_TIER_WEIGHT, NODE_MAGNITUDE_WEIGHTS,
   NODE_MAGNITUDE_YIELD, MAP_TIER_CREATURE_ADD,
-  BIOMES, BIOME_IDS,
+  BIOMES, BIOME_IDS, GATHER_YIELD,
 } from "../src/data/constants";
 import { generateGrid, tierProfile, rollBiome } from "../src/engine/grid";
+import { reduce } from "../src/engine/reduce";
+import { newGame } from "../src/engine/town";
+import type { GameState } from "../src/engine/types";
 
 test("map-tier levers: T1 is identity (hygiene)", () => {
   expect(MAP_TIER_MAX).toBe(5);
@@ -76,6 +79,30 @@ test("magnitude: higher tiers produce rich variants; monsters never carry it", (
   }
   expect(rich).toBeGreaterThan(0);
   expect(monsterWithMag).toBe(0);
+});
+
+test("gather yield scales with node magnitude", () => {
+  // Find a herb node (bare-hands, no tool gate) at magnitude 2 on a T5 map.
+  for (let i = 0; i < 500; i++) {
+    const seed = `gy-${i}`;
+    const grid = generateGrid(seed, rollBiome(seed), 5);
+    const node = grid.pois.find((p) => p.kind === "herb" && (p.magnitude ?? 1) === 2);
+    if (!node) continue;
+    // Stand the player on the node with a T5 expedition and gather.
+    const base = newGame(seed);
+    const st: GameState = {
+      ...base, phase: "expedition", expedition: {
+        mapSeed: seed, mapTier: 5, pos: { x: node.x, y: node.y },
+        energy: 300, maxEnergy: 300, hp: 100, loadout: base.loadout,
+        carry: [], cleared: [], carriedMaps: [],
+      },
+    };
+    const { events } = reduce(st, { type: "gather" });
+    const g = events.find((e) => e.type === "gathered")!;
+    expect(g.qty).toBe(GATHER_YIELD.herb * NODE_MAGNITUDE_YIELD[2]!);
+    return;
+  }
+  throw new Error("no magnitude-2 herb node found in scan range");
 });
 
 test("boss gate is biome-scoped: no cross-biome bosses at high tier", () => {
