@@ -135,7 +135,7 @@ export const FOOD_ENERGY: Record<string, number> = {
   "trail-ration": 130, // compressed from 160 (si7.2) — opens ladder headroom above it
   berries: 30, // fresh forage (e3j): weak-but-immediate — eat on the trail or lose them to staleness
   jam: 120, // processed stale-berries — hauling the harvest home beats eating it raw (1.5 rations/slot)
-  pemmican: 240, // tier-food line (si7.2): dense trail food (meat + berries); < MAX_ENERGY so it stays auto-eatable. TUNED in the harvest sim.
+  pemmican: 240, // tier-food line (si7.2): dense trail food (meat + berries). Auto-eat ceiling is maxEnergy/tentMult, NOT maxEnergy: with a tent (×1.5) pemmican's effective restore is 360, so it needs a canteen (maxEnergy 400) to stay waste-free-eatable — a tent-only player's pemmican blocks the food queue (footgun; follow-up bead). Pairs with tier capacity gear by design.
 };
 
 // Fresh→processed food (e3j): fresh forage eaten on-map is good NOW; hauled

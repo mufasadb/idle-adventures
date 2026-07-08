@@ -122,6 +122,9 @@ export function simHarvest(pack: PackSpec, mapSeed: string, mapTier: number): Ha
     s = r.state;
     if (r.events.some((e) => e.type === "gathered")) {
       cleared++;
+      // Shed the loot so carry-full never stops the walk: this measures energy
+      // REACH, not carry pressure. A carry-full gather-reject is an accepted
+      // measurement floor (affects tier + base packs equally), not a bug.
       if (t.material) s = reduce(s, { type: "drop", itemId: t.material } as Action).state;
     }
   }
