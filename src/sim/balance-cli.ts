@@ -5,6 +5,8 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { KIT_PRESETS, resolveKit, simFight, simReach, simTables, mapTierReport } from "./balance";
 import type { FightReport, ReachReport, TableData, MapTierReport, KitSpec } from "./balance";
+import { harvestFractionReport } from "./harvest";
+import { candidateMaps } from "../engine/town";
 import type { ItemStack } from "../engine/types";
 
 type Flags = { kit: string; overrides: KitSpec; vs?: string; seed?: string; json: boolean; write: boolean };
@@ -53,11 +55,11 @@ function renderFight(r: FightReport): string {
 }
 
 function renderReach(r: ReachReport): string {
-  const rows = r.pois.map((p) => `  (${String(p.x).padStart(2)},${String(p.y).padStart(2)}) ${p.kind.padEnd(7)} ${(p.what ?? "—").padEnd(16)} ${p.cost === null ? "  unreachable" : `${String(p.cost).padStart(6)}e  ${p.tanks}x tank`}`);
+  const rows = r.pois.map((p) => `  (${String(p.x).padStart(2)},${String(p.y).padStart(2)}) ${p.kind.padEnd(7)} ${(p.what ?? "—").padEnd(16)} ${p.cost === null ? "  unreachable" : `${String(p.cost).padStart(6)}e  ${p.capacities}x capacity`}`);
   return [
     `reach on ${r.mapSeed} (${r.biomeId}) from (${r.entry.x},${r.entry.y})`,
     ...rows,
-    `summary: ${r.summary.reachable}/${r.summary.pois} reachable · farthest ${r.summary.farthestCost}e = ${r.summary.farthestTanks}x tank`,
+    `summary: ${r.summary.reachable}/${r.summary.pois} reachable · farthest ${r.summary.farthestCost}e = ${r.summary.farthestCapacities}x capacity`,
   ].join("\n");
 }
 
@@ -111,10 +113,11 @@ export function renderTierTableMd(r: MapTierReport): string {
 }
 
 const USAGE = [
-  `usage: bun run sim <fight|reach|tables> [flags]`,
-  `  fight  --kit <${Object.keys(KIT_PRESETS).join("|")}> [--weapon --armour a,b --potions defId:qty --battle-items defId:qty] --vs <monsterId> [--json]`,
-  `  reach  --kit <...> [--tools a,b --transport t] --seed <mapSeed> [--json]`,
-  `  tables [--json] [--write]   (--write regenerates docs/balance/tables.{md,json})`,
+  `usage: bun run sim <fight|reach|tables|harvest> [flags]`,
+  `  fight    --kit <${Object.keys(KIT_PRESETS).join("|")}> [--weapon --armour a,b --potions defId:qty --battle-items defId:qty] --vs <monsterId> [--json]`,
+  `  reach    --kit <...> [--tools a,b --transport t] --seed <mapSeed> [--json]`,
+  `  tables   [--json] [--write]   (--write regenerates docs/balance/tables.{md,json})`,
+  `  harvest  [--seed <tier>] [--json]   (--seed selects map tier, default 3; samples 5 maps with a tier-food pemmican loadout)`,
 ].join("\n");
 
 export function run(argv: string[]): { code: number; output: string } {
@@ -138,6 +141,20 @@ export function run(argv: string[]): { code: number; output: string } {
       if (flags.write) return writeTables(data, tierData);
       if (flags.json) return { code: 0, output: JSON.stringify({ tables: data, tiers: tierData }, null, 2) };
       return { code: 0, output: renderTablesMd(data) + "\n" + renderTierTableMd(tierData) };
+    }
+    if (cmd === "harvest") {
+      const tier = Number(flags.seed ?? 3); // --seed reused as tier selector for this view
+      const maps = Array.from({ length: 5 }, (_, i) => candidateMaps("hf", i)[0]!.mapSeed);
+      const rep = harvestFractionReport(
+        { tools: ["pick", "knife", "canteen", "tent", "ice-cleats", "climbing-pick"], backpack: "large-pack", transport: "horse", food: [{ defId: "pemmican", qty: 6 }] },
+        tier,
+        maps,
+      );
+      if (flags.json) return { code: 0, output: JSON.stringify(rep, null, 2) };
+      const output =
+        `harvest@T${tier}: avg ${(100 * rep.avg).toFixed(0)}% over ${rep.rows.length} maps\n` +
+        rep.rows.map((r) => `  ${r.mapSeed}: ${r.cleared}/${r.total} (${(100 * r.fraction).toFixed(0)}%)`).join("\n");
+      return { code: 0, output };
     }
     return { code: 1, output: `unknown command: ${cmd}\n${USAGE}` };
   } catch (e) {

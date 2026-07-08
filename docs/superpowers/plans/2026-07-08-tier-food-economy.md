@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Give higher-tier maps a matching food-supply side — denser food + a stamina-ceiling gear axis — so tier-appropriate food harvests ~60% of a high-tier map while base rations harvest ~30%, sim-proven.
+**Goal:** Give higher-tier maps a matching food-supply side — denser food + a stamina-ceiling gear axis — so tier-appropriate food is worth ~2× cheap rations on a high-tier map (design aspiration 60/30; sim-calibrated floor ~50/25), sim-proven.
 
-**Architecture:** Two coupled levers. (1) A food-density ladder: keep `ration` at 80 (protects the T1 sustainability floor), compress `trail-ration` down to open headroom, add one denser tier-food line (`pemmican`). (2) A new energy-capacity gear axis (`ENERGY_CAP_BONUS`, tent-pattern) that raises `maxEnergy` at embark, so denser food stays whole-unit auto-eatable. A new `src/sim/harvest.ts` greedy-harvest sim + `test/harvest-fraction.test.ts` prove the 60/30 bracket. Plus a mechanical `tank → capacity` terminology rename.
+**Architecture:** Two coupled levers. (1) A food-density ladder: keep `ration` at 80 (protects the T1 sustainability floor), compress `trail-ration` down to open headroom, add one denser tier-food line (`pemmican`). (2) A new energy-capacity gear axis (`ENERGY_CAP_BONUS`, tent-pattern) that raises `maxEnergy` at embark, so denser food stays whole-unit auto-eatable. A new `src/sim/harvest.ts` monster-aware harvest sim + `test/harvest-fraction.test.ts` prove the calibrated **tier ≥ 1.8× base** contract. Plus a mechanical `tank → capacity` terminology rename.
 
 **Tech Stack:** TypeScript, bun, `bun test` (jest-compatible), pure-engine reducer (`reduce(state, action) → {state, events}`).
 
@@ -27,7 +27,7 @@
 - `src/engine/reduce.ts` — `energyCapOf(equipment)` helper (exported) + embark uses `maxEnergy = MAX_ENERGY + energyCapOf(...)` and embarks at full.
 - `src/sim/balance.ts` / `src/sim/balance-cli.ts` — `tank → capacity` rename (`ReachRow.capacities`, `summary.farthestCapacities`).
 - `src/sim/harvest.ts` — **new** — `simHarvest(loadout, mapSeed, mapTier)` greedy-harvest sim + `harvestFractionReport()`.
-- `test/harvest-fraction.test.ts` — **new** — the 60/30 bracket proof.
+- `test/harvest-fraction.test.ts` — **new** — the calibrated tier≥1.8×base proof.
 - `test/energy-capacity.test.ts` — **new** — capacity-gear embark behaviour.
 - `test/food-ladder.test.ts` — **new** — pemmican density + eat-under-ceiling coupling.
 - Rename-touched tests: `test/entry-reach.test.ts`, `test/reach-fraction.test.ts`, `test/balance-sim.test.ts`.
@@ -247,7 +247,7 @@ git commit -m "feat(si7.2): energy-capacity gear axis (ENERGY_CAP_BONUS + cantee
 - Test: `test/food-ladder.test.ts` (new)
 
 **Interfaces:**
-- Produces: `FOOD_ENERGY.pemmican` (denser tier food), retuned `FOOD_ENERGY["trail-ration"]`, `FOOD` includes `"pemmican"`, `RECIPE.pemmican`. (Initial numbers below are seeds; **Task 5 tunes them** to hit the 60/30 bracket.)
+- Produces: `FOOD_ENERGY.pemmican` (denser tier food), retuned `FOOD_ENERGY["trail-ration"]`, `FOOD` includes `"pemmican"`, `RECIPE.pemmican`. (These seed values STAND — Task 5 was revised to calibrate the sim targets to the game, not tune the game to the targets.)
 
 - [ ] **Step 1: Write the failing test**
 
@@ -492,88 +492,177 @@ git commit -m "feat(si7.2): harvest-fraction sim — greedy reference player, ti
 
 ---
 
-### Task 5: The 60/30 proof + lever tuning (core deliverable)
+### Task 5: Monster-aware walker + calibrated harvest-fraction proof (core deliverable)
 
-Add the named targets and the bracket assertion, then **tune** the levers from Tasks 2–3 (and, only if needed, 2yn's demand levers) until a tier-matched loadout brackets ~60% and a base-ration loadout brackets ~30% on the same high-tier maps.
+**Revised 2026-07-08 (controller feasibility probes + user decision).** The literal 60/30 is NOT reachable by any reference walker — the ceiling is the map's energy economy (~50% tier / ~25% base), and the true design invariant is **tier food ≈ 2× base**. So this task: (a) upgrades the walker to **monster-aware pathfinding** (the realistic unarmed forager — routes around monsters, never dies to them, so it spends its whole energy budget), (b) adds levers **calibrated to the instrument** (`0.50`/`0.25`), (c) asserts the hard gate **`tier ≥ 1.8 × base`** plus loose absolute bands. NO game-balance lever tuning — the seed food/gear values from Tasks 2–3 stand; we do NOT distort game balance to satisfy a conservative measuring stick.
 
 **Files:**
-- Modify: `src/data/constants.ts` (add `HARVEST_FRACTION_*_TARGET`; retune `FOOD_ENERGY["trail-ration"]`, `FOOD_ENERGY.pemmican`, `ENERGY_CAP_BONUS.canteen`, and if required `POI_DENSITY_BY_TIER` / `TERRAIN_WEIGHT_TIER_SHIFT`)
-- Modify: `test/harvest-fraction.test.ts` (add the bracket test)
+- Modify: `src/sim/harvest.ts` (replace the Chebyshev nearest-neighbour walk with a monster-aware Dijkstra walk; public interface `PackSpec`/`HarvestResult`/`simHarvest`/`harvestFractionReport` is UNCHANGED, so Task 4's structural tests still pass)
+- Modify: `src/data/constants.ts` (add `HARVEST_FRACTION_*_TARGET`)
+- Modify: `test/harvest-fraction.test.ts` (add the calibrated ratio-gate test)
 
 **Interfaces:**
-- Consumes: `simHarvest`/`harvestFractionReport` (Task 4), `FOOD_ENERGY.pemmican` + `ENERGY_CAP_BONUS.canteen` (Tasks 2–3).
+- Consumes: `simHarvest`/`harvestFractionReport` (Task 4 — unchanged signatures), `FOOD_ENERGY.pemmican` + `ENERGY_CAP_BONUS.canteen` (Tasks 2–3), `moveCost` from `../engine/move`.
 - Produces: `HARVEST_FRACTION_TIER_TARGET`, `HARVEST_FRACTION_BASE_TARGET` (constants).
 
-- [ ] **Step 1: Add the named targets**
+**Validated numbers (controller probe, monster-aware walker, T3, `qty:6` food, 3 seeds):** tier ≈ 51%, base ≈ 24%, ratio ≈ 2.1×. The 5-seed test average will differ slightly — the assertion uses bands, not exact values. If your measured `tier` or `base` lands materially outside these (e.g. tier < 0.42 or base > 0.32), STOP and report the actual numbers rather than editing game levers to force the gate.
 
-In `src/data/constants.ts`, in the Map-tiers section (near `POI_DENSITY_BY_TIER`, ~L575+):
+- [ ] **Step 1: Upgrade the walker to monster-aware pathfinding**
 
+In `src/sim/harvest.ts`: add the `moveCost` import and the `Terrain`/`Equipment` types, delete the now-unused `cheb` helper, add the Dijkstra helpers, and replace the greedy Chebyshev `for` loop in `simHarvest` with the monster-aware walk. The bank/pack/embark preamble (up to `const total = grid.pois.length; if (!s.expedition) return …`) is UNCHANGED.
+
+Add imports at the top:
 ```typescript
-// Harvest-fraction targets (si7.2) — the core balance contract, sim-verified by
-// test/harvest-fraction.test.ts. On a tier-matched map, a tier-appropriate food
-// loadout should clear ~TIER of the POIs; a base-ration loadout ~BASE (half) —
-// bringing cheap food visibly under-values the map. Bands (± in the test) absorb
-// seed noise; WHICH ~60% the player takes stays a live routing choice.
-export const HARVEST_FRACTION_TIER_TARGET = 0.6;
-export const HARVEST_FRACTION_BASE_TARGET = 0.3;
+import { moveCost } from "../engine/move";
+import type { BiomeId, Terrain } from "../data/constants";
+import type { GameState, Action } from "../engine/types";
+```
+(`GameState`/`Action` are already imported — merge, don't duplicate. `BiomeId` too.)
+
+Delete the `cheb` line. Add these module-level helpers (after the type exports):
+```typescript
+type Pt = { x: number; y: number };
+const NEIGHBORS: readonly (readonly [number, number])[] = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+
+// One Dijkstra from `from` over passable, monster-free tiles → cost grid + prev
+// pointers. `blocked` = live monster tiles (obstacles), so a path never steps onto
+// a monster: the walker routes AROUND them and never engages. Linear-scan frontier
+// is fine at POC scale (20×60 = 1200 tiles). Absent/Infinity cost = unreachable.
+function dijkstraFrom(terrain: Terrain[][], from: Pt, transport: string | null, tools: string[], blocked: Set<string>): { cost: number[][]; prev: (string | null)[][] } {
+  const cost: number[][] = Array.from({ length: MAP_HEIGHT }, () => new Array<number>(MAP_WIDTH).fill(Infinity));
+  const prev: (string | null)[][] = Array.from({ length: MAP_HEIGHT }, () => new Array<string | null>(MAP_WIDTH).fill(null));
+  cost[from.y]![from.x] = 0;
+  const pq: [number, number, number][] = [[0, from.x, from.y]];
+  while (pq.length) {
+    let bi = 0;
+    for (let i = 1; i < pq.length; i++) if (pq[i]![0] < pq[bi]![0]) bi = i;
+    const [d, x, y] = pq.splice(bi, 1)[0]!;
+    if (d > cost[y]![x]!) continue;
+    for (const [dx, dy] of NEIGHBORS) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || nx >= MAP_WIDTH || ny < 0 || ny >= MAP_HEIGHT) continue;
+      if (blocked.has(`${nx},${ny}`)) continue; // route around live monsters
+      const c = moveCost(terrain[ny]![nx]!, transport, tools);
+      if (!Number.isFinite(c)) continue;
+      const nd = d + c;
+      if (nd < cost[ny]![nx]!) { cost[ny]![nx] = nd; prev[ny]![nx] = `${x},${y}`; pq.push([nd, nx, ny]); }
+    }
+  }
+  return { cost, prev };
+}
+
+// Reconstruct the adjacent-waypoint path to (tx,ty) from a dijkstraFrom result.
+function pathWaypoints(prev: (string | null)[][], from: Pt, tx: number, ty: number): Pt[] {
+  const start = `${from.x},${from.y}`;
+  const steps: Pt[] = [];
+  let cur = `${tx},${ty}`;
+  while (cur !== start) {
+    const [px, py] = cur.split(",").map(Number) as [number, number];
+    steps.unshift({ x: px, y: py });
+    const p = prev[py]![px];
+    if (p === null) return []; // no path (shouldn't happen: caller checks finite cost)
+    cur = p;
+  }
+  return steps;
+}
 ```
 
-- [ ] **Step 2: Write the bracket test**
+Replace the greedy walk loop (everything from `const gatherable = …` through the end of the `for (let step …)` loop, up to but not including `return { mapSeed, mapTier, cleared, total, fraction: total ? cleared / total : 0 };`) with:
+```typescript
+  const eq = s.expedition.loadout.equipment; // transport/tools are fixed for the run
+  const blocked = new Set(grid.pois.filter((p) => p.kind === "monster" && p.creature !== null).map((p) => `${p.x},${p.y}`));
+  const gatherable = grid.pois.filter((p) => p.kind === "herb" || p.kind === "mining" || p.kind === "animal");
+  const worked = new Set<string>();
+  let cleared = 0;
+  // Bound = tiles on the grid: each iteration either clears a node or marks one
+  // worked/unreachable, and both sets only grow — the loop cannot spin.
+  for (let guard = 0; s.expedition && guard < MAP_WIDTH * MAP_HEIGHT; guard++) {
+    const here = s.expedition.pos;
+    const { cost, prev } = dijkstraFrom(grid.terrain, here, eq.transport, eq.tools, blocked);
+    // nearest unworked gatherable by true monster-aware path cost
+    let best: { p: (typeof gatherable)[number] } | null = null;
+    let bestCost = Infinity;
+    for (const p of gatherable) {
+      if (worked.has(`${p.x},${p.y}`)) continue;
+      const c = cost[p.y]![p.x]!;
+      if (Number.isFinite(c) && c < bestCost) { bestCost = c; best = { p }; }
+    }
+    if (!best) break;
+    const t = best.p;
+    worked.add(`${t.x},${t.y}`); // mark now: reached or not, we won't retry it
+    let reached = true;
+    for (const wp of pathWaypoints(prev, here, t.x, t.y)) {
+      const r = reduce(s, { type: "move", to: wp } as Action);
+      if (r.events.some((e) => e.type === "action-rejected")) { reached = false; break; } // exhausted
+      s = r.state;
+      if (!s.expedition) { reached = false; break; }
+    }
+    if (!reached || !s.expedition) continue;
+    const r = reduce(s, { type: "gather" });
+    s = r.state;
+    if (r.events.some((e) => e.type === "gathered")) {
+      cleared++;
+      if (t.material) s = reduce(s, { type: "drop", itemId: t.material } as Action).state;
+    }
+  }
+```
 
-Add to `test/harvest-fraction.test.ts` (`PROOF_TIER = 3` is the high-tier proof map):
+- [ ] **Step 2: Confirm Task 4's structural tests still pass + eyeball the new numbers**
 
+Run: `bun test test/harvest-fraction.test.ts`
+Expected: the two STRUCTURAL tests from Task 4 still PASS (interface unchanged). Then add a temporary `console.log` or use the CLI probe to confirm the walker produces tier ≈ 0.5 / base ≈ 0.25 at T3 before writing the assertion (sanity-check against the validated numbers above).
+
+- [ ] **Step 3: Add the calibrated named targets**
+
+In `src/data/constants.ts`, in the Map-tiers section (near `POI_DENSITY_BY_TIER`):
+```typescript
+// Harvest-fraction targets (si7.2) — the core balance contract, sim-verified by
+// test/harvest-fraction.test.ts. CALIBRATED to the monster-aware reference walker
+// (a headless greedy forager), NOT a human: on a tier-matched map, tier-appropriate
+// food clears ~TIER of the POIs, base rations ~BASE (half). The literal 60/30 is the
+// design ASPIRATION — the no-optimal-router reference player is a conservative floor
+// (a real player harvests more); the TIER≈2×BASE ratio is the invariant, and the hard
+// gate. Which ~half the player takes stays a live routing choice.
+export const HARVEST_FRACTION_TIER_TARGET = 0.5;
+export const HARVEST_FRACTION_BASE_TARGET = 0.25;
+```
+
+- [ ] **Step 4: Write the calibrated ratio-gate test**
+
+Add to `test/harvest-fraction.test.ts`:
 ```typescript
 import { HARVEST_FRACTION_TIER_TARGET, HARVEST_FRACTION_BASE_TARGET } from "../src/data/constants";
 
 const PROOF_TIER = 3;
-const BAND = 0.12; // seed-noise tolerance around each named target
+const BAND = 0.1; // seed-noise tolerance around each calibrated target
 
-test("60/30 proof: tier food out-harvests base rations on a high-tier map", () => {
+test("calibrated harvest proof: tier food ≈2× base rations on a high-tier map", () => {
   const maps = seeds(5);
-  // Tier-matched loadout: dense pemmican + capacity gear + tent + full tool/hauler kit.
+  // Tier-matched loadout: dense pemmican + capacity gear + full reach kit.
   const tierPack = { tools: ["pick", "knife", "canteen", "tent", "ice-cleats", "climbing-pick"], backpack: "large-pack", transport: "horse", food: [{ defId: "pemmican", qty: 6 }] };
-  // Base loadout: the same reach-relevant gear but CHEAP food (base rations only).
+  // Base loadout: the SAME reach gear but CHEAP food (base rations only).
   const basePack = { tools: ["pick", "knife", "tent", "ice-cleats", "climbing-pick"], backpack: "large-pack", transport: "horse", food: [{ defId: "ration", qty: 6 }] };
   const tier = harvestFractionReport(tierPack, PROOF_TIER, maps).avg;
   const base = harvestFractionReport(basePack, PROOF_TIER, maps).avg;
-  console.log(`[si7.2] tier=${(100 * tier).toFixed(0)}% base=${(100 * base).toFixed(0)}% (targets ${100 * HARVEST_FRACTION_TIER_TARGET}/${100 * HARVEST_FRACTION_BASE_TARGET})`);
-  expect(tier).toBeGreaterThan(HARVEST_FRACTION_TIER_TARGET - BAND);
-  expect(base).toBeLessThan(HARVEST_FRACTION_BASE_TARGET + BAND);
-  expect(tier).toBeGreaterThan(base + 0.15); // tier food must MEANINGFULLY out-value cheap food
-});
+  console.log(`[si7.2] tier=${(100 * tier).toFixed(0)}% base=${(100 * base).toFixed(0)}% ratio=${(tier / base).toFixed(2)} (targets ${100 * HARVEST_FRACTION_TIER_TARGET}/${100 * HARVEST_FRACTION_BASE_TARGET})`);
+  // Loose absolute bands (calibration sanity), around the named targets:
+  expect(tier).toBeGreaterThan(HARVEST_FRACTION_TIER_TARGET - BAND); // ≥ ~0.40
+  expect(base).toBeLessThan(HARVEST_FRACTION_BASE_TARGET + BAND);    // ≤ ~0.35
+  // THE HARD GATE — the design invariant: tier food is worth ~2× cheap food.
+  expect(tier).toBeGreaterThan(base * 1.8);
+}, 30000); // Dijkstra-per-step over 10 harvests — generous timeout (cf. reach tests)
 ```
-
-- [ ] **Step 3: Run to see the gap**
-
-Run: `bun test test/harvest-fraction.test.ts`
-Expected: likely FAIL initially — read the `[si7.2]` log line to see actual tier% / base%.
-
-- [ ] **Step 4: Tune the levers until the bracket holds**
-
-Adjust and re-run, one lever at a time (re-run the full suite each change — every lever below has other consumers):
-
-- **tier% too LOW** → raise `FOOD_ENERGY.pemmican` (keep `< MAX_ENERGY + ENERGY_CAP_BONUS.canteen` so it stays auto-eatable) and/or raise `ENERGY_CAP_BONUS.canteen`.
-- **base% too HIGH** (cheap food reaches too much of the map) → the map isn't demanding enough at tier: raise `POI_DENSITY_BY_TIER[PROOF_TIER]` and/or `TERRAIN_WEIGHT_TIER_SHIFT[PROOF_TIER]` (documented as a D46 amendment in Task 6, since these are 2yn levers). Also confirm `trail-ration` compression (Task 3) didn't over-shoot.
-- **tier% too HIGH (near 100%)** → the map is too small to differentiate; raise tier demand (same `POI_DENSITY_BY_TIER`/terrain levers) rather than nerfing food.
-
-Guardrails that MUST stay green after every tune:
-```
-bun test test/harness-sustainability.test.ts   # T1 food floor
-bun test test/reach-fraction.test.ts           # e3j structural ceilings
-bun test test/map-tier.test.ts                 # 2yn generation invariants
-```
-If you touch `POI_DENSITY_BY_TIER` or any tier lever feeding `mapTierReport`, regenerate the committed tier-table: `bun run sim:tables` then `git add docs/balance/tier-table.json` (its staleness gate is `test/balance-tables.test.ts`).
 
 - [ ] **Step 5: Full gates green**
 
 Run: `bun test && bun run typecheck && bun run lint`
-Expected: all PASS, including the new bracket test.
+Expected: all PASS. If the harvest test is slow (>~20s), that's expected (Dijkstra per step × 10 harvests) — the 30s timeout covers it. Do NOT touch game-balance levers to move the numbers; if the gate genuinely can't be met, STOP and report the measured tier/base/ratio.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/data/constants.ts test/harvest-fraction.test.ts docs/balance/tier-table.json
-git commit -m "feat(si7.2): 60/30 harvest-fraction proof + named targets, levers tuned"
+git add src/sim/harvest.ts src/data/constants.ts test/harvest-fraction.test.ts
+git commit -m "feat(si7.2): monster-aware harvest walker + calibrated tier≈2×base proof"
 ```
 
 ---
@@ -619,7 +708,7 @@ There is **no** `GameEvent` change (new items aren't new events), so `web fmt()`
 
 - [ ] **Step 3: Docs — D47 + balance-levers**
 
-Add a `D47` row to `docs/decisions.md` (dense single-row style; cite `docs/superpowers/specs/2026-07-08-tier-food-economy-design.md`) covering: the density×capacity model; `pemmican` (FOOD_ENERGY, meat+berries recipe); `trail-ration` compression 160→(final); `ENERGY_CAP_BONUS` + `canteen` + embark-at-raised-ceiling; `HARVEST_FRACTION_*_TARGET` + the harvest-fraction sim; the `tank→capacity` rename; and (if tuned) the `POI_DENSITY_BY_TIER`/`TERRAIN_WEIGHT_TIER_SHIFT` bump as a D46 amendment.
+Add a `D47` row to `docs/decisions.md` (dense single-row style; cite `docs/superpowers/specs/2026-07-08-tier-food-economy-design.md`) covering: the density×capacity model; `pemmican` (FOOD_ENERGY 240, meat+berries recipe); `trail-ration` compression 160→130; `ENERGY_CAP_BONUS` + `canteen` + embark-at-raised-ceiling; the monster-aware harvest sim + `HARVEST_FRACTION_*_TARGET` **calibrated to 0.50/0.25** with the hard gate `tier ≥ 1.8×base` (note the calibration rationale: 60/30 is the design aspiration, the no-router reference player is a conservative ~50/25 floor, the 2× ratio is the invariant); and the `tank→capacity` rename. No 2yn demand-lever tuning was needed.
 
 Update `docs/balance-levers.md`: add `ENERGY_CAP_BONUS`, `FOOD_ENERGY.pemmican`, `HARVEST_FRACTION_TIER_TARGET`/`HARVEST_FRACTION_BASE_TARGET`; update the `FOOD_ENERGY` line's trail-ration value; add `ENERGY_CAP_BONUS`/`HARVEST_FRACTION_*` to the "dials that most change feel" list (line ~66); reword any "tank" phrasing to "capacity".
 
@@ -657,9 +746,9 @@ bd dolt push
 **Spec coverage:**
 - §1 food-density ladder → Task 3 (pemmican + trail-ration compression, ration floor protected). ✓
 - §2 energy-capacity gear → Task 2 (`ENERGY_CAP_BONUS` + `canteen` + embark). ✓
-- §3 consume 2yn demand, tune if needed → Task 5 Step 4 (tune `POI_DENSITY_BY_TIER`/`TERRAIN_WEIGHT_TIER_SHIFT` only if base% too high; D46 amendment). ✓
+- §3 consume 2yn demand, tune if needed → the calibrated proof (Task 5) hit the ratio gate without any 2yn demand-lever tuning; not needed. ✓
 - §4 unrestricted fresh→dense sourcing → Task 3 (pemmican recipe = huntable hide + foraged berries; monster-meat variant captured for m0a in Task 6). ✓
-- §5 balance targets + sim → Tasks 4 (sim) + 5 (named targets + bracket proof). ✓
+- §5 balance targets + sim → Tasks 4 (sim) + 5 (monster-aware walker + calibrated 0.50/0.25 targets + tier≥1.8×base gate). ✓
 - §6 scope boundary / m0a capture → Task 6 Step 4. ✓
 - §7 tank→capacity rename → Task 1. ✓
 - Acceptance "legibility no worse" → Task 6 Step 2. ✓

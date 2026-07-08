@@ -4,7 +4,7 @@
 // the real numbers for its system. See docs/balance-levers.md.
 
 // --- Map & perception (filled in M1) ---
-// 20×60 strip (e3j): the map outgrows one 300-energy tank so food buys reach
+// 20×60 strip (e3j): the map outgrows one 300-energy capacity so food buys reach
 // again. WIDTH is thumb-sized for phone portrait; HEIGHT is the long axis you
 // scroll — the whole reach economy hangs off this pair.
 export const MAP_WIDTH = 20; // tiles across
@@ -121,13 +121,21 @@ export const MAX_ENERGY = 300;
 // A tent (durable "camp" tool) multiplies energy restored per food unit — each
 // ration goes further, so food is a stronger reach investment. Tunable.
 export const TENT_FOOD_MULTIPLIER = 1.5;
+// Energy-capacity gear (si7.2): a durable tool that RAISES the stamina ceiling
+// (maxEnergy) additively at embark, so denser tier food stays whole-unit
+// auto-eatable (eatToRefill only eats a unit that fits under max). One proof
+// line for the POC (canteen +100 → 300→400); biome-tier variants are m0a.
+export const ENERGY_CAP_BONUS: Record<string, number> = {
+  canteen: 100,
+};
 // Per-food RESTORE (tiered): denser food restores more per unit eaten, earning
 // slot efficiency against the carry squeeze. Absent = ENERGY_PER_FOOD.
 export const FOOD_ENERGY: Record<string, number> = {
-  ration: 80,
-  "trail-ration": 160, // stays 2× a ration — the T2 density edge
+  ration: 80, // T1 floor — do NOT lower (tundra forage-only sustainability, harness-gated)
+  "trail-ration": 130, // compressed from 160 (si7.2) — opens ladder headroom above it
   berries: 30, // fresh forage (e3j): weak-but-immediate — eat on the trail or lose them to staleness
   jam: 120, // processed stale-berries — hauling the harvest home beats eating it raw (1.5 rations/slot)
+  pemmican: 240, // tier-food line (si7.2): dense trail food (meat + berries). Auto-eat ceiling is maxEnergy/tentMult, NOT maxEnergy: with a tent (×1.5) pemmican's effective restore is 360, so it needs a canteen (maxEnergy 400) to stay waste-free-eatable — a tent-only player's pemmican blocks the food queue (footgun; follow-up bead). Pairs with tier capacity gear by design.
 };
 
 // Fresh→processed food (e3j): fresh forage eaten on-map is good NOW; hauled
@@ -219,6 +227,7 @@ export const TOOL_CAPABILITY: Record<string, string> = {
   waders: "wade", // graded-movement gear (svz); NODE_TOOL never asks for it
   "ice-cleats": "trek",
   tent: "camp", // stamina gear (dtv): multiplies food restore; NODE_TOOL never asks for "camp", so no gather impact
+  canteen: "provision", // stamina gear (si7.2): raises maxEnergy; NODE_TOOL never asks for "provision", so no gather impact
 }; // tool defId → capability; tiered tools (M5: "iron-pick": "pick") are data-only
 export const TOOL_QUALITY: Record<string, number> = {
   pick: 1,
@@ -235,6 +244,7 @@ export const TOOL_QUALITY: Record<string, number> = {
   waders: 1,
   "ice-cleats": 1,
   tent: 1, // quality irrelevant to camping; present to satisfy the catalog invariant
+  canteen: 1, // quality irrelevant to capacity; present to satisfy the catalog invariant
 }; // gather-cost divisor AND tier gate (quality == max MATERIAL_TIER gatherable)
 export const GATHER_YIELD: Record<GatherableNodeType, number> = {
   mining: 3,
@@ -461,7 +471,7 @@ export const CATEGORY_LOOT_TABLE: Record<MonsterCategory, ItemStackSpec[]> = {
 // --- Consumable item catalogs (M5) ---
 // ENERGY_PER_FOOD / POTION_HEAL are flat, so these are single-item catalogs for
 // the POC; the list is what `pack`/`slotOf` validate a food/potion defId against.
-export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam"];
+export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican"];
 export const POTION: string[] = ["potion", "greater-potion"];
 export const BATTLE_ITEM: string[] = ["elixir-of-power", "warding-draught"]; // combat consumables (bzd); COMBAT_BUFF keys
 
@@ -482,6 +492,7 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   "ration-game": { inputs: [{ defId: "wolf-pelt", qty: 1 }], output: { defId: "ration", qty: 2 } },
   "ration-jerky": { inputs: [{ defId: "lizard-hide", qty: 1 }], output: { defId: "ration", qty: 2 } },
   jam: { inputs: [{ defId: "stale-berries", qty: 3 }], output: { defId: "jam", qty: 1 } }, // the stale-berry payoff (e3j): denser than ration, cheaper than trail-ration
+  pemmican: { inputs: [{ defId: "drake-hide", qty: 1 }, { defId: "stale-berries", qty: 2 }], output: { defId: "pemmican", qty: 1 } }, // dense trail food (si7.2): meat + berries. Monster-drop-meat variant → m0a.
   potion: { inputs: [{ defId: "desert-sage", qty: 1 }, { defId: "forest-herb", qty: 1 }], output: { defId: "potion", qty: 1 } },
   // Consumables — T2 (gated by a T2 material → sit behind the iron-pick)
   "trail-ration": { inputs: [{ defId: "ration", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "trail-ration", qty: 1 } }, // cooked over coal — denser energy/slot
@@ -500,6 +511,7 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   waders: { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "pine-log", qty: 1 }], output: { defId: "waders", qty: 1 } }, // discounts mud (15 → 10)
   "ice-cleats": { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "wolf-pelt", qty: 1 }], output: { defId: "ice-cleats", qty: 1 } }, // glide on ice (20 → 5)
   tent: { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "pine-log", qty: 2 }], output: { defId: "tent", qty: 1 } }, // camp gear (dtv): food restores +50% energy
+  canteen: { inputs: [{ defId: "copper-ore", qty: 2 }, { defId: "deer-hide", qty: 1 }], output: { defId: "canteen", qty: 1 } }, // provision gear (si7.2): +maxEnergy; a copper sink
   // Backpack — carry upgrades. `starter` is your FIRST pack (you start bare):
   // cheap, one hunt's worth of hide. Then leather (5), large-pack (7, T2).
   starter: { inputs: [{ defId: "deer-hide", qty: 1 }], output: { defId: "starter", qty: 1 } },
@@ -625,6 +637,16 @@ export const POI_DENSITY_BY_TIER: Record<number, number> = {
   4: POI_DENSITY + 6,
   5: POI_DENSITY + 8,
 };
+
+// Harvest-fraction targets (si7.2) — the core balance contract, sim-verified by
+// test/harvest-fraction.test.ts. CALIBRATED to the monster-aware reference walker
+// (a headless greedy forager), NOT a human: on a tier-matched map, tier-appropriate
+// food clears ~TIER of the POIs, base rations ~BASE (half). The literal 60/30 is the
+// design ASPIRATION — the no-optimal-router reference player is a conservative floor
+// (a real player harvests more); the TIER≈2×BASE ratio is the invariant, and the hard
+// gate. Which ~half the player takes stays a live routing choice.
+export const HARVEST_FRACTION_TIER_TARGET = 0.5;
+export const HARVEST_FRACTION_BASE_TARGET = 0.25;
 
 // Per-terrain weight multiplier by map tier. Absent tier/terrain = 1 (identity at T1).
 // Harsher mix upward — the energy cost that makes si7.2's tier-food matter.

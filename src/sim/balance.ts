@@ -177,13 +177,13 @@ export function simFight(loadout: Loadout, monsterId: string): FightReport {
   }
 }
 
-export type ReachRow = { x: number; y: number; kind: NodeType; what: string | null; cost: number | null; tanks: number | null };
+export type ReachRow = { x: number; y: number; kind: NodeType; what: string | null; cost: number | null; capacities: number | null };
 export type ReachReport = {
   mapSeed: string;
   biomeId: string;
   entry: { x: number; y: number };
   pois: ReachRow[];
-  summary: { pois: number; reachable: number; farthestCost: number; farthestTanks: number };
+  summary: { pois: number; reachable: number; farthestCost: number; farthestCapacities: number };
 };
 
 export function simReach(loadout: Loadout, mapSeed: string): ReachReport {
@@ -194,7 +194,7 @@ export function simReach(loadout: Loadout, mapSeed: string): ReachReport {
     .map((p) => {
       const c = cost[p.y]![p.x]!;
       const finite = Number.isFinite(c);
-      return { x: p.x, y: p.y, kind: p.kind, what: p.creature ?? p.material, cost: finite ? round1(c) : null, tanks: finite ? round1(c / MAX_ENERGY) : null };
+      return { x: p.x, y: p.y, kind: p.kind, what: p.creature ?? p.material, cost: finite ? round1(c) : null, capacities: finite ? round1(c / MAX_ENERGY) : null };
     })
     .sort((a, b) => (a.cost ?? Infinity) - (b.cost ?? Infinity));
   const finiteCosts = pois.filter((p) => p.cost !== null).map((p) => p.cost!);
@@ -204,7 +204,7 @@ export function simReach(loadout: Loadout, mapSeed: string): ReachReport {
     biomeId,
     entry: grid.entry,
     pois,
-    summary: { pois: pois.length, reachable: finiteCosts.length, farthestCost, farthestTanks: round1(farthestCost / MAX_ENERGY) },
+    summary: { pois: pois.length, reachable: finiteCosts.length, farthestCost, farthestCapacities: round1(farthestCost / MAX_ENERGY) },
   };
 }
 
