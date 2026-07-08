@@ -3,8 +3,8 @@
 // the import.meta.main block is the only side-effectful line. --write (tables)
 // regenerates docs/balance/tables.{json,md} — see test/balance-tables.test.ts.
 import { mkdirSync, writeFileSync } from "node:fs";
-import { KIT_PRESETS, resolveKit, simFight, simReach, simTables } from "./balance";
-import type { FightReport, ReachReport, TableData, KitSpec } from "./balance";
+import { KIT_PRESETS, resolveKit, simFight, simReach, simTables, mapTierReport } from "./balance";
+import type { FightReport, ReachReport, TableData, MapTierReport, KitSpec } from "./balance";
 import type { ItemStack } from "../engine/types";
 
 type Flags = { kit: string; overrides: KitSpec; vs?: string; seed?: string; json: boolean; write: boolean };
@@ -94,6 +94,22 @@ export function renderTablesMd(d: TableData): string {
   ].join("\n");
 }
 
+export function renderTierTableMd(r: MapTierReport): string {
+  const header = `| tier | avg POI count | bosses present |`;
+  const sep = `|---|---|---|`;
+  const rows = r.rows.map((row) => `| ${row.tier} | ${row.poiCount} | ${row.bosses.length ? row.bosses.join(", ") : "—"} |`);
+  return [
+    `## Map tier scaling`,
+    ``,
+    `Average POI count and boss presence per tier (sampled across all biomes).`,
+    ``,
+    header,
+    sep,
+    ...rows,
+    ``,
+  ].join("\n");
+}
+
 const USAGE = [
   `usage: bun run sim <fight|reach|tables> [flags]`,
   `  fight  --kit <${Object.keys(KIT_PRESETS).join("|")}> [--weapon --armour a,b --potions defId:qty --battle-items defId:qty] --vs <monsterId> [--json]`,
@@ -118,8 +134,10 @@ export function run(argv: string[]): { code: number; output: string } {
     }
     if (cmd === "tables") {
       const data = simTables();
-      if (flags.write) return writeTables(data);
-      return { code: 0, output: flags.json ? JSON.stringify(data, null, 2) : renderTablesMd(data) };
+      const tierData = mapTierReport();
+      if (flags.write) return writeTables(data, tierData);
+      if (flags.json) return { code: 0, output: JSON.stringify({ tables: data, tiers: tierData }, null, 2) };
+      return { code: 0, output: renderTablesMd(data) + "\n" + renderTierTableMd(tierData) };
     }
     return { code: 1, output: `unknown command: ${cmd}\n${USAGE}` };
   } catch (e) {
@@ -129,11 +147,14 @@ export function run(argv: string[]): { code: number; output: string } {
 
 // Regenerates the checked-in balance surface. Byte-stable: no timestamps, all
 // numbers pre-rounded in balance.ts, plain JSON.stringify ordering.
-function writeTables(data: TableData): { code: number; output: string } {
+// tables.{json,md} = combat data only (staleness gate pins to renderTablesMd).
+// tier-table.json = map-tier scaling data (separate artifact, separate gate).
+function writeTables(data: TableData, tierData: MapTierReport): { code: number; output: string } {
   mkdirSync("docs/balance", { recursive: true });
   writeFileSync("docs/balance/tables.json", JSON.stringify(data, null, 2) + "\n");
   writeFileSync("docs/balance/tables.md", renderTablesMd(data));
-  return { code: 0, output: "wrote docs/balance/tables.json + docs/balance/tables.md" };
+  writeFileSync("docs/balance/tier-table.json", JSON.stringify(tierData, null, 2) + "\n");
+  return { code: 0, output: "wrote docs/balance/tables.json + docs/balance/tables.md + docs/balance/tier-table.json" };
 }
 
 if (import.meta.main) {

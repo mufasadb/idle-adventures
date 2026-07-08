@@ -1,7 +1,17 @@
 import { test, expect } from "bun:test";
 import { readFileSync } from "node:fs";
-import { simTables } from "../src/sim/balance";
+import { simTables, mapTierReport } from "../src/sim/balance";
 import { renderTablesMd } from "../src/sim/balance-cli";
+
+test("map-tier report: emits a row per tier 1..5 with poiCount + bossPresence", () => {
+  const rep = mapTierReport();
+  expect(rep.rows.map((r) => r.tier)).toEqual([1, 2, 3, 4, 5]);
+  const t1 = rep.rows.find((r) => r.tier === 1)!;
+  const t3 = rep.rows.find((r) => r.tier === 3)!;
+  expect(t1.bosses).not.toContain("ancient-wyrm");
+  expect(t3.bosses).toContain("ancient-wyrm");
+  expect(t3.poiCount).toBeGreaterThan(t1.poiCount);
+});
 
 // The committed tables are the citable balance surface. Any change to monsters,
 // combat-affecting items, or the combat math shifts simTables() output — this
