@@ -6,14 +6,58 @@
 import { reduce } from "../engine/reduce";
 import { generateGrid, rollBiome } from "../engine/grid";
 import { emptyLoadout } from "../engine/loadout";
+import { moveCost } from "../engine/move";
 import { MAP_WIDTH, MAP_HEIGHT } from "../data/constants";
-import type { BiomeId } from "../data/constants";
+import type { BiomeId, Terrain } from "../data/constants";
 import type { GameState, Action } from "../engine/types";
 
 export type PackSpec = { tools?: string[]; backpack?: string; transport?: string; food: { defId: string; qty: number }[] };
 export type HarvestResult = { mapSeed: string; mapTier: number; cleared: number; total: number; fraction: number };
 
-const cheb = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+type Pt = { x: number; y: number };
+const NEIGHBORS: readonly (readonly [number, number])[] = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+
+// One Dijkstra from `from` over passable, monster-free tiles → cost grid + prev
+// pointers. `blocked` = live monster tiles (obstacles), so a path never steps onto
+// a monster: the walker routes AROUND them and never engages. Linear-scan frontier
+// is fine at POC scale (20×60 = 1200 tiles). Absent/Infinity cost = unreachable.
+function dijkstraFrom(terrain: Terrain[][], from: Pt, transport: string | null, tools: string[], blocked: Set<string>): { cost: number[][]; prev: (string | null)[][] } {
+  const cost: number[][] = Array.from({ length: MAP_HEIGHT }, () => new Array<number>(MAP_WIDTH).fill(Infinity));
+  const prev: (string | null)[][] = Array.from({ length: MAP_HEIGHT }, () => new Array<string | null>(MAP_WIDTH).fill(null));
+  cost[from.y]![from.x] = 0;
+  const pq: [number, number, number][] = [[0, from.x, from.y]];
+  while (pq.length) {
+    let bi = 0;
+    for (let i = 1; i < pq.length; i++) if (pq[i]![0] < pq[bi]![0]) bi = i;
+    const [d, x, y] = pq.splice(bi, 1)[0]!;
+    if (d > cost[y]![x]!) continue;
+    for (const [dx, dy] of NEIGHBORS) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || nx >= MAP_WIDTH || ny < 0 || ny >= MAP_HEIGHT) continue;
+      if (blocked.has(`${nx},${ny}`)) continue; // route around live monsters
+      const c = moveCost(terrain[ny]![nx]!, transport, tools);
+      if (!Number.isFinite(c)) continue;
+      const nd = d + c;
+      if (nd < cost[ny]![nx]!) { cost[ny]![nx] = nd; prev[ny]![nx] = `${x},${y}`; pq.push([nd, nx, ny]); }
+    }
+  }
+  return { cost, prev };
+}
+
+// Reconstruct the adjacent-waypoint path to (tx,ty) from a dijkstraFrom result.
+function pathWaypoints(prev: (string | null)[][], from: Pt, tx: number, ty: number): Pt[] {
+  const start = `${from.x},${from.y}`;
+  const steps: Pt[] = [];
+  let cur = `${tx},${ty}`;
+  while (cur !== start) {
+    const [px, py] = cur.split(",").map(Number) as [number, number];
+    steps.unshift({ x: px, y: py });
+    const p = prev[py]![px];
+    if (p === null) return []; // no path (shouldn't happen: caller checks finite cost)
+    cur = p;
+  }
+  return steps;
+}
 
 export function simHarvest(pack: PackSpec, mapSeed: string, mapTier: number): HarvestResult {
   const biomeId = rollBiome(mapSeed) as BiomeId;
@@ -45,33 +89,41 @@ export function simHarvest(pack: PackSpec, mapSeed: string, mapTier: number): Ha
   const total = grid.pois.length;
   if (!s.expedition) return { mapSeed, mapTier, cleared: 0, total, fraction: 0 };
 
-  // Only nodes a bare-hands/pick/knife kit can work (skip wood — no axe here) and
-  // materials at tier ≤ 1 tool quality; keeps the greedy walker from wedging on
-  // tool-too-weak rejections. This measures reach, not tool progression.
+  const eq = s.expedition.loadout.equipment; // transport/tools are fixed for the run
+  const blocked = new Set(grid.pois.filter((p) => p.kind === "monster" && p.creature !== null).map((p) => `${p.x},${p.y}`));
   const gatherable = grid.pois.filter((p) => p.kind === "herb" || p.kind === "mining" || p.kind === "animal");
+  const worked = new Set<string>();
   let cleared = 0;
-  const skipped = new Set<string>();
-  for (let step = 0; step < (MAP_WIDTH + MAP_HEIGHT) * 4 && s.expedition; step++) {
+  // Bound = tiles on the grid: each iteration either clears a node or marks one
+  // worked/unreachable, and both sets only grow — the loop cannot spin.
+  for (let guard = 0; s.expedition && guard < MAP_WIDTH * MAP_HEIGHT; guard++) {
     const here = s.expedition.pos;
-    const targets = gatherable.filter(
-      (p) => !s.expedition!.cleared.some((q) => q.x === p.x && q.y === p.y) && !skipped.has(`${p.x},${p.y}`),
-    );
-    if (targets.length === 0) break;
-    targets.sort((a, b) => cheb(a, here) - cheb(b, here));
-    const t = targets[0]!;
-    if (t.x === here.x && t.y === here.y) {
-      const r = reduce(s, { type: "gather" });
-      s = r.state;
-      if (!r.events.some((e) => e.type === "gathered")) { skipped.add(`${t.x},${t.y}`); continue; }
-      cleared++;
-      if (t.material) s = reduce(s, { type: "drop", itemId: t.material } as Action).state; // shed loot: measure reach, not carry
-      continue;
+    const { cost, prev } = dijkstraFrom(grid.terrain, here, eq.transport, eq.tools, blocked);
+    // nearest unworked gatherable by true monster-aware path cost
+    let best: { p: (typeof gatherable)[number] } | null = null;
+    let bestCost = Infinity;
+    for (const p of gatherable) {
+      if (worked.has(`${p.x},${p.y}`)) continue;
+      const c = cost[p.y]![p.x]!;
+      if (Number.isFinite(c) && c < bestCost) { bestCost = c; best = { p }; }
     }
-    const r = reduce(s, { type: "move", to: { x: t.x, y: t.y } });
-    if (r.events.some((e) => e.type === "action-rejected")) break;
+    if (!best) break;
+    const t = best.p;
+    worked.add(`${t.x},${t.y}`); // mark now: reached or not, we won't retry it
+    let reached = true;
+    for (const wp of pathWaypoints(prev, here, t.x, t.y)) {
+      const r = reduce(s, { type: "move", to: wp } as Action);
+      if (r.events.some((e) => e.type === "action-rejected")) { reached = false; break; } // exhausted
+      s = r.state;
+      if (!s.expedition) { reached = false; break; }
+    }
+    if (!reached || !s.expedition) continue;
+    const r = reduce(s, { type: "gather" });
     s = r.state;
-    if (s.expedition?.combat) { skipped.add(`${t.x},${t.y}`); continue; } // walked into a monster; skip it
-    if (s.expedition && s.expedition.pos.x === here.x && s.expedition.pos.y === here.y) break; // wedged
+    if (r.events.some((e) => e.type === "gathered")) {
+      cleared++;
+      if (t.material) s = reduce(s, { type: "drop", itemId: t.material } as Action).state;
+    }
   }
   return { mapSeed, mapTier, cleared, total, fraction: total ? cleared / total : 0 };
 }

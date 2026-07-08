@@ -638,6 +638,16 @@ export const POI_DENSITY_BY_TIER: Record<number, number> = {
   5: POI_DENSITY + 8,
 };
 
+// Harvest-fraction targets (si7.2) — the core balance contract, sim-verified by
+// test/harvest-fraction.test.ts. CALIBRATED to the monster-aware reference walker
+// (a headless greedy forager), NOT a human: on a tier-matched map, tier-appropriate
+// food clears ~TIER of the POIs, base rations ~BASE (half). The literal 60/30 is the
+// design ASPIRATION — the no-optimal-router reference player is a conservative floor
+// (a real player harvests more); the TIER≈2×BASE ratio is the invariant, and the hard
+// gate. Which ~half the player takes stays a live routing choice.
+export const HARVEST_FRACTION_TIER_TARGET = 0.5;
+export const HARVEST_FRACTION_BASE_TARGET = 0.25;
+
 // Per-terrain weight multiplier by map tier. Absent tier/terrain = 1 (identity at T1).
 // Harsher mix upward — the energy cost that makes si7.2's tier-food matter.
 export const TERRAIN_WEIGHT_TIER_SHIFT: Record<number, Partial<Record<Terrain, number>>> = {
