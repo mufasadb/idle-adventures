@@ -506,7 +506,7 @@ function engagementPanel(exp: NonNullable<GameState["expedition"]>, legal: Actio
 
 function expeditionView(): string {
   const exp = state.expedition!;
-  const grid = generateGrid(exp.mapSeed, rollBiome(exp.mapSeed));
+  const grid = generateGrid(exp.mapSeed, rollBiome(exp.mapSeed), exp.mapTier ?? 1);
   const legal = legalActions(state);
 
   const poiAt = new Map(grid.pois.map((p) => [kk(p), p]));
@@ -674,7 +674,7 @@ function onTileClick(to: Pos): void {
   if (!exp) return;
   if (to.x === exp.pos.x && to.y === exp.pos.y) { pending = null; draw(); return; } // click self = cancel
   if (pending && kk(pending.goal) === kk(to)) { confirmWalk(pending.path); return; } // confirm
-  const grid = generateGrid(exp.mapSeed, rollBiome(exp.mapSeed));
+  const grid = generateGrid(exp.mapSeed, rollBiome(exp.mapSeed), exp.mapTier ?? 1);
   const cleared = new Set(exp.cleared.map(kk));
   // live monsters block the route (you fight what you walk into) — routed around
   const blocked = new Set(grid.pois.filter((p) => p.kind === "monster" && p.creature && !cleared.has(kk(p))).map(kk));

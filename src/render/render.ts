@@ -93,8 +93,8 @@ export const PLAYER_CHAR = "@";
 
 export function render(state: GameState): string {
   if (!state.expedition) return "(town)";
-  const { mapSeed, pos } = state.expedition;
-  const grid = generateGrid(mapSeed, rollBiome(mapSeed));
+  const { mapSeed, pos, mapTier } = state.expedition;
+  const grid = generateGrid(mapSeed, rollBiome(mapSeed), mapTier ?? 1);
   return renderGridText(grid, pos);
 }
 
