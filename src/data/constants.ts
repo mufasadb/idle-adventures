@@ -572,3 +572,55 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
 };
 
 type ItemStackSpec = { defId: string; qty: number; chance?: number }; // chance ∈ (0,1): drop probability, rolled per-encounter (LOOT_TABLE only); absent = always drops
+
+// === Map tiers (2yn) — value-scaling generation axis. See spec 2026-07-08-map-tiers. ===
+export const MAP_TIER_MAX = 5; // deepest map tier; drop-mint caps here
+
+// Per-material weight multiplier by map tier. Sparse: absent defId/tier = 1 (identity).
+// MUST be 1 at tier 1 for every listed material (asserted in map-tier.test).
+export const MATERIAL_TIER_WEIGHT: Record<string, Record<number, number>> = {
+  coal:          { 2: 1, 3: 2, 4: 4, 5: 2 },
+  "iron-ore":    { 2: 1.5, 3: 2, 4: 2, 5: 1.5 },
+  "mithril-ore": { 3: 1, 4: 2, 5: 3 },
+};
+
+// Node-variant magnitude distribution by map tier. Weighted over class {1,2,3}.
+// T1 = {1:1} (always base — identity). Higher tiers shift toward rich.
+export const NODE_MAGNITUDE_WEIGHTS: Record<number, Record<number, number>> = {
+  1: { 1: 1 },
+  2: { 1: 6, 2: 3, 3: 1 },
+  3: { 1: 4, 2: 4, 3: 2 },
+  4: { 1: 3, 2: 4, 3: 3 },
+  5: { 1: 2, 2: 4, 3: 4 },
+};
+
+// Yield multiplier per magnitude class; multiplies GATHER_YIELD[kind].
+export const NODE_MAGNITUDE_YIELD: Record<number, number> = { 1: 1, 2: 2, 3: 3 };
+
+// Boss gate = the SINGLE source of where bosses spawn. Bosses are REMOVED from the
+// base biome creatureTables (Task 2) and live ONLY here; tierProfile ADDS these to the
+// boss-free base table at each map tier. A boss cannot appear below its lowest listed
+// tier — that IS the gate. Graduated: minibosses at T2, the wyrm at T3.
+export const MAP_TIER_CREATURE_ADD: Record<number, Record<string, number>> = {
+  2: { "ice-troll": 1, "dust-vampire": 1 },
+  3: { "ice-troll": 2, "dust-vampire": 2, "ancient-wyrm": 1 },
+  4: { "ice-troll": 2, "dust-vampire": 2, "ancient-wyrm": 2 },
+  5: { "ice-troll": 3, "dust-vampire": 3, "ancient-wyrm": 3 },
+};
+
+// POI count by map tier. Absent = POI_DENSITY (identity at T1). Richer maps upward.
+export const POI_DENSITY_BY_TIER: Record<number, number> = {
+  2: POI_DENSITY + 2,
+  3: POI_DENSITY + 4,
+  4: POI_DENSITY + 6,
+  5: POI_DENSITY + 8,
+};
+
+// Per-terrain weight multiplier by map tier. Absent tier/terrain = 1 (identity at T1).
+// Harsher mix upward — the energy cost that makes si7.2's tier-food matter.
+export const TERRAIN_WEIGHT_TIER_SHIFT: Record<number, Partial<Record<Terrain, number>>> = {
+  2: { mountain: 1.15, river: 1.15 },
+  3: { mountain: 1.3, river: 1.3, ice: 1.15 },
+  4: { mountain: 1.5, river: 1.4, ice: 1.3 },
+  5: { mountain: 1.7, river: 1.5, ice: 1.4 },
+};

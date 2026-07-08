@@ -27,6 +27,8 @@ export type Poi = {
   kind: NodeType;
   material: string | null; // yield defId, rolled from the biome's weighted table at generation (D25/D27) — gather never consults the biome
   creature: string | null; // monster defId, stamped from the biome at generation (M4, mirrors D25) — combat never consults the biome
+  magnitude?: number; // node-variant level (2yn): 1 base, 2 mid, 3 rich. Multiplies
+                      // GATHER_YIELD via NODE_MAGNITUDE_YIELD. Gatherable kinds only. Absent = 1.
 };
 
 export type Grid = {
