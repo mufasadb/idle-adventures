@@ -17,11 +17,12 @@ export function heldFoodEnergy(food: ItemStack[]): number {
   return food.reduce((sum, s) => sum + s.qty * foodEnergyOf(s.defId), 0);
 }
 
-// Eat whole food units off the FRONT to refill CURRENT energy toward maxEnergy,
-// but only while a full unit's restore fits (never overfills / wastes). tentMult
-// multiplies restore-per-unit (TENT_FOOD_MULTIPLIER with a tent equipped). Pure —
-// returns the remaining food + new energy. Front-to-back mirrors the potion-quaff
-// order (combat.ts).
+// Eat whole food units to refill CURRENT energy toward maxEnergy, waste-free.
+// Least-dense-first (m0a — resolves si7.7): repeatedly picks the lowest-FOOD_ENERGY
+// unit whose boosted restore still fits under maxEnergy — so a dense unit at the
+// front never blocks lower-density food behind it. Ties break by lowest index
+// (matches prior forage-first ordering). tentMult multiplies restore-per-unit
+// (TENT_FOOD_MULTIPLIER with a tent equipped). Pure — returns remaining food + new energy.
 export function eatToRefill(
   food: ItemStack[],
   energy: number,
@@ -30,12 +31,22 @@ export function eatToRefill(
 ): { food: ItemStack[]; energy: number } {
   const next = food.map((s) => ({ ...s }));
   let e = energy;
-  while (next.length > 0) {
-    const restore = foodEnergyOf(next[0]!.defId) * tentMult;
-    if (e + restore > maxEnergy) break; // would waste — stop
-    e += restore;
-    next[0]!.qty -= 1;
-    if (next[0]!.qty <= 0) next.shift();
+  // Least-dense-first (m0a): repeatedly eat the lowest-FOOD_ENERGY unit whose
+  // boosted restore still fits under maxEnergy. Never blocks (a too-dense unit is
+  // passed over, not a wall — resolves si7.7); stays waste-free; fresh forage is
+  // the least dense so it's still eaten first. Ties break by lowest index.
+  for (;;) {
+    let bestIdx = -1;
+    let bestDensity = Infinity;
+    for (let i = 0; i < next.length; i++) {
+      if (next[i]!.qty <= 0) continue;
+      const density = foodEnergyOf(next[i]!.defId);
+      if (e + density * tentMult > maxEnergy) continue; // doesn't fit — skip
+      if (density < bestDensity) { bestDensity = density; bestIdx = i; }
+    }
+    if (bestIdx === -1) break; // nothing fits
+    e += foodEnergyOf(next[bestIdx]!.defId) * tentMult;
+    next[bestIdx]!.qty -= 1;
   }
-  return { food: next, energy: e };
+  return { food: next.filter((s) => s.qty > 0), energy: e };
 }
