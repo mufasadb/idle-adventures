@@ -12,7 +12,7 @@ import { packItem, reserveLoadout, EQUIP_SLOTS } from "./pack";
 import type { EquipSlot } from "./pack";
 import { slotOf, isGear } from "./catalog";
 import { candidateMaps, previewHints } from "./town";
-import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY } from "../data/constants";
+import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 
 // Pure reducer. M2 fills embark/move; M3 fills gather/drop; M4 fills fight; remaining cases are no-op stubs:
@@ -144,10 +144,10 @@ function pocketMap(
   if (!found) return rejected(state, "pocket-map", "not-offered");
   const maps = state.maps ?? [];
   if (maps.some((m) => m.mapSeed === mapSeed)) return rejected(state, "pocket-map", "already-pocketed");
-  const item = { mapSeed: found.mapSeed, biomeId: found.biomeId, vintage: state.runs ?? 0 };
+  const item = { mapSeed: found.mapSeed, biomeId: found.biomeId, vintage: state.runs ?? 0, tier: 1 };
   return {
     state: { ...state, maps: [...maps, item] },
-    events: [{ type: "pocketed-map", mapSeed, biomeId: found.biomeId }],
+    events: [{ type: "pocketed-map", mapSeed, biomeId: found.biomeId, tier: 1 }],
   };
 }
 
@@ -494,9 +494,11 @@ function fight(state: GameState, at?: { x: number; y: number }): { state: GameSt
   if (mapDrops.length > 0) {
     const mapSeed = `${expedition.mapSeed}:drop:${combat.at.x},${combat.at.y}`;
     const biomeId = rollBiome(mapSeed);
+    const sourceTier = expedition.mapTier ?? 1;
+    const tier = Math.min(sourceTier + 1, MAP_TIER_MAX);
     const carried = carryWithLoot.length + carriedMaps.length < freeCarryStacks(loadout);
-    if (carried) mapsAfter = [...carriedMaps, { mapSeed, biomeId, vintage: state.runs ?? 0 }];
-    mapEvents.push({ type: "map-dropped", at: { x: combat.at.x, y: combat.at.y }, mapSeed, biomeId, hints: previewHints(mapSeed, biomeId), carried });
+    if (carried) mapsAfter = [...carriedMaps, { mapSeed, biomeId, vintage: state.runs ?? 0, tier }];
+    mapEvents.push({ type: "map-dropped", at: { x: combat.at.x, y: combat.at.y }, mapSeed, biomeId, hints: previewHints(mapSeed, biomeId), carried, tier });
   }
   return {
     state: {

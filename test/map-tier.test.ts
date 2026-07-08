@@ -3,11 +3,15 @@ import {
   MAP_TIER_MAX, MATERIAL_TIER_WEIGHT, NODE_MAGNITUDE_WEIGHTS,
   NODE_MAGNITUDE_YIELD, MAP_TIER_CREATURE_ADD,
   BIOMES, BIOME_IDS, GATHER_YIELD,
+  MAP_DROP_CHANCE, MAP_SCROLL_ID, PLAYER_BASE_HP,
 } from "../src/data/constants";
 import { generateGrid, tierProfile, rollBiome } from "../src/engine/grid";
+import type { Poi } from "../src/engine/grid";
+import { rand } from "../src/engine/rng";
 import { reduce } from "../src/engine/reduce";
+import { emptyLoadout } from "../src/engine/loadout";
 import { newGame } from "../src/engine/town";
-import type { GameState } from "../src/engine/types";
+import type { GameState, GameEvent } from "../src/engine/types";
 
 test("map-tier levers: T1 is identity (hygiene)", () => {
   expect(MAP_TIER_MAX).toBe(5);
@@ -123,3 +127,63 @@ test("boss gate is biome-scoped: no cross-biome bosses at high tier", () => {
   }
   expect(checkedDesert && checkedTundra).toBe(true);
 }, 30000);
+
+test("drop ladder: T1 humanoid drop mints T2, and T2 mints T3 (wyrm reachable)", () => {
+  // Find a humanoid that guarantees a map drop using the same scan pattern as reduce-map-drop.test.ts
+  let found: { seed: string; poi: Poi } | undefined;
+  for (let i = 0; i < 2000; i++) {
+    const seed = `8ec-scan-${i}`;
+    const grid = generateGrid(seed, rollBiome(seed));
+    const poi = grid.pois.find(
+      (p) => p.kind === "monster" && (p.creature === "sand-raider" || p.creature === "forest-bandit"),
+    );
+    if (!poi) continue;
+    const roll = rand("g", "loot", poi.creature!, poi.x, poi.y, MAP_SCROLL_ID);
+    if (roll < MAP_DROP_CHANCE) { found = { seed, poi }; break; }
+  }
+  expect(found).toBeDefined();
+  const { seed, poi } = found!;
+
+  function buildState(mapTier: number): GameState {
+    const loadout = emptyLoadout();
+    loadout.equipment.weapon = "sword";
+    return {
+      seed: "g",
+      phase: "expedition",
+      bank: [],
+      loadout: emptyLoadout(),
+      runs: 1,
+      expedition: {
+        mapSeed: seed,
+        mapTier,
+        pos: { x: poi.x, y: poi.y },
+        energy: 50,
+        hp: PLAYER_BASE_HP,
+        loadout,
+        carry: [],
+        cleared: [],
+      },
+    };
+  }
+
+  function fightToEnd(state: GameState): { state: GameState; events: GameEvent[] } {
+    let s = reduce(state, { type: "fight" });
+    const all = [...s.events];
+    let guard = 0;
+    while (s.state.expedition?.combat && ++guard < 100) {
+      s = reduce(s.state, { type: "fight" });
+      all.push(...s.events);
+    }
+    return { state: s.state, events: all };
+  }
+
+  // T1 source → mints T2
+  const { events: t1Events } = fightToEnd(buildState(1));
+  const firstDrop = t1Events.find((e) => e.type === "map-dropped") as { tier: number } | undefined;
+  expect(firstDrop?.tier).toBe(2);
+
+  // T2 source → mints T3
+  const { events: t2Events } = fightToEnd(buildState(2));
+  const secondDrop = t2Events.find((e) => e.type === "map-dropped") as { tier: number } | undefined;
+  expect(secondDrop?.tier).toBe(3);
+});

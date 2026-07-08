@@ -195,8 +195,8 @@ export type GameEvent =
       matchup: Matchup; // post-fight RPS/affinity lesson facts (9u9.2)
     }
   | { type: "crafted"; recipeId: string; output: ItemStack }
-  | { type: "pocketed-map"; mapSeed: string; biomeId: BiomeId }
-  | { type: "map-dropped"; at: { x: number; y: number }; mapSeed: string; biomeId: BiomeId; hints: string[]; carried: boolean } // humanoid kill minted a map (8ec); carried=false → pack full, left behind
+  | { type: "pocketed-map"; mapSeed: string; biomeId: BiomeId; tier: number }
+  | { type: "map-dropped"; at: { x: number; y: number }; mapSeed: string; biomeId: BiomeId; hints: string[]; carried: boolean; tier: number } // humanoid kill minted a map (8ec); carried=false → pack full, left behind
   | { type: "map-discarded"; mapSeed: string } // drop-map (8ec): carried map thrown away mid-run
   | { type: "packed"; slot: LoadoutSlot; defId: string }
   | { type: "run-ended"; reason: string }

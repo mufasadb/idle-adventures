@@ -144,10 +144,10 @@ function fmt(e: GameEvent): string {
         : `☠ the ${name(e.creature)} downed you · run ends, haul kept`) + tail;
     }
     case "crafted": return `✦ crafted ${e.output.qty}× ${name(e.output.defId)}`;
-    case "pocketed-map": return `📜 pocketed a ${name(e.biomeId)} map`;
+    case "pocketed-map": return `📜 pocketed a T${e.tier} ${name(e.biomeId)} map`;
     case "map-dropped": return e.carried
-      ? `🗺️ looted a ${name(e.biomeId)} map (takes 1 slot — banks home with you)`
-      : `🗺️ a ${name(e.biomeId)} map dropped — pack full, left behind`;
+      ? `🗺️ looted a T${e.tier} ${name(e.biomeId)} map (takes 1 slot — banks home with you)`
+      : `🗺️ a T${e.tier} ${name(e.biomeId)} map dropped — pack full, left behind`;
     case "map-discarded": return `🗺️ discarded a carried map`;
     case "packed": return `packed ${name(e.defId)} → ${e.slot}`;
     case "run-ended": return `— run ended (${e.reason}) —`;
