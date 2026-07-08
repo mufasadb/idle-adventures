@@ -8,6 +8,8 @@ import { reduce } from "../engine/reduce";
 import { RECIPE } from "../data/constants";
 import { slotOf, isGear } from "../engine/catalog";
 import { candidateMaps } from "../engine/town";
+import { expeditionGrid } from "../engine/grid";
+import { perceive } from "../engine/perceive";
 
 // An action is legal iff reducing it emits no rejection. reduce is pure + cheap.
 function accepts(state: GameState, action: Action): boolean {
@@ -65,6 +67,12 @@ export function expeditionActions(state: GameState): Action[] {
   candidates.push({ type: "toggle-auto-quaff" });
   // use-item (90j): each held battle item; reduce keeps it only while engaged (D29)
   for (const stack of state.expedition.loadout.battleItems ?? []) candidates.push({ type: "use-item", itemId: stack.defId });
+  // survey (54f): each POI whose detail is NOT yet resolved from here; reduce
+  // filters missing-tool / exhausted / already-resolved (D29)
+  const grid = expeditionGrid(state.expedition);
+  for (const p of perceive(grid, pos, state.expedition.loadout.equipment.tools, state.expedition.surveyed ?? [])) {
+    if (p.detail === null) candidates.push({ type: "survey", at: { x: p.x, y: p.y } });
+  }
   // stamina (dtv): eat when there's food + room; toggle the auto-eat any time
   candidates.push({ type: "eat" });
   candidates.push({ type: "toggle-auto-eat" });

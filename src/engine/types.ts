@@ -65,6 +65,7 @@ export type Expedition = {
   autoQuaff?: boolean; // auto-potion at the threshold inside exchanges (si7.1, mirrors autoEat). Optional/absent = true; reads guard with `?? true`.
   mapTier?: number; // this run's map tier (2yn): set at embark from the chosen map's tier
                     // (offered map = 1, held MapItem = its tier). Optional/absent = 1.
+  surveyed?: { x: number; y: number }[]; // POIs resolved at range by the survey action (54f): perceive treats these as always-in-radius. Optional/absent = [] (old saves, terse test states); reads guard with `?? []`.
 };
 
 export type GameState = {
@@ -106,6 +107,7 @@ export type Action =
   | { type: "flee" } // disengage at the cost of one parting hit (si7.1)
   | { type: "quaff" } // drink one potion: mid-engagement (no exchange, si7.1) or on the map for QUAFF_ENERGY (82r)
   | { type: "use-item"; itemId: string } // use a packed battle item mid-fight (90j): manual-only, no auto-consume; adds its COMBAT_BUFF for THIS engagement, no exchange (mirrors quaff)
+  | { type: "survey"; at: { x: number; y: number } } // spend SURVEY_ENERGY to resolve one far POI's detail at range with a vision tool (54f)
   | { type: "don"; itemId: string } // equip a carried gear piece into its slot, displacing the worn one to carry (82r)
   | { type: "doff"; itemId: string } // unequip a worn piece / remove a tool to carry (82r)
   | { type: "toggle-auto-quaff" } // flip auto-potion-at-threshold (si7.1)
@@ -144,7 +146,8 @@ export type RejectionReason =
   | "already-pocketed"
   | "engaged"
   | "not-engaged"
-  | "not-worn"; // doff of a defId that isn't currently equipped (82r)
+  | "not-worn" // doff of a defId that isn't currently equipped (82r)
+  | "already-resolved"; // survey of a POI whose detail is already in focus (54f)
 
 // Events are a render byproduct emitted by reduce. Named GameEvent (not Event)
 // to avoid colliding with the DOM Event global, which engine code must not use.
@@ -182,6 +185,7 @@ export type GameEvent =
   | { type: "fled"; creature: string; partingHit: number; hp: number }
   | { type: "quaffed"; defId: string; healed: number; hp: number; energy?: number } // energy present only when spent (out-of-combat quaff, 82r)
   | { type: "item-used"; defId: string; damageAdd: number; mitigationAdd: number } // battle item used mid-fight (90j); buff added to this engagement (also vb8's missing consumption log line)
+  | { type: "surveyed"; at: { x: number; y: number }; kind: NodeType } // spyglass survey resolved a far POI's detail (54f); qualitative only
   | { type: "auto-quaff-toggled"; on: boolean }
   | { type: "donned"; defId: string; slot: LoadoutSlot; displaced: string | null; energy: number } // equipped from carry (82r)
   | { type: "doffed"; defId: string; slot: LoadoutSlot; energy: number } // unequipped to carry (82r)

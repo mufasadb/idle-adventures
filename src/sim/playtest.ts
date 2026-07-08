@@ -19,7 +19,7 @@ import {
   POI_CHAR,
   PLAYER_CHAR,
 } from "../render/render";
-import { RECIPE, MAP_WIDTH, MAP_HEIGHT } from "../data/constants";
+import { RECIPE, MAP_WIDTH, MAP_HEIGHT, SURVEY_ENERGY } from "../data/constants";
 import { moveCostBreakdown } from "../engine/move";
 import { usedSlots, carryCap } from "../engine/carry";
 import { costToReach } from "../engine/reach";
@@ -64,6 +64,7 @@ function fmtEvent(e: GameEvent): string {
     case "packed": return `packed ${e.defId} → ${e.slot}`;
     case "quaffed": return `🧪 quaffed ${e.defId} · +${e.healed}hp → ${e.hp}hp${e.energy !== undefined ? ` · energy → ${e.energy}e` : ""}`;
     case "item-used": return `⚗ used ${e.defId} this fight${e.damageAdd ? ` · +${e.damageAdd} dmg` : ""}${e.mitigationAdd ? ` · +${e.mitigationAdd} mitigation` : ""}`;
+    case "surveyed": return `🔭 surveyed the ${e.kind} at (${e.at.x},${e.at.y}) — its detail is now in focus`;
     case "donned": return `🧤 donned ${e.defId}${e.displaced ? ` (stowed ${e.displaced} in the bag)` : ""} · energy → ${e.energy}e`;
     case "doffed": return `🎒 doffed ${e.defId} to the bag (takes a slot) · energy → ${e.energy}e`;
     case "run-ended": return `— run ended (${e.reason})`;
@@ -151,7 +152,7 @@ function printTown(st: GameState): void {
 function printExpedition(st: GameState): void {
   const exp = st.expedition!;
   const grid = expeditionGrid(exp);
-  const seen = new Map(perceive(grid, exp.pos, exp.loadout.equipment.tools).map((p) => [`${p.x},${p.y}`, p]));
+  const seen = new Map(perceive(grid, exp.pos, exp.loadout.equipment.tools, exp.surveyed ?? []).map((p) => [`${p.x},${p.y}`, p]));
   const cleared = new Set(exp.cleared.map((c) => `${c.x},${c.y}`));
   if (exp.combat) {
     const c = exp.combat;
@@ -212,7 +213,10 @@ function printExpedition(st: GameState): void {
       const foot = onFoot[poi.y]![poi.x]!;
       const delta = Number.isFinite(foot) && foot !== c ? ` (${c < foot ? "−" : "+"}${Math.abs(Math.round(foot - c))}e vs on foot)` : "";
       const afford = c > exp.energy ? " ⚠ more than you have" : "";
-      console.log(`  (${poi.x},${poi.y}) ${poi.kind} — reach ${Math.round(c)}e${delta}${afford}`);
+      const surveyHint = legalActions(st).some((a) => a.type === "survey" && a.at.x === poi.x && a.at.y === poi.y)
+        ? ` · survey it from here (−${SURVEY_ENERGY}e, no walk): {"type":"survey","at":{"x":${poi.x},"y":${poi.y}}}`
+        : "";
+      console.log(`  (${poi.x},${poi.y}) ${poi.kind} — reach ${Math.round(c)}e${delta}${afford}${surveyHint}`);
     }
   } else {
     console.log("\nTip: append --reach to the command to see the gear-adjusted energy cost to reach each node before committing to a long walk.");

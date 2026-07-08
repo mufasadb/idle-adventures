@@ -15,7 +15,7 @@ import { costToReach } from "../engine/reach";
 import { carryCap } from "../engine/carry";
 import { heldFoodEnergy } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
-import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, TERRAIN_GATE, COMBAT_BUFF } from "../data/constants";
+import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, TERRAIN_GATE, COMBAT_BUFF, SURVEY_ENERGY } from "../data/constants";
 import type { BiomeId } from "../data/constants";
 import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint } from "../render/render";
 import { perceive } from "../engine/perceive";
@@ -160,6 +160,7 @@ function fmt(e: GameEvent): string {
     case "fled": return `🏃 fled the ${name(e.creature)} · −${round(e.partingHit)}hp → ${round(e.hp)}hp`;
     case "quaffed": return `🧪 quaffed ${name(e.defId)} · +${round(e.healed)}hp → ${round(e.hp)}hp${e.energy !== undefined ? ` · −${QUAFF_ENERGY}e → ${round(e.energy)}e` : ""}`;
     case "item-used": return `⚗ used ${name(e.defId)} this fight${e.damageAdd ? ` · +${round(e.damageAdd)} dmg` : ""}${e.mitigationAdd ? ` · +${round(e.mitigationAdd)} mitigation` : ""}`;
+    case "surveyed": return `🔭 surveyed the ${e.kind} at (${e.at.x},${e.at.y}) — its detail is now in focus`;
     case "auto-quaff-toggled": return `auto-quaff ${e.on ? "on" : "off"}`;
     case "donned": return `🧤 donned ${name(e.defId)}${e.displaced ? ` (stowed ${name(e.displaced)})` : ""} · −${DON_DOFF_ENERGY}e → ${round(e.energy)}e`;
     case "doffed": return `🎒 doffed ${name(e.defId)} to the bag · −${DON_DOFF_ENERGY}e → ${round(e.energy)}e`;
@@ -458,7 +459,7 @@ function herePanel(grid: Grid, exp: NonNullable<GameState["expedition"]>, legal:
   }
   if (poi.kind === "monster" && poi.creature) {
     // You're standing on it, so it's always within perception range.
-    const per = perceive(grid, exp.pos, exp.loadout.equipment.tools).find((p) => p.x === poi.x && p.y === poi.y);
+    const per = perceive(grid, exp.pos, exp.loadout.equipment.tools, exp.surveyed ?? []).find((p) => p.x === poi.x && p.y === poi.y);
     const desc = flavorDetail(per?.detail ?? null, "monster");
     // Standing on a live, un-engaged monster shouldn't happen in normal play
     // (move-onto-tile auto-engages, grid gen bars POIs from the entry tile,
@@ -520,7 +521,7 @@ function expeditionView(): string {
 
   const poiAt = new Map(grid.pois.map((p) => [kk(p), p]));
   const perceived = new Map(
-    perceive(grid, exp.pos, exp.loadout.equipment.tools).map((p) => [`${p.x},${p.y}`, p]),
+    perceive(grid, exp.pos, exp.loadout.equipment.tools, exp.surveyed ?? []).map((p) => [`${p.x},${p.y}`, p]),
   );
   const cleared = new Set(exp.cleared.map(kk));
   const pathSet = new Set(pending ? pending.path.map(kk) : []);
@@ -598,7 +599,7 @@ function expeditionView(): string {
   const pathBanner = exp.combat
     ? `<div class="pathbanner engaged">⚔ <b>ENGAGED — the ${name(exp.combat.creature)}</b> · fight or flee in the panel below ↓</div>`
     : pending
-    ? `<div class="pathbanner">${pending.fight ? `⚔ walk in &amp; <b>fight the ${name(pending.fight)}</b> · ` : ""}→ (${pending.goal.x},${pending.goal.y}): ${pending.path.length} tile${pending.path.length !== 1 ? "s" : ""}, <b class="${pending.cost > exp.energy ? "over" : ""}">−${round(pending.cost)} energy</b>${savingClause}${forecastClause} · <button data-walk>${pending.fight ? "Fight ▶" : "Walk ▶"}</button> ${pending.shoot ? `<button data-shoot title="engage from here with your bow — your opener lands before it can answer, and you don't step in">🏹 Shoot</button> ` : ""}<button class="link" data-cancelpath>cancel</button></div>`
+    ? `<div class="pathbanner">${pending.fight ? `⚔ walk in &amp; <b>fight the ${name(pending.fight)}</b> · ` : ""}→ (${pending.goal.x},${pending.goal.y}): ${pending.path.length} tile${pending.path.length !== 1 ? "s" : ""}, <b class="${pending.cost > exp.energy ? "over" : ""}">−${round(pending.cost)} energy</b>${savingClause}${forecastClause} · <button data-walk>${pending.fight ? "Fight ▶" : "Walk ▶"}</button> ${pending.shoot ? `<button data-shoot title="engage from here with your bow — your opener lands before it can answer, and you don't step in">🏹 Shoot</button> ` : ""}${legal.some((a) => a.type === "survey" && a.at.x === pending!.goal.x && a.at.y === pending!.goal.y) ? `<button data-survey-x="${pending.goal.x}" data-survey-y="${pending.goal.y}" title="study it through the glass without walking over — resolves its detail for −${SURVEY_ENERGY}e">🔭 Survey (−${SURVEY_ENERGY}e)</button> ` : ""}<button class="link" data-cancelpath>cancel</button></div>`
     : hint
     ? `<div class="pathbanner"><b class="over">✗ ${hint}</b></div>`
     : `<div class="pathbanner muted">Click a tile → previews the route + energy. Click <b>Walk</b> (or the tile again / right-click) to go. Monsters (<b>X</b>) block their tile — click one to fight, or route around.</div>`;
@@ -655,6 +656,8 @@ function wire(): void {
   const walk = app.querySelector<HTMLElement>("[data-walk]"); if (walk) walk.onclick = () => { if (pending) confirmWalk(pending.path); };
   // Shoot (D45): ranged engage on the pending goal — stays put, spends no energy
   const shoot = app.querySelector<HTMLElement>("[data-shoot]"); if (shoot) shoot.onclick = () => { if (pending) { const at = pending.goal; pending = null; apply({ type: "fight", at }); } };
+  // Survey (54f): resolve the pending goal's detail at range, stay put
+  const surveyBtn = app.querySelector<HTMLElement>("[data-survey-x]"); if (surveyBtn) surveyBtn.onclick = () => { const at = { x: Number(surveyBtn.dataset.surveyX), y: Number(surveyBtn.dataset.surveyY) }; pending = null; apply({ type: "survey", at }); };
   app.querySelectorAll<HTMLElement>("[data-newgame]").forEach((el) => el.onclick = () => { if (confirm("Start a new game? This wipes the current run.")) newRun(); });
   app.querySelectorAll<HTMLElement>(".tile[data-x]").forEach((el) => {
     const handler = (ev: Event) => { ev.preventDefault(); onTileClick({ x: Number(el.dataset.x), y: Number(el.dataset.y) }); };

@@ -12,7 +12,8 @@ import { packItem, reserveLoadout, EQUIP_SLOTS } from "./pack";
 import type { EquipSlot } from "./pack";
 import { slotOf, isGear } from "./catalog";
 import { candidateMaps, previewHints } from "./town";
-import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF } from "../data/constants";
+import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF, SURVEY_ENERGY, TOOL_CAPABILITY } from "../data/constants";
+import { visionRadius } from "./perceive";
 import type { GatherableNodeType } from "../data/constants";
 
 // Pure reducer. M2 fills embark/move; M3 fills gather/drop; M4 fills fight; remaining cases are no-op stubs:
@@ -47,6 +48,8 @@ export function reduce(
       return quaff(state);
     case "use-item":
       return useItem(state, action.itemId);
+    case "survey":
+      return survey(state, action.at);
     case "toggle-auto-quaff":
       return toggleAutoQuaff(state);
     case "don":
@@ -609,6 +612,41 @@ function useItem(state: GameState, itemId: string): { state: GameState; events: 
       },
     },
     events: [{ type: "item-used", defId: itemId, damageAdd, mitigationAdd }],
+  };
+}
+
+// Survey a POI at range (54f): the spyglass's ACTIVE verb. Costs SURVEY_ENERGY
+// to resolve one far node's detail (perceive then treats it as always-in-radius).
+// Not-engaged, needs a vision-capability tool equipped; the target must be an
+// as-yet-unresolved POI tile. Range is the whole map — the cost + slot + not-
+// engaged is the price. Qualitative only: the `surveyed` event carries the kind,
+// never an outcome (perception rules hold).
+function survey(state: GameState, at: { x: number; y: number }): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) return rejected(state, "survey", "not-on-expedition");
+  if (expedition.combat) return rejected(state, "survey", "engaged");
+  const tools = expedition.loadout.equipment.tools;
+  if (!tools.some((t) => TOOL_CAPABILITY[t] === "vision")) return rejected(state, "survey", "missing-tool");
+  const grid = expeditionGrid(expedition);
+  const poi = grid.pois.find((p) => p.x === at.x && p.y === at.y);
+  if (!poi) return rejected(state, "survey", "no-node");
+  const surveyed = expedition.surveyed ?? [];
+  const withinRadius = Math.max(Math.abs(at.x - expedition.pos.x), Math.abs(at.y - expedition.pos.y)) <= visionRadius(tools);
+  const alreadySurveyed = surveyed.some((s) => s.x === at.x && s.y === at.y);
+  if (withinRadius || alreadySurveyed) return rejected(state, "survey", "already-resolved");
+  if (SURVEY_ENERGY > expedition.energy) return rejected(state, "survey", "exhausted");
+  const fed = autoRefill(expedition, expedition.energy - SURVEY_ENERGY);
+  return {
+    state: {
+      ...state,
+      expedition: {
+        ...expedition,
+        energy: fed.energy,
+        loadout: { ...expedition.loadout, food: fed.food },
+        surveyed: [...surveyed, { x: at.x, y: at.y }],
+      },
+    },
+    events: [{ type: "surveyed", at: { x: at.x, y: at.y }, kind: poi.kind }],
   };
 }
 

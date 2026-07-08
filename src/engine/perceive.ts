@@ -24,11 +24,13 @@ export function visionRadius(tools: string[]): number {
   return r;
 }
 
-export function perceive(grid: Grid, playerPos: Coord, tools: string[]): PerceivedPoi[] {
+export function perceive(grid: Grid, playerPos: Coord, tools: string[], surveyed: { x: number; y: number }[] = []): PerceivedPoi[] {
   const radius = visionRadius(tools);
   return grid.pois.map((p) => {
+    // In focus if within the passive radius OR surveyed at range (54f).
     const inRange =
-      Math.max(Math.abs(p.x - playerPos.x), Math.abs(p.y - playerPos.y)) <= radius;
+      Math.max(Math.abs(p.x - playerPos.x), Math.abs(p.y - playerPos.y)) <= radius ||
+      surveyed.some((s) => s.x === p.x && s.y === p.y);
     if (!inRange) return { x: p.x, y: p.y, kind: p.kind, detail: null };
     let detail: PoiDetail;
     if (p.kind === "monster" && p.creature) {

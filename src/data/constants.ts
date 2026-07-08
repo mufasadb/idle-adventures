@@ -312,6 +312,7 @@ export const AUTO_POTION_THRESHOLD = 0.5; // fraction of base HP to auto-quaff a
 // one plains step each. In-combat quaff stays energy-free (its cost is tempo;
 // si7.1 combat balance was calibrated with it).
 export const QUAFF_ENERGY = 2; // energy to drink a potion OUTSIDE an engagement
+export const SURVEY_ENERGY = 5; // energy to survey a POI at range (54f): ~half a plains step — the price of studying the glass, paid to resolve one far node's detail
 export const DON_DOFF_ENERGY = 2; // energy to don/doff one piece of gear on the map
 export const UNARMED_DAMAGE = 1; // damage when wielding no weapon — ALSO a bow with no arrows left (D45: arrows-out = a club, never a soft-lock)
 
