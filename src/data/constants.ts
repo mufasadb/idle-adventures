@@ -4,7 +4,7 @@
 // the real numbers for its system. See docs/balance-levers.md.
 
 // --- Map & perception (filled in M1) ---
-// 20×60 strip (e3j): the map outgrows one 300-energy tank so food buys reach
+// 20×60 strip (e3j): the map outgrows one 300-energy capacity so food buys reach
 // again. WIDTH is thumb-sized for phone portrait; HEIGHT is the long axis you
 // scroll — the whole reach economy hangs off this pair.
 export const MAP_WIDTH = 20; // tiles across

@@ -22,7 +22,7 @@ function resolveWalkIn(state: GameState): GameState {
   return s;
 }
 
-test("e3j structural: the strip out-ranges one energy tank (5 offered maps)", () => {
+test("e3j structural: the strip out-ranges one energy capacity (5 offered maps)", () => {
   // The farthest POI must cost more than MAX_ENERGY to even REACH on foot —
   // food (and forage routing) is the only way to work the deep half.
   for (let r = 0; r < 5; r++) {

@@ -53,11 +53,11 @@ function renderFight(r: FightReport): string {
 }
 
 function renderReach(r: ReachReport): string {
-  const rows = r.pois.map((p) => `  (${String(p.x).padStart(2)},${String(p.y).padStart(2)}) ${p.kind.padEnd(7)} ${(p.what ?? "—").padEnd(16)} ${p.cost === null ? "  unreachable" : `${String(p.cost).padStart(6)}e  ${p.tanks}x tank`}`);
+  const rows = r.pois.map((p) => `  (${String(p.x).padStart(2)},${String(p.y).padStart(2)}) ${p.kind.padEnd(7)} ${(p.what ?? "—").padEnd(16)} ${p.cost === null ? "  unreachable" : `${String(p.cost).padStart(6)}e  ${p.capacities}x capacity`}`);
   return [
     `reach on ${r.mapSeed} (${r.biomeId}) from (${r.entry.x},${r.entry.y})`,
     ...rows,
-    `summary: ${r.summary.reachable}/${r.summary.pois} reachable · farthest ${r.summary.farthestCost}e = ${r.summary.farthestTanks}x tank`,
+    `summary: ${r.summary.reachable}/${r.summary.pois} reachable · farthest ${r.summary.farthestCost}e = ${r.summary.farthestCapacities}x capacity`,
   ].join("\n");
 }
 

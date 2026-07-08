@@ -49,13 +49,13 @@ test("simFight matches resolveCombat across kits × monsters × potions × battl
   }
 });
 
-test("simReach: every POI reported; on-foot all reachable; strip out-ranges one tank", () => {
+test("simReach: every POI reported; on-foot all reachable; strip out-ranges one capacity", () => {
   const seed = "sim-reach-0";
   const report = simReach(resolveKit("bare"), seed);
   const grid = generateGrid(seed, rollBiome(seed));
   expect(report.summary.pois).toBe(grid.pois.length);
   expect(report.summary.reachable).toBe(report.summary.pois); // e3j: POIs sample walkable tiles, one component
-  expect(report.summary.farthestTanks).toBeGreaterThan(1); // e3j: the strip out-ranges one energy tank
+  expect(report.summary.farthestCapacities).toBeGreaterThan(1); // e3j: the strip out-ranges one energy capacity
   const costs = report.pois.map((p) => p.cost!);
   expect([...costs].sort((a, b) => a - b)).toEqual(costs); // sorted ascending
 });
