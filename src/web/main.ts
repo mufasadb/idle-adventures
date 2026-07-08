@@ -62,9 +62,57 @@ function loadLog(): string[] {
 }
 function newRun(): void { state = newGame(seed); log = ["· new game"]; pending = null; draw(); }
 
+// --- repack-last-loadout (nuy) -----------------------------------------------
+// The plan is consumed at embark by design (D22/D28) — correct, but it read as a
+// silent reset, and hand-repacking the same kit cost 10+ clicks per run. We keep
+// the engine untouched: serialize the JUST-CONSUMED plan as an ordered list of
+// ordinary pack actions and replay them through reduce (D29 intact). Equipment
+// that changes carry capacity (backpack/transport/panniers) is packed FIRST so
+// later consumable slot checks see the real cap.
+type PackStep = { slot: LoadoutSlot; itemId: string };
+function planActions(lo: Loadout): PackStep[] {
+  const eq = lo.equipment;
+  const acts: PackStep[] = [];
+  const equip: [LoadoutSlot, string | null][] = [
+    ["backpack", eq.backpack], ["transport", eq.transport], ["panniers", eq.panniers],
+    ["weapon", eq.weapon], ["helmet", eq.helmet], ["chest", eq.chest], ["legs", eq.legs], ["boots", eq.boots], ["gloves", eq.gloves],
+  ];
+  for (const [slot, id] of equip) if (id) acts.push({ slot, itemId: id });
+  for (const t of eq.tools) acts.push({ slot: "tool", itemId: t });
+  const units = (list: ItemStack[], slot: LoadoutSlot) => { for (const s of list) for (let i = 0; i < s.qty; i++) acts.push({ slot, itemId: s.defId }); };
+  units(lo.food, "food");
+  units(lo.potions, "potion");
+  units(lo.battleItems ?? [], "battle-item");
+  units(lo.spares ?? [], "spare");
+  units(lo.ammo ?? [], "ammo");
+  return acts;
+}
+function saveLastPlan(lo: Loadout): void {
+  const steps = planActions(lo);
+  try { localStorage.setItem(`${SAVE_KEY}:lastPlan`, JSON.stringify(steps)); } catch { /* storage disabled */ }
+}
+function loadLastPlan(): PackStep[] {
+  try { const raw = localStorage.getItem(`${SAVE_KEY}:lastPlan`); return raw ? (JSON.parse(raw) as PackStep[]) : []; } catch { return []; }
+}
+// Replay each stored pack through reduce; items eaten/lost/sold-off last run just
+// reject (insufficient / wrong-slot for a dead defId) and are counted as skipped.
+function repackLast(): void {
+  const plan = loadLastPlan();
+  if (!plan.length) return;
+  let skipped = 0;
+  for (const step of plan) {
+    const { state: next, events } = reduce(state, { type: "pack", slot: step.slot, itemId: step.itemId });
+    if (events.some((e) => e.type === "action-rejected")) { skipped += 1; continue; }
+    state = next;
+  }
+  note(`↻ repacked last loadout${skipped ? ` · skipped ${skipped} (not in bank / no slot)` : ""}`);
+}
+
 // --- action plumbing: one funnel so every interaction goes through reduce ----
 function apply(action: Action): void {
+  const prevLoadout = state.loadout; // embark consumes this plan — stash it for repack
   const { state: next, events } = reduce(state, action);
+  if (action.type === "embark" && !events.some((e) => e.type === "action-rejected")) saveLastPlan(prevLoadout);
   state = next;
   for (const e of events) log.unshift(fmt(e));
   trimAndDraw();
@@ -312,7 +360,7 @@ function townView(): string {
     </section>
 
     <section>
-      <h2>Loadout plan <button class="link" data-reset>reset</button></h2>
+      <h2>Loadout plan <button class="link" data-reset>reset</button>${loadLastPlan().length && planActions(lo).length === 0 ? ` <button class="link" data-repack title="re-pack the loadout you took last run (skips anything no longer in the bank)">↻ repack last</button>` : ""}</h2>
       ${equipRow("weapon", eq.weapon ? name(eq.weapon) : null)}
       ${equipRow("armour", [eq.helmet, eq.chest, eq.legs, eq.boots, eq.gloves].filter(Boolean).map((d) => name(d as string)).join(", ") || null)}
       ${equipRow("transport", eq.transport ? `${name(eq.transport)}${TRANSPORT_ROLE[eq.transport] ? ` — ${TRANSPORT_ROLE[eq.transport]}` : ""}` : null)}
@@ -583,6 +631,7 @@ function wire(): void {
   app.querySelectorAll<HTMLElement>("[data-drop-map]").forEach((el) => el.onclick = () => apply({ type: "drop-map", mapSeed: el.dataset.dropMap! }));
   app.querySelectorAll<HTMLElement>("[data-act]").forEach((el) => el.onclick = () => { pending = null; apply({ type: el.dataset.act! } as Action); });
   const reset = app.querySelector<HTMLElement>("[data-reset]"); if (reset) reset.onclick = () => planReset();
+  const repack = app.querySelector<HTMLElement>("[data-repack]"); if (repack) repack.onclick = () => repackLast();
   const cancel = app.querySelector<HTMLElement>("[data-cancelpath]"); if (cancel) cancel.onclick = () => { pending = null; draw(); };
   const walk = app.querySelector<HTMLElement>("[data-walk]"); if (walk) walk.onclick = () => { if (pending) confirmWalk(pending.path); };
   // Shoot (D45): ranged engage on the pending goal — stays put, spends no energy
