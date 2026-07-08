@@ -17,7 +17,7 @@ import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
 import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP } from "../data/constants";
 import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint } from "../render/render";
 import { perceive } from "../engine/perceive";
-import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, LoadoutSlot, MapItem } from "../engine/types";
+import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, LoadoutSlot, MapItem, RejectionReason } from "../engine/types";
 
 // Per-node verb so the UI reads right: you don't "mine" an animal.
 const GATHER_VERB: Record<string, { label: string; past: string; noun: string }> = {
@@ -174,16 +174,50 @@ function findPath(grid: Grid, start: Pos, goal: Pos, transport: string | null, t
   return null;
 }
 
-function confirmWalk(path: Pos[]): void {
-  let steps = 0, spent = 0, stopped = false;
-  for (const t of path) {
-    const before = state.expedition!.energy;
-    const { state: next, events } = reduce(state, { type: "move", to: t });
-    if (events.some((e) => e.type === "action-rejected")) { stopped = true; break; }
-    spent += before - next.expedition!.energy; steps += 1; state = next;
+// Map a rejected walk step to a cause-specific message (1te-e): one banner
+// string used to cover ≥3 distinct RejectionReasons, so a bag-full fight read
+// identically to a walled tile. The reason rides the action-rejected event the
+// move driver already receives.
+function rejectCopy(reason: RejectionReason): string {
+  switch (reason) {
+    case "impassable": return "blocked by terrain";
+    case "carry-full": return "bag full — a monster fight needs a free loot slot";
+    case "exhausted": return "out of energy";
+    case "engaged": return "you're engaged — fight or flee below";
+    default: return reason;
   }
-  const p = state.expedition!.pos;
-  log.unshift(`🚶 walked ${steps} tile${steps !== 1 ? "s" : ""} → (${p.x},${p.y}) · −${round(spent)}e${stopped ? " (stopped: blocked / out of energy)" : ""}`);
+}
+const foodUnits = (food: ItemStack[]) => food.reduce((n, s) => n + s.qty, 0);
+
+// Replay a proposed path one move at a time (each still validated by reduce).
+// Stops early on the first rejection (surfacing its true cause, 1te-e) or when
+// a step engages a monster (1te-a: walking INTO a monster is a fight, not a
+// walk — the deadlock was that the generic "blocked" message hid a bag-full
+// engage rejection and swallowed the successful engagement's state change).
+function confirmWalk(path: Pos[]): void {
+  const startEnergy = state.expedition!.energy;
+  const startFood = state.expedition!.loadout.food;
+  let steps = 0;
+  let stopReason: RejectionReason | null = null;
+  let engaged = false;
+  for (const t of path) {
+    const { state: next, events } = reduce(state, { type: "move", to: t });
+    const rej = events.find((e): e is Extract<GameEvent, { type: "action-rejected" }> => e.type === "action-rejected");
+    if (rej) { stopReason = rej.reason; break; }
+    state = next;
+    if (next.expedition!.combat) { engaged = true; break; } // final step was the fight
+    steps += 1;
+  }
+  const exp = state.expedition!;
+  // spend/food computed once from start→end state — no per-step sign juggling,
+  // so auto-eat refills mid-walk net out correctly and never print "−-45e" (1te-b).
+  const net = startEnergy - exp.energy; // >0 spent, <0 net gain from auto-eat
+  const delta = net >= 0 ? `−${round(net)}e` : `+${round(-net)}e`;
+  const ate = foodUnits(startFood) - foodUnits(exp.loadout.food);
+  const ateClause = ate > 0 ? ` · auto-ate ${ate}× ration` : "";
+  if (steps > 0) log.unshift(`🚶 walked ${steps} tile${steps !== 1 ? "s" : ""} → (${exp.pos.x},${exp.pos.y}) · ${delta}${ateClause}`);
+  if (engaged) log.unshift(`⚔ engaged the ${name(exp.combat!.creature)} — resolve the fight in the panel below`);
+  if (stopReason) log.unshift(`✋ stopped — ${rejectCopy(stopReason)}`);
   pending = null; trimAndDraw();
 }
 
@@ -457,7 +491,7 @@ function expeditionView(): string {
     const per = poi ? perceived.get(k) : undefined;
     const title = stepBd
       ? stepExplain(stepBd)
-      : poi
+      : poi && !isCleared // a cleared tile shows '·' — its title must not keep the stale poi text (1te-d)
       ? (per && per.detail
           ? `${poi.kind} · ${flavorDetail(per.detail, poi.kind)}${locked ? ` (needs a better tool)` : ""}`
           : poi.kind === "monster" ? "a monster" : `a ${poi.kind} node`)
@@ -497,7 +531,9 @@ function expeditionView(): string {
         return ` · <span class="forecast" title="bare-kit forecast — battle items apply when the fight starts">forecast: you hit ${round(dmgOut)}, it hits ${round(dmgIn)} — <b class="${winning ? "good" : "over"}">${winning ? `kill in ${toKill}` : "it wins the race"}</b></span>`;
       })()
     : "";
-  const pathBanner = pending
+  const pathBanner = exp.combat
+    ? `<div class="pathbanner engaged">⚔ <b>ENGAGED — the ${name(exp.combat.creature)}</b> · fight or flee in the panel below ↓</div>`
+    : pending
     ? `<div class="pathbanner">${pending.fight ? `⚔ walk in &amp; <b>fight the ${name(pending.fight)}</b> · ` : ""}→ (${pending.goal.x},${pending.goal.y}): ${pending.path.length} tile${pending.path.length !== 1 ? "s" : ""}, <b class="${pending.cost > exp.energy ? "over" : ""}">−${round(pending.cost)} energy</b>${savingClause}${forecastClause} · <button data-walk>${pending.fight ? "Fight ▶" : "Walk ▶"}</button> ${pending.shoot ? `<button data-shoot title="engage from here with your bow — your opener lands before it can answer, and you don't step in">🏹 Shoot</button> ` : ""}<button class="link" data-cancelpath>cancel</button></div>`
     : `<div class="pathbanner muted">Click a tile → previews the route + energy. Click <b>Walk</b> (or the tile again / right-click) to go. Monsters (<b>X</b>) block their tile — click one to fight, or route around.</div>`;
 
