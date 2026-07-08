@@ -56,8 +56,8 @@ test("eatToRefill: pure — does not mutate the input food array", () => {
 
 test("foodEnergyOf / heldFoodEnergy still report restore reserves", () => {
   expect(foodEnergyOf("ration")).toBe(80);
-  expect(foodEnergyOf("trail-ration")).toBe(160);
-  expect(heldFoodEnergy([{ defId: "ration", qty: 2 }, { defId: "trail-ration", qty: 1 }])).toBe(320);
+  expect(foodEnergyOf("trail-ration")).toBe(130);
+  expect(heldFoodEnergy([{ defId: "ration", qty: 2 }, { defId: "trail-ration", qty: 1 }])).toBe(290);
 });
 
 test("eatToRefill: at max already, nothing is eaten", () => {

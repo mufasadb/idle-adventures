@@ -131,10 +131,11 @@ export const ENERGY_CAP_BONUS: Record<string, number> = {
 // Per-food RESTORE (tiered): denser food restores more per unit eaten, earning
 // slot efficiency against the carry squeeze. Absent = ENERGY_PER_FOOD.
 export const FOOD_ENERGY: Record<string, number> = {
-  ration: 80,
-  "trail-ration": 160, // stays 2× a ration — the T2 density edge
+  ration: 80, // T1 floor — do NOT lower (tundra forage-only sustainability, harness-gated)
+  "trail-ration": 130, // compressed from 160 (si7.2) — opens ladder headroom above it
   berries: 30, // fresh forage (e3j): weak-but-immediate — eat on the trail or lose them to staleness
   jam: 120, // processed stale-berries — hauling the harvest home beats eating it raw (1.5 rations/slot)
+  pemmican: 240, // tier-food line (si7.2): dense trail food (meat + berries); < MAX_ENERGY so it stays auto-eatable. TUNED in the harvest sim.
 };
 
 // Fresh→processed food (e3j): fresh forage eaten on-map is good NOW; hauled
@@ -470,7 +471,7 @@ export const CATEGORY_LOOT_TABLE: Record<MonsterCategory, ItemStackSpec[]> = {
 // --- Consumable item catalogs (M5) ---
 // ENERGY_PER_FOOD / POTION_HEAL are flat, so these are single-item catalogs for
 // the POC; the list is what `pack`/`slotOf` validate a food/potion defId against.
-export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam"];
+export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican"];
 export const POTION: string[] = ["potion", "greater-potion"];
 export const BATTLE_ITEM: string[] = ["elixir-of-power", "warding-draught"]; // combat consumables (bzd); COMBAT_BUFF keys
 
@@ -491,6 +492,7 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   "ration-game": { inputs: [{ defId: "wolf-pelt", qty: 1 }], output: { defId: "ration", qty: 2 } },
   "ration-jerky": { inputs: [{ defId: "lizard-hide", qty: 1 }], output: { defId: "ration", qty: 2 } },
   jam: { inputs: [{ defId: "stale-berries", qty: 3 }], output: { defId: "jam", qty: 1 } }, // the stale-berry payoff (e3j): denser than ration, cheaper than trail-ration
+  pemmican: { inputs: [{ defId: "drake-hide", qty: 1 }, { defId: "stale-berries", qty: 2 }], output: { defId: "pemmican", qty: 1 } }, // dense trail food (si7.2): meat + berries. Monster-drop-meat variant → m0a.
   potion: { inputs: [{ defId: "desert-sage", qty: 1 }, { defId: "forest-herb", qty: 1 }], output: { defId: "potion", qty: 1 } },
   // Consumables — T2 (gated by a T2 material → sit behind the iron-pick)
   "trail-ration": { inputs: [{ defId: "ration", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "trail-ration", qty: 1 } }, // cooked over coal — denser energy/slot

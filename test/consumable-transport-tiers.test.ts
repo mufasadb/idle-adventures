@@ -31,13 +31,13 @@ test("eat: trail-ration RESTORES 2× a ration (per-food lever now = restore, ff7
   // both start at max
   expect(withRation.expedition!.energy).toBe(300);
   expect(withTrail.expedition!.energy).toBe(300);
-  // drain to 100 (below max − a trail-ration's 160), then eat one unit
+  // drain to 100 (below max − a trail-ration's 130), then eat one unit
   const drainedR = { ...withRation, expedition: { ...withRation.expedition!, energy: 100 } };
   const drainedT = { ...withTrail, expedition: { ...withTrail.expedition!, energy: 100 } };
   const ateR = reduce(drainedR, { type: "eat" }).state;
   const ateT = reduce(drainedT, { type: "eat" }).state;
   expect(ateR.expedition!.energy).toBe(180); // 100 + 80
-  expect(ateT.expedition!.energy).toBe(260); // 100 + 160 — same slot, double restore
+  expect(ateT.expedition!.energy).toBe(230); // 100 + 130 — same slot, denser restore (si7.2 compression)
 });
 
 test("combat: a greater-potion heals 20 where a potion heals 10", () => {
