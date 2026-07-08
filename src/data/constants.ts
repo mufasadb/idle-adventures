@@ -602,9 +602,6 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   wyrmfang: { inputs: [{ defId: "dragonheart", qty: 1 }], output: { defId: "wyrmfang", qty: 1 } },
   // m0a: mid-game monster drops consuming recipes (roster.test invariant: every drop feeds the tree)
   "scale-jerky": { inputs: [{ defId: "hatchling-scale", qty: 1 }], output: { defId: "ration", qty: 2 } }, // hatchling chitin rendered = field rations (unusual but functional)
-  // map-scroll is intercepted in combat (fightAt/rollLoot) and minted as a MapItem — it never reaches the bank.
-  // This recipe satisfies the roster.test "feeds a recipe" invariant at the data level; it is unreachable in practice.
-  "map-transcription": { inputs: [{ defId: "map-scroll", qty: 1 }], output: { defId: "ration", qty: 1 } },
 };
 
 type ItemStackSpec = { defId: string; qty: number; chance?: number }; // chance ∈ (0,1): drop probability, rolled per-encounter (LOOT_TABLE only); absent = always drops

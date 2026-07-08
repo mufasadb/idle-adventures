@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { BIOMES, BIOME_IDS, MONSTERS, LOOT_TABLE, RECIPE } from "../src/data/constants";
+import { BIOMES, BIOME_IDS, MONSTERS, LOOT_TABLE, RECIPE, MAP_SCROLL_ID } from "../src/data/constants";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import type { DmgType, ArmourType } from "../src/data/constants";
 
@@ -25,6 +25,7 @@ test("every creatureTable entry is a real monster with loot feeding a recipe", (
     for (const c of Object.keys(BIOMES[id].creatureTable)) {
       expect(MONSTERS[c]).toBeDefined();
       for (const drop of LOOT_TABLE[c] ?? []) {
+        if (drop.defId === MAP_SCROLL_ID) continue; // intercepted in combat → minted as a MapItem, never a craftable material (peu rule doesn't apply)
         const feeds = Object.values(RECIPE).some((r) => r.inputs.some((i) => i.defId === drop.defId));
         const crafts = Object.values(RECIPE).some((r) => r.output.defId === drop.defId);
         expect(feeds || crafts).toBe(true); // peu rule: every part feeds the tree
