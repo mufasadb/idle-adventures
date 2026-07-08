@@ -1,5 +1,5 @@
 import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot, RejectionReason, Expedition, Equipment } from "./types";
-import { generateGrid, rollBiome } from "./grid";
+import { expeditionGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
 import { addToCarry, freeCarryStacks, freeLootStacks, usedSlots, carryCap } from "./carry";
@@ -92,7 +92,7 @@ function embark(
   if (bank === null) return rejected(state, "embark", "unaffordable");
   const heldMap = held.find((m) => m.mapSeed === mapSeed);
   const mapTier = heldMap?.tier ?? 1;
-  const grid = generateGrid(mapSeed, rollBiome(mapSeed), mapTier);
+  const grid = expeditionGrid({ mapSeed, mapTier });
   // Stamina model (dtv): current energy starts at MAX_ENERGY regardless of packed
   // food — food is a reserve you EAT to refill toward max mid-run, not the source
   // of the whole budget. autoEat (default on) refills waste-free after each spend.
@@ -209,7 +209,7 @@ function move(
   if (step.x < 0 || step.x >= MAP_WIDTH || step.y < 0 || step.y >= MAP_HEIGHT) {
     return rejected(state, "move", "out-of-bounds");
   }
-  const grid = generateGrid(expedition.mapSeed, rollBiome(expedition.mapSeed), expedition.mapTier ?? 1);
+  const grid = expeditionGrid(expedition);
   // Walking INTO a live monster is a fight, not a step (2026-07-05): monsters
   // block their tile until beaten, so pathing through one is a real choice
   // (fight it, or route around). No energy cost — combat spends HP, not energy.
@@ -239,7 +239,7 @@ function gather(state: GameState): { state: GameState; events: GameEvent[] } {
   }
   if (expedition.combat) return rejected(state, "gather", "engaged");
   const { pos } = expedition;
-  const grid = generateGrid(expedition.mapSeed, rollBiome(expedition.mapSeed), expedition.mapTier ?? 1);
+  const grid = expeditionGrid(expedition);
   const poi = grid.pois.find((p) => p.x === pos.x && p.y === pos.y);
   const alreadyCleared = expedition.cleared.some(
     (c) => c.x === pos.x && c.y === pos.y,
@@ -411,7 +411,7 @@ function fight(state: GameState, at?: { x: number; y: number }): { state: GameSt
   const combat = expedition.combat;
   if (!combat) {
     const { pos } = expedition;
-    const grid = generateGrid(expedition.mapSeed, rollBiome(expedition.mapSeed), expedition.mapTier ?? 1);
+    const grid = expeditionGrid(expedition);
     if (at !== undefined) {
       // Ranged engage (D45): `at` must be an ADJACENT (8-neighbour) live monster
       // tile, with a bow wielded and ≥1 arrow held. Engages without stepping in
