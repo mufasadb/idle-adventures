@@ -9,7 +9,7 @@ import { play } from "./play";
 import { legalActions } from "./legal";
 import { summarize } from "./report";
 import { candidateMaps } from "../engine/town";
-import { generateGrid, rollBiome } from "../engine/grid";
+import { expeditionGrid } from "../engine/grid";
 import { perceive } from "../engine/perceive";
 import {
   flavorDetail,
@@ -149,7 +149,7 @@ function printTown(st: GameState): void {
 
 function printExpedition(st: GameState): void {
   const exp = st.expedition!;
-  const grid = generateGrid(exp.mapSeed, rollBiome(exp.mapSeed), exp.mapTier ?? 1);
+  const grid = expeditionGrid(exp);
   const seen = new Map(perceive(grid, exp.pos, exp.loadout.equipment.tools).map((p) => [`${p.x},${p.y}`, p]));
   const cleared = new Set(exp.cleared.map((c) => `${c.x},${c.y}`));
   if (exp.combat) {

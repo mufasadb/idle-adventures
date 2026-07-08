@@ -178,6 +178,14 @@ export function tierProfile(biome: Biome, biomeId: BiomeId, mapTier: number): Bi
   return { ...biome, materialTable, creatureTable, terrainWeights };
 }
 
+// Single derivation of an in-run map grid from expedition identity (kuv): every
+// in-run VIEW and ENGINE site MUST derive the grid through this helper, so a new
+// generation discriminator (mapTier today, affixes for cxq) can never desync
+// view↔engine again. Town-side / offer-preview (candidateMaps) stays separate.
+export function expeditionGrid(exp: { mapSeed: string; mapTier?: number }): Grid {
+  return generateGrid(exp.mapSeed, rollBiome(exp.mapSeed), exp.mapTier ?? 1);
+}
+
 export function generateGrid(mapSeed: string, biomeId: BiomeId, mapTier = 1, _affixes?: string[]): Grid {
   const key = `${mapSeed.length}:${mapSeed}:${biomeId}:${mapTier}`;
   const hit = gridCache.get(key);

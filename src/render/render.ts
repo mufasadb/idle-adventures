@@ -1,5 +1,5 @@
 import type { GameState } from "../engine/types";
-import { generateGrid, rollBiome } from "../engine/grid";
+import { expeditionGrid } from "../engine/grid";
 import type { Grid } from "../engine/grid";
 import { WEAPONS } from "../data/constants";
 import type { Terrain, NodeType, DmgType, ArmourType } from "../data/constants";
@@ -93,8 +93,8 @@ export const PLAYER_CHAR = "@";
 
 export function render(state: GameState): string {
   if (!state.expedition) return "(town)";
-  const { mapSeed, pos, mapTier } = state.expedition;
-  const grid = generateGrid(mapSeed, rollBiome(mapSeed), mapTier ?? 1);
+  const { pos } = state.expedition;
+  const grid = expeditionGrid(state.expedition);
   return renderGridText(grid, pos);
 }
 
