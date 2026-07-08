@@ -4,6 +4,7 @@
 
 ## Problem
 
+Unlocking progression is difficult to impliment mechanically and signal to a player
 Playtest v3: map **value** differentiation is the missing gradient. It powers the
 anti-kamikaze (dying on a valuable map wastes it), fixes the wyrm/coal spawn lottery
 (bosses/rare ore are a blind roll on free maps), and is the skeleton of the pull
@@ -111,10 +112,18 @@ export function generateGrid(
 - Memo key: `` `${mapSeed.length}:${mapSeed}:${biomeId}:${mapTier}` ``. (Affixes append
   later; leaving the param unused now keeps the cartography-readiness contract from the
   bead's NOTES — one `(tier, affixes)` modifier input, tier applied first.)
-- Every existing call site passes no `mapTier` → defaults to 1 → **identical output**.
-  Call sites to leave alone (they stay T1): `render.ts:87`, `web/main.ts:509,677`,
-  `sim/playtest.ts:152`, `sim/balance.ts:139`. The reducer sites (`reduce.ts:93,207,237,409`)
-  pass `expedition.mapTier ?? 1` (embark's site reads the chosen map's tier — see §4).
+- Every existing call site defaults `mapTier` to 1 → **identical output at T1**. But the
+  DISTINCTION that matters is *town-side vs in-run*, not *engine vs surface*:
+  - **In-run grid regens MUST thread the run's tier** — the reducer sites
+    (`reduce.ts` move/gather/fight) AND every VIEW/render site that redraws the CURRENT
+    expedition's grid (`render.ts` `render()`, `web/main.ts` `expeditionView` + path
+    planner, `sim/playtest.ts` `printExpedition`) pass `expedition.mapTier ?? 1`.
+    Omitting it on a view site silently draws a T1 grid over a T2+ run — a view↔engine
+    desync (caught in final review; corrected 2026-07-08). Embark reads the chosen
+    map's tier (see §4).
+  - **Town-side / offer-preview regens stay T1** — `candidateMaps` and any offer preview
+    in `town.ts`; the balance-sim (`sim/balance.ts`) passes an EXPLICIT tier per report
+    row. These are correct as-is.
 
 ### `tierProfile(biome, mapTier) → Biome` — the identity-at-1 transform
 
