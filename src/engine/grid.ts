@@ -19,6 +19,7 @@ import {
   POI_DENSITY_BY_TIER,
   TERRAIN_WEIGHT_TIER_SHIFT,
   NODE_MAGNITUDE_WEIGHTS,
+  AFFIX_EFFECTS,
 } from "../data/constants";
 import type { Terrain, NodeType, BiomeId, Biome } from "../data/constants";
 import { rand, weightedPick } from "./rng";
@@ -178,26 +179,57 @@ export function tierProfile(biome: Biome, biomeId: BiomeId, mapTier: number): Bi
   return { ...biome, materialTable, creatureTable, terrainWeights };
 }
 
-// Single derivation of an in-run map grid from expedition identity (kuv): every
-// in-run VIEW and ENGINE site MUST derive the grid through this helper, so a new
-// generation discriminator (mapTier today, affixes for cxq) can never desync
-// view↔engine again. Town-side / offer-preview (candidateMaps) stays separate.
-export function expeditionGrid(exp: { mapSeed: string; mapTier?: number }): Grid {
-  return generateGrid(exp.mapSeed, rollBiome(exp.mapSeed), exp.mapTier ?? 1);
+// Transform a biome's generation profile for cartography affixes (cxq). IDENTITY
+// at zero affixes: returns the biome unchanged, so an un-inked map is byte-
+// identical (base snapshots don't move). Multiplies material/node-kind weights
+// AFTER tierProfile — one modifier pipeline, two inputs (tier, then affixes).
+// Never touches RNG: a bias over the same random stream, deterministic. A
+// materialWeightMul only bites where the defId already exists in that biome
+// (you can't ink coal onto a biome that never had any).
+export function affixProfile(biome: Biome, affixes: string[]): Biome {
+  if (affixes.length === 0) return biome;
+  const materialTable: Biome["materialTable"] = {};
+  for (const kind of Object.keys(biome.materialTable) as (keyof Biome["materialTable"])[]) {
+    materialTable[kind] = { ...biome.materialTable[kind]! };
+  }
+  const nodeTypeWeights: Biome["nodeTypeWeights"] = { ...biome.nodeTypeWeights };
+  for (const a of affixes) {
+    const eff = AFFIX_EFFECTS[a];
+    if (!eff) continue;
+    for (const [defId, mul] of Object.entries(eff.materialWeightMul ?? {})) {
+      for (const kind of Object.keys(materialTable) as (keyof Biome["materialTable"])[]) {
+        const tbl = materialTable[kind]!;
+        if (defId in tbl) tbl[defId] = tbl[defId]! * mul;
+      }
+    }
+    for (const [nt, mul] of Object.entries(eff.nodeTypeWeightMul ?? {})) {
+      const k = nt as NodeType;
+      if (nodeTypeWeights[k] !== undefined) nodeTypeWeights[k] = nodeTypeWeights[k]! * mul;
+    }
+  }
+  return { ...biome, materialTable, nodeTypeWeights };
 }
 
-export function generateGrid(mapSeed: string, biomeId: BiomeId, mapTier = 1, _affixes?: string[]): Grid {
-  const key = `${mapSeed.length}:${mapSeed}:${biomeId}:${mapTier}`;
+// Single derivation of an in-run map grid from expedition identity (kuv): every
+// in-run VIEW and ENGINE site MUST derive the grid through this helper, so a new
+// generation discriminator (mapTier, affixes) can never desync view↔engine
+// again. Town-side / offer-preview (candidateMaps) stays separate.
+export function expeditionGrid(exp: { mapSeed: string; mapTier?: number; affixes?: string[] }): Grid {
+  return generateGrid(exp.mapSeed, rollBiome(exp.mapSeed), exp.mapTier ?? 1, exp.affixes ?? []);
+}
+
+export function generateGrid(mapSeed: string, biomeId: BiomeId, mapTier = 1, affixes: string[] = []): Grid {
+  const key = `${mapSeed.length}:${mapSeed}:${biomeId}:${mapTier}:${[...affixes].sort().join(",")}`;
   const hit = gridCache.get(key);
   if (hit) return hit;
-  const grid = buildGrid(mapSeed, biomeId, mapTier);
+  const grid = buildGrid(mapSeed, biomeId, mapTier, affixes);
   if (gridCache.size >= GRID_CACHE_CAP) gridCache.clear();
   gridCache.set(key, grid);
   return grid;
 }
 
-function buildGrid(mapSeed: string, biomeId: BiomeId, mapTier: number): Grid {
-  const biome = tierProfile(BIOMES[biomeId], biomeId, mapTier);
+function buildGrid(mapSeed: string, biomeId: BiomeId, mapTier: number, affixes: string[]): Grid {
+  const biome = affixProfile(tierProfile(BIOMES[biomeId], biomeId, mapTier), affixes);
   const terrain: Terrain[][] = [];
   for (let y = 0; y < MAP_HEIGHT; y++) {
     const row: Terrain[] = [];

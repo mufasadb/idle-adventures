@@ -133,6 +133,36 @@ export const EPITHETS: Epithet[] = [
   { id: "plenty", label: "plenty", test: { nodeType: "herb", minShare: 0.45 } }, // forage-rich
 ];
 
+// --- Cartography: inks + affixes (cxq) — soft-editing a held map toward what
+// you want to farm. LOOP: craft an ink (picks the DOMAIN) → apply it to a HELD
+// map (the `ink` action) → the world ROLLS a specific affix from that ink's pool
+// → generateGrid reads the affix as a weight multiplier. Re-inking the SAME
+// domain REPLACES its affix (chasing the roll is a resource loop). Semi-
+// deterministic: player picks domain, world picks the affix (seeded, not save-
+// scummable). LEGIBILITY (user): ink RECIPES carry only VAGUE flavour; the affix
+// NAME carries the meaning — and the labels are the SAME vocabulary q2k's map
+// EPITHETS use (read the language in offers before you write it with inks).
+export type AffixEffect = {
+  label: string; // display: "<biome> map of <label>" — shares q2k's EPITHETS vocabulary
+  materialWeightMul?: Record<string, number>; // ×weight on these material defIds in their node table
+  nodeTypeWeightMul?: Partial<Record<NodeType, number>>; // ×weight on these POI kinds
+};
+// Affixes apply MULTIPLICATIVELY to the (tier-scaled) generation tables — one
+// modifier pipeline, applied after tierProfile. Labels reuse q2k EPITHETS words.
+export const AFFIX_EFFECTS: Record<string, AffixEffect> = {
+  "of-carbon": { label: "carbon", nodeTypeWeightMul: { mining: 1.5 }, materialWeightMul: { coal: 4 } },
+  "of-gleaming": { label: "gleaming", nodeTypeWeightMul: { mining: 1.5 }, materialWeightMul: { "mithril-ore": 5 } },
+  "of-sage": { label: "sage", nodeTypeWeightMul: { herb: 1.5 }, materialWeightMul: { "desert-sage": 4 } },
+  "of-thorns": { label: "thorns", nodeTypeWeightMul: { herb: 1.5 }, materialWeightMul: { thistle: 4 } },
+};
+// Each ink defId declares its DOMAIN (for same-domain replacement) and the POOL
+// of affixes the world rolls from. Inks are bank materials crafted via RECIPE
+// and consumed by the `ink` action (never packed).
+export const INKS: Record<string, { domain: string; pool: string[] }> = {
+  "ore-ink": { domain: "ore", pool: ["of-carbon", "of-gleaming"] },
+  "herb-ink": { domain: "herb", pool: ["of-sage", "of-thorns"] },
+};
+
 // --- Energy economy (filled in M2; rescaled ×10 for graded movement, svz) ---
 // Every energy-denominated lever sits on a ×10 scale so gear can shave meaningful
 // POINTS off a step (TERRAIN_GATE) without snapping to impassable — ratios are
@@ -534,6 +564,11 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   jam: { inputs: [{ defId: "stale-berries", qty: 3 }], output: { defId: "jam", qty: 1 } }, // the stale-berry payoff (e3j): denser than ration, cheaper than trail-ration
   pemmican: { inputs: [{ defId: "drake-hide", qty: 1 }, { defId: "stale-berries", qty: 2 }], output: { defId: "pemmican", qty: 1 } }, // dense trail food (si7.2): meat + berries. Monster-drop-meat variant → m0a.
   potion: { inputs: [{ defId: "desert-sage", qty: 1 }, { defId: "forest-herb", qty: 1 }], output: { defId: "potion", qty: 1 } },
+  // Cartography inks (cxq) — apply to a HELD map to roll an affix from the ink's
+  // domain. Vague flavour only (the affix NAME carries the meaning). ore-ink is a
+  // deliberate copper sink (playtest flagged copper as a trap).
+  "ore-ink": { inputs: [{ defId: "copper-ore", qty: 2 }, { defId: "potion", qty: 1 }], output: { defId: "ore-ink", qty: 1 } },
+  "herb-ink": { inputs: [{ defId: "forest-herb", qty: 2 }, { defId: "potion", qty: 1 }], output: { defId: "herb-ink", qty: 1 } },
   // Consumables — T2 (gated by a T2 material → sit behind the iron-pick)
   "trail-ration": { inputs: [{ defId: "ration", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "trail-ration", qty: 1 } }, // cooked over coal — denser energy/slot
   "greater-potion": { inputs: [{ defId: "potion", qty: 1 }, { defId: "silver-ore", qty: 1 }], output: { defId: "greater-potion", qty: 1 } },

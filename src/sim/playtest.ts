@@ -19,7 +19,7 @@ import {
   POI_CHAR,
   PLAYER_CHAR,
 } from "../render/render";
-import { RECIPE, MAP_WIDTH, MAP_HEIGHT, SURVEY_ENERGY } from "../data/constants";
+import { RECIPE, MAP_WIDTH, MAP_HEIGHT, SURVEY_ENERGY, AFFIX_EFFECTS } from "../data/constants";
 import { moveCostBreakdown } from "../engine/move";
 import { usedSlots, carryCap } from "../engine/carry";
 import { costToReach } from "../engine/reach";
@@ -65,6 +65,7 @@ function fmtEvent(e: GameEvent): string {
     case "quaffed": return `🧪 quaffed ${e.defId} · +${e.healed}hp → ${e.hp}hp${e.energy !== undefined ? ` · energy → ${e.energy}e` : ""}`;
     case "item-used": return `⚗ used ${e.defId} this fight${e.damageAdd ? ` · +${e.damageAdd} dmg` : ""}${e.mitigationAdd ? ` · +${e.mitigationAdd} mitigation` : ""}`;
     case "surveyed": return `🔭 surveyed the ${e.kind} at (${e.at.x},${e.at.y}) — its detail is now in focus`;
+    case "inked": return `🖋 inked the map — it is now of ${AFFIX_EFFECTS[e.affix]?.label ?? e.affix}`;
     case "donned": return `🧤 donned ${e.defId}${e.displaced ? ` (stowed ${e.displaced} in the bag)` : ""} · energy → ${e.energy}e`;
     case "doffed": return `🎒 doffed ${e.defId} to the bag (takes a slot) · energy → ${e.energy}e`;
     case "run-ended": return `— run ended (${e.reason})`;
@@ -131,7 +132,16 @@ function printTown(st: GameState): void {
   const held = st.maps ?? [];
   console.log("\nYour maps (held — embarking one SPENDS it; they outlast the offer rotating):");
   if (held.length === 0) console.log("  (none — pocket a map above to keep it)");
-  for (const m of held) { const e = mapEpithet(m.mapSeed, m.biomeId, m.tier ?? 1); console.log(`  • T${m.tier ?? 1} ${m.biomeId} map${e ? ` of ${e}` : ""} · ${(st.runs ?? 0) - m.vintage} runs old  →  embark mapSeed="${m.mapSeed}" (spends it)`); }
+  for (const m of held) {
+    // cxq affix labels (player-inked) take precedence over the q2k emergent epithet.
+    const affixes = m.affixes ?? [];
+    const nameSuffix = affixes.length
+      ? ` of ${affixes.map((a) => AFFIX_EFFECTS[a]?.label ?? a).join(", ")}`
+      : (() => { const e = mapEpithet(m.mapSeed, m.biomeId, m.tier ?? 1); return e ? ` of ${e}` : ""; })();
+    const inkActions = legalActions(st).filter((a) => a.type === "ink" && a.mapSeed === m.mapSeed) as Extract<Action, { type: "ink" }>[];
+    const inkHint = inkActions.length ? `  ·  ink: ${inkActions.map((a) => `ink mapSeed="${m.mapSeed}" inkId="${a.inkId}"`).join(" | ")}` : "";
+    console.log(`  • T${m.tier ?? 1} ${m.biomeId} map${nameSuffix} · ${(st.runs ?? 0) - m.vintage} runs old  →  embark mapSeed="${m.mapSeed}" (spends it)${inkHint}`);
+  }
   const affordable = new Set(
     legalActions(st).filter((a) => a.type === "craft").map((a) => (a as { recipeId: string }).recipeId),
   );

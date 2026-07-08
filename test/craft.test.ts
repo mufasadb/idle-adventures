@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { craft } from "../src/engine/craft";
-import { RECIPE, ARMOUR, WEAPONS, TOOL_CAPABILITY, BACKPACK_SLOTS, TRANSPORT_MULTIPLIER, FOOD, POTION, BATTLE_ITEM, PANNIERS, AMMO } from "../src/data/constants";
+import { RECIPE, ARMOUR, WEAPONS, TOOL_CAPABILITY, BACKPACK_SLOTS, TRANSPORT_MULTIPLIER, FOOD, POTION, BATTLE_ITEM, PANNIERS, AMMO, INKS } from "../src/data/constants";
 import { slotOf } from "../src/engine/catalog";
 
 test("craft: consumes inputs and yields output (bead acceptance)", () => {
@@ -32,7 +32,8 @@ test("craft: does not mutate the input bank", () => {
 test("recipes: every output is a real equippable/consumable defId — or a crafted intermediate another recipe consumes", () => {
   const known = (d: string) =>
     d in WEAPONS || d in ARMOUR || d in TOOL_CAPABILITY || d in BACKPACK_SLOTS ||
-    d in TRANSPORT_MULTIPLIER || FOOD.includes(d) || POTION.includes(d) || BATTLE_ITEM.includes(d) || PANNIERS.includes(d) || AMMO.includes(d);
+    d in TRANSPORT_MULTIPLIER || FOOD.includes(d) || POTION.includes(d) || BATTLE_ITEM.includes(d) || PANNIERS.includes(d) || AMMO.includes(d) ||
+    d in INKS; // cartography inks (cxq): bank materials consumed by the `ink` action, not a recipe
   // Crafted intermediates (D45 ranged-combat spec, 2026-07-07): `bowstring` is the
   // first recipe OUTPUT that is itself a material — legal iff some other recipe
   // consumes it (otherwise it'd be a dead-end craft).

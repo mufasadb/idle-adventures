@@ -29,9 +29,12 @@ export type Loadout = {
 
 // A pocketed map (xzx): a single-use snapshot of an offered map you chose to keep.
 // vintage = `runs` when pocketed — flavour only ("N runs old"), no mechanic.
-export type MapItem = { mapSeed: string; biomeId: BiomeId; vintage: number; tier?: number };
-// tier: map tier (2yn), drives generation scaling. Additive so affixes? slots in later
-// (cxq). Optional/absent = 1; read with `?? 1`.
+export type MapItem = { mapSeed: string; biomeId: BiomeId; vintage: number; tier?: number; affixes?: string[]; inkCount?: number };
+// tier: map tier (2yn), drives generation scaling. Optional/absent = 1; read with `?? 1`.
+// affixes: cartography affixes applied by inking (cxq), read as generateGrid weight
+//   multipliers. Optional/absent = [] (old saves, un-inked maps); read with `?? []`.
+// inkCount: how many times this map has been inked (cxq) — seeds the affix roll so
+//   re-inking a domain can land a different affix. Optional/absent = 0; read with `?? 0`.
 
 // A live combat engagement (si7.1): combat is no longer atomic — `fight` runs
 // one exchange per action, `flee`/`quaff` are the mid-fight decisions. Battle-
@@ -66,6 +69,7 @@ export type Expedition = {
   mapTier?: number; // this run's map tier (2yn): set at embark from the chosen map's tier
                     // (offered map = 1, held MapItem = its tier). Optional/absent = 1.
   surveyed?: { x: number; y: number }[]; // POIs resolved at range by the survey action (54f): perceive treats these as always-in-radius. Optional/absent = [] (old saves, terse test states); reads guard with `?? []`.
+  affixes?: string[]; // cartography affixes carried from the embarked map (cxq): fed to expeditionGrid so the in-run grid matches what was inked. Optional/absent = []; reads guard with `?? []`.
 };
 
 export type GameState = {
@@ -101,6 +105,7 @@ export type Action =
   | { type: "pack"; slot: LoadoutSlot; itemId: string }
   | { type: "embark"; mapSeed: string }
   | { type: "pocket-map"; mapSeed: string }
+  | { type: "ink"; mapSeed: string; inkId: string } // apply a crafted ink to a held map (cxq): rolls + writes an affix from the ink's domain
   | { type: "move"; to: { x: number; y: number } } // steps ONE tile toward target
   | { type: "gather" }
   | { type: "fight"; at?: { x: number; y: number } } // engage the monster on your tile, or run ONE exchange when engaged (si7.1); `at` = an ADJACENT live monster tile to engage at range with a wielded bow + ≥1 arrow (D45)
@@ -202,6 +207,7 @@ export type GameEvent =
     }
   | { type: "crafted"; recipeId: string; output: ItemStack }
   | { type: "pocketed-map"; mapSeed: string; biomeId: BiomeId; tier: number }
+  | { type: "inked"; mapSeed: string; affix: string } // an ink rolled + wrote this affix onto a held map (cxq)
   | { type: "map-dropped"; at: { x: number; y: number }; mapSeed: string; biomeId: BiomeId; hints: string[]; carried: boolean; tier: number } // humanoid kill minted a map (8ec); carried=false → pack full, left behind
   | { type: "map-discarded"; mapSeed: string } // drop-map (8ec): carried map thrown away mid-run
   | { type: "packed"; slot: LoadoutSlot; defId: string }

@@ -15,7 +15,7 @@ import { costToReach } from "../engine/reach";
 import { carryCap } from "../engine/carry";
 import { heldFoodEnergy } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
-import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, TERRAIN_GATE, COMBAT_BUFF, SURVEY_ENERGY } from "../data/constants";
+import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, TERRAIN_GATE, COMBAT_BUFF, SURVEY_ENERGY, INKS, AFFIX_EFFECTS } from "../data/constants";
 import type { BiomeId } from "../data/constants";
 import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint } from "../render/render";
 import { perceive } from "../engine/perceive";
@@ -161,6 +161,7 @@ function fmt(e: GameEvent): string {
     case "quaffed": return `🧪 quaffed ${name(e.defId)} · +${round(e.healed)}hp → ${round(e.hp)}hp${e.energy !== undefined ? ` · −${QUAFF_ENERGY}e → ${round(e.energy)}e` : ""}`;
     case "item-used": return `⚗ used ${name(e.defId)} this fight${e.damageAdd ? ` · +${round(e.damageAdd)} dmg` : ""}${e.mitigationAdd ? ` · +${round(e.mitigationAdd)} mitigation` : ""}`;
     case "surveyed": return `🔭 surveyed the ${e.kind} at (${e.at.x},${e.at.y}) — its detail is now in focus`;
+    case "inked": return `🖋 inked the map — it is now of ${AFFIX_EFFECTS[e.affix]?.label ?? e.affix}`;
     case "auto-quaff-toggled": return `auto-quaff ${e.on ? "on" : "off"}`;
     case "donned": return `🧤 donned ${name(e.defId)}${e.displaced ? ` (stowed ${name(e.displaced)})` : ""} · −${DON_DOFF_ENERGY}e → ${round(e.energy)}e`;
     case "doffed": return `🎒 doffed ${name(e.defId)} to the bag · −${DON_DOFF_ENERGY}e → ${round(e.energy)}e`;
@@ -330,6 +331,14 @@ function epithetSuffix(mapSeed: string, biomeId: BiomeId, tier = 1): string {
   return e ? ` <span class="muted">of ${e}</span>` : "";
 }
 
+// A held map's name suffix: cxq affix labels (explicit, player-inked) take
+// precedence over the q2k emergent epithet — the affix IS the notability signal.
+function heldMapSuffix(m: MapItem): string {
+  const affixes = m.affixes ?? [];
+  if (affixes.length) return ` <span class="muted">of ${affixes.map((a) => AFFIX_EFFECTS[a]?.label ?? a).join(", ")}</span>`;
+  return epithetSuffix(m.mapSeed, m.biomeId, m.tier ?? 1);
+}
+
 function townView(): string {
   const legal = legalActions(state);
   const craftable = legal.filter((a): a is Extract<Action, { type: "craft" }> => a.type === "craft");
@@ -364,9 +373,10 @@ function townView(): string {
       ${heldMaps.length ? `<div class="mapoffer">
         ${heldMaps.map((m) => `
           <div class="mapcard">
-            <b>T${m.tier ?? 1} ${name(m.biomeId)} map${epithetSuffix(m.mapSeed, m.biomeId, m.tier ?? 1)}</b>
+            <b>T${m.tier ?? 1} ${name(m.biomeId)} map${heldMapSuffix(m)}</b>
             <span class="muted small">${(state.runs ?? 0) - m.vintage} runs old</span>
             <button data-embark="${m.mapSeed}">Embark ▶ (spend)</button>
+            ${Object.keys(INKS).filter((inkId) => legal.some((a) => a.type === "ink" && a.mapSeed === m.mapSeed && a.inkId === inkId)).map((inkId) => `<button data-ink-map="${m.mapSeed}" data-ink-id="${inkId}" title="apply ${name(inkId)} — rolls an affix from its domain onto this map">${name(inkId)}</button>`).join("")}
           </div>`).join("")}
       </div>` : `<div class="muted small">(none — pocket a map to keep it for later)</div>`}
     </section>
@@ -658,6 +668,7 @@ function wire(): void {
   const shoot = app.querySelector<HTMLElement>("[data-shoot]"); if (shoot) shoot.onclick = () => { if (pending) { const at = pending.goal; pending = null; apply({ type: "fight", at }); } };
   // Survey (54f): resolve the pending goal's detail at range, stay put
   const surveyBtn = app.querySelector<HTMLElement>("[data-survey-x]"); if (surveyBtn) surveyBtn.onclick = () => { const at = { x: Number(surveyBtn.dataset.surveyX), y: Number(surveyBtn.dataset.surveyY) }; pending = null; apply({ type: "survey", at }); };
+  app.querySelectorAll<HTMLElement>("[data-ink-map]").forEach((el) => el.onclick = () => apply({ type: "ink", mapSeed: el.dataset.inkMap!, inkId: el.dataset.inkId! }));
   app.querySelectorAll<HTMLElement>("[data-newgame]").forEach((el) => el.onclick = () => { if (confirm("Start a new game? This wipes the current run.")) newRun(); });
   app.querySelectorAll<HTMLElement>(".tile[data-x]").forEach((el) => {
     const handler = (ev: Event) => { ev.preventDefault(); onTileClick({ x: Number(el.dataset.x), y: Number(el.dataset.y) }); };

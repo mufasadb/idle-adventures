@@ -5,7 +5,7 @@
 // future terrain-gating gear is reflected for free).
 import type { Action, GameState } from "../engine/types";
 import { reduce } from "../engine/reduce";
-import { RECIPE } from "../data/constants";
+import { RECIPE, INKS } from "../data/constants";
 import { slotOf, isGear } from "../engine/catalog";
 import { candidateMaps } from "../engine/town";
 import { expeditionGrid } from "../engine/grid";
@@ -40,6 +40,9 @@ export function townActions(state: GameState): Action[] {
     if (!held.has(map.mapSeed)) candidates.push({ type: "pocket-map", mapSeed: map.mapSeed });
   }
   for (const m of state.maps ?? []) candidates.push({ type: "embark", mapSeed: m.mapSeed });
+  // ink (cxq): each held map × each ink defId you hold; reduce filters the rest (D29)
+  const inkIds = state.bank.filter((s) => s.defId in INKS).map((s) => s.defId);
+  for (const m of state.maps ?? []) for (const inkId of inkIds) candidates.push({ type: "ink", mapSeed: m.mapSeed, inkId });
   return candidates.filter((a) => accepts(state, a));
 }
 

@@ -7,12 +7,13 @@ import { toolQualityFor } from "./tools";
 import { strikeExchange, rollLoot, explainMatchup, damageTaken, wieldsRanged, hasAmmo } from "./combat";
 import { eatToRefill, foodEnergyOf } from "./food";
 import { endExpedition, subtractStacks } from "./bank";
+import { rand } from "./rng";
 import { craft as applyRecipe } from "./craft";
 import { packItem, reserveLoadout, EQUIP_SLOTS } from "./pack";
 import type { EquipSlot } from "./pack";
 import { slotOf, isGear } from "./catalog";
 import { candidateMaps, previewHints } from "./town";
-import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF, SURVEY_ENERGY, TOOL_CAPABILITY } from "../data/constants";
+import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF, SURVEY_ENERGY, TOOL_CAPABILITY, INKS } from "../data/constants";
 import { visionRadius } from "./perceive";
 import type { GatherableNodeType } from "../data/constants";
 
@@ -28,6 +29,8 @@ export function reduce(
       return embark(state, action.mapSeed);
     case "pocket-map":
       return pocketMap(state, action.mapSeed);
+    case "ink":
+      return inkMap(state, action.mapSeed, action.inkId);
     case "move":
       return move(state, action.to);
     case "gather":
@@ -97,7 +100,8 @@ function embark(
   if (bank === null) return rejected(state, "embark", "unaffordable");
   const heldMap = held.find((m) => m.mapSeed === mapSeed);
   const mapTier = heldMap?.tier ?? 1;
-  const grid = expeditionGrid({ mapSeed, mapTier });
+  const affixes = heldMap?.affixes ?? []; // cartography affixes ride onto the run (cxq)
+  const grid = expeditionGrid({ mapSeed, mapTier, affixes });
   // Stamina model (dtv): current energy starts at MAX_ENERGY regardless of packed
   // food — food is a reserve you EAT to refill toward max mid-run, not the source
   // of the whole budget. autoEat (default on) refills waste-free after each spend.
@@ -130,6 +134,7 @@ function embark(
         carry,
         cleared: [],
         carriedMaps: [],
+        ...(affixes.length ? { affixes } : {}),
       },
     },
     events: [
@@ -155,6 +160,31 @@ function pocketMap(
   return {
     state: { ...state, maps: [...maps, item] },
     events: [{ type: "pocketed-map", mapSeed, biomeId: found.biomeId, tier: 1 }],
+  };
+}
+
+// Apply an ink to a held map (cxq): consume 1 ink from the bank, roll an affix
+// from the ink's domain pool (seeded by the map's ink count so re-inking a domain
+// can land differently — deterministic, not save-scummable), and REPLACE any
+// existing affix from the same domain (chasing the roll is a resource loop).
+function inkMap(state: GameState, mapSeed: string, inkId: string): { state: GameState; events: GameEvent[] } {
+  if (state.phase !== "town") return rejected(state, "ink", "not-in-town");
+  const maps = state.maps ?? [];
+  const idx = maps.findIndex((m) => m.mapSeed === mapSeed);
+  if (idx === -1) return rejected(state, "ink", "map-not-carried");
+  const ink = INKS[inkId];
+  if (!ink) return rejected(state, "ink", "insufficient");
+  const bank = subtractStacks(state.bank, [{ defId: inkId, qty: 1 }]);
+  if (bank === null) return rejected(state, "ink", "insufficient");
+  const map = maps[idx]!;
+  const inkCount = map.inkCount ?? 0;
+  const roll = rand(`${state.seed}:${mapSeed}`, "ink", inkCount);
+  const affix = ink.pool[Math.floor(roll * ink.pool.length)] ?? ink.pool[0]!;
+  const kept = (map.affixes ?? []).filter((a) => !ink.pool.includes(a)); // same-domain replace
+  const nextMap = { ...map, affixes: [...kept, affix], inkCount: inkCount + 1 };
+  return {
+    state: { ...state, bank, maps: maps.map((m, i) => (i === idx ? nextMap : m)) },
+    events: [{ type: "inked", mapSeed, affix }],
   };
 }
 
