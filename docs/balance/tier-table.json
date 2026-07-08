@@ -1,0 +1,44 @@
+{
+  "rows": [
+    {
+      "tier": 1,
+      "poiCount": 60,
+      "bosses": []
+    },
+    {
+      "tier": 2,
+      "poiCount": 62,
+      "bosses": [
+        "dust-vampire",
+        "ice-troll"
+      ]
+    },
+    {
+      "tier": 3,
+      "poiCount": 64,
+      "bosses": [
+        "ancient-wyrm",
+        "dust-vampire",
+        "ice-troll"
+      ]
+    },
+    {
+      "tier": 4,
+      "poiCount": 66,
+      "bosses": [
+        "ancient-wyrm",
+        "dust-vampire",
+        "ice-troll"
+      ]
+    },
+    {
+      "tier": 5,
+      "poiCount": 68,
+      "bosses": [
+        "ancient-wyrm",
+        "dust-vampire",
+        "ice-troll"
+      ]
+    }
+  ]
+}

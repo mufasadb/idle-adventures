@@ -71,7 +71,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
   desert: {
     terrainWeights: { plains: 0.55, mountain: 0.3, river: 0.15 },
     nodeTypeWeights: { mining: 0.4, monster: 0.25, herb: 0.15, wood: 0.1, animal: 0.1 },
-    creatureTable: { "sand-raider": 5, "mirage-wisp": 4, "giant-scorpion": 3, "dust-vampire": 1 },
+    creatureTable: { "sand-raider": 5, "mirage-wisp": 4, "giant-scorpion": 3 },
     materialTable: {
       mining: { "copper-ore": 7, "iron-ore": 2, "coal": 1 }, // coal T2 (iron-pick) — desert is a fuel source
       wood: { "cactus-wood": 7, "oak-log": 2, "pine-log": 1 },
@@ -83,8 +83,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
   tundra: {
     terrainWeights: { ice: 0.5, mountain: 0.25, plains: 0.15, river: 0.1 },
     nodeTypeWeights: { animal: 0.35, monster: 0.25, mining: 0.2, wood: 0.1, herb: 0.1 },
-    // wyrm 1/16 ≈ 6% of monster POIs (was 1/5): the goal is a discovery, not a doormat (si7.1)
-    creatureTable: { "snow-wolf": 5, "ice-crab": 4, "snow-marauder": 3, "frost-fae": 2, "ice-troll": 1, "ancient-wyrm": 1 },
+    creatureTable: { "snow-wolf": 5, "ice-crab": 4, "snow-marauder": 3, "frost-fae": 2 },
     materialTable: {
       mining: { "silver-ore": 5, "coal": 2, "iron-ore": 2, "mithril-ore": 1 }, // silver T2 + coal T2 + mithril T3: tundra is the deep-tier mine
       wood: { "pine-log": 7, "oak-log": 2, "ironwood-log": 1, stringybark: 1 }, // stringybark rare here (D45) — bow country is woodland
@@ -572,3 +571,66 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
 };
 
 type ItemStackSpec = { defId: string; qty: number; chance?: number }; // chance ∈ (0,1): drop probability, rolled per-encounter (LOOT_TABLE only); absent = always drops
+
+// === Map tiers (2yn) — value-scaling generation axis. See spec 2026-07-08-map-tiers. ===
+export const MAP_TIER_MAX = 5; // deepest map tier; drop-mint caps here
+
+// Per-material weight multiplier by map tier. Sparse: absent defId/tier = 1 (identity).
+// MUST be 1 at tier 1 for every listed material (asserted in map-tier.test).
+export const MATERIAL_TIER_WEIGHT: Record<string, Record<number, number>> = {
+  coal:          { 2: 1, 3: 2, 4: 4, 5: 2 },
+  "iron-ore":    { 2: 1.5, 3: 2, 4: 2, 5: 1.5 },
+  "mithril-ore": { 3: 1, 4: 2, 5: 3 },
+};
+
+// Node-variant magnitude distribution by map tier. Weighted over class {1,2,3}.
+// T1 = {1:1} (always base — identity). Higher tiers shift toward rich.
+export const NODE_MAGNITUDE_WEIGHTS: Record<number, Record<number, number>> = {
+  1: { 1: 1 },
+  2: { 1: 6, 2: 3, 3: 1 },
+  3: { 1: 4, 2: 4, 3: 2 },
+  4: { 1: 3, 2: 4, 3: 3 },
+  5: { 1: 2, 2: 4, 3: 4 },
+};
+
+// Yield multiplier per magnitude class; multiplies GATHER_YIELD[kind].
+export const NODE_MAGNITUDE_YIELD: Record<number, number> = { 1: 1, 2: 2, 3: 3 };
+
+// Boss gate = the SINGLE source of where bosses spawn, now BIOME-SCOPED (user 2026-07-08):
+// each boss re-enters ONLY its native biome at its gate tier. Bosses are removed from the
+// base biome creatureTables and live only here; tierProfile ADDS the matching
+// biome+tier layer to the boss-free base table. Graduated: minibosses at T2, wyrm at T3.
+// A biome/tier with no entry adds nothing (identity). Each tier's entry is the FULL add
+// for that tier (not a delta from the previous tier).
+export const MAP_TIER_CREATURE_ADD: Record<BiomeId, Record<number, Record<string, number>>> = {
+  woodland: {}, // no gated bosses native to woodland in the POC
+  desert: {
+    2: { "dust-vampire": 1 },
+    3: { "dust-vampire": 2 },
+    4: { "dust-vampire": 2 },
+    5: { "dust-vampire": 3 },
+  },
+  tundra: {
+    2: { "ice-troll": 1 },
+    3: { "ice-troll": 2, "ancient-wyrm": 1 },
+    4: { "ice-troll": 2, "ancient-wyrm": 2 },
+    5: { "ice-troll": 3, "ancient-wyrm": 3 },
+  },
+};
+
+// POI count by map tier. Absent = POI_DENSITY (identity at T1). Richer maps upward.
+export const POI_DENSITY_BY_TIER: Record<number, number> = {
+  2: POI_DENSITY + 2,
+  3: POI_DENSITY + 4,
+  4: POI_DENSITY + 6,
+  5: POI_DENSITY + 8,
+};
+
+// Per-terrain weight multiplier by map tier. Absent tier/terrain = 1 (identity at T1).
+// Harsher mix upward — the energy cost that makes si7.2's tier-food matter.
+export const TERRAIN_WEIGHT_TIER_SHIFT: Record<number, Partial<Record<Terrain, number>>> = {
+  2: { mountain: 1.15, river: 1.15 },
+  3: { mountain: 1.3, river: 1.3, ice: 1.15 },
+  4: { mountain: 1.5, river: 1.4, ice: 1.3 },
+  5: { mountain: 1.7, river: 1.5, ice: 1.4 },
+};

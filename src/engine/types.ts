@@ -29,7 +29,9 @@ export type Loadout = {
 
 // A pocketed map (xzx): a single-use snapshot of an offered map you chose to keep.
 // vintage = `runs` when pocketed — flavour only ("N runs old"), no mechanic.
-export type MapItem = { mapSeed: string; biomeId: BiomeId; vintage: number };
+export type MapItem = { mapSeed: string; biomeId: BiomeId; vintage: number; tier?: number };
+// tier: map tier (2yn), drives generation scaling. Additive so affixes? slots in later
+// (cxq). Optional/absent = 1; read with `?? 1`.
 
 // A live combat engagement (si7.1): combat is no longer atomic — `fight` runs
 // one exchange per action, `flee`/`quaff` are the mid-fight decisions. Battle-
@@ -61,6 +63,8 @@ export type Expedition = {
   carriedMaps?: MapItem[]; // map-scroll drops carried home (8ec): each costs ONE carry slot for the run; banked into GameState.maps at run end. Optional/absent = [] (old saves, terse test states); reads guard with `?? []`.
   combat?: Engagement; // live engagement (si7.1). Optional/absent = not engaged; reads guard with `?? undefined` checks.
   autoQuaff?: boolean; // auto-potion at the threshold inside exchanges (si7.1, mirrors autoEat). Optional/absent = true; reads guard with `?? true`.
+  mapTier?: number; // this run's map tier (2yn): set at embark from the chosen map's tier
+                    // (offered map = 1, held MapItem = its tier). Optional/absent = 1.
 };
 
 export type GameState = {
@@ -191,8 +195,8 @@ export type GameEvent =
       matchup: Matchup; // post-fight RPS/affinity lesson facts (9u9.2)
     }
   | { type: "crafted"; recipeId: string; output: ItemStack }
-  | { type: "pocketed-map"; mapSeed: string; biomeId: BiomeId }
-  | { type: "map-dropped"; at: { x: number; y: number }; mapSeed: string; biomeId: BiomeId; hints: string[]; carried: boolean } // humanoid kill minted a map (8ec); carried=false → pack full, left behind
+  | { type: "pocketed-map"; mapSeed: string; biomeId: BiomeId; tier: number }
+  | { type: "map-dropped"; at: { x: number; y: number }; mapSeed: string; biomeId: BiomeId; hints: string[]; carried: boolean; tier: number } // humanoid kill minted a map (8ec); carried=false → pack full, left behind
   | { type: "map-discarded"; mapSeed: string } // drop-map (8ec): carried map thrown away mid-run
   | { type: "packed"; slot: LoadoutSlot; defId: string }
   | { type: "run-ended"; reason: string }

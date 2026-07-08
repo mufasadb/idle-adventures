@@ -20,8 +20,11 @@ import {
   AUTO_POTION_THRESHOLD,
   POTION_HEAL_BY,
   AFFINITY_MULTIPLIER,
+  BIOME_IDS,
+  MAP_TIER_MAX,
+  MAP_TIER_CREATURE_ADD,
 } from "../data/constants";
-import type { DmgType, NodeType } from "../data/constants";
+import type { DmgType, NodeType, BiomeId } from "../data/constants";
 import type { ItemStack, Loadout } from "../engine/types";
 import { emptyLoadout } from "../engine/loadout";
 import { strikeExchange, battleBuff, mitigation } from "../engine/combat";
@@ -29,6 +32,55 @@ import { generateGrid, rollBiome } from "../engine/grid";
 import { costToReach } from "../engine/reach";
 
 export const round1 = (n: number): number => Math.round(n * 10) / 10;
+
+export type MapTierRow = {
+  tier: number;
+  poiCount: number; // average POI count across sampled seeds × biomes (rounded)
+  bosses: string[]; // distinct boss creature defIds present at this tier (across biomes), sorted
+};
+export type MapTierReport = { rows: MapTierRow[] };
+
+// Per-tier balance report: samples N seeds per tier across all biomes, sums POI
+// counts, and collects distinct boss creatures added by MAP_TIER_CREATURE_ADD.
+// Pure: deterministic seeds derived from tier/index, no Math.random.
+const MAP_TIER_REPORT_SEEDS = 5;
+export function mapTierReport(): MapTierReport {
+  const rows: MapTierRow[] = [];
+  for (let tier = 1; tier <= MAP_TIER_MAX; tier++) {
+    let totalPois = 0;
+    let sampleCount = 0;
+    const bossSet = new Set<string>();
+
+    // Collect bosses from MAP_TIER_CREATURE_ADD for this tier (across all biomes)
+    for (const biomeId of BIOME_IDS as readonly BiomeId[]) {
+      const adds = MAP_TIER_CREATURE_ADD[biomeId]?.[tier];
+      if (adds) {
+        for (const defId of Object.keys(adds)) {
+          bossSet.add(defId);
+        }
+      }
+    }
+
+    // Sample grids to get actual POI counts
+    for (let s = 0; s < MAP_TIER_REPORT_SEEDS; s++) {
+      for (const biomeId of BIOME_IDS as readonly BiomeId[]) {
+        const seed = `balance-tier${tier}-s${s}`;
+        const grid = generateGrid(seed, biomeId, tier);
+        totalPois += grid.pois.length;
+        sampleCount++;
+      }
+    }
+
+    const avgPois = Math.round(totalPois / sampleCount);
+    rows.push({
+      tier,
+      poiCount: avgPois,
+      bosses: Array.from(bossSet).sort(),
+    });
+  }
+  return { rows };
+}
+
 
 export type KitSpec = {
   weapon?: string;

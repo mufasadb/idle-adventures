@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { render, renderGridText, renderGridHtml } from "../src/render/render";
-import { generateGrid } from "../src/engine/grid";
+import { generateGrid, rollBiome } from "../src/engine/grid";
 import { MAP_WIDTH, MAP_HEIGHT, POI_DENSITY } from "../src/data/constants";
 import type { GameState } from "../src/engine/types";
 import { emptyLoadout } from "../src/engine/loadout";
@@ -92,4 +92,40 @@ test("matchupLessons: surfaces affinity + weapon-vs-hide + armour result", () =>
   expect(l.join(" ")).toMatch(/savaged|something/i); // affinity line present
   const none = matchupLessons({ weaponVsHide: 1, affinityFired: false, armourVsAttack: "neutral" }, "sword");
   expect(none.length).toBe(0); // nothing notable → no noise
+});
+
+test("render: expedition honours mapTier — tier-3 render differs from tier-1 render", () => {
+  // seed="snap-1" biome="desert" (rollBiome("snap-1")==="desert") produces different
+  // terrain/POI layouts at tier 1 vs tier 3, so we can prove the tier arg is used.
+  const seed = "snap-1";
+  const biome = rollBiome(seed);
+  const tier1Grid = generateGrid(seed, biome, 1);
+  const tier3Grid = generateGrid(seed, biome, 3);
+  // Sanity: the two grids actually differ for this seed (proves the test is meaningful)
+  expect(renderGridText(tier1Grid)).not.toBe(renderGridText(tier3Grid));
+
+  // Build a GameState with mapTier: 3
+  const baseExp = expeditionState(seed);
+  const tier3State: GameState = {
+    ...baseExp,
+    expedition: { ...baseExp.expedition!, mapTier: 3 },
+  };
+  const tier1State: GameState = {
+    ...baseExp,
+    expedition: { ...baseExp.expedition!, mapTier: 1 },
+  };
+
+  // render() must match the grid generated at the expedition's actual tier
+  expect(render(tier3State)).toBe(renderGridText(tier3Grid, baseExp.expedition!.pos));
+  expect(render(tier1State)).toBe(renderGridText(tier1Grid, baseExp.expedition!.pos));
+  // Cross-check: tier-3 state must NOT render as tier-1 grid
+  expect(render(tier3State)).not.toBe(renderGridText(tier1Grid, baseExp.expedition!.pos));
+});
+
+test("flavorDetail names node magnitude variants", () => {
+  expect(flavorDetail({ tier: 1, material: "iron-ore", magnitude: 2 }, "mining")).toBe("iron-ore cluster");
+  expect(flavorDetail({ tier: 1, material: "iron-ore", magnitude: 3 }, "mining")).toBe("iron-ore cave");
+  expect(flavorDetail({ tier: 1, material: "berries", magnitude: 2 }, "herb")).toBe("berries patch");
+  // base (magnitude 1/absent) unchanged
+  expect(flavorDetail({ tier: 1, material: "iron-ore" }, "mining")).toBe("iron-ore");
 });

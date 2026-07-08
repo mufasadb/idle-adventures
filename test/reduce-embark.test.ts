@@ -3,8 +3,8 @@ import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import { MAX_ENERGY } from "../src/data/constants";
-import { candidateMaps } from "../src/engine/town";
-import type { GameState } from "../src/engine/types";
+import { candidateMaps, newGame } from "../src/engine/town";
+import type { GameState, MapItem } from "../src/engine/types";
 
 const OFFER_G = candidateMaps("g", 0)[0]!.mapSeed; // townState()'s first offered map
 const OFFER_E = candidateMaps("e", 0)[0]!.mapSeed; // seed-"e" states' first offered map
@@ -124,6 +124,22 @@ test("embark: an off-offer seed is rejected (no seed re-farming, 9u9.3)", () => 
   expect(events).toEqual([
     { type: "action-rejected", action: "embark", reason: "not-offered" },
   ]);
+});
+
+test("embark: held map tier flows into expedition.mapTier", () => {
+  // Pocket-free path: inject a held T3 map, then embark it.
+  const base = newGame("emk");
+  const held: MapItem = { mapSeed: "held-t3", biomeId: "tundra", vintage: 0, tier: 3 };
+  const st = { ...base, maps: [held] };
+  const { state } = reduce(st, { type: "embark", mapSeed: "held-t3" });
+  expect(state.expedition?.mapTier).toBe(3);
+});
+
+test("embark: an offered map is tier 1", () => {
+  const base = newGame("emk2");
+  const offer = candidateMaps("emk2", 0)[0]!;
+  const { state } = reduce(base, { type: "embark", mapSeed: offer.mapSeed });
+  expect(state.expedition?.mapTier).toBe(1);
 });
 
 test("embark: the offer rotates with runs — last visit's seed is no longer valid", () => {

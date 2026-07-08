@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test";
 import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
-import { candidateMaps } from "../src/engine/town";
+import { candidateMaps, newGame } from "../src/engine/town";
 import { rollBiome } from "../src/engine/grid";
 import type { GameState } from "../src/engine/types";
 
@@ -13,7 +13,7 @@ test("pocket-map: an offered map is added to the held collection with its biome 
   const s = town("m", 0);
   const offer = candidateMaps("m", 0);
   const { state } = reduce(s, { type: "pocket-map", mapSeed: offer[0]!.mapSeed });
-  expect(state.maps).toEqual([{ mapSeed: offer[0]!.mapSeed, biomeId: offer[0]!.biomeId, vintage: 0 }]);
+  expect(state.maps).toEqual([{ mapSeed: offer[0]!.mapSeed, biomeId: offer[0]!.biomeId, vintage: 0, tier: 1 }]);
 });
 
 test("pocket-map: pocketing the same map twice is rejected", () => {
@@ -47,4 +47,12 @@ test("embark: 'go nearby' (a currently-offered map, not held) does not touch the
 test("embark: a seed neither offered nor held is rejected (farm loop stays closed)", () => {
   const { events } = reduce(town("m", 0), { type: "embark", mapSeed: "arbitrary" });
   expect(events).toEqual([{ type: "action-rejected", action: "embark", reason: "not-offered" }]);
+});
+
+test("pocketed offered map is tier 1", () => {
+  const base = newGame("pk");
+  const offer = candidateMaps("pk", 0)[0]!;
+  const { state, events } = reduce(base, { type: "pocket-map", mapSeed: offer.mapSeed });
+  expect(state.maps?.[0]?.tier).toBe(1);
+  expect(events.find((e) => e.type === "pocketed-map")).toMatchObject({ tier: 1 });
 });

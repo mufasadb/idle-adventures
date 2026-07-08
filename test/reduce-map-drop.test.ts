@@ -12,6 +12,7 @@ import {
   PLAYER_BASE_HP,
   BASE_CARRY_SLOTS,
   STACK_CAP,
+  MAP_TIER_MAX,
 } from "../src/data/constants";
 import type { GameState, GameEvent, MapItem } from "../src/engine/types";
 
@@ -73,7 +74,7 @@ test("humanoid victory mints a carried map: deterministic seed, biome from rollB
   const { state, events } = fightToEnd(atMonster(seed, poi));
   const expectedSeed = `${seed}:drop:${poi.x},${poi.y}`;
   expect(state.expedition!.carriedMaps ?? []).toEqual([
-    { mapSeed: expectedSeed, biomeId: rollBiome(expectedSeed), vintage: 3 },
+    { mapSeed: expectedSeed, biomeId: rollBiome(expectedSeed), vintage: 3, tier: 2 },
   ]);
   expect(events).toContainEqual({
     type: "map-dropped",
@@ -82,6 +83,7 @@ test("humanoid victory mints a carried map: deterministic seed, biome from rollB
     biomeId: rollBiome(expectedSeed),
     hints: [],
     carried: true,
+    tier: 2,
   });
   // the scroll never enters carry as a material, and fought.loot excludes it
   expect(state.expedition!.carry.some((s) => s.defId === MAP_SCROLL_ID)).toBe(false);
@@ -160,4 +162,20 @@ test("carried map banks on return and is embarkable+spent like a pocketed map", 
   const out = reduce(home, { type: "embark", mapSeed: minted });
   expect(out.state.phase).toBe("expedition");
   expect((out.state.maps ?? []).some((m) => m.mapSeed === minted)).toBe(false); // spent
+});
+
+test("drop-mint stamps sourceTier+1, capped at MAP_TIER_MAX", () => {
+  const { seed, poi } = humanoidFight(true);
+
+  // T4 source → mints T5
+  const t4State = atMonster(seed, poi, (s) => { s.expedition!.mapTier = 4; });
+  const { events: t4Events } = fightToEnd(t4State);
+  const t4Drop = t4Events.find((e) => e.type === "map-dropped") as { tier: number } | undefined;
+  expect(t4Drop?.tier).toBe(5);
+
+  // T5 source → mints T5 (capped at MAP_TIER_MAX)
+  const t5State = atMonster(seed, poi, (s) => { s.expedition!.mapTier = 5; });
+  const { events: t5Events } = fightToEnd(t5State);
+  const t5Drop = t5Events.find((e) => e.type === "map-dropped") as { tier: number } | undefined;
+  expect(t5Drop?.tier).toBe(MAP_TIER_MAX);
 });

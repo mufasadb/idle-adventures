@@ -23,10 +23,10 @@ function fightToEnd(state: GameState): { state: GameState; events: GameEvent[] }
   return { state: s.state, events: all };
 }
 
-function mapWithMonster(creature?: string): { seed: string; grid: Grid; poi: Poi } {
+function mapWithMonster(creature?: string, mapTier = 1): { seed: string; grid: Grid; poi: Poi } {
   for (let i = 0; i < 500; i++) {
     const seed = `m4-scan-${i}`;
-    const grid = generateGrid(seed, rollBiome(seed));
+    const grid = generateGrid(seed, rollBiome(seed), mapTier);
     const poi = grid.pois.find(
       (p) => p.kind === "monster" && (creature === undefined || p.creature === creature),
     );
@@ -93,7 +93,7 @@ test("fight: a cleared monster is gone", () => {
 });
 
 test("fight: HP 0 soft-fails — run ends, carry is KEPT in the bank (bead acceptance)", () => {
-  const { seed, poi } = mapWithMonster("ice-troll"); // tier 3
+  const { seed, poi } = mapWithMonster(); // any T1 monster — naked player with 3 HP dies to anything
   const before = atMonster(seed, poi, (l) => { l.equipment.weapon = null; }, 3); // naked, 3 hp
   before.expedition!.carry = [{ defId: "silver-ore", qty: 3 }];
   const { state, events } = fightToEnd(before);
@@ -146,16 +146,15 @@ test("fight: rejected in town", () => {
 });
 
 test("fight: defeat banks only the UNSPENT potions (quaffed ones are gone)", () => {
-  const { seed, poi } = mapWithMonster("ice-troll"); // lethal without gear
+  // werewolf (tier 2) is still on T1 woodland maps; unarmed (1 dmg/round) vs 16 HP werewolf
+  // guarantees defeat long before player can kill it — potions quaff mid-fight before run ends
+  const { seed, poi } = mapWithMonster("werewolf");
   const before = atMonster(seed, poi, (l) => {
     l.equipment.weapon = null; // unarmed → guaranteed defeat
     l.equipment.backpack = "leather"; // room for loot so the fit-check passes (pqp: potions now cost slots)
     l.potions = [{ defId: "healing-potion", qty: 3 }];
-  }); // si7.1: starting at 12 HP now dies on the FIRST hit (14 dmgIn, bare
-  // kit) before the auto-quaff check runs. PLAYER_BASE_HP (the atMonster
-  // default) still crosses the threshold mid-fight so potionsUsed > 0, while
-  // unarmed-vs-ice-troll remains a guaranteed eventual defeat.
-  const expected = resolveCombat(before.expedition!.loadout, PLAYER_BASE_HP, "ice-troll");
+  });
+  const expected = resolveCombat(before.expedition!.loadout, PLAYER_BASE_HP, "werewolf");
   expect(expected.victory).toBe(false);
   expect(expected.potionsUsed).toBeGreaterThan(0);
   const { state } = fightToEnd(before);
@@ -218,7 +217,8 @@ test("move: walking onto a live monster engages (moveOnWin), win takes the tile"
 });
 
 test("move: losing the walk-in fight soft-fails the run (keeps the haul)", () => {
-  const { seed, poi } = mapWithMonster("ice-troll"); // tier-3, lethal unarmoured
+  // werewolf (tier 2) is still on T1 woodland maps; sword+no-armour+no-potions loses
+  const { seed, poi } = mapWithMonster("werewolf");
   const base = atMonster(seed, poi); // basic sword, no armour, no potions
   const adj: GameState = { ...base, expedition: { ...base.expedition!, pos: { x: poi.x - 1, y: poi.y }, carry: [{ defId: "iron-ore", qty: 2 }] } };
   const engaged = reduce(adj, { type: "move", to: { x: poi.x, y: poi.y } });
