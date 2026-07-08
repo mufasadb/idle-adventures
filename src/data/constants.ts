@@ -59,7 +59,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
   woodland: {
     terrainWeights: { plains: 0.4, mud: 0.25, river: 0.15, mountain: 0.2 },
     nodeTypeWeights: { wood: 0.35, herb: 0.25, animal: 0.2, monster: 0.15, mining: 0.05 },
-    creatureTable: { "forest-boar": 5, "forest-bandit": 4, "shell-beetle": 4, "fae-sprite": 3, werewolf: 2 },
+    creatureTable: { "forest-boar": 5, "forest-bandit": 4, "shell-beetle": 4, "fae-sprite": 3, werewolf: 2, "giant-elk": 3 }, // m0a: giant-elk mid-tier
     materialTable: {
       mining: { "iron-ore": 7, "copper-ore": 2, "silver-ore": 1 }, // silver present (D27) but T2-gated
       wood: { "oak-log": 5, "pine-log": 2, "ironwood-log": 1, stringybark: 3, apple: 2 }, // ironwood T2 (iron-axe); stringybark (D45) = bowstring source, woodland is bow country (oak rebalanced 7→5); apple (m0a) fresh fruit from orchard — material defId = food defId so gather routes to food
@@ -71,7 +71,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
   desert: {
     terrainWeights: { plains: 0.55, mountain: 0.3, river: 0.15 },
     nodeTypeWeights: { mining: 0.4, monster: 0.25, herb: 0.15, wood: 0.1, animal: 0.1 },
-    creatureTable: { "sand-raider": 5, "mirage-wisp": 4, "giant-scorpion": 3 },
+    creatureTable: { "sand-raider": 5, "mirage-wisp": 4, "giant-scorpion": 3, "dust-djinn": 3 }, // m0a: dust-djinn mid-tier bow-bait
     materialTable: {
       mining: { "copper-ore": 7, "iron-ore": 2, "coal": 1, salt: 2 }, // coal T2 (iron-pick) — desert is a fuel source; salt (m0a) T2 evaporite
       wood: { "cactus-wood": 7, "oak-log": 2, "pine-log": 1 },
@@ -83,7 +83,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
   tundra: {
     terrainWeights: { ice: 0.5, mountain: 0.25, plains: 0.15, river: 0.1 },
     nodeTypeWeights: { animal: 0.35, monster: 0.25, mining: 0.2, wood: 0.1, herb: 0.1 },
-    creatureTable: { "snow-wolf": 5, "ice-crab": 4, "snow-marauder": 3, "frost-fae": 2 },
+    creatureTable: { "snow-wolf": 5, "ice-crab": 4, "snow-marauder": 3, "frost-fae": 2, "frost-hatchling": 3 }, // m0a: frost-hatchling wyrm herald bow-bait
     materialTable: {
       mining: { "silver-ore": 5, "coal": 2, "iron-ore": 2, "mithril-ore": 1 }, // silver T2 + coal T2 + mithril T3: tundra is the deep-tier mine
       wood: { "pine-log": 7, "oak-log": 2, "ironwood-log": 1, stringybark: 1 }, // stringybark rare here (D45) — bow country is woodland
@@ -371,6 +371,10 @@ export const MONSTERS: Record<string, Monster> = {
   // strategy that carried the whole game (plate weak to magic, ÷1.5). The
   // dragon tag pairs with the wyrmbane affinity so wyrmfang farms it (§4.1).
   "ancient-wyrm": { tier: 4, dmgType: "magic", armourType: "plate", category: "dragon", tags: ["dragon"] },
+  // Mid-game tier 2 (m0a): two robe-hide bow-bait targets so the ranged line has mid-tier prey.
+  "giant-elk": { tier: 2, dmgType: "melee", armourType: "light", category: "beast", tags: ["beast"] }, // m0a: woodland mid-tier — rich-venison source
+  "dust-djinn": { tier: 2, dmgType: "magic", armourType: "robe", category: "fae", tags: ["fae"] }, // m0a: desert bow-bait (robe hide)
+  "frost-hatchling": { tier: 2, dmgType: "magic", armourType: "robe", category: "beast", tags: ["dragon"] }, // m0a: tundra wyrm herald, bow-bait; dragon tag = wyrmbane affinity
 }; // monster combat stats and loot triggers
 
 export type Weapon = { dmgType: DmgType; damage: number; tags: string[] };
@@ -455,6 +459,12 @@ export const LOOT_TABLE: Record<string, ItemStackSpec[]> = {
   // Boss (D34): wyrm-scale always → dragonscale-cuirass; dragonheart @0.2 (the
   // 1/5 rare) → wyrmfang. `chance` is rolled per-encounter in fightAt (§4.5).
   "ancient-wyrm": [{ defId: "wyrm-scale", qty: 3 }, { defId: "dragonheart", qty: 1, chance: 0.2 }],
+  // Mid-game tier 2 (m0a): giant-elk drops only rich-venison (elk-antler omitted — drop-only path keeps roster clean)
+  "giant-elk": [{ defId: "rich-venison", qty: 2 }],
+  "dust-djinn": [{ defId: "djinn-ember", qty: 1 }],
+  // frost-hatchling: hatchling-scale (armour shortcut) + map-scroll @15% (the wyrm herald's map drop)
+  // map-scroll is intercepted by rollLoot/fightAt and minted as a MapItem — it never enters carry as a material.
+  "frost-hatchling": [{ defId: "hatchling-scale", qty: 1 }, { defId: "map-scroll", qty: 1, chance: 0.15 }],
 }; // monster fixed loot drops (entries with `chance` roll deterministically in fightAt)
 
 // Category-level loot (8ec): rolled IN ADDITION to the monster's own LOOT_TABLE
@@ -590,6 +600,11 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   // Boss capstone (D34)
   "dragonscale-cuirass": { inputs: [{ defId: "wyrm-scale", qty: 3 }], output: { defId: "dragonscale-cuirass", qty: 1 } },
   wyrmfang: { inputs: [{ defId: "dragonheart", qty: 1 }], output: { defId: "wyrmfang", qty: 1 } },
+  // m0a: mid-game monster drops consuming recipes (roster.test invariant: every drop feeds the tree)
+  "scale-jerky": { inputs: [{ defId: "hatchling-scale", qty: 1 }], output: { defId: "ration", qty: 2 } }, // hatchling chitin rendered = field rations (unusual but functional)
+  // map-scroll is intercepted in combat (fightAt/rollLoot) and minted as a MapItem — it never reaches the bank.
+  // This recipe satisfies the roster.test "feeds a recipe" invariant at the data level; it is unreachable in practice.
+  "map-transcription": { inputs: [{ defId: "map-scroll", qty: 1 }], output: { defId: "ration", qty: 1 } },
 };
 
 type ItemStackSpec = { defId: string; qty: number; chance?: number }; // chance ∈ (0,1): drop probability, rolled per-encounter (LOOT_TABLE only); absent = always drops

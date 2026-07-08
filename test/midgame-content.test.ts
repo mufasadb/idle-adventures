@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { FOOD, FOOD_ENERGY, FRESH_TO_STALE, MATERIAL_TIER, BIOMES } from "../src/data/constants";
+import { FOOD, FOOD_ENERGY, FRESH_TO_STALE, MATERIAL_TIER, BIOMES, MONSTERS, LOOT_TABLE } from "../src/data/constants";
 import { slotOf } from "../src/engine/catalog";
 import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
@@ -34,6 +34,25 @@ test("mid-game tier foods exist with documented densities", () => {
   expect(FOOD_ENERGY["blubber-stew"]).toBe(160);
   expect(FOOD.includes("smoked-venison")).toBe(true);
   expect(FOOD.includes("blubber-stew")).toBe(true);
+});
+
+test("mid-game monsters: 2 of 3 are robe-hide bow-bait, all tier 2", () => {
+  for (const id of ["giant-elk", "dust-djinn", "frost-hatchling"]) {
+    expect(MONSTERS[id]?.tier).toBe(2);
+  }
+  const robe = ["giant-elk", "dust-djinn", "frost-hatchling"].filter((id) => MONSTERS[id]!.armourType === "robe");
+  expect(robe.length).toBe(2); // dust-djinn + frost-hatchling
+  expect(MONSTERS["giant-elk"]!.armourType).toBe("light");
+});
+
+test("giant-elk drops rich-venison only (elk-antler omitted — drop-only path)", () => {
+  // Resolution 1: elk-antler dropped from loot to keep roster clean; rich-venison feeds smoked-venison recipe
+  expect(LOOT_TABLE["giant-elk"]!.some((d) => d.defId === "rich-venison")).toBe(true);
+  expect(LOOT_TABLE["giant-elk"]!.some((d) => d.defId === "elk-antler")).toBe(false);
+});
+
+test("frost-hatchling drops a map-scroll (the wyrm herald)", () => {
+  expect(LOOT_TABLE["frost-hatchling"]!.some((d) => d.defId === "map-scroll")).toBe(true);
 });
 
 test("mid-game recipes craft from their inputs", () => {
