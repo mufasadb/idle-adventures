@@ -59,11 +59,11 @@ export const BIOMES: Record<BiomeId, Biome> = {
   woodland: {
     terrainWeights: { plains: 0.4, mud: 0.25, river: 0.15, mountain: 0.2 },
     nodeTypeWeights: { wood: 0.35, herb: 0.25, animal: 0.2, monster: 0.15, mining: 0.05 },
-    creatureTable: { "forest-boar": 5, "forest-bandit": 4, "shell-beetle": 4, "fae-sprite": 3, werewolf: 2 },
+    creatureTable: { "forest-boar": 5, "forest-bandit": 4, "shell-beetle": 4, "fae-sprite": 3, werewolf: 2, "giant-elk": 3 }, // m0a: giant-elk mid-tier
     materialTable: {
       mining: { "iron-ore": 7, "copper-ore": 2, "silver-ore": 1 }, // silver present (D27) but T2-gated
-      wood: { "oak-log": 5, "pine-log": 2, "ironwood-log": 1, stringybark: 3 }, // ironwood T2 (iron-axe); stringybark (D45) = bowstring source, woodland is bow country (oak rebalanced 7→5)
-      herb: { "forest-herb": 7, berries: 4, "desert-sage": 2, "ice-moss": 1, flint: 2 }, // flint (D45): foraged from creek beds, bare hands — arrowheads without a pick
+      wood: { "oak-log": 5, "pine-log": 2, "ironwood-log": 1, stringybark: 3, apple: 2 }, // ironwood T2 (iron-axe); stringybark (D45) = bowstring source, woodland is bow country (oak rebalanced 7→5); apple (m0a) fresh fruit from orchard — material defId = food defId so gather routes to food
+      herb: { "forest-herb": 7, berries: 4, "desert-sage": 2, "ice-moss": 1, flint: 2, thistle: 1 }, // flint (D45): foraged from creek beds, bare hands — arrowheads without a pick; thistle (m0a) T1 herb
       animal: { "deer-hide": 7, "wolf-pelt": 2, "lizard-hide": 1, feather: 2 }, // feather (D45): fletching from birds (knife)
     },
     barrierTerrain: "mountain",
@@ -71,9 +71,9 @@ export const BIOMES: Record<BiomeId, Biome> = {
   desert: {
     terrainWeights: { plains: 0.55, mountain: 0.3, river: 0.15 },
     nodeTypeWeights: { mining: 0.4, monster: 0.25, herb: 0.15, wood: 0.1, animal: 0.1 },
-    creatureTable: { "sand-raider": 5, "mirage-wisp": 4, "giant-scorpion": 3 },
+    creatureTable: { "sand-raider": 5, "mirage-wisp": 4, "giant-scorpion": 3, "dust-djinn": 3 }, // m0a: dust-djinn mid-tier bow-bait
     materialTable: {
-      mining: { "copper-ore": 7, "iron-ore": 2, "coal": 1 }, // coal T2 (iron-pick) — desert is a fuel source
+      mining: { "copper-ore": 7, "iron-ore": 2, "coal": 1, salt: 2 }, // coal T2 (iron-pick) — desert is a fuel source; salt (m0a) T2 evaporite
       wood: { "cactus-wood": 7, "oak-log": 2, "pine-log": 1 },
       herb: { "desert-sage": 7, "forest-herb": 2, berries: 1, "ice-moss": 1, flint: 3 }, // flint country (D45): scree + dry creek beds
       animal: { "lizard-hide": 7, "deer-hide": 2, "drake-hide": 1, feather: 2 }, // drake T2 (steel-knife); feather (D45)
@@ -83,12 +83,12 @@ export const BIOMES: Record<BiomeId, Biome> = {
   tundra: {
     terrainWeights: { ice: 0.5, mountain: 0.25, plains: 0.15, river: 0.1 },
     nodeTypeWeights: { animal: 0.35, monster: 0.25, mining: 0.2, wood: 0.1, herb: 0.1 },
-    creatureTable: { "snow-wolf": 5, "ice-crab": 4, "snow-marauder": 3, "frost-fae": 2 },
+    creatureTable: { "snow-wolf": 5, "ice-crab": 4, "snow-marauder": 3, "frost-fae": 2, "frost-hatchling": 3 }, // m0a: frost-hatchling wyrm herald bow-bait
     materialTable: {
       mining: { "silver-ore": 5, "coal": 2, "iron-ore": 2, "mithril-ore": 1 }, // silver T2 + coal T2 + mithril T3: tundra is the deep-tier mine
       wood: { "pine-log": 7, "oak-log": 2, "ironwood-log": 1, stringybark: 1 }, // stringybark rare here (D45) — bow country is woodland
-      herb: { "ice-moss": 7, "desert-sage": 2, berries: 1, "forest-herb": 1, flint: 1 }, // flint scarce under the ice (D45)
-      animal: { "wolf-pelt": 7, "deer-hide": 2, "drake-hide": 1, feather: 2 }, // feather (D45)
+      herb: { "ice-moss": 7, "desert-sage": 2, berries: 1, "forest-herb": 1, flint: 1, thistle: 2 }, // thistle (m0a) T2 herb; flint scarce under the ice (D45)
+      animal: { "wolf-pelt": 7, "deer-hide": 2, "drake-hide": 1, feather: 2, seal: 2 }, // seal (m0a) T2 large prey; feather (D45)
     },
     barrierTerrain: "mountain",
   },
@@ -105,6 +105,8 @@ export const MATERIAL_TIER: Record<string, number> = {
   "ironwood-log": 2,
   "drake-hide": 2,
   "mithril-ore": 3,
+  salt: 2, // desert mining (m0a): evaporite deposits — pick required
+  seal: 2, // tundra animal (m0a): large prey — knife required at T2
 };
 
 // --- Energy economy (filled in M2; rescaled ×10 for graded movement, svz) ---
@@ -135,7 +137,10 @@ export const FOOD_ENERGY: Record<string, number> = {
   "trail-ration": 130, // compressed from 160 (si7.2) — opens ladder headroom above it
   berries: 30, // fresh forage (e3j): weak-but-immediate — eat on the trail or lose them to staleness
   jam: 120, // processed stale-berries — hauling the harvest home beats eating it raw (1.5 rations/slot)
-  pemmican: 240, // tier-food line (si7.2): dense trail food (meat + berries). Auto-eat ceiling is maxEnergy/tentMult, NOT maxEnergy: with a tent (×1.5) pemmican's effective restore is 360, so it needs a canteen (maxEnergy 400) to stay waste-free-eatable — a tent-only player's pemmican blocks the food queue (footgun; follow-up bead). Pairs with tier capacity gear by design.
+  pemmican: 240, // tier-food line (si7.2): dense trail food (meat + berries). Auto-eat (least-dense-first, m0a) leaves it as a RESERVE; you cash it in with a manual `eat` (over-eats up to foodEnergy×tentMult, may exceed maxEnergy). No tent-safe density cap needed (m0a).
+  apple: 40, // fresh forage (m0a): woodland orchard fruit — weak-but-immediate, stales to bruised-apple
+  "smoked-venison": 200, // m0a: woodland cured meat — a manual-over-eat reserve under a tent
+  "blubber-stew": 160, // m0a: tundra rendered fat + moss
 };
 
 // Fresh→processed food (e3j): fresh forage eaten on-map is good NOW; hauled
@@ -143,7 +148,7 @@ export const FOOD_ENERGY: Record<string, number> = {
 // town-crafts into denser food (jam). Stale forms are materials — slotOf never
 // returns "food" for them — so they can't be packed back out: "old berries"
 // enforce themselves with no extra rule.
-export const FRESH_TO_STALE: Record<string, string> = { berries: "stale-berries" };
+export const FRESH_TO_STALE: Record<string, string> = { berries: "stale-berries", apple: "bruised-apple" };
 export const MIN_STEP = 5; // a discounted step never costs less than this (svz)
 // Movement is GRADED (svz): TERRAIN_COST is ABSOLUTE step energy on a ×10 scale.
 // Gear subtracts point-discounts (TERRAIN_GATE), transport divides per-terrain.
@@ -366,6 +371,10 @@ export const MONSTERS: Record<string, Monster> = {
   // strategy that carried the whole game (plate weak to magic, ÷1.5). The
   // dragon tag pairs with the wyrmbane affinity so wyrmfang farms it (§4.1).
   "ancient-wyrm": { tier: 4, dmgType: "magic", armourType: "plate", category: "dragon", tags: ["dragon"] },
+  // Mid-game tier 2 (m0a): two robe-hide bow-bait targets so the ranged line has mid-tier prey.
+  "giant-elk": { tier: 2, dmgType: "melee", armourType: "light", category: "beast", tags: ["beast"] }, // m0a: woodland mid-tier — rich-venison source
+  "dust-djinn": { tier: 2, dmgType: "magic", armourType: "robe", category: "fae", tags: ["fae"] }, // m0a: desert bow-bait (robe hide)
+  "frost-hatchling": { tier: 2, dmgType: "magic", armourType: "robe", category: "beast", tags: ["dragon"] }, // m0a: tundra wyrm herald, bow-bait; dragon tag = wyrmbane affinity
 }; // monster combat stats and loot triggers
 
 export type Weapon = { dmgType: DmgType; damage: number; tags: string[] };
@@ -450,6 +459,12 @@ export const LOOT_TABLE: Record<string, ItemStackSpec[]> = {
   // Boss (D34): wyrm-scale always → dragonscale-cuirass; dragonheart @0.2 (the
   // 1/5 rare) → wyrmfang. `chance` is rolled per-encounter in fightAt (§4.5).
   "ancient-wyrm": [{ defId: "wyrm-scale", qty: 3 }, { defId: "dragonheart", qty: 1, chance: 0.2 }],
+  // Mid-game tier 2 (m0a): giant-elk drops only rich-venison (elk-antler omitted — drop-only path keeps roster clean)
+  "giant-elk": [{ defId: "rich-venison", qty: 2 }],
+  "dust-djinn": [{ defId: "djinn-ember", qty: 1 }],
+  // frost-hatchling: hatchling-scale (armour shortcut) + map-scroll @15% (the wyrm herald's map drop)
+  // map-scroll is intercepted by rollLoot/fightAt and minted as a MapItem — it never enters carry as a material.
+  "frost-hatchling": [{ defId: "hatchling-scale", qty: 1 }, { defId: "map-scroll", qty: 1, chance: 0.15 }],
 }; // monster fixed loot drops (entries with `chance` roll deterministically in fightAt)
 
 // Category-level loot (8ec): rolled IN ADDITION to the monster's own LOOT_TABLE
@@ -471,7 +486,7 @@ export const CATEGORY_LOOT_TABLE: Record<MonsterCategory, ItemStackSpec[]> = {
 // --- Consumable item catalogs (M5) ---
 // ENERGY_PER_FOOD / POTION_HEAL are flat, so these are single-item catalogs for
 // the POC; the list is what `pack`/`slotOf` validate a food/potion defId against.
-export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican"];
+export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican", "apple", "smoked-venison", "blubber-stew"];
 export const POTION: string[] = ["potion", "greater-potion"];
 export const BATTLE_ITEM: string[] = ["elixir-of-power", "warding-draught"]; // combat consumables (bzd); COMBAT_BUFF keys
 
@@ -577,9 +592,16 @@ export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStack
   // T3 combat consumables (bzd) — the exclusive reward for fighting T3 monsters
   "elixir-of-power": { inputs: [{ defId: "vampire-ash", qty: 2 }], output: { defId: "elixir-of-power", qty: 1 } }, // +2 dmg, one fight
   "warding-draught": { inputs: [{ defId: "troll-hide", qty: 2 }], output: { defId: "warding-draught", qty: 1 } }, // +3 mitigation, one fight
+  // m0a: mid-game tier foods — dense reserves that reward routing cross-biome materials
+  "smoked-venison": { inputs: [{ defId: "rich-venison", qty: 1 }, { defId: "salt", qty: 1 }], output: { defId: "smoked-venison", qty: 1 } }, // m0a: woodland tier-food (elk meat + desert salt — cross-biome pull)
+  "blubber-stew": { inputs: [{ defId: "seal-blubber", qty: 1 }, { defId: "ice-moss", qty: 1 }], output: { defId: "blubber-stew", qty: 1 } }, // m0a: tundra tier-food
+  "apple-jam": { inputs: [{ defId: "bruised-apple", qty: 3 }], output: { defId: "jam", qty: 1 } }, // m0a: staled orchard fruit → jam (mirrors stale-berries→jam)
+  "elixir-of-power-thistle": { inputs: [{ defId: "thistle", qty: 2 }, { defId: "djinn-ember", qty: 1 }], output: { defId: "elixir-of-power", qty: 1 } }, // m0a: breaks the vampire-only gate on the battle-item line
   // Boss capstone (D34)
   "dragonscale-cuirass": { inputs: [{ defId: "wyrm-scale", qty: 3 }], output: { defId: "dragonscale-cuirass", qty: 1 } },
   wyrmfang: { inputs: [{ defId: "dragonheart", qty: 1 }], output: { defId: "wyrmfang", qty: 1 } },
+  // m0a: mid-game monster drops consuming recipes (roster.test invariant: every drop feeds the tree)
+  "scale-jerky": { inputs: [{ defId: "hatchling-scale", qty: 1 }], output: { defId: "ration", qty: 2 } }, // hatchling chitin rendered = field rations (unusual but functional)
 };
 
 type ItemStackSpec = { defId: string; qty: number; chance?: number }; // chance ∈ (0,1): drop probability, rolled per-encounter (LOOT_TABLE only); absent = always drops

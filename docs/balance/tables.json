@@ -189,6 +189,33 @@
       "tags": [
         "dragon"
       ]
+    },
+    "giant-elk": {
+      "tier": 2,
+      "dmgType": "melee",
+      "armourType": "light",
+      "category": "beast",
+      "tags": [
+        "beast"
+      ]
+    },
+    "dust-djinn": {
+      "tier": 2,
+      "dmgType": "magic",
+      "armourType": "robe",
+      "category": "fae",
+      "tags": [
+        "fae"
+      ]
+    },
+    "frost-hatchling": {
+      "tier": 2,
+      "dmgType": "magic",
+      "armourType": "robe",
+      "category": "beast",
+      "tags": [
+        "dragon"
+      ]
     }
   },
   "tolls": {
@@ -400,6 +427,32 @@
         "rounds": 2
       }
     },
+    "dust-djinn": {
+      "bare": {
+        "victory": true,
+        "hpLost": 24,
+        "hpLostPct": 80,
+        "rounds": 4
+      },
+      "iron": {
+        "victory": true,
+        "hpLost": 4.8,
+        "hpLostPct": 16,
+        "rounds": 2
+      },
+      "steel": {
+        "victory": true,
+        "hpLost": 7.6,
+        "hpLostPct": 25.3,
+        "rounds": 3
+      },
+      "mithril": {
+        "victory": true,
+        "hpLost": 3,
+        "hpLostPct": 10,
+        "rounds": 2
+      }
+    },
     "frost-fae": {
       "bare": {
         "victory": true,
@@ -424,6 +477,58 @@
         "hpLost": 3,
         "hpLostPct": 10,
         "rounds": 2
+      }
+    },
+    "frost-hatchling": {
+      "bare": {
+        "victory": true,
+        "hpLost": 24,
+        "hpLostPct": 80,
+        "rounds": 4
+      },
+      "iron": {
+        "victory": true,
+        "hpLost": 14.4,
+        "hpLostPct": 48,
+        "rounds": 4
+      },
+      "steel": {
+        "victory": true,
+        "hpLost": 7.6,
+        "hpLostPct": 25.3,
+        "rounds": 3
+      },
+      "mithril": {
+        "victory": true,
+        "hpLost": 3,
+        "hpLostPct": 10,
+        "rounds": 2
+      }
+    },
+    "giant-elk": {
+      "bare": {
+        "victory": false,
+        "hpLost": 30,
+        "hpLostPct": 100,
+        "rounds": 4
+      },
+      "iron": {
+        "victory": true,
+        "hpLost": 16,
+        "hpLostPct": 53.3,
+        "rounds": 5
+      },
+      "steel": {
+        "victory": true,
+        "hpLost": 9,
+        "hpLostPct": 30,
+        "rounds": 4
+      },
+      "mithril": {
+        "victory": true,
+        "hpLost": 4.6,
+        "hpLostPct": 15.2,
+        "rounds": 3
       }
     },
     "giant-scorpion": {

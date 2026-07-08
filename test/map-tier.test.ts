@@ -129,15 +129,24 @@ test("boss gate is biome-scoped: no cross-biome bosses at high tier", () => {
 }, 30000);
 
 test("drop ladder: T1 humanoid drop mints T2, and T2 mints T3 (wyrm reachable)", () => {
-  // Find a humanoid that guarantees a map drop using the same scan pattern as reduce-map-drop.test.ts
+  // Find a humanoid that guarantees a map drop using the same scan pattern as reduce-map-drop.test.ts.
+  // STABILITY REQUIREMENT: the same humanoid creature must appear at the found tile on both the T1
+  // and T2 map (terrain weights shift at T2 via TERRAIN_WEIGHT_TIER_SHIFT, which can rearrange POIs).
+  // We verify the T2 creature identity before accepting a candidate, so the two fightToEnd calls
+  // engage the same humanoid creature and both can roll the map-scroll drop.
   let found: { seed: string; poi: Poi } | undefined;
   for (let i = 0; i < 2000; i++) {
     const seed = `8ec-scan-${i}`;
-    const grid = generateGrid(seed, rollBiome(seed));
+    const biome = rollBiome(seed);
+    const grid = generateGrid(seed, biome);
     const poi = grid.pois.find(
       (p) => p.kind === "monster" && (p.creature === "sand-raider" || p.creature === "forest-bandit"),
     );
     if (!poi) continue;
+    // Verify creature is the same at T2 (terrain shift can rearrange POIs).
+    const gridT2 = generateGrid(seed, biome, 2);
+    const poiT2 = gridT2.pois.find((p) => p.x === poi.x && p.y === poi.y);
+    if (poiT2?.creature !== poi.creature) continue; // not stable — skip
     const roll = rand("g", "loot", poi.creature!, poi.x, poi.y, MAP_SCROLL_ID);
     if (roll < MAP_DROP_CHANCE) { found = { seed, poi }; break; }
   }

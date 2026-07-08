@@ -32,14 +32,24 @@ function fightToEnd(state: GameState): { state: GameState; events: GameEvent[] }
 
 // Find a map with a tier-1 humanoid the base sword build beats, where the
 // map-scroll roll PASSES (drop=true) or FAILS (drop=false) on the game seed "g".
+// STABILITY: also verify the creature at the found tile is the same across all map tiers (T2-T5),
+// since some tests mutate mapTier and regenerate the grid. Terrain weights shift at T2+
+// (TERRAIN_WEIGHT_TIER_SHIFT), which can rearrange POIs and change creature assignments.
 function humanoidFight(drop: boolean): { seed: string; poi: Poi } {
   for (let i = 0; i < 2000; i++) {
     const seed = `8ec-scan-${i}`;
-    const grid = generateGrid(seed, rollBiome(seed));
+    const biome = rollBiome(seed);
+    const grid = generateGrid(seed, biome);
     const poi = grid.pois.find(
       (p) => p.kind === "monster" && (p.creature === "sand-raider" || p.creature === "forest-bandit"),
     );
     if (!poi) continue;
+    // Verify same humanoid creature appears at this tile on all higher-tier maps (T2–T5).
+    const stable = [2, 3, 4, 5].every((tier) => {
+      const g = generateGrid(seed, biome, tier);
+      return g.pois.find((p) => p.x === poi.x && p.y === poi.y)?.creature === poi.creature;
+    });
+    if (!stable) continue;
     const roll = rand("g", "loot", poi.creature!, poi.x, poi.y, MAP_SCROLL_ID);
     if (roll < MAP_DROP_CHANCE === drop) return { seed, poi };
   }

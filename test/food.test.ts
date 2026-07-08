@@ -66,3 +66,25 @@ test("eatToRefill: at max already, nothing is eaten", () => {
   expect(energy).toBe(MAX_ENERGY);
   expect(out).toEqual([{ defId: "ration", qty: 2 }]);
 });
+
+test("auto-eat is least-dense-first and never blocks on a dense front unit", () => {
+  // pemmican(240) at FRONT, ration(80) behind, no tent, max 300, energy 0.
+  // Old front-to-back would eat pemmican (240) then stop (80 fits: 240+80=320>300 → stop at 320? no).
+  // New least-dense-first: eat ration(80) first → 80, then ration none; pemmican 240 fits (80+240=320>300 → no).
+  const r = eatToRefill([{ defId: "pemmican", qty: 1 }, { defId: "ration", qty: 1 }], 0, 300);
+  expect(r.energy).toBe(80);                       // ate the ration, not blocked by pemmican
+  expect(r.food.find((s) => s.defId === "ration")).toBeUndefined(); // ration consumed
+  expect(r.food.find((s) => s.defId === "pemmican")?.qty).toBe(1);  // pemmican left as reserve
+});
+
+test("auto-eat stays waste-free (never overfills past max)", () => {
+  const r = eatToRefill([{ defId: "ration", qty: 5 }], 260, 300); // 260+80=340>300 → can't fit even one
+  expect(r.energy).toBe(260);
+  expect(r.food[0]!.qty).toBe(5);
+});
+
+test("auto-eat with a single food type is unchanged (order-invariant)", () => {
+  const r = eatToRefill([{ defId: "ration", qty: 4 }], 0, 300); // 80×3=240 ≤300, 4th 320>300
+  expect(r.energy).toBe(240);
+  expect(r.food[0]!.qty).toBe(1);
+});

@@ -704,32 +704,39 @@ function autoRefill(
   );
 }
 
-// Eat one food unit NOW (dtv): the player's manual refill, even if slightly
-// wasteful (unlike the waste-free auto-eat). Rejects when there's no food or you're
-// already at max. Restore = foodEnergyOf × tentMult, clamped to max.
+// Eat one food unit NOW (m0a): deliberate over-eat. Targets the MOST-dense unit
+// (the reserve auto-eat leaves alone) and jumps energy TO its boosted value
+// (foodEnergy × tentMult), which may exceed maxEnergy. Ties break by lowest index.
+// Rejects when there's no food or the boosted value wouldn't raise energy.
 function eat(state: GameState): { state: GameState; events: GameEvent[] } {
   const expedition = state.expedition;
   if (state.phase !== "expedition" || !expedition) {
     return rejected(state, "eat", "not-on-expedition");
   }
   if (expedition.combat) return rejected(state, "eat", "engaged");
-  const maxEnergy = expedition.maxEnergy ?? MAX_ENERGY;
+  const tentMult = tentMultOf(expedition);
   const food = expedition.loadout.food;
-  if (food.length === 0 || expedition.energy >= maxEnergy) {
-    return rejected(state, "eat", "insufficient");
+  if (food.length === 0) return rejected(state, "eat", "insufficient");
+  // Deliberate over-eat (m0a): target the MOST-dense unit (the reserve auto-eat
+  // leaves alone) and jump energy TO its boosted value (foodEnergy × tentMult),
+  // which may exceed maxEnergy. Ties break by lowest index. Reject if eating it
+  // wouldn't raise energy (boosted ≤ current) — nothing to gain.
+  let idx = 0;
+  for (let i = 1; i < food.length; i++) {
+    if (foodEnergyOf(food[i]!.defId) > foodEnergyOf(food[idx]!.defId)) idx = i;
   }
-  const front = food[0]!;
-  const restore = foodEnergyOf(front.defId) * tentMultOf(expedition);
-  const energy = Math.min(maxEnergy, expedition.energy + restore);
+  const boosted = foodEnergyOf(food[idx]!.defId) * tentMult;
+  if (boosted <= expedition.energy) return rejected(state, "eat", "insufficient");
+  const energy = boosted;
   const nextFood = food.map((s) => ({ ...s }));
-  nextFood[0]!.qty -= 1;
-  if (nextFood[0]!.qty <= 0) nextFood.shift();
+  nextFood[idx]!.qty -= 1;
+  const filtered = nextFood.filter((s) => s.qty > 0);
   return {
     state: {
       ...state,
-      expedition: { ...expedition, energy, loadout: { ...expedition.loadout, food: nextFood } },
+      expedition: { ...expedition, energy, loadout: { ...expedition.loadout, food: filtered } },
     },
-    events: [{ type: "ate", defId: front.defId, restored: energy - expedition.energy, energy }],
+    events: [{ type: "ate", defId: food[idx]!.defId, restored: energy - expedition.energy, energy }],
   };
 }
 

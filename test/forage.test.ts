@@ -72,10 +72,12 @@ test("gathering berries rejects carry-full when the bag can't hold the units", (
 });
 
 test("berries eat like food (30 restore)", () => {
+  // manual eat (m0a) jumps energy TO foodEnergy×tentMult. Use energy 0 so
+  // boosted(30) > current(0) and the eat is accepted.
   const { seed, poi } = berryMap();
-  const before = standingOn(seed, poi, { energy: 200, food: [{ defId: "berries", qty: 1 }] });
+  const before = standingOn(seed, poi, { energy: 0, food: [{ defId: "berries", qty: 1 }] });
   const { state, events } = reduce(before, { type: "eat" });
-  expect(events[0]).toEqual({ type: "ate", defId: "berries", restored: FOOD_ENERGY.berries!, energy: 200 + FOOD_ENERGY.berries! });
+  expect(events[0]).toEqual({ type: "ate", defId: "berries", restored: FOOD_ENERGY.berries!, energy: FOOD_ENERGY.berries! });
   expect(state.expedition!.loadout.food).toEqual([]);
 });
 
