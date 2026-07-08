@@ -561,7 +561,7 @@ function expeditionView(): string {
   // energy may exceed maxEnergy after a manual over-eat (m0a) — cap the bar fill at
   // 100% and surface the surplus rather than overflowing the track.
   const overFull = !pending && exp.energy > maxEnergy;
-  const overSpan = overFull ? ` <span class="over">+${round(exp.energy - maxEnergy)}</span>` : "";
+  const overSpan = overFull ? ` <span class="overfull">+${round(exp.energy - maxEnergy)}</span>` : "";
   const energyFill = pending
     ? `<div class="fill energy" style="width:${pct(keep)}%"></div><div class="fill spend${overBudget ? " over" : ""}" style="width:${pct(spend)}%"></div>`
     : `<div class="fill energy" style="width:${pct(exp.energy)}%"></div>`;
