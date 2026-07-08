@@ -23,3 +23,13 @@ test("committed balance tables are current — run `bun run sim:tables` after co
   // the human artifact is part of the gate too — a render change requires regeneration
   expect(readFileSync("docs/balance/tables.md", "utf8")).toBe(renderTablesMd(simTables()));
 });
+
+// The committed tier-table is the citable map-tier scaling surface. Any change to
+// MAP_TIER_CREATURE_ADD, POI_DENSITY_BY_TIER, TERRAIN_WEIGHT_TIER_SHIFT,
+// MATERIAL_TIER_WEIGHT, or NODE_MAGNITUDE_WEIGHTS shifts mapTierReport() output —
+// this test goes red until you regenerate: `bun run sim:tables` (then commit the
+// docs/balance/ diff; reviewing it IS reviewing the balance change).
+test("committed tier-table is current — run `bun run sim:tables` after map-tier lever changes", () => {
+  const committed = JSON.parse(readFileSync("docs/balance/tier-table.json", "utf8"));
+  expect(mapTierReport()).toEqual(committed);
+});

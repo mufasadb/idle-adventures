@@ -23,8 +23,6 @@ import {
   BIOME_IDS,
   MAP_TIER_MAX,
   MAP_TIER_CREATURE_ADD,
-  POI_DENSITY_BY_TIER,
-  POI_DENSITY,
 } from "../data/constants";
 import type { DmgType, NodeType, BiomeId } from "../data/constants";
 import type { ItemStack, Loadout } from "../engine/types";
@@ -83,10 +81,6 @@ export function mapTierReport(): MapTierReport {
   return { rows };
 }
 
-// Expected POI density at a given tier (for display — does not sample grids).
-export function expectedPoiCount(tier: number): number {
-  return POI_DENSITY_BY_TIER[tier] ?? POI_DENSITY;
-}
 
 export type KitSpec = {
   weapon?: string;
