@@ -2,7 +2,7 @@ import { test, expect } from "bun:test";
 import {
   MAP_TIER_MAX, MATERIAL_TIER_WEIGHT, NODE_MAGNITUDE_WEIGHTS,
   NODE_MAGNITUDE_YIELD, MAP_TIER_CREATURE_ADD,
-  BIOMES,
+  BIOMES, BIOME_IDS,
 } from "../src/data/constants";
 import { generateGrid, tierProfile, rollBiome } from "../src/engine/grid";
 
@@ -15,8 +15,8 @@ test("map-tier levers: T1 is identity (hygiene)", () => {
   // Magnitude at T1 is always the base class.
   expect(NODE_MAGNITUDE_WEIGHTS[1]).toEqual({ 1: 1 });
   expect(NODE_MAGNITUDE_YIELD[1]).toBe(1);
-  // No boss additive layer at T1 (bosses gated to T2+).
-  expect(MAP_TIER_CREATURE_ADD[1]).toBeUndefined();
+  // No boss additive layer at T1 (bosses gated to T2+) — biome-scoped shape.
+  for (const b of BIOME_IDS) expect(MAP_TIER_CREATURE_ADD[b][1]).toBeUndefined();
 });
 
 test("generateGrid: mapTier 1 equals the default (identity at T1)", () => {
@@ -28,7 +28,7 @@ test("generateGrid: mapTier 1 equals the default (identity at T1)", () => {
 
 test("tierProfile: T1 returns the base biome unchanged", () => {
   for (const id of ["woodland", "desert", "tundra"] as const) {
-    expect(tierProfile(BIOMES[id], 1)).toEqual(BIOMES[id]);
+    expect(tierProfile(BIOMES[id], id, 1)).toEqual(BIOMES[id]);
   }
 });
 
@@ -77,3 +77,22 @@ test("magnitude: higher tiers produce rich variants; monsters never carry it", (
   expect(rich).toBeGreaterThan(0);
   expect(monsterWithMag).toBe(0);
 });
+
+test("boss gate is biome-scoped: no cross-biome bosses at high tier", () => {
+  let checkedDesert = false, checkedTundra = false;
+  for (let i = 0; i < 400; i++) {
+    const seed = `bs-${i}`;
+    const b = rollBiome(seed);
+    if (b === "desert") {
+      checkedDesert = true;
+      const creatures = generateGrid(seed, "desert", 5).pois.map((p) => p.creature);
+      expect(creatures).not.toContain("ancient-wyrm");
+      expect(creatures).not.toContain("ice-troll");
+    }
+    if (b === "tundra") {
+      checkedTundra = true;
+      expect(generateGrid(seed, "tundra", 5).pois.map((p) => p.creature)).not.toContain("dust-vampire");
+    }
+  }
+  expect(checkedDesert && checkedTundra).toBe(true);
+}, 30000);

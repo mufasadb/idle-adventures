@@ -596,15 +596,26 @@ export const NODE_MAGNITUDE_WEIGHTS: Record<number, Record<number, number>> = {
 // Yield multiplier per magnitude class; multiplies GATHER_YIELD[kind].
 export const NODE_MAGNITUDE_YIELD: Record<number, number> = { 1: 1, 2: 2, 3: 3 };
 
-// Boss gate = the SINGLE source of where bosses spawn. Bosses are REMOVED from the
-// base biome creatureTables (Task 2) and live ONLY here; tierProfile ADDS these to the
-// boss-free base table at each map tier. A boss cannot appear below its lowest listed
-// tier — that IS the gate. Graduated: minibosses at T2, the wyrm at T3.
-export const MAP_TIER_CREATURE_ADD: Record<number, Record<string, number>> = {
-  2: { "ice-troll": 1, "dust-vampire": 1 },
-  3: { "ice-troll": 2, "dust-vampire": 2, "ancient-wyrm": 1 },
-  4: { "ice-troll": 2, "dust-vampire": 2, "ancient-wyrm": 2 },
-  5: { "ice-troll": 3, "dust-vampire": 3, "ancient-wyrm": 3 },
+// Boss gate = the SINGLE source of where bosses spawn, now BIOME-SCOPED (user 2026-07-08):
+// each boss re-enters ONLY its native biome at its gate tier. Bosses are removed from the
+// base biome creatureTables and live only here; tierProfile ADDS the matching
+// biome+tier layer to the boss-free base table. Graduated: minibosses at T2, wyrm at T3.
+// A biome/tier with no entry adds nothing (identity). Each tier's entry is the FULL add
+// for that tier (not a delta from the previous tier).
+export const MAP_TIER_CREATURE_ADD: Record<BiomeId, Record<number, Record<string, number>>> = {
+  woodland: {}, // no gated bosses native to woodland in the POC
+  desert: {
+    2: { "dust-vampire": 1 },
+    3: { "dust-vampire": 2 },
+    4: { "dust-vampire": 2 },
+    5: { "dust-vampire": 3 },
+  },
+  tundra: {
+    2: { "ice-troll": 1 },
+    3: { "ice-troll": 2, "ancient-wyrm": 1 },
+    4: { "ice-troll": 2, "ancient-wyrm": 2 },
+    5: { "ice-troll": 3, "ancient-wyrm": 3 },
+  },
 };
 
 // POI count by map tier. Absent = POI_DENSITY (identity at T1). Richer maps upward.

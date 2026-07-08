@@ -152,7 +152,7 @@ function carveConnectivity(terrain: Terrain[][], biome: Biome): void {
 // Transform a biome's generation profile for a map tier (2yn). IDENTITY at mapTier 1:
 // every lever below is absent/1 at tier 1, so the returned biome deep-equals the base
 // and T1 generation is byte-identical. Never touches RNG — only the weight tables.
-export function tierProfile(biome: Biome, mapTier: number): Biome {
+export function tierProfile(biome: Biome, biomeId: BiomeId, mapTier: number): Biome {
   if (mapTier <= 1) return biome;
   // (a) materialTable weights × per-material tier multiplier
   const materialTable: Biome["materialTable"] = {};
@@ -164,9 +164,9 @@ export function tierProfile(biome: Biome, mapTier: number): Biome {
     }
     materialTable[kind] = scaled;
   }
-  // (b) creatureTable = boss-free base + additive boss layer (weights sum on collision)
+  // (b) creatureTable = boss-free base + additive boss layer (biome-scoped, weights sum on collision)
   const creatureTable: Record<string, number> = { ...biome.creatureTable };
-  for (const [defId, w] of Object.entries(MAP_TIER_CREATURE_ADD[mapTier] ?? {})) {
+  for (const [defId, w] of Object.entries(MAP_TIER_CREATURE_ADD[biomeId]?.[mapTier] ?? {})) {
     creatureTable[defId] = (creatureTable[defId] ?? 0) + w;
   }
   // (c) terrainWeights × per-terrain tier shift
@@ -189,7 +189,7 @@ export function generateGrid(mapSeed: string, biomeId: BiomeId, mapTier = 1, _af
 }
 
 function buildGrid(mapSeed: string, biomeId: BiomeId, mapTier: number): Grid {
-  const biome = tierProfile(BIOMES[biomeId], mapTier);
+  const biome = tierProfile(BIOMES[biomeId], biomeId, mapTier);
   const terrain: Terrain[][] = [];
   for (let y = 0; y < MAP_HEIGHT; y++) {
     const row: Terrain[] = [];
