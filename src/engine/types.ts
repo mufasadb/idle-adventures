@@ -105,6 +105,7 @@ export type Action =
   | { type: "fight"; at?: { x: number; y: number } } // engage the monster on your tile, or run ONE exchange when engaged (si7.1); `at` = an ADJACENT live monster tile to engage at range with a wielded bow + ≥1 arrow (D45)
   | { type: "flee" } // disengage at the cost of one parting hit (si7.1)
   | { type: "quaff" } // drink one potion: mid-engagement (no exchange, si7.1) or on the map for QUAFF_ENERGY (82r)
+  | { type: "use-item"; itemId: string } // use a packed battle item mid-fight (90j): manual-only, no auto-consume; adds its COMBAT_BUFF for THIS engagement, no exchange (mirrors quaff)
   | { type: "don"; itemId: string } // equip a carried gear piece into its slot, displacing the worn one to carry (82r)
   | { type: "doff"; itemId: string } // unequip a worn piece / remove a tool to carry (82r)
   | { type: "toggle-auto-quaff" } // flip auto-potion-at-threshold (si7.1)
@@ -180,6 +181,7 @@ export type GameEvent =
   | { type: "exchanged"; creature: string; dmgDealt: number; dmgTaken: number; monsterHp: number; hp: number; potionsUsed: number; arrowSpent?: boolean } // arrowSpent (D45): present when this exchange shot an arrow
   | { type: "fled"; creature: string; partingHit: number; hp: number }
   | { type: "quaffed"; defId: string; healed: number; hp: number; energy?: number } // energy present only when spent (out-of-combat quaff, 82r)
+  | { type: "item-used"; defId: string; damageAdd: number; mitigationAdd: number } // battle item used mid-fight (90j); buff added to this engagement (also vb8's missing consumption log line)
   | { type: "auto-quaff-toggled"; on: boolean }
   | { type: "donned"; defId: string; slot: LoadoutSlot; displaced: string | null; energy: number } // equipped from carry (82r)
   | { type: "doffed"; defId: string; slot: LoadoutSlot; energy: number } // unequipped to carry (82r)

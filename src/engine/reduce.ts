@@ -4,7 +4,7 @@ import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
 import { addToCarry, freeCarryStacks, freeLootStacks, usedSlots, carryCap } from "./carry";
 import { toolQualityFor } from "./tools";
-import { strikeExchange, battleBuff, rollLoot, explainMatchup, damageTaken, wieldsRanged, hasAmmo } from "./combat";
+import { strikeExchange, rollLoot, explainMatchup, damageTaken, wieldsRanged, hasAmmo } from "./combat";
 import { eatToRefill, foodEnergyOf } from "./food";
 import { endExpedition, subtractStacks } from "./bank";
 import { craft as applyRecipe } from "./craft";
@@ -12,7 +12,7 @@ import { packItem, reserveLoadout, EQUIP_SLOTS } from "./pack";
 import type { EquipSlot } from "./pack";
 import { slotOf, isGear } from "./catalog";
 import { candidateMaps, previewHints } from "./town";
-import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX } from "../data/constants";
+import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 
 // Pure reducer. M2 fills embark/move; M3 fills gather/drop; M4 fills fight; remaining cases are no-op stubs:
@@ -45,6 +45,8 @@ export function reduce(
       return flee(state);
     case "quaff":
       return quaff(state);
+    case "use-item":
+      return useItem(state, action.itemId);
     case "toggle-auto-quaff":
       return toggleAutoQuaff(state);
     case "don":
@@ -385,17 +387,18 @@ function engage(
     carryWithLoot = addToCarry(carryWithLoot, stack.defId, stack.qty, maxStacks);
     if (carryWithLoot === null) return rejected(state, action, "carry-full");
   }
-  const buff = battleBuff(expedition.loadout.battleItems ?? []);
   const monsterHp = MONSTER_TIER_HP_CURVE[MONSTERS[creature]!.tier]!;
   return {
     state: {
       ...state,
       expedition: {
         ...expedition,
-        loadout: { ...expedition.loadout, battleItems: [] }, // consumed at engagement start (bzd)
+        // Battle items are NO LONGER auto-consumed at engage (90j, amends D36): they
+        // stay packed and are used mid-fight by the `use-item` action, or bank back
+        // unused. The engagement's buff therefore starts at zero.
         combat: {
           at: { x: at.x, y: at.y }, creature, monsterHp, moveOnWin,
-          damageAdd: buff.damageAdd, mitigationAdd: buff.mitigationAdd,
+          damageAdd: 0, mitigationAdd: 0,
           startHp: expedition.hp, potionsUsed: 0,
           ...(ranged ? { ranged: true, opener: true } : {}), // D45: first exchange skips its retaliation
         },
@@ -574,6 +577,38 @@ function quaff(state: GameState): { state: GameState; events: GameEvent[] } {
       },
     },
     events: [{ type: "quaffed", defId: front.defId, healed: hp - expedition.hp, hp }],
+  };
+}
+
+// Use one packed battle item mid-fight (90j, mirrors quaff): manual-only, no
+// auto-consume. Must be engaged; the id must be a held battle-item stack. Adds
+// its COMBAT_BUFF into the live engagement (persists for THIS fight only — dies
+// with combat) and decrements one unit off the front stack. No exchange runs.
+function useItem(state: GameState, itemId: string): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) return rejected(state, "use-item", "not-on-expedition");
+  const combat = expedition.combat;
+  if (!combat) return rejected(state, "use-item", "not-engaged");
+  if (slotOf(itemId) !== "battle-item") return rejected(state, "use-item", "wrong-slot");
+  const items = expedition.loadout.battleItems ?? [];
+  const idx = items.findIndex((s) => s.defId === itemId);
+  if (idx === -1) return rejected(state, "use-item", "insufficient");
+  const buff = COMBAT_BUFF[itemId] ?? {};
+  const damageAdd = buff.damageAdd ?? 0;
+  const mitigationAdd = buff.mitigationAdd ?? 0;
+  const next = items.map((s) => ({ ...s }));
+  next[idx]!.qty -= 1;
+  if (next[idx]!.qty <= 0) next.splice(idx, 1);
+  return {
+    state: {
+      ...state,
+      expedition: {
+        ...expedition,
+        loadout: { ...expedition.loadout, battleItems: next },
+        combat: { ...combat, damageAdd: combat.damageAdd + damageAdd, mitigationAdd: combat.mitigationAdd + mitigationAdd },
+      },
+    },
+    events: [{ type: "item-used", defId: itemId, damageAdd, mitigationAdd }],
   };
 }
 

@@ -63,6 +63,7 @@ function fmtEvent(e: GameEvent): string {
     case "map-discarded": return `🗺️ discarded a carried map`;
     case "packed": return `packed ${e.defId} → ${e.slot}`;
     case "quaffed": return `🧪 quaffed ${e.defId} · +${e.healed}hp → ${e.hp}hp${e.energy !== undefined ? ` · energy → ${e.energy}e` : ""}`;
+    case "item-used": return `⚗ used ${e.defId} this fight${e.damageAdd ? ` · +${e.damageAdd} dmg` : ""}${e.mitigationAdd ? ` · +${e.mitigationAdd} mitigation` : ""}`;
     case "donned": return `🧤 donned ${e.defId}${e.displaced ? ` (stowed ${e.displaced} in the bag)` : ""} · energy → ${e.energy}e`;
     case "doffed": return `🎒 doffed ${e.defId} to the bag (takes a slot) · energy → ${e.energy}e`;
     case "run-ended": return `— run ended (${e.reason})`;
@@ -161,7 +162,11 @@ function printExpedition(st: GameState): void {
     const quiver = wieldsRanged(exp.loadout)
       ? (() => { const n = (exp.loadout.ammo ?? []).reduce((s, a) => s + a.qty, 0); return n > 0 ? ` · 🏹 ${n} arrows` : " · 🏹 NO ARROWS — bow is a club!"; })()
       : "";
-    console.log(`\n=== ENGAGED: ${c.creature} — ${c.monsterHp} HP · you hit ${dmgOut}, it hits ${dmgIn}${quiver} · actions: fight | flee | quaff | toggle-auto-quaff ===`);
+    // 90j: held battle items are used MANUALLY mid-fight (no auto-consume) — surface them + the use action.
+    const battle = (exp.loadout.battleItems ?? []).length
+      ? ` · battle items: ${(exp.loadout.battleItems ?? []).map((b) => `${b.qty}× ${b.defId}`).join(", ")} (use-item itemId="…" — this fight only)`
+      : "";
+    console.log(`\n=== ENGAGED: ${c.creature} — ${c.monsterHp} HP · you hit ${dmgOut}, it hits ${dmgIn}${quiver}${battle} · actions: fight | flee | quaff${battle ? " | use-item" : ""} | toggle-auto-quaff ===`);
   }
   console.log("\n=== MAP (▲ you · letters = node kinds · detail only resolves near you) ===");
   const rows: string[] = [];

@@ -63,6 +63,8 @@ export function expeditionActions(state: GameState): Action[] {
   candidates.push({ type: "flee" });
   candidates.push({ type: "quaff" });
   candidates.push({ type: "toggle-auto-quaff" });
+  // use-item (90j): each held battle item; reduce keeps it only while engaged (D29)
+  for (const stack of state.expedition.loadout.battleItems ?? []) candidates.push({ type: "use-item", itemId: stack.defId });
   // stamina (dtv): eat when there's food + room; toggle the auto-eat any time
   candidates.push({ type: "eat" });
   candidates.push({ type: "toggle-auto-eat" });
