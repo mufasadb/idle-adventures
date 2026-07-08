@@ -14,6 +14,10 @@ import {
   POI_PLACEMENT_ATTEMPTS,
   NODE_TYPES,
   MATERIAL_TIER,
+  MATERIAL_TIER_WEIGHT,
+  MAP_TIER_CREATURE_ADD,
+  POI_DENSITY_BY_TIER,
+  TERRAIN_WEIGHT_TIER_SHIFT,
 } from "../data/constants";
 import type { Terrain, NodeType, BiomeId, Biome } from "../data/constants";
 import { rand, weightedPick } from "./rng";
@@ -137,18 +141,47 @@ function carveConnectivity(terrain: Terrain[][], biome: Biome): void {
   }
 }
 
-export function generateGrid(mapSeed: string, biomeId: BiomeId): Grid {
-  const key = `${mapSeed.length}:${mapSeed}:${biomeId}`;
+// Transform a biome's generation profile for a map tier (2yn). IDENTITY at mapTier 1:
+// every lever below is absent/1 at tier 1, so the returned biome deep-equals the base
+// and T1 generation is byte-identical. Never touches RNG — only the weight tables.
+export function tierProfile(biome: Biome, mapTier: number): Biome {
+  if (mapTier <= 1) return biome;
+  // (a) materialTable weights × per-material tier multiplier
+  const materialTable: Biome["materialTable"] = {};
+  for (const kind of Object.keys(biome.materialTable) as (keyof Biome["materialTable"])[]) {
+    const base = biome.materialTable[kind]!;
+    const scaled: Record<string, number> = {};
+    for (const defId of Object.keys(base)) {
+      scaled[defId] = base[defId]! * (MATERIAL_TIER_WEIGHT[defId]?.[mapTier] ?? 1);
+    }
+    materialTable[kind] = scaled;
+  }
+  // (b) creatureTable = boss-free base + additive boss layer (weights sum on collision)
+  const creatureTable: Record<string, number> = { ...biome.creatureTable };
+  for (const [defId, w] of Object.entries(MAP_TIER_CREATURE_ADD[mapTier] ?? {})) {
+    creatureTable[defId] = (creatureTable[defId] ?? 0) + w;
+  }
+  // (c) terrainWeights × per-terrain tier shift
+  const shift = TERRAIN_WEIGHT_TIER_SHIFT[mapTier] ?? {};
+  const terrainWeights: Biome["terrainWeights"] = { ...biome.terrainWeights };
+  for (const t of Object.keys(terrainWeights) as Terrain[]) {
+    terrainWeights[t] = terrainWeights[t]! * (shift[t] ?? 1);
+  }
+  return { ...biome, materialTable, creatureTable, terrainWeights };
+}
+
+export function generateGrid(mapSeed: string, biomeId: BiomeId, mapTier = 1, _affixes?: string[]): Grid {
+  const key = `${mapSeed.length}:${mapSeed}:${biomeId}:${mapTier}`;
   const hit = gridCache.get(key);
   if (hit) return hit;
-  const grid = buildGrid(mapSeed, biomeId);
+  const grid = buildGrid(mapSeed, biomeId, mapTier);
   if (gridCache.size >= GRID_CACHE_CAP) gridCache.clear();
   gridCache.set(key, grid);
   return grid;
 }
 
-function buildGrid(mapSeed: string, biomeId: BiomeId): Grid {
-  const biome = BIOMES[biomeId];
+function buildGrid(mapSeed: string, biomeId: BiomeId, mapTier: number): Grid {
+  const biome = tierProfile(BIOMES[biomeId], mapTier);
   const terrain: Terrain[][] = [];
   for (let y = 0; y < MAP_HEIGHT; y++) {
     const row: Terrain[] = [];
@@ -203,10 +236,11 @@ function buildGrid(mapSeed: string, biomeId: BiomeId): Grid {
   //     (Chebyshev, 8-dir) from every accepted position and avoid the entry tile.
   //     NOTE: if the attempt budget exhausts, FEWER than POI_DENSITY positions
   //     result (astronomically unlikely) — callers must not assume the count.
+  const poiCount = POI_DENSITY_BY_TIER[mapTier] ?? POI_DENSITY;
   const positions: { x: number; y: number }[] = [];
   for (
     let attempt = 0;
-    attempt < POI_PLACEMENT_ATTEMPTS && positions.length < POI_DENSITY;
+    attempt < POI_PLACEMENT_ATTEMPTS && positions.length < poiCount;
     attempt++
   ) {
     const x = Math.floor(rand(mapSeed, "poi-x", attempt) * MAP_WIDTH);

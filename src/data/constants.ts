@@ -71,7 +71,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
   desert: {
     terrainWeights: { plains: 0.55, mountain: 0.3, river: 0.15 },
     nodeTypeWeights: { mining: 0.4, monster: 0.25, herb: 0.15, wood: 0.1, animal: 0.1 },
-    creatureTable: { "sand-raider": 5, "mirage-wisp": 4, "giant-scorpion": 3, "dust-vampire": 1 },
+    creatureTable: { "sand-raider": 5, "mirage-wisp": 4, "giant-scorpion": 3 },
     materialTable: {
       mining: { "copper-ore": 7, "iron-ore": 2, "coal": 1 }, // coal T2 (iron-pick) — desert is a fuel source
       wood: { "cactus-wood": 7, "oak-log": 2, "pine-log": 1 },
@@ -83,8 +83,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
   tundra: {
     terrainWeights: { ice: 0.5, mountain: 0.25, plains: 0.15, river: 0.1 },
     nodeTypeWeights: { animal: 0.35, monster: 0.25, mining: 0.2, wood: 0.1, herb: 0.1 },
-    // wyrm 1/16 ≈ 6% of monster POIs (was 1/5): the goal is a discovery, not a doormat (si7.1)
-    creatureTable: { "snow-wolf": 5, "ice-crab": 4, "snow-marauder": 3, "frost-fae": 2, "ice-troll": 1, "ancient-wyrm": 1 },
+    creatureTable: { "snow-wolf": 5, "ice-crab": 4, "snow-marauder": 3, "frost-fae": 2 },
     materialTable: {
       mining: { "silver-ore": 5, "coal": 2, "iron-ore": 2, "mithril-ore": 1 }, // silver T2 + coal T2 + mithril T3: tundra is the deep-tier mine
       wood: { "pine-log": 7, "oak-log": 2, "ironwood-log": 1, stringybark: 1 }, // stringybark rare here (D45) — bow country is woodland
