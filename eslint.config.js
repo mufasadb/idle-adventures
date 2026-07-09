@@ -10,7 +10,7 @@ const engineForbiddenZones = [
 ];
 
 export default tseslint.config(
-  { ignores: ["node_modules/**", "bun.lock"] },
+  { ignores: ["node_modules/**", "bun.lock", ".claude/worktrees/**"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
