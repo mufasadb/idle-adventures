@@ -10,6 +10,7 @@ import { legalActions } from "../sim/legal";
 import { expeditionGrid, rollBiome } from "../engine/grid";
 import type { Grid } from "../engine/grid";
 import { slotOf } from "../engine/catalog";
+import { recipeOutputQty } from "../engine/craft";
 import { moveCost, moveCostBreakdown } from "../engine/move";
 import { costToReach } from "../engine/reach";
 import { carryCap } from "../engine/carry";
@@ -433,9 +434,12 @@ function townView(): string {
             const bv = byOutput.get(b)!.some((id) => affordable.has(id)) ? 0 : 1;
             return av - bv;
           });
+          // ke3.3: town tool pool (bank ∪ equipped) → outputScale recipes show
+          // their REAL yield at your current knife tier, not the base qty.
+          const townTools = [...state.bank.map((s) => s.defId), ...state.loadout.equipment.tools];
           return outputs.map((out) => {
             const ids = byOutput.get(out)!;
-            const qty = RECIPE[ids[0]!]!.output.qty;
+            const qty = recipeOutputQty(RECIPE[ids[0]!]!, townTools);
             const anyCan = ids.some((id) => affordable.has(id));
             const paths = ids.map((id) => {
               const r = RECIPE[id]!;

@@ -105,6 +105,24 @@ test("craft: stations never touch carry/loadout math (ke3.2)", () => {
   );
 });
 
+test("craft: fletchers-knife crafts then packs into the tool slot (ke3.3)", () => {
+  // craft the knife, then pack it — proves it's a real, carriable tool.
+  const crafted = reduce(town([{ defId: "iron-ore", qty: 1 }, { defId: "oak-log", qty: 1 }]), { type: "craft", recipeId: "fletchers-knife" });
+  expect(crafted.state.bank.find((s) => s.defId === "fletchers-knife")?.qty).toBe(1);
+  const packed = reduce(crafted.state, { type: "pack", slot: "tool", itemId: "fletchers-knife" });
+  expect(packed.state.loadout.equipment.tools).toContain("fletchers-knife");
+  expect(packed.events.some((e) => e.type === "action-rejected")).toBe(false);
+});
+
+test("craft: with fletchers-knife equipped, town arrow-shaft scales off the loadout tool (ke3.3)", () => {
+  // town pool = bank ∪ equipped tools → an equipped knife satisfies the gate AND
+  // supplies the quality even though it isn't in the bank.
+  const base = town([{ defId: "oak-log", qty: 3 }]);
+  const withKnife: GameState = { ...base, loadout: { ...base.loadout, equipment: { ...base.loadout.equipment, tools: ["fletchers-knife"] } } };
+  const { state } = reduce(withKnife, { type: "craft", recipeId: "arrow-shaft" });
+  expect(state.bank.find((s) => s.defId === "arrow-shaft")?.qty).toBe(3);
+});
+
 test("craft: rejected outside town", () => {
   const expeditionState: GameState = {
     ...town([{ defId: "iron-ore", qty: 3 }, { defId: "oak-log", qty: 1 }]),

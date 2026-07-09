@@ -10,6 +10,7 @@ import { legalActions } from "./legal";
 import { summarize } from "./report";
 import { candidateMaps, mapEpithet } from "../engine/town";
 import { expeditionGrid } from "../engine/grid";
+import { recipeOutputQty } from "../engine/craft";
 import { perceive } from "../engine/perceive";
 import {
   flavorDetail,
@@ -147,6 +148,8 @@ function printTown(st: GameState): void {
   );
   console.log("\nRecipe book (every craftable output + its ingredients; where to FIND ingredients is for you to discover):");
   const ids = Object.keys(RECIPE).sort((a, b) => (affordable.has(a) ? 0 : 1) - (affordable.has(b) ? 0 : 1));
+  // ke3.3: outputScale recipes report their REAL yield at the current knife tier.
+  const townTools = [...st.bank.map((s) => s.defId), ...st.loadout.equipment.tools];
   for (const id of ids) {
     const r = RECIPE[id]!;
     const ing = r.inputs.map((i) => `${i.qty}× ${i.defId}`).join(" + ");
@@ -154,7 +157,7 @@ function printTown(st: GameState): void {
     // (ration vs ration-sage …), and crafting the wrong id was a silent rake.
     // 57l: weapon rows get their class hint — the bow died 3/3 to invisibility.
     const hint = weaponHint(r.output.defId);
-    console.log(`  ${affordable.has(id) ? "✓" : "·"} ${r.output.qty}× ${r.output.defId}  ←  ${ing}  ·  craft recipeId="${id}"${hint ? `  ·  ${hint}` : ""}`);
+    console.log(`  ${affordable.has(id) ? "✓" : "·"} ${recipeOutputQty(r, townTools)}× ${r.output.defId}  ←  ${ing}  ·  craft recipeId="${id}"${hint ? `  ·  ${hint}` : ""}`);
   }
   console.log("\nTip: tools each take one bag slot — you can pack several (pick + axe + knife + …).");
 }

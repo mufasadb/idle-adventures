@@ -110,6 +110,50 @@ test("craft: ungated recipes ignore the tool/station pools (existing behaviour) 
   expect(r.ok).toBe(true);
 });
 
+// --- ke3.3: tool-gated yield-mod (fletchers-knife → arrow-shaft) -------------
+
+test("fletching: arrow-shaft rejects missing-tool without the knife (ke3.3)", () => {
+  const r = craft([{ defId: "oak-log", qty: 3 }], "arrow-shaft", [], []);
+  expect(r).toEqual({ ok: false, reason: "missing-tool" });
+});
+
+test("fletching: arrow-shaft output scales with knife quality (ke3.3)", () => {
+  // q1 knife → qtyPer × 1 shafts
+  const base = craft([{ defId: "oak-log", qty: 3 }], "arrow-shaft", ["fletchers-knife"]);
+  expect(base.ok).toBe(true);
+  if (!base.ok) return;
+  expect(base.output).toEqual({ defId: "arrow-shaft", qty: 3 });
+  // q2 knife present (gate still satisfied by the base knife) → qtyPer × 2 (max quality)
+  const steel = craft([{ defId: "oak-log", qty: 3 }], "arrow-shaft", ["fletchers-knife", "steel-fletchers-knife"]);
+  expect(steel.ok).toBe(true);
+  if (!steel.ok) return;
+  expect(steel.output).toEqual({ defId: "arrow-shaft", qty: 6 });
+});
+
+test("fletching: arrows-fletched turns shafts into a batch of arrows (ke3.3)", () => {
+  const r = craft([{ defId: "arrow-shaft", qty: 3 }, { defId: "flint", qty: 1 }, { defId: "feather", qty: 1 }], "arrows-fletched");
+  expect(r.ok).toBe(true);
+  if (!r.ok) return;
+  expect(r.output.defId).toBe("arrows");
+  expect(r.output.qty).toBe(10);
+});
+
+test("fletching: fletchers-knife slots as a tool (ke3.3)", () => {
+  expect(slotOf("fletchers-knife")).toBe("tool");
+  expect(slotOf("steel-fletchers-knife")).toBe("tool");
+});
+
+test("recipes: no recipe uses outputScale without also gating the same capability (ke3.3)", () => {
+  // outputScale relies on the gate guaranteeing a capable tool is present. Guard
+  // against a mis-declared recipe that scales on a capability it doesn't gate.
+  for (const recipe of Object.values(RECIPE)) {
+    if (!recipe.outputScale) continue;
+    const gateDefs = recipe.requires?.tools ?? [];
+    const gatesCapability = gateDefs.some((d) => TOOL_CAPABILITY[d] === recipe.outputScale!.capability);
+    expect(gatesCapability).toBe(true);
+  }
+});
+
 test("recipes: every output is a real equippable/consumable defId — or a crafted intermediate another recipe consumes", () => {
   const known = (d: string) =>
     d in WEAPONS || d in ARMOUR || d in TOOL_CAPABILITY || d in BACKPACK_SLOTS ||

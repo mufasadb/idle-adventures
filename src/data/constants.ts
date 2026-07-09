@@ -287,6 +287,8 @@ export const TOOL_CAPABILITY: Record<string, string> = {
   "ice-cleats": "trek",
   tent: "camp", // stamina gear (dtv): multiplies food restore; NODE_TOOL never asks for "camp", so no gather impact
   canteen: "provision", // stamina gear (si7.2): raises maxEnergy; NODE_TOOL never asks for "provision", so no gather impact
+  "fletchers-knife": "fletch", // crafting tool (ke3.3): gates + quality-scales the arrow-shaft recipe. NODE_TOOL never asks for "fletch", so no gather impact — the payoff is on the CRAFT (outputScale), not gathering
+  "steel-fletchers-knife": "fletch", // data-only tier-2 fletch tool (like iron-pick): more shafts per log
 }; // tool defId → capability; tiered tools (M5: "iron-pick": "pick") are data-only
 export const TOOL_QUALITY: Record<string, number> = {
   pick: 1,
@@ -304,6 +306,8 @@ export const TOOL_QUALITY: Record<string, number> = {
   "ice-cleats": 1,
   tent: 1, // quality irrelevant to camping; present to satisfy the catalog invariant
   canteen: 1, // quality irrelevant to capacity; present to satisfy the catalog invariant
+  "fletchers-knife": 1, // ke3.3: outputScale multiplier for arrow-shaft (qtyPer × quality)
+  "steel-fletchers-knife": 2, // tier-2: 2× shafts per log — the visible tool payoff (repays 57l)
 }; // gather-cost divisor AND tier gate (quality == max MATERIAL_TIER gatherable)
 export const GATHER_YIELD: Record<GatherableNodeType, number> = {
   mining: 3,
@@ -354,6 +358,13 @@ export const UNARMED_DAMAGE = 1; // damage when wielding no weapon — ALSO a bo
 // ⚠ balance surface: arrow supply gates bow damage — changing this requires `bun run sim:tables` if kits carry ammo (test/balance-tables.test.ts enforces)
 export const ARROW_STACK_CAP = 20; // arrows per inventory slot; raise = cheaper ammo logistics, lower = tighter ammo-vs-food-vs-loot squeeze
 export const ARROWS_PER_CRAFT = 10; // arrows per craft batch — "three different things to grab, so it should give you quite a lot of them" (user, 2026-07-07)
+// ke3.3: the arrow-shaft recipe's outputScale multiplier — shafts per oak-log =
+// ARROW_SHAFTS_PER_LOG × the fletch tool's TOOL_QUALITY. At q1 (fletchers-knife) one
+// log → 3 shafts → exactly one arrows-fletched batch; at q2 (steel-fletchers-knife)
+// one log → 6 shafts → two batches, i.e. the better knife HALVES wood/arrow. The
+// fletched path is deliberately parallel to the direct `arrows` recipe at q1 (no
+// free lunch) and only pays off once you've climbed to the steel knife.
+export const ARROW_SHAFTS_PER_LOG = 3; // shafts per log per unit tool quality (outputScale qtyPer)
 export const AMMO: string[] = ["arrows"]; // ammo catalog (slotOf → "ammo"); packed like potions, spent per exchange
 
 // ⚠ balance surface: changing this requires `bun run sim:tables` (test/balance-tables.test.ts enforces)
@@ -572,6 +583,7 @@ export const RECIPE: Record<
     requires?: { station?: StationId; tools?: string[]; terrain?: Terrain };
     field?: boolean;
     buildsStation?: StationId; // ke3.2: this recipe BUILDS a home station — its output is routed into state.stations (once), never banked. Inputs consumed normally (e.g. steel×N → anvil). Town-only by nature.
+    outputScale?: { capability: string; qtyPer: number }; // ke3.3: output.qty is REPLACED by qtyPer × best TOOL_QUALITY over availableTools with this capability (the gating tool's quality scales the yield). Absent = fixed output.qty (every existing recipe unchanged).
   }
 > = {
   // Consumables — T1. Rations are FORAGED: any herb → food. Herbs need no tool
@@ -624,6 +636,14 @@ export const RECIPE: Record<
   // Ranged line (D45) — fully pick-free: bark → string, wood+flint+feather → arrows.
   bowstring: { inputs: [{ defId: "stringybark", qty: 2 }], output: { defId: "bowstring", qty: 1 } }, // bark strips twist into cord
   arrows: { inputs: [{ defId: "pine-log", qty: 1 }, { defId: "flint", qty: 1 }, { defId: "feather", qty: 1 }], output: { defId: "arrows", qty: ARROWS_PER_CRAFT } }, // three cheap inputs, generous batch
+  // Fletching thread (ke3.3) — the cross-tree yield-mod that laces wood/smithing
+  // into the bow line and repays 57l (bow payoff invisible) with a VISIBLE tool
+  // payoff. A fletchers-knife turns one oak-log into a batch of shafts; a steel
+  // knife doubles the batch. Shafts are the alternate arrow body (vs the direct
+  // pine-log recipe above) — parallel cost at the base knife, cheaper with steel.
+  "fletchers-knife": { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "oak-log", qty: 1 }], output: { defId: "fletchers-knife", qty: 1 } },
+  "arrow-shaft": { inputs: [{ defId: "oak-log", qty: 1 }], output: { defId: "arrow-shaft", qty: 1 }, requires: { tools: ["fletchers-knife"] }, outputScale: { capability: "fletch", qtyPer: ARROW_SHAFTS_PER_LOG } }, // qty REPLACED by qtyPer × knife quality
+  "arrows-fletched": { inputs: [{ defId: "arrow-shaft", qty: ARROW_SHAFTS_PER_LOG }, { defId: "flint", qty: 1 }, { defId: "feather", qty: 1 }], output: { defId: "arrows", qty: ARROWS_PER_CRAFT } }, // shafts + heads + fletching → a batch; one q1-log's worth of shafts = one batch
   // Weapons — T1
   "iron-sword": { inputs: [{ defId: "iron-ore", qty: 3 }], output: { defId: "iron-sword", qty: 1 } },
   bow: { inputs: [{ defId: "oak-log", qty: 2 }, { defId: "bowstring", qty: 1 }], output: { defId: "bow", qty: 1 } }, // D45 rework: bowstring replaces deer-hide — the whole bow line stays pick-free (starter axe)
