@@ -145,6 +145,7 @@ export type RejectionReason =
   | "unaffordable"
   | "no-recipe"
   | "missing-station" // craft: a recipe's requires.station isn't among the built home stations (ke3.1)
+  | "already-built" // craft: a buildsStation recipe whose station is already built (ke3.2)
   | "insufficient-materials"
   | "wrong-slot"
   | "insufficient"

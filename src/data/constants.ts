@@ -571,6 +571,7 @@ export const RECIPE: Record<
     output: ItemStackSpec;
     requires?: { station?: StationId; tools?: string[]; terrain?: Terrain };
     field?: boolean;
+    buildsStation?: StationId; // ke3.2: this recipe BUILDS a home station — its output is routed into state.stations (once), never banked. Inputs consumed normally (e.g. steel×N → anvil). Town-only by nature.
   }
 > = {
   // Consumables — T1. Rations are FORAGED: any herb → food. Herbs need no tool

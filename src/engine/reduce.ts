@@ -13,7 +13,7 @@ import { packItem, reserveLoadout, EQUIP_SLOTS } from "./pack";
 import type { EquipSlot } from "./pack";
 import { slotOf, isGear } from "./catalog";
 import { candidateMaps, previewHints } from "./town";
-import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF, SURVEY_ENERGY, TOOL_CAPABILITY, INKS } from "../data/constants";
+import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF, SURVEY_ENERGY, TOOL_CAPABILITY, INKS, RECIPE } from "../data/constants";
 import { visionRadius } from "./perceive";
 import type { GatherableNodeType } from "../data/constants";
 
@@ -195,11 +195,20 @@ function craftAction(
   if (state.phase !== "town") return rejected(state, "craft", "not-in-town");
   // Town tool pool (ke3.1): home means everything's reachable — a required tool
   // may sit in the bank OR the loadout. Stations come from base state.
+  const stations = state.stations ?? [];
   const toolPool = [...state.bank.map((s) => s.defId), ...state.loadout.equipment.tools];
-  const result = applyRecipe(state.bank, recipeId, toolPool, state.stations ?? []);
+  const result = applyRecipe(state.bank, recipeId, toolPool, stations);
   if (!result.ok) return rejected(state, "craft", result.reason);
+  // ke3.2: a station-building recipe deposits its output into base infra
+  // (state.stations, idempotent — no dupes), never the bank. craft() already
+  // rejected a rebuild ('already-built') and left the output un-banked. Ordinary
+  // crafts don't touch the stations key (keeps terse states/snapshots minimal).
+  const builds = RECIPE[recipeId]?.buildsStation;
+  const next: GameState = builds
+    ? { ...state, bank: result.bank, stations: [...stations, builds] }
+    : { ...state, bank: result.bank };
   return {
-    state: { ...state, bank: result.bank },
+    state: next,
     events: [{ type: "crafted", recipeId, output: result.output }],
   };
 }

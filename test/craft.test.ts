@@ -121,7 +121,10 @@ test("recipes: every output is a real equippable/consumable defId — or a craft
   const isIntermediate = (d: string) =>
     Object.values(RECIPE).some((r) => r.inputs.some((i) => i.defId === d));
   for (const [id, recipe] of Object.entries(RECIPE)) {
-    expect(known(recipe.output.defId) || isIntermediate(recipe.output.defId)).toBe(true);
+    // ke3.2: a station-building recipe's output is base infra (a StationId), not an
+    // equippable/consumable defId — legal iff the recipe declares buildsStation.
+    const isStation = recipe.buildsStation !== undefined && recipe.output.defId === recipe.buildsStation;
+    expect(known(recipe.output.defId) || isIntermediate(recipe.output.defId) || isStation).toBe(true);
     expect(recipe.output.qty).toBeGreaterThan(0);
     expect(recipe.inputs.length).toBeGreaterThan(0);
     // recipe id conventionally matches its output for gear — optionally with a

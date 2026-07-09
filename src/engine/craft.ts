@@ -18,7 +18,7 @@ export function craft(
   availableStations: StationId[] = [], // built home stations (never satisfiable in field)
 ):
   | { ok: true; bank: ItemStack[]; output: ItemStack }
-  | { ok: false; reason: "no-recipe" | "missing-station" | "missing-tool" | "insufficient-materials" } {
+  | { ok: false; reason: "no-recipe" | "missing-station" | "missing-tool" | "already-built" | "insufficient-materials" } {
   const recipe = RECIPE[recipeId];
   if (!recipe) return { ok: false, reason: "no-recipe" };
   const req = recipe.requires;
@@ -29,8 +29,16 @@ export function craft(
   if (req?.tools?.some((t) => !availableTools.includes(t))) {
     return { ok: false, reason: "missing-tool" };
   }
+  // ke3.2: a station you've already built can't be rebuilt (checked before mats so
+  // the message is clear even when you no longer hold the inputs).
+  if (recipe.buildsStation && availableStations.includes(recipe.buildsStation)) {
+    return { ok: false, reason: "already-built" };
+  }
   const afterInputs = subtractStacks(bank, recipe.inputs);
   if (afterInputs === null) return { ok: false, reason: "insufficient-materials" };
   const output = { ...recipe.output };
-  return { ok: true, bank: bankStacks(afterInputs, [output]), output };
+  // ke3.2: a station output is base infra, not a stack — leave it un-banked; the
+  // caller (craftAction) routes it into state.stations. Inputs are still consumed.
+  const newBank = recipe.buildsStation ? afterInputs : bankStacks(afterInputs, [output]);
+  return { ok: true, bank: newBank, output };
 }

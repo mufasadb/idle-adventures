@@ -420,8 +420,11 @@ function townView(): string {
           const affordable = new Set(craftable.map((a) => a.recipeId));
           // group recipe ids by the defId they output, preserving insertion order
           const byOutput = new Map<string, string[]>();
+          const built = new Set(state.stations ?? []); // ke3.2: an already-built station has no rebuild option
           for (const id of Object.keys(RECIPE)) {
-            const out = RECIPE[id]!.output.defId;
+            const r = RECIPE[id]!;
+            if (r.buildsStation && built.has(r.buildsStation)) continue; // hide, don't render locked
+            const out = r.output.defId;
             (byOutput.get(out) ?? byOutput.set(out, []).get(out)!).push(id);
           }
           // outputs with any affordable path first, else stable insertion order
