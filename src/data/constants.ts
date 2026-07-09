@@ -295,6 +295,7 @@ export const TOOL_CAPABILITY: Record<string, string> = {
   "fire-kit": "heat", // field-craft kit-tool (ke3.4): the heat gate for cooking. Carried into the field; NODE_TOOL never asks for "heat", so no gather impact
   "cooking-pot": "simmer", // field-craft kit-tool (ke3.5): the second cooking tool — a stew needs fire-kit AND cooking-pot (AND-gate). NODE_TOOL never asks for "simmer"
   glassware: "alchemy", // field-craft kit-tool (ke3.6): the brewing gate for draughts. Carried into the field; NODE_TOOL never asks for "alchemy"
+  "blacksmiths-hammer": "smith", // forge tool (ke3.7): gates all metal plate at the anvil. NODE_TOOL never asks for "smith"; it never needs to leave town but reuses the tool path
 }; // tool defId → capability; tiered tools (M5: "iron-pick": "pick") are data-only
 export const TOOL_QUALITY: Record<string, number> = {
   pick: 1,
@@ -317,6 +318,7 @@ export const TOOL_QUALITY: Record<string, number> = {
   "fire-kit": 1, // ke3.4: quality irrelevant to the heat gate; present to satisfy the catalog invariant
   "cooking-pot": 1, // ke3.5: quality irrelevant to the simmer gate; present to satisfy the catalog invariant
   glassware: 1, // ke3.6: quality irrelevant to the alchemy gate; present to satisfy the catalog invariant
+  "blacksmiths-hammer": 1, // ke3.7: quality irrelevant to the smith gate; present to satisfy the catalog invariant
 }; // gather-cost divisor AND tier gate (quality == max MATERIAL_TIER gatherable)
 export const GATHER_YIELD: Record<GatherableNodeType, number> = {
   mining: 3,
@@ -683,6 +685,12 @@ export const RECIPE: Record<
   "field-draught": { inputs: [{ defId: "water-vial", qty: 1 }, { defId: "forest-herb", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "draught", qty: 1 }, requires: { tools: ["glassware", "fire-kit"] }, field: true }, // FIELD brew: same basic draught, needs a filled vial + heat; lands in loadout.potions so it's quaffable right away
   "alchemical-desk": { inputs: [{ defId: "glass-vial", qty: 3 }, { defId: "iron-ore", qty: 2 }], output: { defId: "alchemical-desk", qty: 1 }, buildsStation: "alchemical-desk" }, // the deep home alchemy station
   "greater-draught": { inputs: [{ defId: "forest-herb", qty: 2 }, { defId: "silver-ore", qty: 1 }], output: { defId: "greater-draught", qty: 1 }, requires: { station: "alchemical-desk" } }, // strong heal the field kit CAN'T make — station-gated, town-only
+  // Forge (ke3.7) — the anvil station + blacksmith's hammer gate ALL metal plate.
+  // Adds NO new armour (F1-safe); it makes "heavy armour = forge work" a real
+  // progression beat (build a forge before plate flows). Chitin/carapace plate
+  // alternates stay ungated — the deliberate "plate without a forge" path.
+  anvil: { inputs: [{ defId: "iron-ore", qty: 3 }, { defId: "oak-log", qty: 2 }], output: { defId: "anvil", qty: 1 }, buildsStation: "anvil" },
+  "blacksmiths-hammer": { inputs: [{ defId: "iron-ore", qty: 2 }], output: { defId: "blacksmiths-hammer", qty: 1 } },
   // Weapons — T1
   "iron-sword": { inputs: [{ defId: "iron-ore", qty: 3 }], output: { defId: "iron-sword", qty: 1 } },
   bow: { inputs: [{ defId: "oak-log", qty: 2 }, { defId: "bowstring", qty: 1 }], output: { defId: "bow", qty: 1 } }, // D45 rework: bowstring replaces deer-hide — the whole bow line stays pick-free (starter axe)
@@ -694,28 +702,31 @@ export const RECIPE: Record<
   "inferno-staff": { inputs: [{ defId: "fae-dust", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "inferno-staff", qty: 1 } },
   // Weapons — T3 (mithril → steel-pick)
   "mithril-sword": { inputs: [{ defId: "mithril-ore", qty: 3 }], output: { defId: "mithril-sword", qty: 1 } },
-  // Armour — full plate set + light/robe samples
-  "plate-helmet": { inputs: [{ defId: "iron-ore", qty: 2 }], output: { defId: "plate-helmet", qty: 1 } },
-  "plate-chest": { inputs: [{ defId: "iron-ore", qty: 3 }], output: { defId: "plate-chest", qty: 1 } },
-  "plate-legs": { inputs: [{ defId: "iron-ore", qty: 2 }], output: { defId: "plate-legs", qty: 1 } },
-  "plate-boots": { inputs: [{ defId: "iron-ore", qty: 1 }], output: { defId: "plate-boots", qty: 1 } },
-  "plate-gloves": { inputs: [{ defId: "iron-ore", qty: 1 }], output: { defId: "plate-gloves", qty: 1 } },
+  // Armour — full plate set + light/robe samples. ALL metal plate (iron/steel/
+  // mithril) is FORGE work (ke3.7): gated behind the anvil station + a blacksmith's
+  // hammer. No new armour → F1-safe; if anything it gates plate MORE (the chitin/
+  // carapace alternates below stay ungated — "plate without a forge").
+  "plate-helmet": { inputs: [{ defId: "iron-ore", qty: 2 }], output: { defId: "plate-helmet", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
+  "plate-chest": { inputs: [{ defId: "iron-ore", qty: 3 }], output: { defId: "plate-chest", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
+  "plate-legs": { inputs: [{ defId: "iron-ore", qty: 2 }], output: { defId: "plate-legs", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
+  "plate-boots": { inputs: [{ defId: "iron-ore", qty: 1 }], output: { defId: "plate-boots", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
+  "plate-gloves": { inputs: [{ defId: "iron-ore", qty: 1 }], output: { defId: "plate-gloves", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
   "light-chest": { inputs: [{ defId: "deer-hide", qty: 2 }], output: { defId: "light-chest", qty: 1 } },
   "light-legs": { inputs: [{ defId: "deer-hide", qty: 1 }, { defId: "wolf-pelt", qty: 1 }], output: { defId: "light-legs", qty: 1 } },
   "robe-chest": { inputs: [{ defId: "forest-herb", qty: 2 }, { defId: "ice-moss", qty: 1 }], output: { defId: "robe-chest", qty: 1 } },
   "robe-hood": { inputs: [{ defId: "forest-herb", qty: 1 }, { defId: "ice-moss", qty: 1 }], output: { defId: "robe-hood", qty: 1 } },
   // Armour — T2 steel plate (iron-plate cost + coal → iron-pick-gated)
-  "steel-plate-helmet": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "steel-plate-helmet", qty: 1 } },
-  "steel-plate-chest": { inputs: [{ defId: "iron-ore", qty: 3 }, { defId: "coal", qty: 2 }], output: { defId: "steel-plate-chest", qty: 1 } },
-  "steel-plate-legs": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "steel-plate-legs", qty: 1 } },
-  "steel-plate-boots": { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "coal", qty: 1 }], output: { defId: "steel-plate-boots", qty: 1 } },
-  "steel-plate-gloves": { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "coal", qty: 1 }], output: { defId: "steel-plate-gloves", qty: 1 } },
+  "steel-plate-helmet": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "steel-plate-helmet", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
+  "steel-plate-chest": { inputs: [{ defId: "iron-ore", qty: 3 }, { defId: "coal", qty: 2 }], output: { defId: "steel-plate-chest", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
+  "steel-plate-legs": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "steel-plate-legs", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
+  "steel-plate-boots": { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "coal", qty: 1 }], output: { defId: "steel-plate-boots", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
+  "steel-plate-gloves": { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "coal", qty: 1 }], output: { defId: "steel-plate-gloves", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
   // Armour — T3 mithril plate (mithril → steel-pick-gated). The combat-trivializer, top of the longest climb.
-  "mithril-plate-helmet": { inputs: [{ defId: "mithril-ore", qty: 2 }], output: { defId: "mithril-plate-helmet", qty: 1 } },
-  "mithril-plate-chest": { inputs: [{ defId: "mithril-ore", qty: 3 }], output: { defId: "mithril-plate-chest", qty: 1 } },
-  "mithril-plate-legs": { inputs: [{ defId: "mithril-ore", qty: 2 }], output: { defId: "mithril-plate-legs", qty: 1 } },
-  "mithril-plate-boots": { inputs: [{ defId: "mithril-ore", qty: 1 }], output: { defId: "mithril-plate-boots", qty: 1 } },
-  "mithril-plate-gloves": { inputs: [{ defId: "mithril-ore", qty: 1 }], output: { defId: "mithril-plate-gloves", qty: 1 } },
+  "mithril-plate-helmet": { inputs: [{ defId: "mithril-ore", qty: 2 }], output: { defId: "mithril-plate-helmet", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
+  "mithril-plate-chest": { inputs: [{ defId: "mithril-ore", qty: 3 }], output: { defId: "mithril-plate-chest", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
+  "mithril-plate-legs": { inputs: [{ defId: "mithril-ore", qty: 2 }], output: { defId: "mithril-plate-legs", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
+  "mithril-plate-boots": { inputs: [{ defId: "mithril-ore", qty: 1 }], output: { defId: "mithril-plate-boots", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
+  "mithril-plate-gloves": { inputs: [{ defId: "mithril-ore", qty: 1 }], output: { defId: "mithril-plate-gloves", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
   // Armour — light/robe T2 samples (gated by a T2 material so they sit mid-climb)
   "studded-chest": { inputs: [{ defId: "drake-hide", qty: 1 }, { defId: "deer-hide", qty: 1 }], output: { defId: "studded-chest", qty: 1 } }, // drake T2 → steel-knife
   "studded-legs": { inputs: [{ defId: "drake-hide", qty: 1 }], output: { defId: "studded-legs", qty: 1 } },
