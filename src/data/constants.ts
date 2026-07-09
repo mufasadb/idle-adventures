@@ -196,6 +196,8 @@ export const FOOD_ENERGY: Record<string, number> = {
   "smoked-venison": 200, // m0a: woodland cured meat — a manual-over-eat reserve under a tent
   "blubber-stew": 160, // m0a: tundra rendered fat + moss
   "cooked-venison": 150, // ke3.4: field-cooked over a fire-kit — denser than a ration, less than the home-smoked (200) version; turns raw meat into mid-run stamina
+  "cooked-berries": 100, // ke3.5: field-roasted fresh berries — a universal-forage field cook (berries appear in every biome); denser than 2 raw berries (60) and a keeper (doesn't stale)
+  stew: 220, // ke3.5: the premium field cook — needs BOTH fire-kit + cooking-pot (2 tool slots) and 3 gathered inputs; denser than smoked-venison (200), still under the pemmican reserve (240)
 };
 
 // Fresh→processed food (e3j): fresh forage eaten on-map is good NOW; hauled
@@ -291,6 +293,7 @@ export const TOOL_CAPABILITY: Record<string, string> = {
   "fletchers-knife": "fletch", // crafting tool (ke3.3): gates + quality-scales the arrow-shaft recipe. NODE_TOOL never asks for "fletch", so no gather impact — the payoff is on the CRAFT (outputScale), not gathering
   "steel-fletchers-knife": "fletch", // data-only tier-2 fletch tool (like iron-pick): more shafts per log
   "fire-kit": "heat", // field-craft kit-tool (ke3.4): the heat gate for cooking. Carried into the field; NODE_TOOL never asks for "heat", so no gather impact
+  "cooking-pot": "simmer", // field-craft kit-tool (ke3.5): the second cooking tool — a stew needs fire-kit AND cooking-pot (AND-gate). NODE_TOOL never asks for "simmer"
 }; // tool defId → capability; tiered tools (M5: "iron-pick": "pick") are data-only
 export const TOOL_QUALITY: Record<string, number> = {
   pick: 1,
@@ -311,6 +314,7 @@ export const TOOL_QUALITY: Record<string, number> = {
   "fletchers-knife": 1, // ke3.3: outputScale multiplier for arrow-shaft (qtyPer × quality)
   "steel-fletchers-knife": 2, // tier-2: 2× shafts per log — the visible tool payoff (repays 57l)
   "fire-kit": 1, // ke3.4: quality irrelevant to the heat gate; present to satisfy the catalog invariant
+  "cooking-pot": 1, // ke3.5: quality irrelevant to the simmer gate; present to satisfy the catalog invariant
 }; // gather-cost divisor AND tier gate (quality == max MATERIAL_TIER gatherable)
 export const GATHER_YIELD: Record<GatherableNodeType, number> = {
   mining: 3,
@@ -556,7 +560,7 @@ export const CATEGORY_LOOT_TABLE: Record<MonsterCategory, ItemStackSpec[]> = {
 // --- Consumable item catalogs (M5) ---
 // ENERGY_PER_FOOD / POTION_HEAL are flat, so these are single-item catalogs for
 // the POC; the list is what `pack`/`slotOf` validate a food/potion defId against.
-export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican", "apple", "smoked-venison", "blubber-stew", "cooked-venison"];
+export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican", "apple", "smoked-venison", "blubber-stew", "cooked-venison", "cooked-berries", "stew"];
 export const POTION: string[] = ["potion", "greater-potion"];
 export const BATTLE_ITEM: string[] = ["elixir-of-power", "warding-draught"]; // combat consumables (bzd); COMBAT_BUFF keys
 
@@ -655,6 +659,14 @@ export const RECIPE: Record<
   // state machine — fuel is a normal input, the fire-kit is the gate.
   "fire-kit": { inputs: [{ defId: "flint", qty: 1 }, { defId: "iron-ore", qty: 1 }], output: { defId: "fire-kit", qty: 1 } },
   "cooked-venison": { inputs: [{ defId: "rich-venison", qty: 1 }, { defId: "oak-log", qty: 1 }], output: { defId: "cooked-venison", qty: 1 }, requires: { tools: ["fire-kit"] }, field: true }, // fuel = oak-log; heat = fire-kit; field-only
+  // ke3.5 proof slice — the cooking LOOP has depth: a bare fire-kit roasts meat or
+  // fresh forage; adding a cooking-pot (a second tool slot) unlocks the dense stew.
+  "cooked-berries": { inputs: [{ defId: "berries", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "cooked-berries", qty: 1 }, requires: { tools: ["fire-kit"] }, field: true }, // universal-forage field cook (berries in every biome) — turns fresh-that-stales into a keeper
+  "cooking-pot": { inputs: [{ defId: "iron-ore", qty: 2 }], output: { defId: "cooking-pot", qty: 1 } }, // the second cooking tool (town-crafted, carried into the field)
+  stew: { inputs: [{ defId: "rich-venison", qty: 1 }, { defId: "berries", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "stew", qty: 1 }, requires: { tools: ["fire-kit", "cooking-pot"] }, field: true }, // AND-gate: needs BOTH kit-tools; multi-ingredient premium field food
+  // Smokehouse (station) — gates the EXISTING smoked-venison recipe behind home
+  // infra (ke3.5). Near-zero new content: proves the station gate on real food.
+  smokehouse: { inputs: [{ defId: "oak-log", qty: 3 }, { defId: "iron-ore", qty: 2 }], output: { defId: "smokehouse", qty: 1 }, buildsStation: "smokehouse" },
   // Weapons — T1
   "iron-sword": { inputs: [{ defId: "iron-ore", qty: 3 }], output: { defId: "iron-sword", qty: 1 } },
   bow: { inputs: [{ defId: "oak-log", qty: 2 }, { defId: "bowstring", qty: 1 }], output: { defId: "bow", qty: 1 } }, // D45 rework: bowstring replaces deer-hide — the whole bow line stays pick-free (starter axe)
@@ -709,7 +721,7 @@ export const RECIPE: Record<
   "elixir-of-power": { inputs: [{ defId: "vampire-ash", qty: 2 }], output: { defId: "elixir-of-power", qty: 1 } }, // +2 dmg, one fight
   "warding-draught": { inputs: [{ defId: "troll-hide", qty: 2 }], output: { defId: "warding-draught", qty: 1 } }, // +3 mitigation, one fight
   // m0a: mid-game tier foods — dense reserves that reward routing cross-biome materials
-  "smoked-venison": { inputs: [{ defId: "rich-venison", qty: 1 }, { defId: "salt", qty: 1 }], output: { defId: "smoked-venison", qty: 1 } }, // m0a: woodland tier-food (elk meat + desert salt — cross-biome pull)
+  "smoked-venison": { inputs: [{ defId: "rich-venison", qty: 1 }, { defId: "salt", qty: 1 }], output: { defId: "smoked-venison", qty: 1 }, requires: { station: "smokehouse" } }, // m0a food, now gated behind the smokehouse station (ke3.5): the deep home-cured version (200) vs the field roast (cooked-venison, 150)
   "blubber-stew": { inputs: [{ defId: "seal-blubber", qty: 1 }, { defId: "ice-moss", qty: 1 }], output: { defId: "blubber-stew", qty: 1 } }, // m0a: tundra tier-food
   "apple-jam": { inputs: [{ defId: "bruised-apple", qty: 3 }], output: { defId: "jam", qty: 1 } }, // m0a: staled orchard fruit → jam (mirrors stale-berries→jam)
   "elixir-of-power-thistle": { inputs: [{ defId: "thistle", qty: 2 }, { defId: "djinn-ember", qty: 1 }], output: { defId: "elixir-of-power", qty: 1 } }, // m0a: breaks the vampire-only gate on the battle-item line

@@ -5,8 +5,8 @@ import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
 import type { GameState, Action } from "../src/engine/types";
 
-function craft(bank: { defId: string; qty: number }[], recipeId: string) {
-  const s: GameState = { seed: "c", phase: "town", bank, loadout: emptyLoadout(), expedition: null, runs: 0 };
+function craft(bank: { defId: string; qty: number }[], recipeId: string, stations?: string[]) {
+  const s: GameState = { seed: "c", phase: "town", bank, loadout: emptyLoadout(), expedition: null, runs: 0, ...(stations ? { stations: stations as GameState["stations"] } : {}) };
   return reduce(s, { type: "craft", recipeId } as Action);
 }
 
@@ -56,7 +56,7 @@ test("frost-hatchling drops a map-scroll (the wyrm herald)", () => {
 });
 
 test("mid-game recipes craft from their inputs", () => {
-  const a = craft([{ defId: "rich-venison", qty: 1 }, { defId: "salt", qty: 1 }], "smoked-venison");
+  const a = craft([{ defId: "rich-venison", qty: 1 }, { defId: "salt", qty: 1 }], "smoked-venison", ["smokehouse"]); // ke3.5: now gated behind the smokehouse station
   expect(a.state.bank.find((x) => x.defId === "smoked-venison")?.qty).toBe(1);
   const b = craft([{ defId: "seal-blubber", qty: 1 }, { defId: "ice-moss", qty: 1 }], "blubber-stew");
   expect(b.state.bank.find((x) => x.defId === "blubber-stew")?.qty).toBe(1);
