@@ -16,11 +16,14 @@ import {
   flavorDetail,
   matchupLessons,
   weaponHint,
+  recipeGateHint,
+  nodeToolHint,
   TERRAIN_CHAR,
   POI_CHAR,
   PLAYER_CHAR,
 } from "../render/render";
-import { RECIPE, MAP_WIDTH, MAP_HEIGHT, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, AFFIX_EFFECTS } from "../data/constants";
+import { RECIPE, MAP_WIDTH, MAP_HEIGHT, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, AFFIX_EFFECTS, NODE_TOOL, TOOL_CAPABILITY, TOOL_PURPOSE } from "../data/constants";
+import type { GatherableNodeType } from "../data/constants";
 import { moveCostBreakdown } from "../engine/move";
 import { usedSlots, carryCap } from "../engine/carry";
 import { costToReach } from "../engine/reach";
@@ -163,7 +166,16 @@ function printTown(st: GameState): void {
     // (ration vs ration-sage …), and crafting the wrong id was a silent rake.
     // 57l: weapon rows get their class hint — the bow died 3/3 to invisibility.
     const hint = weaponHint(r.output.defId);
-    console.log(`  ${affordable.has(id) ? "✓" : "·"} ${recipeOutputQty(r, townTools)}× ${r.output.defId}  ←  ${ing}  ·  craft recipeId="${id}"${hint ? `  ·  ${hint}` : ""}`);
+    // gate-legibility (playtest 2026-07-09 #1): a locked recipe with a STATION/TOOL
+    // gate unmet names it — "[needs anvil + blacksmiths-hammer]" — so a blind player
+    // stops inferring "I lack mats" for a hard gate (append-only).
+    const req = r.requires;
+    const gateUnmet = !affordable.has(id) && req && (
+      (req.station && !built.has(req.station)) ||
+      (req.tools?.some((t) => !townTools.includes(t)))
+    );
+    const gateNote = gateUnmet ? `  ·  [${recipeGateHint(id)}]` : "";
+    console.log(`  ${affordable.has(id) ? "✓" : "·"} ${recipeOutputQty(r, townTools)}× ${r.output.defId}  ←  ${ing}  ·  craft recipeId="${id}"${hint ? `  ·  ${hint}` : ""}${gateNote}`);
   }
   console.log("\nTip: tools each take one bag slot — you can pack several (pick + axe + knife + …).");
 }
@@ -204,13 +216,24 @@ function printExpedition(st: GameState): void {
   console.log(rows.join("\n"));
   // ke3.4: field-craft candidates you can make right here (reduce-filtered).
   const fieldCrafts = legalActions(st).filter((a) => a.type === "craft") as Extract<Action, { type: "craft" }>[];
+  const pool = [...exp.loadout.equipment.tools, ...exp.carry.map((s) => s.defId)];
   if (fieldCrafts.length) {
-    const pool = [...exp.loadout.equipment.tools, ...exp.carry.map((s) => s.defId)];
     console.log(`\nField craft (−${FIELD_CRAFT_ENERGY}e each):`);
     for (const a of fieldCrafts) {
       const r = RECIPE[a.recipeId]!;
       const ing = r.inputs.map((i) => `${i.qty}× ${i.defId}`).join(" + ");
       console.log(`  🔥 ${recipeOutputQty(r, pool)}× ${r.output.defId}  ←  ${ing}  ·  craft recipeId="${a.recipeId}"`);
+    }
+  }
+  // gate-legibility (playtest 2026-07-09 #1, field-craft discoverability): 3/3
+  // testers never found field crafting — a kit-tool (fire-kit/glassware) is an
+  // unmarked key. If you carry ANY kit-tool but have no legal field craft right now,
+  // say what the kit enables + what it still needs (append-only, mirrors the web).
+  {
+    const carriedKitTools = pool.filter((t) => TOOL_PURPOSE[TOOL_CAPABILITY[t] ?? ""]);
+    if (carriedKitTools.length && !fieldCrafts.length) {
+      const bits = carriedKitTools.map((t) => `${t} (${TOOL_PURPOSE[TOOL_CAPABILITY[t]!]})`);
+      console.log(`\nField craft: your kit — ${bits.join(", ")} — but nothing craftable here yet (need the ingredients, a partner kit-tool, or the right terrain).`);
     }
   }
   const nearby = [...seen.values()].filter((p) => p.detail && !cleared.has(`${p.x},${p.y}`));
@@ -220,13 +243,19 @@ function printExpedition(st: GameState): void {
       // si7.4 parity: the web telegraphs walk-in combat; tell the console player
       // too (suffix hint, mirroring tierHint — drivers parse these lines).
       const tierHint = p.kind !== "monster" && p.detail!.tier > 1 ? ` (needs a tier-${p.detail!.tier} tool)` : "";
+      // gate-legibility (playtest 2026-07-09 #1): name the tool KIND a gatherable
+      // node needs when the player lacks it — the hunting node's "needs a knife" was
+      // never spelled out (web agent burned ~4 runs guessing). Append-only.
+      const needCap = p.kind !== "monster" ? NODE_TOOL[p.kind as GatherableNodeType] : null;
+      const hasKind = !needCap || exp.loadout.equipment.tools.some((t) => TOOL_CAPABILITY[t] === needCap);
+      const toolHint = needCap && !hasKind ? ` (${nodeToolHint(p.kind as GatherableNodeType)})` : "";
       const fightHint = p.kind === "monster" ? ` (step onto it to fight — needs a free loot slot)` : "";
       // Shoot hint (D45, append-only): an adjacent monster you can ranged-engage
       // right now (bow wielded + arrows) — the legal-action JSON carries `fight at`.
       const shootHint = p.kind === "monster" && legalActions(st).some((a) => a.type === "fight" && a.at !== undefined && a.at.x === p.x && a.at.y === p.y)
         ? ` (adjacent — shoot it from here without stepping in: {"type":"fight","at":{"x":${p.x},"y":${p.y}}} — your opener lands before it can answer)`
         : "";
-      console.log(`  (${p.x},${p.y}) ${flavorDetail(p.detail, p.kind)}${tierHint}${fightHint}${shootHint}`);
+      console.log(`  (${p.x},${p.y}) ${flavorDetail(p.detail, p.kind)}${toolHint}${tierHint}${fightHint}${shootHint}`);
     }
   }
   console.log("\nTip: move steps ONE tile straight toward `to` — it does NOT route around walls; an impassable/no-step rejection means pick a different neighbouring tile yourself."); // 2g7.7: was learned by punishment

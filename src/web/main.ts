@@ -16,9 +16,9 @@ import { costToReach } from "../engine/reach";
 import { carryCap } from "../engine/carry";
 import { heldFoodEnergy } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
-import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, TERRAIN_GATE, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, INKS, AFFIX_EFFECTS } from "../data/constants";
-import type { BiomeId } from "../data/constants";
-import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint, describe } from "../render/render";
+import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, TERRAIN_GATE, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, INKS, AFFIX_EFFECTS, NODE_TOOL, TOOL_CAPABILITY } from "../data/constants";
+import type { BiomeId, GatherableNodeType } from "../data/constants";
+import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint, describe, recipeGateHint, recipeTerrainGate, nodeToolHint, nodeTierNote } from "../render/render";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, LoadoutSlot, MapItem, RejectionReason } from "../engine/types";
 
@@ -119,7 +119,15 @@ function apply(action: Action): void {
   const { state: next, events } = reduce(state, action);
   if (action.type === "embark" && !events.some((e) => e.type === "action-rejected")) saveLastPlan(prevLoadout);
   state = next;
-  for (const e of events) log.unshift(fmt(e));
+  for (const e of events) {
+    // gate-legibility (playtest 2026-07-09 #1): a rejected CRAFT knows its recipeId
+    // here (the event doesn't carry it) — name the exact missing station/tool/terrain.
+    if (e.type === "action-rejected" && e.action === "craft" && action.type === "craft") {
+      log.unshift(`✗ craft — ${rejectCopy(e.reason, action.recipeId)}`);
+    } else {
+      log.unshift(fmt(e));
+    }
+  }
   trimAndDraw();
 }
 function note(line: string): void { log.unshift(line); trimAndDraw(); }
@@ -153,7 +161,7 @@ function fmt(e: GameEvent): string {
     case "map-discarded": return `🗺️ discarded a carried map`;
     case "packed": return `packed ${name(e.defId)} → ${e.slot}`;
     case "run-ended": return `— run ended (${e.reason}) —`;
-    case "action-rejected": return `✗ ${e.action} rejected: ${e.reason}`;
+    case "action-rejected": return `✗ ${e.action} — ${rejectCopy(e.reason)}`;
     case "engaged": return e.ranged
       ? `🏹 engaged the ${name(e.creature)} from a tile away — your opener lands before it can answer`
       : `⚔ engaged the ${name(e.creature)}`;
@@ -234,13 +242,24 @@ function findPath(grid: Grid, start: Pos, goal: Pos, transport: string | null, t
 // string used to cover ≥3 distinct RejectionReasons, so a bag-full fight read
 // identically to a walled tile. The reason rides the action-rejected event the
 // move driver already receives.
-function rejectCopy(reason: RejectionReason): string {
+// gate-legibility (playtest 2026-07-09 #1): NAME the missing thing. When the reject
+// came from a craft, `recipeId` lets us read RECIPE[...].requires and say exactly
+// which station/tool/terrain is missing instead of a generic "needs something."
+function rejectCopy(reason: RejectionReason, recipeId?: string): string {
+  const gate = recipeId ? recipeGateHint(recipeId) : null; // "needs anvil + blacksmiths-hammer"
   switch (reason) {
     case "impassable": return "blocked by terrain";
     case "carry-full": return "bag full — a monster fight needs a free loot slot";
     case "exhausted": return "out of energy";
     case "engaged": return "you're engaged — fight or flee below";
-    case "missing-station": return "needs a station you haven't built";
+    case "missing-station": return gate ? `can't craft — ${gate} (build the station first)` : "needs a station you haven't built";
+    case "missing-tool": return gate ? `can't craft — ${gate}` : "needs a tool you don't have";
+    case "tool-too-weak": return "your tool is too weak for this material's tier";
+    case "not-field-craftable": return "that recipe is town-only — it can't be made in the field";
+    case "not-near-terrain": {
+      const terr = recipeId ? recipeTerrainGate(recipeId) : null;
+      return terr ? `must stand on (or next to) ${terr} to make this` : "you're not on the terrain this needs";
+    }
     default: return reason;
   }
 }
@@ -446,8 +465,17 @@ function townView(): string {
               const r = RECIPE[id]!;
               const ing = r.inputs.map((i) => `${i.qty}× ${name(i.defId)}`).join(" + ");
               const can = affordable.has(id);
+              // gate-legibility (playtest 2026-07-09 #1): a locked row named its
+              // ingredients but not its STATION/TOOL gate — players only inferred
+              // "I lack mats." If a hard gate (station/tool) is unmet, name it.
+              const req = r.requires;
+              const gateUnmet = !can && req && (
+                (req.station && !built.has(req.station)) ||
+                (req.tools?.some((t) => !townTools.includes(t)))
+              );
+              const gate = gateUnmet ? recipeGateHint(id) : null;
               return `<div class="craftpath${can ? "" : " locked"}">← ${ing}${
-                can ? ` <button data-craft="${id}">craft ✓</button>` : ""
+                can ? ` <button data-craft="${id}">craft ✓</button>` : gate ? ` <span class="warn small">🔒 ${gate}</span>` : ""
               }</div>`;
             }).join("");
             const hint = weaponHint(out); // 57l: weapon-class hint — the bow died 3/3 to invisibility
@@ -496,13 +524,21 @@ function herePanel(grid: Grid, exp: NonNullable<GameState["expedition"]>, legal:
   // gatherable node
   const verb = GATHER_VERB[poi.kind]!;
   const tier = poi.material ? (MATERIAL_TIER[poi.material] ?? 1) : 1;
-  const locked = tier > 1 && !canGather;
+  // gate-legibility (playtest 2026-07-09 #1): distinguish the two "can't gather"
+  // reasons and name each. NO tool of the required KIND → "needs a knife"; has the
+  // kind but too weak for the tier → "needs a tier-N tool".
+  const needCap = NODE_TOOL[poi.kind as GatherableNodeType];
+  const hasToolKind = !needCap || exp.loadout.equipment.tools.some((t) => TOOL_CAPABILITY[t] === needCap);
+  const toolLocked = !canGather && !hasToolKind;
+  const tierLocked = !canGather && hasToolKind && tier > 1;
+  const locked = toolLocked || tierLocked;
   const article = /^[aeiou]/i.test(verb.noun) ? "an" : "a";
   return `<div class="here ${locked ? "locked" : ""}">
     <b>Here:</b> ${article} ${verb.noun} — <b>${name(poi.material!)}</b>${tier > 1 ? ` <span class="tier">tier ${tier}</span>` : ""}.
     ${canGather ? `<button data-act="gather">${verb.label} it</button>`
-      : locked ? `🔒 <span class="warn">your tool is too weak — needs a tier-${tier} tool to work ${name(poi.material!)}</span>`
-      : `<span class="warn">can't ${verb.past.replace(/ed$/, "")} (no tool / bag full)</span>`}
+      : toolLocked ? `🔒 <span class="warn">${nodeToolHint(poi.kind as GatherableNodeType)} to work ${name(poi.material!)}</span>`
+      : tierLocked ? `🔒 <span class="warn">your tool is too weak — needs a tier-${tier} tool to work ${name(poi.material!)}</span>`
+      : `<span class="warn">can't ${verb.past.replace(/ed$/, "")} — bag full (need a free loot slot)</span>`}
   </div>`;
 }
 
@@ -571,11 +607,17 @@ function expeditionView(): string {
     if (locked) cls.push("locked");
     const ch = isPlayer ? PLAYER_CHAR : isCleared ? "·" : poi ? POI_CHAR[poi.kind] : TERRAIN_CHAR[grid.terrain[y]![x]!];
     const per = poi ? perceived.get(k) : undefined;
+    // gate-legibility (playtest 2026-07-09 #1, node tier/reach visibility): a
+    // surveyed / in-vision node names its MATERIAL TIER at range (nodeTierNote reads
+    // the PERCEIVED, range-gated tier) so a far vein's worth-the-trek is legible —
+    // an agent trekked 50 tiles only to learn a node was tier-2. This also makes the
+    // tier honest to sight: an out-of-range node (per.detail null) reveals nothing.
+    const tierNote = per ? nodeTierNote(per.detail) : null;
     const title = stepBd
       ? stepExplain(stepBd)
       : poi && !isCleared // a cleared tile shows '·' — its title must not keep the stale poi text (1te-d)
       ? (per && per.detail
-          ? `${poi.kind} · ${flavorDetail(per.detail, poi.kind)}${locked ? ` (needs a better tool)` : ""}`
+          ? `${poi.kind} · ${flavorDetail(per.detail, poi.kind)}${tierNote ? ` · ${tierNote}` : ""}`
           : poi.kind === "monster" ? "a monster" : `a ${poi.kind} node`)
       : grid.terrain[y]![x]!;
     cells += `<div class="${cls.join(" ")}" data-x="${x}" data-y="${y}" title="${title}">${ch}</div>`;
@@ -649,14 +691,31 @@ function expeditionView(): string {
         // ke3.4: field-craft list — legal craft candidates on expedition (reduce
         // has already filtered to field recipes you can make right here).
         const fieldCrafts = legal.filter((a): a is Extract<Action, { type: "craft" }> => a.type === "craft");
-        if (!fieldCrafts.length) return "";
+        const craftable = new Set(fieldCrafts.map((a) => a.recipeId));
         const pool = [...exp.loadout.equipment.tools, ...exp.carry.map((s) => s.defId)];
-        const rows = fieldCrafts.map((a) => {
+        // gate-legibility (playtest 2026-07-09 #1, field-craft discoverability): 3/3
+        // testers never found field crafting because the panel only appeared once the
+        // kit was already equipped — the fire-kit was an unmarked key. Show the DOOR
+        // before the key: any field recipe gated on a kit-tool you lack renders greyed
+        // with its "needs: fire-kit" requirement, so the branch is visible to plan for.
+        const kitLocked = Object.keys(RECIPE).filter((id) => {
+          const r = RECIPE[id]!;
+          if (!r.field || craftable.has(id)) return false;
+          const tools = r.requires?.tools;
+          return tools && tools.some((t) => !pool.includes(t)); // missing a kit-tool
+        });
+        if (!fieldCrafts.length && !kitLocked.length) return "";
+        const readyRows = fieldCrafts.map((a) => {
           const r = RECIPE[a.recipeId]!;
           const ing = r.inputs.map((i) => `${i.qty}× ${name(i.defId)}`).join(" + ");
           return `<div class="craftpath">🔥 <button data-craft="${a.recipeId}" title="field-craft (−${FIELD_CRAFT_ENERGY}e)">craft ✓</button> ${recipeOutputQty(r, pool)}× ${name(r.output.defId)} <span class="muted small">← ${ing}</span></div>`;
         }).join("");
-        return `<h2>Field craft <span class="muted small">−${FIELD_CRAFT_ENERGY}e each</span></h2><div class="craftlist">${rows}</div>`;
+        const lockedRows = kitLocked.map((id) => {
+          const r = RECIPE[id]!;
+          const ing = r.inputs.map((i) => `${i.qty}× ${name(i.defId)}`).join(" + ");
+          return `<div class="craftpath locked">🔒 ${r.output.qty}× ${name(r.output.defId)} <span class="muted small">← ${ing}</span> <span class="warn small">${recipeGateHint(id)}</span></div>`;
+        }).join("");
+        return `<h2>Field craft <span class="muted small">−${FIELD_CRAFT_ENERGY}e each</span></h2><div class="craftlist">${readyRows}${lockedRows}</div>`;
       })()}
       <h2>Bag <span class="muted small">${inv.used}/${cap} slots</span></h2>
       ${inv.html}
