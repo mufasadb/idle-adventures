@@ -36,6 +36,7 @@ export function reserveLoadout(loadout: Loadout): ItemStack[] {
   for (const stack of food) out.push({ defId: stack.defId, qty: stack.qty });
   for (const stack of potions) out.push({ defId: stack.defId, qty: stack.qty });
   for (const stack of loadout.battleItems ?? []) out.push({ defId: stack.defId, qty: stack.qty });
+  for (const stack of loadout.enhancements ?? []) out.push({ defId: stack.defId, qty: stack.qty }); // weapon enhancements (D60)
   for (const stack of loadout.spares ?? []) out.push({ defId: stack.defId, qty: stack.qty }); // spare gear (82r)
   for (const stack of loadout.ammo ?? []) out.push({ defId: stack.defId, qty: stack.qty }); // arrows (D45)
   return out;
@@ -101,7 +102,9 @@ export function packItem(
           ? { ...loadout, spares: addConsumable(loadout.spares ?? [], itemId) }
           : slot === "ammo"
             ? { ...loadout, ammo: addConsumable(loadout.ammo ?? [], itemId) }
-            : { ...loadout, battleItems: addConsumable(loadout.battleItems, itemId) };
+            : slot === "enhancement"
+              ? { ...loadout, enhancements: addConsumable(loadout.enhancements ?? [], itemId) }
+              : { ...loadout, battleItems: addConsumable(loadout.battleItems, itemId) };
   if (consumableSlots(candidate) > cap) return { ok: false, reason: "no-slot" };
   if (reservedQty(candidate, itemId) > bankQty(bank, itemId)) {
     return { ok: false, reason: "insufficient" };

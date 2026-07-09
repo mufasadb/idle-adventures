@@ -21,6 +21,7 @@ import {
   CHIP_DAMAGE_MIN,
   COMBAT_BUFF,
   MITIGATION_K,
+  WEAPON_ENHANCEMENT,
 } from "../data/constants";
 import type { DmgType } from "../data/constants";
 import type { Loadout, ItemStack } from "./types";
@@ -97,7 +98,17 @@ export function hasAmmo(loadout: Loadout): boolean {
 // Arrows-out (D45): a ranged weapon with no ammo held swings as a club —
 // UNARMED_DAMAGE, no matrix, no tags — so an empty quiver never soft-locks a
 // fight; it just makes ammo a pack-time judgment.
-export function playerDamage(loadout: Loadout, monsterId: string): number {
+// weaponBuff (D60): an OPTIONAL active enhancement — absent = today's behaviour
+// exactly (all existing callers untouched, all combat numbers byte-identical).
+// When present: `flatDamage` adds to base (after the ×matrix/affinity scaling),
+// and `affinityTag` is a MONSTER tag the coating checks directly against the
+// creature — matched-or-not, never double (if the weapon already fires the
+// multiplier, the coating can't push past ×AFFINITY_MULTIPLIER; §4 double-dip guard).
+export function playerDamage(
+  loadout: Loadout,
+  monsterId: string,
+  weaponBuff?: { id: string },
+): number {
   const monster = MONSTERS[monsterId];
   if (!monster) throw new Error(`unknown monster: ${monsterId}`);
   const weaponId = loadout.equipment.weapon;
@@ -110,10 +121,15 @@ export function playerDamage(loadout: Loadout, monsterId: string): number {
     ? weapon.damage * DMG_ARMOUR_MATRIX[weapon.dmgType][monster.armourType]
     : UNARMED_DAMAGE;
   const tags = clubbed ? [] : weapon?.tags ?? [];
-  const affine = AFFINITIES.some(
-    (a) => monster.tags.includes(a.monsterTag) && tags.includes(a.itemTag),
-  );
-  return Math.max(CHIP_DAMAGE_MIN, base * (affine ? AFFINITY_MULTIPLIER : 1));
+  const enh = weaponBuff ? WEAPON_ENHANCEMENT[weaponBuff.id] : undefined;
+  // Affinity fires if the WEAPON's tag pairs with the monster (existing path) OR
+  // the coating's affinityTag matches a monster tag directly (the oil path). It's
+  // a boolean OR, so it never stacks past ×AFFINITY_MULTIPLIER.
+  const affine =
+    AFFINITIES.some((a) => monster.tags.includes(a.monsterTag) && tags.includes(a.itemTag)) ||
+    (enh?.affinityTag !== undefined && monster.tags.includes(enh.affinityTag));
+  const flat = enh?.flatDamage ?? 0; // whetstone: flat add, after the ×matrix/affinity scaling
+  return Math.max(CHIP_DAMAGE_MIN, base * (affine ? AFFINITY_MULTIPLIER : 1) + flat);
 }
 
 // Per-piece mitigation: defense ÷ matrix[dmgType][pieceArmour]. Division is
@@ -184,17 +200,24 @@ export type ExchangeResult = {
   hp: number;
   potionsAfter: ItemStack[];
   potionsUsed: number;
-  dmgDealt: number;
+  dmgDealt: number; // the player's SWING (flat/affinity applied); poison is reported separately
   dmgTaken: number; // 0 when the strike killed before retaliation
   victory: boolean;
   defeated: boolean;
+  weaponBuffAfter?: { id: string; charges: number }; // D60: charges after this strike (undefined = cleared/none)
+  poisonAfter?: { dmg: number; rounds: number }; // D60: engagement poison after this round's tick (undefined = none)
+  poisonDmg: number; // D60: poison damage dealt to the monster this round (0 = none)
 };
 
-// One combat round (si7.1): player strike → if the monster lives, retaliation →
-// waste-tolerant auto-quaff at the threshold. Pure; the reducer holds the
-// engagement state between rounds, resolveCombat loops this for the atomic API.
+// One combat round (si7.1): player strike → weapon-enhancement bookkeeping (D60:
+// spend a charge, set/refresh poison) → round-end poison tick (can land the kill)
+// → if the monster lives, retaliation → waste-tolerant auto-quaff at the threshold.
+// Pure; the reducer holds the engagement state between rounds, resolveCombat loops
+// this for the atomic API — both paths thread weaponBuff+poison IDENTICALLY.
 // skipRetaliation (D45): the ranged opener — the monster's answer to THIS round
 // is skipped (dmgTaken 0); melee callers never set it, so melee math is untouched.
+// weaponBuff/poison (D60): absent = today's behaviour exactly (all combat numbers
+// byte-identical, the harness passes un-edited).
 export function strikeExchange(
   loadout: Loadout,
   hp: number,
@@ -204,12 +227,29 @@ export function strikeExchange(
   mitigationAdd = 0,
   autoQuaff = true,
   skipRetaliation = false,
+  weaponBuff?: { id: string; charges: number },
+  poison?: { dmg: number; rounds: number },
 ): ExchangeResult {
-  const dmgDealt = playerDamage(loadout, monsterId) + damageAdd;
+  const dmgDealt = playerDamage(loadout, monsterId, weaponBuff) + damageAdd;
+  // Weapon-enhancement bookkeeping (D60). The strike always spends one charge; at
+  // 0 the coating clears. A poison coating set/refreshes the engagement's poison on
+  // this hit (before it wears off), so a fresh coat also ticks this same round.
+  const enh = weaponBuff ? WEAPON_ENHANCEMENT[weaponBuff.id] : undefined;
+  const weaponBuffAfter =
+    weaponBuff && weaponBuff.charges - 1 > 0 ? { id: weaponBuff.id, charges: weaponBuff.charges - 1 } : undefined;
+  const poisonState = enh?.poison ? { ...enh.poison } : poison ? { ...poison } : undefined;
+  // Round-end poison tick: the monster loses poison.dmg (dealt with the strike so
+  // it can land the kill), rounds decrements, clears at 0. INDEPENDENT of charges.
+  let poisonDmg = 0;
+  let poisonAfter: { dmg: number; rounds: number } | undefined = poisonState;
+  if (poisonState) {
+    poisonDmg = poisonState.dmg;
+    poisonAfter = poisonState.rounds - 1 > 0 ? { dmg: poisonState.dmg, rounds: poisonState.rounds - 1 } : undefined;
+  }
   const potions = loadout.potions.map((p) => ({ ...p }));
   let potionsUsed = 0;
   let current = hp;
-  const monsterAfter = monsterHp - dmgDealt;
+  const monsterAfter = monsterHp - dmgDealt - poisonDmg;
   let dmgTaken = 0;
   if (monsterAfter > 0) {
     if (!skipRetaliation) dmgTaken = damageTaken(loadout, monsterId, mitigationAdd);
@@ -232,10 +272,22 @@ export function strikeExchange(
     dmgTaken,
     victory: monsterAfter <= 0,
     defeated: monsterAfter > 0 && current <= 0,
+    weaponBuffAfter,
+    poisonAfter,
+    poisonDmg,
   };
 }
 
-export function resolveCombat(loadout: Loadout, hp: number, monsterId: string): CombatResult {
+// Atomic combat (sim/harness API). Reads Expedition.weaponBuff at fight start (D60)
+// and models it strike-by-strike EXACTLY as the interactive fight does — charges
+// spent per strike, poison ticking each round — so atomic == interactive.
+// No weaponBuff = today's behaviour byte-identical (the balance harness passes un-edited).
+export function resolveCombat(
+  loadout: Loadout,
+  hp: number,
+  monsterId: string,
+  weaponBuff?: { id: string; charges: number },
+): CombatResult {
   const monster = MONSTERS[monsterId];
   if (!monster) throw new Error(`unknown monster: ${monsterId}`);
   const buff = battleBuff(loadout.battleItems ?? []);
@@ -243,17 +295,21 @@ export function resolveCombat(loadout: Loadout, hp: number, monsterId: string): 
   let monsterHp = MONSTER_TIER_HP_CURVE[monster.tier]!;
   let potions = loadout.potions;
   let potionsUsed = 0;
+  let coating = weaponBuff;
+  let poison: { dmg: number; rounds: number } | undefined;
   // dmgDealt ≥ CHIP_DAMAGE_MIN > 0 guarantees termination (monster HP strictly
   // decreases each round).
   for (;;) {
     const round = strikeExchange(
       { ...loadout, potions }, current, monsterHp, monsterId,
-      buff.damageAdd, buff.mitigationAdd, true,
+      buff.damageAdd, buff.mitigationAdd, true, false, coating, poison,
     );
     current = round.hp;
     monsterHp = round.monsterHp;
     potions = round.potionsAfter;
     potionsUsed += round.potionsUsed;
+    coating = round.weaponBuffAfter;
+    poison = round.poisonAfter;
     if (round.victory || round.defeated) {
       return {
         victory: round.victory,

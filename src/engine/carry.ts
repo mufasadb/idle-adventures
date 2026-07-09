@@ -22,6 +22,7 @@ export function consumableSlots(loadout: Loadout): number {
     units(loadout.food) +
     units(loadout.potions) +
     units(loadout.battleItems ?? []) +
+    units(loadout.enhancements ?? []) + // weapon enhancements (D60): 1 slot per unit, like battle-items
     units(loadout.spares ?? []) + // spare gear (82r): 1 slot per piece, town-side; expanded into carry at embark
     (loadout.ammo ?? []).reduce((n, s) => n + Math.ceil(s.qty / stackCapOf(s.defId)), 0) + // ammo (D45): stacked slots
     loadout.equipment.tools.length

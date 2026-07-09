@@ -25,6 +25,7 @@ export type Loadout = {
   battleItems: ItemStack[]; // combat consumables (bzd): buff a single fight, consumed at fight start
   spares?: ItemStack[]; // spare gear packed into carry slots (82r): 1 slot per piece; expanded into expedition.carry at embark. Optional/absent = [] (old saves, terse test states); reads guard with `?? []`.
   ammo?: ItemStack[]; // arrows (D45): spent 1/exchange while a bow is wielded; stacks ARROW_STACK_CAP per slot (consumableSlots counts ceil); unspent ammo banks back at run end. Optional/absent = []; reads guard with `?? []`.
+  enhancements?: ItemStack[]; // weapon enhancements (D60): whetstone/oils packed like battle-items (1 slot/unit, no stacking); applied mid-run by the `enhance` action, unused ones bank back. Optional/absent = []; reads guard with `?? []`.
 };
 
 // A pocketed map (xzx): a single-use snapshot of an offered map you chose to keep.
@@ -50,6 +51,7 @@ export type Engagement = {
   potionsUsed: number; // accumulated across rounds + manual quaffs
   ranged?: boolean; // engaged from an adjacent tile with a bow (D45). Optional/absent = false; reads guard with `?? false`.
   opener?: boolean; // ranged opener pending (D45): the FIRST exchange skips the monster's retaliation, then this clears. Optional/absent = false; reads guard with `?? false`.
+  poison?: { dmg: number; rounds: number }; // weapon-enhancement poison DoT (D60): set/refreshed when a poison-coated strike lands; the monster loses `dmg` each round end, `rounds` decrements, clears at 0. INDEPENDENT of weaponBuff.charges — already-delivered poison keeps ticking after the coating wears off or you flee. Optional/absent = not poisoned. This is the state si7.6.6's blowdart reuses.
 };
 
 export type Expedition = {
@@ -70,6 +72,7 @@ export type Expedition = {
                     // (offered map = 1, held MapItem = its tier). Optional/absent = 1.
   surveyed?: { x: number; y: number }[]; // POIs resolved at range by the survey action (54f): perceive treats these as always-in-radius. Optional/absent = [] (old saves, terse test states); reads guard with `?? []`.
   affixes?: string[]; // cartography affixes carried from the embarked map (cxq): fed to expeditionGrid so the in-run grid matches what was inked. Optional/absent = []; reads guard with `?? []`.
+  weaponBuff?: { id: string; charges: number }; // active weapon enhancement (D60): a whetstone/oil coating applied mid-run via `enhance`. `id` is a WEAPON_ENHANCEMENT key; `charges` = remaining player strikes before it clears. Rides the EXPEDITION, not the weapon (no per-instance item state). Applying a new one REPLACES this (charges lost). Optional/absent = no enhancement; reads guard with `?? undefined`.
 };
 
 export type GameState = {
@@ -99,7 +102,8 @@ export type LoadoutSlot =
   | "potion"
   | "battle-item"
   | "spare" // spare gear into carry slots (82r): any gear defId, 1 slot per piece
-  | "ammo"; // arrows (D45): packed like potions, but slots count ceil(units/ARROW_STACK_CAP)
+  | "ammo" // arrows (D45): packed like potions, but slots count ceil(units/ARROW_STACK_CAP)
+  | "enhancement"; // weapon enhancements (D60): whetstone/oils, packed like a battle-item (1 slot/unit, no stacking)
 
 export type Action =
   | { type: "craft"; recipeId: string }
@@ -113,6 +117,7 @@ export type Action =
   | { type: "flee" } // disengage at the cost of one parting hit (si7.1)
   | { type: "quaff" } // drink one potion: mid-engagement (no exchange, si7.1) or on the map for QUAFF_ENERGY (82r)
   | { type: "use-item"; itemId: string } // use a packed battle item mid-fight (90j): manual-only, no auto-consume; adds its COMBAT_BUFF for THIS engagement, no exchange (mirrors quaff)
+  | { type: "enhance"; id: string } // apply a weapon enhancement (D60): sets Expedition.weaponBuff from a held enhancement stack; usable engaged or unengaged, no exchange, no energy (mirrors use-item/quaff)
   | { type: "survey"; at: { x: number; y: number } } // spend SURVEY_ENERGY to resolve one far POI's detail at range with a vision tool (54f)
   | { type: "don"; itemId: string } // equip a carried gear piece into its slot, displacing the worn one to carry (82r)
   | { type: "doff"; itemId: string } // unequip a worn piece / remove a tool to carry (82r)
@@ -191,10 +196,11 @@ export type GameEvent =
   | { type: "ate"; defId: string; restored: number; energy: number } // ate one food unit (dtv): restored energy, new current
   | { type: "auto-eat-toggled"; on: boolean } // flipped "eat when hungry" (dtv)
   | { type: "engaged"; at: { x: number; y: number }; creature: string; monsterHp: number; ranged?: boolean } // ranged (D45): engaged from an adjacent tile with a bow — the first exchange skips its retaliation
-  | { type: "exchanged"; creature: string; dmgDealt: number; dmgTaken: number; monsterHp: number; hp: number; potionsUsed: number; arrowSpent?: boolean } // arrowSpent (D45): present when this exchange shot an arrow
+  | { type: "exchanged"; creature: string; dmgDealt: number; dmgTaken: number; monsterHp: number; hp: number; potionsUsed: number; arrowSpent?: boolean; poisonDmg?: number } // arrowSpent (D45): present when this exchange shot an arrow. poisonDmg (D60): poison DoT dealt to the monster this round, present when >0
   | { type: "fled"; creature: string; partingHit: number; hp: number }
   | { type: "quaffed"; defId: string; healed: number; hp: number; energy?: number } // energy present only when spent (out-of-combat quaff, 82r)
   | { type: "item-used"; defId: string; damageAdd: number; mitigationAdd: number } // battle item used mid-fight (90j); buff added to this engagement (also vb8's missing consumption log line)
+  | { type: "enhanced"; id: string; charges: number } // weapon enhancement applied (D60): the coating `id` now rides the expedition with `charges` strikes left
   | { type: "surveyed"; at: { x: number; y: number }; kind: NodeType } // spyglass survey resolved a far POI's detail (54f); qualitative only
   | { type: "auto-quaff-toggled"; on: boolean }
   | { type: "donned"; defId: string; slot: LoadoutSlot; displaced: string | null; energy: number } // equipped from carry (82r)
