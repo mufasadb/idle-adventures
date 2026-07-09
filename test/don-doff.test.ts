@@ -29,7 +29,7 @@ function onMap(opts: {
     seed: "g", phase: "expedition", bank: [], loadout: emptyLoadout(),
     expedition: {
       mapSeed: "dd-seed", pos: { x: 0, y: 19 }, energy: opts.energy ?? 100,
-      hp: 30, loadout, carry: opts.carry ?? [], cleared: [], autoEat: false,
+      hp: 30, loadout, carry: opts.carry ?? [], cleared: [], // auto-eat off (no autoEatFood)
     },
   };
 }

@@ -34,7 +34,7 @@ test("embark: enters expedition at the map's entry at MAX_ENERGY (stamina model,
   expect(state.expedition!.pos).toEqual(grid.entry);
   expect(state.expedition!.energy).toBe(MAX_ENERGY); // start at max regardless of packed food
   expect(state.expedition!.maxEnergy).toBe(MAX_ENERGY);
-  expect(state.expedition!.autoEat).toBe(true);
+  expect(state.expedition!.autoEatFood).toBeUndefined(); // auto-eat starts OFF (mco)
   expect(state.expedition!.carry).toEqual([]);
   expect(state.expedition!.cleared).toEqual([]);
   expect(events).toEqual([

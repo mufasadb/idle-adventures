@@ -38,6 +38,8 @@ function runLoop(seed: string, mapSeed: string, runs: number): { state: GameStat
   for (let i = 0; i < 4; i++) pack({ type: "pack", slot: "food", itemId: "ration" }); // 40 energy
   state = reduce(state, { type: "embark", mapSeed }).state;
   expect(state.phase).toBe("expedition");
+  // mco: auto-eat is off by default — designate the packed ration to eat-to-refill.
+  state = reduce(state, { type: "set-auto-eat-food", defId: "ration" }).state;
 
   const grid = generateGrid(mapSeed, rollBiome(mapSeed));
   const gatherable = grid.pois.filter((p) => p.kind !== "monster" && p.material !== null);

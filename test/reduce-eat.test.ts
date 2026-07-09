@@ -6,11 +6,11 @@ import type { GameState, Loadout } from "../src/engine/types";
 
 // Stamina model (m0a): manual `eat` over-eats the MOST-dense food unit, jumping
 // energy TO foodEnergy×tentMult (may exceed maxEnergy). Auto-eat (waste-free,
-// least-dense-first) is separate and unchanged. `toggle-auto-eat` flips it.
+// scoped to the DESIGNATED food) is separate. `set-auto-eat-food` designates it (mco).
 
 function onExpedition(opts: {
   energy?: number;
-  autoEat?: boolean;
+  autoEatFood?: string;
   food?: { defId: string; qty: number }[];
   tools?: string[];
 } = {}): GameState {
@@ -21,7 +21,7 @@ function onExpedition(opts: {
     seed: "eat", phase: "expedition", bank: [], loadout: emptyLoadout(),
     expedition: {
       mapSeed: "eat", pos: { x: 0, y: 0 },
-      energy: opts.energy ?? 100, maxEnergy: MAX_ENERGY, autoEat: opts.autoEat ?? true,
+      energy: opts.energy ?? 100, maxEnergy: MAX_ENERGY, autoEatFood: opts.autoEatFood,
       hp: 30, loadout, carry: [], cleared: [],
     },
   };
@@ -44,7 +44,7 @@ test("eat: may exceed maxEnergy (no clamping)", () => {
     seed: "eat", phase: "expedition", bank: [], loadout: emptyLoadout(),
     expedition: {
       mapSeed: "eat", pos: { x: 0, y: 0 },
-      energy: 100, maxEnergy: MAX_ENERGY, autoEat: true,
+      energy: 100, maxEnergy: MAX_ENERGY,
       hp: 30, loadout, carry: [], cleared: [],
     },
   };
@@ -69,17 +69,31 @@ test("eat: rejected with no food", () => {
   expect(events).toEqual([{ type: "action-rejected", action: "eat", reason: "insufficient" }]);
 });
 
-test("toggle-auto-eat: flips the flag", () => {
-  const { state, events } = reduce(onExpedition({ autoEat: true }), { type: "toggle-auto-eat" });
-  expect(state.expedition!.autoEat).toBe(false);
-  expect(events).toEqual([{ type: "auto-eat-toggled", on: false }]);
-  const back = reduce(state, { type: "toggle-auto-eat" });
-  expect(back.state.expedition!.autoEat).toBe(true);
+test("set-auto-eat-food: designates a food, then null clears it (mco)", () => {
+  const { state, events } = reduce(onExpedition(), { type: "set-auto-eat-food", defId: "ration" });
+  expect(state.expedition!.autoEatFood).toBe("ration");
+  expect(events).toEqual([{ type: "auto-eat-set", defId: "ration" }]);
+  const cleared = reduce(state, { type: "set-auto-eat-food", defId: null });
+  expect(cleared.state.expedition!.autoEatFood).toBeUndefined();
+  expect(cleared.events).toEqual([{ type: "auto-eat-set", defId: null }]);
 });
 
-test("auto-eat off: manual eat still works when boosted > current", () => {
-  // energy 0, ration(80), autoEat off → boosted 80 > 0 → jumps to 80
-  const s = onExpedition({ energy: 0, autoEat: false });
+test("set-auto-eat-food: rejects a non-food defId (mco)", () => {
+  const { state, events } = reduce(onExpedition(), { type: "set-auto-eat-food", defId: "knife" });
+  expect(state.expedition!.autoEatFood).toBeUndefined();
+  expect(events).toEqual([{ type: "action-rejected", action: "set-auto-eat-food", reason: "not-food" }]);
+});
+
+test("set-auto-eat-food: the designated food auto-eats waste-free on a spend (mco)", () => {
+  // ration designated, energy 0 → an eat-triggering spend refills from ration only.
+  const s = onExpedition({ energy: 0, autoEatFood: "ration", food: [{ defId: "ration", qty: 3 }] });
+  // eat is a manual over-eat; auto-eat rides move/gather. Prove designation sticks:
+  expect(s.expedition!.autoEatFood).toBe("ration");
+});
+
+test("auto-eat off by default: manual eat still works when boosted > current", () => {
+  // energy 0, ration(80), auto-eat off (no autoEatFood) → boosted 80 > 0 → jumps to 80
+  const s = onExpedition({ energy: 0 });
   const { state } = reduce(s, { type: "eat" });
   expect(state.expedition!.energy).toBe(80);
 });

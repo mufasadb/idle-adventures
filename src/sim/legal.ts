@@ -81,9 +81,12 @@ export function expeditionActions(state: GameState): Action[] {
   // field craft (ke3.4): every recipe as a craft candidate; reduce filters
   // non-field / missing-tool / not-near-terrain / insufficient / exhausted (D29)
   if (!engaged) for (const recipeId of Object.keys(RECIPE)) candidates.push({ type: "craft", recipeId });
-  // stamina (dtv): eat when there's food + room; toggle the auto-eat any time
+  // stamina (dtv/mco): eat when there's food + room; designate the auto-eat food.
+  // One set-auto-eat-food per held food defId (designate it), plus null (clear/off).
   candidates.push({ type: "eat" });
-  candidates.push({ type: "toggle-auto-eat" });
+  const foodDefs = new Set(state.expedition.loadout.food.map((s) => s.defId));
+  for (const defId of foodDefs) candidates.push({ type: "set-auto-eat-food", defId });
+  candidates.push({ type: "set-auto-eat-food", defId: null });
   // drop each carried stack
   for (const stack of carry) candidates.push({ type: "drop", itemId: stack.defId });
   // don each carried gear piece; doff each worn piece + tool (82r) — reduce

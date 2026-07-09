@@ -64,7 +64,7 @@ export type Expedition = {
   cleared: { x: number; y: number }[]; // POIs consumed this run (D24): gathered nodes; M4 adds defeated monsters
   // grid regenerated from mapSeed on demand, not stored
   maxEnergy?: number; // stamina ceiling (dtv): set to MAX_ENERGY at embark (gear-raisable later). Optional/absent = MAX_ENERGY (old saves, terse test states); reads guard with `?? MAX_ENERGY`.
-  autoEat?: boolean; // "eat when hungry" (dtv): waste-free auto-eat after each spend. Set true at embark; toggle-auto-eat flips it. Optional/absent = true; reads guard with `?? true`.
+  autoEatFood?: string; // designated auto-eat food (mco): a food defId. When set, autoRefill eats ONLY units of this food, waste-free, after each spend. Absent/undefined = auto-eat OFF (nothing auto-eats). Supersedes the old autoEat boolean + least-dense-first (D48). Set via set-auto-eat-food.
   carriedMaps?: MapItem[]; // map-scroll drops carried home (8ec): each costs ONE carry slot for the run; banked into GameState.maps at run end. Optional/absent = [] (old saves, terse test states); reads guard with `?? []`.
   combat?: Engagement; // live engagement (si7.1). Optional/absent = not engaged; reads guard with `?? undefined` checks.
   autoQuaff?: boolean; // auto-potion at the threshold inside exchanges (si7.1, mirrors autoEat). Optional/absent = true; reads guard with `?? true`.
@@ -123,7 +123,7 @@ export type Action =
   | { type: "doff"; itemId: string } // unequip a worn piece / remove a tool to carry (82r)
   | { type: "toggle-auto-quaff" } // flip auto-potion-at-threshold (si7.1)
   | { type: "eat" } // eat one food unit now → refill current energy toward max (dtv)
-  | { type: "toggle-auto-eat" } // flip the waste-free "eat when hungry" auto-eat (dtv)
+  | { type: "set-auto-eat-food"; defId: string | null } // designate the food that auto-eats waste-free (mco); null clears it (auto-eat off). Supersedes toggle-auto-eat.
   | { type: "drop"; itemId: string }
   | { type: "drop-map"; mapSeed: string } // discard a carried map mid-run (8ec) — frees its slot; no re-pickup
   | { type: "return" };
@@ -162,6 +162,7 @@ export type RejectionReason =
   | "engaged"
   | "not-engaged"
   | "not-worn" // doff of a defId that isn't currently equipped (82r)
+  | "not-food" // set-auto-eat-food with a defId that isn't a food (mco)
   | "already-resolved"; // survey of a POI whose detail is already in focus (54f)
 
 // Events are a render byproduct emitted by reduce. Named GameEvent (not Event)
@@ -194,7 +195,7 @@ export type GameEvent =
     }
   | { type: "dropped"; defId: string; qty: number }
   | { type: "ate"; defId: string; restored: number; energy: number } // ate one food unit (dtv): restored energy, new current
-  | { type: "auto-eat-toggled"; on: boolean } // flipped "eat when hungry" (dtv)
+  | { type: "auto-eat-set"; defId: string | null } // designated (or cleared, null) the auto-eat food (mco)
   | { type: "engaged"; at: { x: number; y: number }; creature: string; monsterHp: number; ranged?: boolean } // ranged (D45): engaged from an adjacent tile with a bow — the first exchange skips its retaliation
   | { type: "exchanged"; creature: string; dmgDealt: number; dmgTaken: number; monsterHp: number; hp: number; potionsUsed: number; arrowSpent?: boolean; poisonDmg?: number } // arrowSpent (D45): present when this exchange shot an arrow. poisonDmg (D60): poison DoT dealt to the monster this round, present when >0
   | { type: "fled"; creature: string; partingHit: number; hp: number }

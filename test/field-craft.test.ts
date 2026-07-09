@@ -10,7 +10,7 @@ import type { Terrain } from "../src/data/constants";
 // A field expedition: pick any seed, stand at a walkable tile, equip tools, carry
 // the given materials. maxEnergy default (no food) so autoRefill is a no-op and
 // energy deltas are exact.
-function fieldState(opts: { tools?: string[]; carry?: ItemStack[]; energy?: number; food?: ItemStack[]; seed?: string; pos?: { x: number; y: number }; autoEat?: boolean } = {}): GameState {
+function fieldState(opts: { tools?: string[]; carry?: ItemStack[]; energy?: number; food?: ItemStack[]; seed?: string; pos?: { x: number; y: number }; autoEatFood?: string } = {}): GameState {
   const seed = opts.seed ?? "fc-seed";
   const loadout = emptyLoadout();
   loadout.equipment.tools = opts.tools ?? [];
@@ -28,7 +28,7 @@ function fieldState(opts: { tools?: string[]; carry?: ItemStack[]; energy?: numb
       loadout,
       carry: opts.carry ?? [],
       cleared: [],
-      autoEat: opts.autoEat ?? true,
+      autoEatFood: opts.autoEatFood,
     },
   };
 }
@@ -73,7 +73,7 @@ test("field craft: fire-kit + rich-venison + oak-log → cooked-venison at food 
     carry: [{ defId: "rich-venison", qty: 1 }, { defId: "oak-log", qty: 1 }],
     food: [{ defId: "ration", qty: 1 }],
     energy: 100,
-    autoEat: false,
+    // auto-eat off (no autoEatFood) — the ration stays put; energy delta is the flat cost.
   });
   const { state, events } = reduce(before, { type: "craft", recipeId: "cooked-venison" });
   const exp = state.expedition!;
@@ -94,7 +94,7 @@ test("field craft: pays FIELD_CRAFT_ENERGY then waste-free auto-eats, like gathe
     carry: [{ defId: "rich-venison", qty: 1 }, { defId: "oak-log", qty: 1 }],
     food: [{ defId: "ration", qty: 1 }],
     energy: 100,
-    autoEat: true,
+    autoEatFood: "ration", // auto-eat ON, designating ration
   });
   const { state } = reduce(before, { type: "craft", recipeId: "cooked-venison" });
   const exp = state.expedition!;

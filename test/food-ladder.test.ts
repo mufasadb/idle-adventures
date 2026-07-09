@@ -19,10 +19,10 @@ test("ration stays at 80 (T1 sustainability floor)", () => {
 test("dense food is blocked at a full base ceiling but eats under a raised one", () => {
   const dense = foodEnergyOf("pemmican");
   // At MAX_ENERGY with only headroom for a smaller unit, pemmican at the front blocks:
-  const blocked = eatToRefill([{ defId: "pemmican", qty: 1 }], MAX_ENERGY - 1, MAX_ENERGY);
+  const blocked = eatToRefill([{ defId: "pemmican", qty: 1 }], MAX_ENERGY - 1, MAX_ENERGY, "pemmican");
   expect(blocked.food.length).toBe(1); // uneaten — would overfill
   // With a raised ceiling and low energy, it eats:
-  const eaten = eatToRefill([{ defId: "pemmican", qty: 1 }], 100, 100 + dense);
+  const eaten = eatToRefill([{ defId: "pemmican", qty: 1 }], 100, 100 + dense, "pemmican");
   expect(eaten.food.length).toBe(0);
   expect(eaten.energy).toBe(100 + dense);
 });

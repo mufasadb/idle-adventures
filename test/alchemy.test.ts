@@ -13,13 +13,13 @@ function town(bank: ItemStack[], stations?: GameState["stations"]): GameState {
   return { seed: "c", phase: "town", bank, loadout: emptyLoadout(), expedition: null, ...(stations ? { stations } : {}) };
 }
 
-function field(opts: { tools?: string[]; carry?: ItemStack[]; potions?: ItemStack[]; hp?: number; energy?: number; seed?: string; pos?: { x: number; y: number }; autoEat?: boolean } = {}): GameState {
+function field(opts: { tools?: string[]; carry?: ItemStack[]; potions?: ItemStack[]; hp?: number; energy?: number; seed?: string; pos?: { x: number; y: number } } = {}): GameState {
   const loadout = emptyLoadout();
   loadout.equipment.tools = opts.tools ?? [];
   loadout.potions = opts.potions ?? [];
   return {
     seed: "al", phase: "expedition", bank: [], loadout: emptyLoadout(),
-    expedition: { mapSeed: opts.seed ?? "al-seed", pos: opts.pos ?? { x: 10, y: 30 }, energy: opts.energy ?? 200, hp: opts.hp ?? 30, maxEnergy: 300, loadout, carry: opts.carry ?? [], cleared: [], autoEat: opts.autoEat ?? false },
+    expedition: { mapSeed: opts.seed ?? "al-seed", pos: opts.pos ?? { x: 10, y: 30 }, energy: opts.energy ?? 200, hp: opts.hp ?? 30, maxEnergy: 300, loadout, carry: opts.carry ?? [], cleared: [] },
   };
 }
 

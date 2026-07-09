@@ -56,6 +56,8 @@ test("e3j report: starter-kit harvest fraction", () => {
   }
   state = act({ type: "embark", mapSeed: c.mapSeed }).state;
   expect(state.phase).toBe("expedition");
+  // mco: auto-eat off by default — designate the packed ration to eat-to-refill.
+  state = reduce(state, { type: "set-auto-eat-food", defId: "ration" }).state;
   const grid = generateGrid(c.mapSeed, rollBiome(c.mapSeed));
   // Only target nodes this kit can actually work: herb (bare hands), mining
   // (pick) or animal (knife) — no axe, so skip wood — and only materials at
@@ -159,6 +161,8 @@ test("e3j report: geared-kit harvest fraction", () => {
   }
   state = act({ type: "embark", mapSeed: c.mapSeed }).state;
   expect(state.phase).toBe("expedition");
+  // mco: auto-eat off by default — designate the packed ration to eat-to-refill.
+  state = reduce(state, { type: "set-auto-eat-food", defId: "ration" }).state;
   const grid = generateGrid(c.mapSeed, rollBiome(c.mapSeed));
   // Target ALL gatherable kinds/tiers this kit can work: pick + knife (no axe,
   // so still skip wood), tier ≤ tool quality 1 — same filter as the starter test.

@@ -88,6 +88,9 @@ export function simHarvest(pack: PackSpec, mapSeed: string, mapTier: number): Ha
   const grid = generateGrid(mapSeed, biomeId, mapTier);
   const total = grid.pois.length;
   if (!s.expedition) return { mapSeed, mapTier, cleared: 0, total, fraction: 0 };
+  // mco: auto-eat is OFF by default — designate the packed food so the greedy
+  // harvester eats-to-refill and reaches deep (was the pre-mco embark default).
+  if (pack.food[0]) s = reduce(s, { type: "set-auto-eat-food", defId: pack.food[0].defId } as Action).state;
 
   const eq = s.expedition.loadout.equipment; // transport/tools are fixed for the run
   const blocked = new Set(grid.pois.filter((p) => p.kind === "monster" && p.creature !== null).map((p) => `${p.x},${p.y}`));

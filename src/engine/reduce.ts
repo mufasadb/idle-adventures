@@ -37,8 +37,8 @@ export function reduce(
       return gather(state);
     case "eat":
       return eat(state);
-    case "toggle-auto-eat":
-      return toggleAutoEat(state);
+    case "set-auto-eat-food":
+      return setAutoEatFood(state, action.defId);
     case "drop":
       return drop(state, action.itemId);
     case "drop-map":
@@ -106,7 +106,8 @@ function embark(
   const grid = expeditionGrid({ mapSeed, mapTier, affixes });
   // Stamina model (dtv): current energy starts at MAX_ENERGY regardless of packed
   // food — food is a reserve you EAT to refill toward max mid-run, not the source
-  // of the whole budget. autoEat (default on) refills waste-free after each spend.
+  // of the whole budget. Auto-eat starts OFF (mco): the player designates a food
+  // (set-auto-eat-food) to refill waste-free after each spend; until then nothing auto-eats.
   // Capacity gear (si7.2): canteen and future tools raise the ceiling additively.
   const maxEnergy = MAX_ENERGY + energyCapOf(state.loadout.equipment);
   const energy = maxEnergy;
@@ -130,7 +131,6 @@ function embark(
         pos: grid.entry,
         energy,
         maxEnergy,
-        autoEat: true,
         hp: PLAYER_BASE_HP,
         loadout: { ...state.loadout, spares: [] },
         carry,
@@ -914,17 +914,20 @@ export function energyCapOf(equipment: Equipment): number {
 }
 
 // Drain-then-refill helper for move/gather: given the post-spend current energy,
-// run waste-free auto-eat if the toggle is on (dtv). Returns the food reserve +
-// new current energy. autoEat/maxEnergy default via the optional-field guards.
+// eat waste-free from the DESIGNATED auto-eat food if one is set (mco). Returns the
+// food reserve + new current energy. No designation (autoEatFood absent) = off, no eat.
+// maxEnergy defaults via the optional-field guard.
 function autoRefill(
   expedition: Expedition,
   energy: number,
 ): { food: Expedition["loadout"]["food"]; energy: number } {
-  if (!(expedition.autoEat ?? true)) return { food: expedition.loadout.food, energy };
+  const target = expedition.autoEatFood;
+  if (!target) return { food: expedition.loadout.food, energy };
   return eatToRefill(
     expedition.loadout.food,
     energy,
     expedition.maxEnergy ?? MAX_ENERGY,
+    target,
     tentMultOf(expedition),
   );
 }
@@ -965,16 +968,19 @@ function eat(state: GameState): { state: GameState; events: GameEvent[] } {
   };
 }
 
-// Flip the waste-free "eat when hungry" auto-eat (dtv). Pure toggle; no eating here.
-function toggleAutoEat(state: GameState): { state: GameState; events: GameEvent[] } {
+// Designate which food auto-eats waste-free (mco); null clears it (auto-eat off).
+// No eating here — just sets Expedition.autoEatFood; autoRefill acts on it next spend.
+function setAutoEatFood(state: GameState, defId: string | null): { state: GameState; events: GameEvent[] } {
   const expedition = state.expedition;
   if (state.phase !== "expedition" || !expedition) {
-    return rejected(state, "toggle-auto-eat", "not-on-expedition");
+    return rejected(state, "set-auto-eat-food", "not-on-expedition");
   }
-  const on = !(expedition.autoEat ?? true);
+  if (defId !== null && slotOf(defId) !== "food") {
+    return rejected(state, "set-auto-eat-food", "not-food");
+  }
   return {
-    state: { ...state, expedition: { ...expedition, autoEat: on } },
-    events: [{ type: "auto-eat-toggled", on }],
+    state: { ...state, expedition: { ...expedition, autoEatFood: defId ?? undefined } },
+    events: [{ type: "auto-eat-set", defId }],
   };
 }
 

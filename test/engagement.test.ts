@@ -71,7 +71,7 @@ test("non-combat actions reject 'engaged'; toggles stay legal", () => {
     const { events } = reduce(s, a as never);
     expect(events[0]).toMatchObject({ type: "action-rejected", reason: "engaged" });
   }
-  expect(types(reduce(s, { type: "toggle-auto-eat" }).events)).toEqual(["auto-eat-toggled"]);
+  expect(types(reduce(s, { type: "set-auto-eat-food", defId: "ration" }).events)).toEqual(["auto-eat-set"]);
   expect(types(reduce(s, { type: "toggle-auto-quaff" }).events)).toEqual(["auto-quaff-toggled"]);
 });
 
@@ -105,7 +105,7 @@ test("quaff heals mid-engagement without an exchange; works on the map for energ
   expect((events[0] as { energy?: number }).energy).toBeUndefined(); // in-combat quaff spends no energy (its cost is tempo)
   // Out of combat (82r): quaff heals between fights and costs QUAFF_ENERGY.
   const hurt = onMonster(seed, poi, { hp: 10, potions: [{ defId: "potion", qty: 1 }] });
-  hurt.expedition!.autoEat = false; // keep the energy arithmetic bare
+  // auto-eat off by default (no autoEatFood) — energy arithmetic stays bare
   const before = hurt.expedition!.energy;
   const outside = reduce(hurt, { type: "quaff" });
   expect(outside.events[0]).toMatchObject({ type: "quaffed", defId: "potion", healed: 10, hp: 20, energy: before - QUAFF_ENERGY });

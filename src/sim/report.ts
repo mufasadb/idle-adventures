@@ -7,7 +7,7 @@ type ExpeditionSummary = {
   pos: { x: number; y: number };
   energy: number;
   maxEnergy: number;
-  autoEat: boolean;
+  autoEatFood: string | null;
   hp: number;
   carry: ItemStack[];
   cleared: number;
@@ -30,7 +30,7 @@ export function summarize(state: GameState): {
           pos: e.pos,
           energy: e.energy,
           maxEnergy: e.maxEnergy ?? MAX_ENERGY,
-          autoEat: e.autoEat ?? true,
+          autoEatFood: e.autoEatFood ?? null,
           hp: e.hp,
           carry: e.carry,
           cleared: e.cleared.length,

@@ -37,6 +37,9 @@ function oneRun(s: GameState, mapSeed: string): GameState {
 
   s = reduce(s, { type: "embark", mapSeed }).state;
   if (!s.expedition) return s; // embarked with 0 energy — starvation (caught by the assert)
+  // mco: auto-eat is OFF by default — the greedy player designates its packed ration
+  // so it eats-to-refill waste-free as it travels (was the pre-mco embark default).
+  s = reduce(s, { type: "set-auto-eat-food", defId: "ration" }).state;
 
   const grid = generateGrid(mapSeed, rollBiome(mapSeed));
   const targets = grid.pois.filter((p) => p.kind === "herb" || p.kind === "animal");

@@ -191,7 +191,7 @@ export const FOOD_ENERGY: Record<string, number> = {
   "trail-ration": 130, // compressed from 160 (si7.2) — opens ladder headroom above it
   berries: 30, // fresh forage (e3j): weak-but-immediate — eat on the trail or lose them to staleness
   jam: 120, // processed stale-berries — hauling the harvest home beats eating it raw (1.5 rations/slot)
-  pemmican: 240, // tier-food line (si7.2): dense trail food (meat + berries). Auto-eat (least-dense-first, m0a) leaves it as a RESERVE; you cash it in with a manual `eat` (over-eats up to foodEnergy×tentMult, may exceed maxEnergy). No tent-safe density cap needed (m0a).
+  pemmican: 240, // tier-food line (si7.2): dense trail food (meat + berries). Auto-eat only fires if you DESIGNATE it (mco); otherwise it's a RESERVE you cash in with a manual `eat` (over-eats up to foodEnergy×tentMult, may exceed maxEnergy). No tent-safe density cap needed (m0a).
   apple: 40, // fresh forage (m0a): woodland orchard fruit — weak-but-immediate, stales to bruised-apple
   "smoked-venison": 200, // m0a: woodland cured meat — a manual-over-eat reserve under a tent
   "blubber-stew": 160, // m0a: tundra rendered fat + moss
