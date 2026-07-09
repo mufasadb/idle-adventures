@@ -20,7 +20,7 @@ import {
   POI_CHAR,
   PLAYER_CHAR,
 } from "../render/render";
-import { RECIPE, MAP_WIDTH, MAP_HEIGHT, SURVEY_ENERGY, AFFIX_EFFECTS } from "../data/constants";
+import { RECIPE, MAP_WIDTH, MAP_HEIGHT, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, AFFIX_EFFECTS } from "../data/constants";
 import { moveCostBreakdown } from "../engine/move";
 import { usedSlots, carryCap } from "../engine/carry";
 import { costToReach } from "../engine/reach";
@@ -56,7 +56,7 @@ function fmtEvent(e: GameEvent): string {
         ? `⚔ beat it · −${e.hpLost}hp · loot ${e.loot.map((l) => `${l.qty}× ${l.defId}`).join(", ") || "none"}`
         : `☠ you were downed · run ends, haul kept`) + tail;
     }
-    case "crafted": return `✦ crafted ${e.output.qty}× ${e.output.defId}`;
+    case "crafted": return `✦ ${e.where === "field" ? "field-crafted 🔥 " : "crafted "}${e.output.qty}× ${e.output.defId}`;
     case "pocketed-map": return `📜 pocketed a T${e.tier} ${e.biomeId} map`;
     case "map-dropped": return e.carried
       ? `🗺️ looted a T${e.tier} ${e.biomeId} map (takes 1 carry slot — banks home with you)`
@@ -196,6 +196,17 @@ function printExpedition(st: GameState): void {
     rows.push(row);
   }
   console.log(rows.join("\n"));
+  // ke3.4: field-craft candidates you can make right here (reduce-filtered).
+  const fieldCrafts = legalActions(st).filter((a) => a.type === "craft") as Extract<Action, { type: "craft" }>[];
+  if (fieldCrafts.length) {
+    const pool = [...exp.loadout.equipment.tools, ...exp.carry.map((s) => s.defId)];
+    console.log(`\nField craft (−${FIELD_CRAFT_ENERGY}e each):`);
+    for (const a of fieldCrafts) {
+      const r = RECIPE[a.recipeId]!;
+      const ing = r.inputs.map((i) => `${i.qty}× ${i.defId}`).join(" + ");
+      console.log(`  🔥 ${recipeOutputQty(r, pool)}× ${r.output.defId}  ←  ${ing}  ·  craft recipeId="${a.recipeId}"`);
+    }
+  }
   const nearby = [...seen.values()].filter((p) => p.detail && !cleared.has(`${p.x},${p.y}`));
   if (nearby.length) {
     console.log("\nWhat you can make out nearby:");

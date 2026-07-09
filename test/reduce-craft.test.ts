@@ -123,13 +123,18 @@ test("craft: with fletchers-knife equipped, town arrow-shaft scales off the load
   expect(state.bank.find((s) => s.defId === "arrow-shaft")?.qty).toBe(3);
 });
 
-test("craft: rejected outside town", () => {
-  const expeditionState: GameState = {
-    ...town([{ defId: "iron-ore", qty: 3 }, { defId: "oak-log", qty: 1 }]),
+test("craft: a town-only recipe can't be field-crafted — routes by phase (ke3.4)", () => {
+  // craft now routes town↔field by phase; a non-field recipe on expedition is
+  // rejected via the field path (not-field-craftable), not not-in-town.
+  const s: GameState = {
+    seed: "c",
     phase: "expedition",
+    bank: [],
+    loadout: emptyLoadout(),
+    expedition: { mapSeed: "x", pos: { x: 0, y: 0 }, energy: 100, hp: 30, loadout: emptyLoadout(), carry: [{ defId: "iron-ore", qty: 5 }], cleared: [] },
   };
-  const { events } = reduce(expeditionState, { type: "craft", recipeId: "iron-pick" });
+  const { events } = reduce(s, { type: "craft", recipeId: "iron-pick" });
   expect(events).toEqual([
-    { type: "action-rejected", action: "craft", reason: "not-in-town" },
+    { type: "action-rejected", action: "craft", reason: "not-field-craftable" },
   ]);
 });

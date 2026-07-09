@@ -2,18 +2,18 @@ import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot, RejectionRea
 import { expeditionGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
-import { addToCarry, freeCarryStacks, freeLootStacks, usedSlots, carryCap } from "./carry";
+import { addToCarry, freeCarryStacks, freeLootStacks, usedSlots, carryCap, consumeExpeditionInputs } from "./carry";
 import { toolQualityFor } from "./tools";
 import { strikeExchange, rollLoot, explainMatchup, damageTaken, wieldsRanged, hasAmmo } from "./combat";
 import { eatToRefill, foodEnergyOf } from "./food";
 import { endExpedition, subtractStacks } from "./bank";
 import { rand } from "./rng";
-import { craft as applyRecipe } from "./craft";
+import { craft as applyRecipe, recipeOutputQty } from "./craft";
 import { packItem, reserveLoadout, EQUIP_SLOTS } from "./pack";
 import type { EquipSlot } from "./pack";
 import { slotOf, isGear } from "./catalog";
 import { candidateMaps, previewHints } from "./town";
-import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF, SURVEY_ENERGY, TOOL_CAPABILITY, INKS, RECIPE } from "../data/constants";
+import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, INKS, RECIPE } from "../data/constants";
 import { visionRadius } from "./perceive";
 import type { GatherableNodeType } from "../data/constants";
 
@@ -192,7 +192,11 @@ function craftAction(
   state: GameState,
   recipeId: string,
 ): { state: GameState; events: GameEvent[] } {
+  // ke3.4: one craft Action, routed by phase. On expedition → field crafting.
+  if (state.phase === "expedition") return fieldCraftAction(state, recipeId);
   if (state.phase !== "town") return rejected(state, "craft", "not-in-town");
+  // A field:true recipe is field-ONLY — in town you're not on an expedition (ke3.4).
+  if (RECIPE[recipeId]?.field) return rejected(state, "craft", "not-on-expedition");
   // Town tool pool (ke3.1): home means everything's reachable — a required tool
   // may sit in the bank OR the loadout. Stations come from base state.
   const stations = state.stations ?? [];
@@ -210,6 +214,69 @@ function craftAction(
   return {
     state: next,
     events: [{ type: "crafted", recipeId, output: result.output }],
+  };
+}
+
+// ke3.4: is `terrain` the current tile or one of its 4-neighbours? (field-craft
+// terrain gate — e.g. an alchemy recipe that needs water nearby). Bounds-safe.
+function nearTerrain(grid: ReturnType<typeof expeditionGrid>, pos: { x: number; y: number }, terrain: string): boolean {
+  const at = (x: number, y: number) =>
+    y >= 0 && y < grid.terrain.length && x >= 0 && x < grid.terrain[0]!.length && grid.terrain[y]![x] === terrain;
+  return at(pos.x, pos.y) || at(pos.x + 1, pos.y) || at(pos.x - 1, pos.y) || at(pos.x, pos.y + 1) || at(pos.x, pos.y - 1);
+}
+
+// Field crafting (ke3.4, spec §4.4): a field:true recipe crafted on expedition.
+// Tool pool = equipped ∪ carry (the bank isn't reachable); inputs consumed from
+// the expedition inventory (carry materials + loadout.food); output goes to the
+// BACK of food (cooked food auto-eats LAST, clarification #3) or into carry. Costs
+// FIELD_CRAFT_ENERGY, then waste-free auto-eat exactly like gather.
+function fieldCraftAction(state: GameState, recipeId: string): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) return rejected(state, "craft", "not-on-expedition");
+  if (expedition.combat) return rejected(state, "craft", "engaged");
+  const recipe = RECIPE[recipeId];
+  if (!recipe) return rejected(state, "craft", "no-recipe");
+  if (!recipe.field) return rejected(state, "craft", "not-field-craftable");
+  const loadout = expedition.loadout;
+  // Field tool pool: equipped tools ∪ carried defIds (carried-only — no bank).
+  const toolPool = [...loadout.equipment.tools, ...expedition.carry.map((s) => s.defId)];
+  const req = recipe.requires;
+  if (req?.tools?.some((t) => !toolPool.includes(t))) return rejected(state, "craft", "missing-tool");
+  if (req?.terrain && !nearTerrain(expeditionGrid(expedition), expedition.pos, req.terrain)) {
+    return rejected(state, "craft", "not-near-terrain");
+  }
+  if (FIELD_CRAFT_ENERGY > expedition.energy) return rejected(state, "craft", "exhausted");
+  // Consume inputs from the expedition inventory (carry first, then food).
+  const consumed = consumeExpeditionInputs(loadout.food, expedition.carry, recipe.inputs);
+  if (consumed === null) return rejected(state, "craft", "insufficient-materials");
+  // Pay energy, then waste-free auto-eat on the POST-consume food (gather pattern).
+  const fed = autoRefill({ ...expedition, loadout: { ...loadout, food: consumed.food } }, expedition.energy - FIELD_CRAFT_ENERGY);
+  const qty = recipeOutputQty(recipe, toolPool);
+  const outDef = recipe.output.defId;
+  if (FOOD.includes(outDef)) {
+    // Cooked food appends to the BACK (auto-eat burns it last): merge with the
+    // trailing stack if it matches, else open a new one at the end.
+    const food = [...fed.food];
+    const last = food[food.length - 1];
+    const nextFood = last && last.defId === outDef
+      ? [...food.slice(0, -1), { defId: outDef, qty: last.qty + qty }]
+      : [...food, { defId: outDef, qty }];
+    const candidate = { ...loadout, food: nextFood };
+    if (usedSlots(candidate, consumed.carry, expedition.carriedMaps) > carryCap(candidate.equipment)) {
+      return rejected(state, "craft", "carry-full");
+    }
+    return {
+      state: { ...state, expedition: { ...expedition, energy: fed.energy, carry: consumed.carry, loadout: candidate } },
+      events: [{ type: "crafted", recipeId, output: { defId: outDef, qty }, where: "field" }],
+    };
+  }
+  // Non-food output → carry, slot-fit-checked against the post-consume inventory.
+  const loadoutFed = { ...loadout, food: fed.food };
+  const carry = addToCarry(consumed.carry, outDef, qty, freeLootStacks(loadoutFed, expedition.carriedMaps));
+  if (carry === null) return rejected(state, "craft", "carry-full");
+  return {
+    state: { ...state, expedition: { ...expedition, energy: fed.energy, carry, loadout: loadoutFed } },
+    events: [{ type: "crafted", recipeId, output: { defId: outDef, qty }, where: "field" }],
   };
 }
 

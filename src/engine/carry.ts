@@ -97,3 +97,34 @@ export function addToCarry(
   }
   return next.length > maxStacks ? null : next;
 }
+
+// Field crafting (ke3.4): consume recipe inputs from the EXPEDITION inventory —
+// carry materials first, then loadout.food for any remainder (a recipe may list a
+// food item). Returns the debited {food, carry}, or null if the combined pool is
+// short. Multi-stack safe; pure (clones before mutating). The bank isn't reachable
+// in the field, so it's deliberately not consulted here.
+export function consumeExpeditionInputs(
+  food: ItemStack[],
+  carry: ItemStack[],
+  inputs: { defId: string; qty: number }[],
+): { food: ItemStack[]; carry: ItemStack[] } | null {
+  const f = food.map((s) => ({ ...s }));
+  const c = carry.map((s) => ({ ...s }));
+  for (const need of inputs) {
+    let remaining = need.qty;
+    for (const s of c) {
+      if (s.defId !== need.defId || remaining === 0) continue;
+      const take = Math.min(s.qty, remaining);
+      s.qty -= take;
+      remaining -= take;
+    }
+    for (const s of f) {
+      if (s.defId !== need.defId || remaining === 0) continue;
+      const take = Math.min(s.qty, remaining);
+      s.qty -= take;
+      remaining -= take;
+    }
+    if (remaining > 0) return null;
+  }
+  return { food: f.filter((s) => s.qty > 0), carry: c.filter((s) => s.qty > 0) };
+}

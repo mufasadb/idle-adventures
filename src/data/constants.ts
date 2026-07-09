@@ -195,6 +195,7 @@ export const FOOD_ENERGY: Record<string, number> = {
   apple: 40, // fresh forage (m0a): woodland orchard fruit — weak-but-immediate, stales to bruised-apple
   "smoked-venison": 200, // m0a: woodland cured meat — a manual-over-eat reserve under a tent
   "blubber-stew": 160, // m0a: tundra rendered fat + moss
+  "cooked-venison": 150, // ke3.4: field-cooked over a fire-kit — denser than a ration, less than the home-smoked (200) version; turns raw meat into mid-run stamina
 };
 
 // Fresh→processed food (e3j): fresh forage eaten on-map is good NOW; hauled
@@ -289,6 +290,7 @@ export const TOOL_CAPABILITY: Record<string, string> = {
   canteen: "provision", // stamina gear (si7.2): raises maxEnergy; NODE_TOOL never asks for "provision", so no gather impact
   "fletchers-knife": "fletch", // crafting tool (ke3.3): gates + quality-scales the arrow-shaft recipe. NODE_TOOL never asks for "fletch", so no gather impact — the payoff is on the CRAFT (outputScale), not gathering
   "steel-fletchers-knife": "fletch", // data-only tier-2 fletch tool (like iron-pick): more shafts per log
+  "fire-kit": "heat", // field-craft kit-tool (ke3.4): the heat gate for cooking. Carried into the field; NODE_TOOL never asks for "heat", so no gather impact
 }; // tool defId → capability; tiered tools (M5: "iron-pick": "pick") are data-only
 export const TOOL_QUALITY: Record<string, number> = {
   pick: 1,
@@ -308,6 +310,7 @@ export const TOOL_QUALITY: Record<string, number> = {
   canteen: 1, // quality irrelevant to capacity; present to satisfy the catalog invariant
   "fletchers-knife": 1, // ke3.3: outputScale multiplier for arrow-shaft (qtyPer × quality)
   "steel-fletchers-knife": 2, // tier-2: 2× shafts per log — the visible tool payoff (repays 57l)
+  "fire-kit": 1, // ke3.4: quality irrelevant to the heat gate; present to satisfy the catalog invariant
 }; // gather-cost divisor AND tier gate (quality == max MATERIAL_TIER gatherable)
 export const GATHER_YIELD: Record<GatherableNodeType, number> = {
   mining: 3,
@@ -347,6 +350,7 @@ export const AUTO_POTION_THRESHOLD = 0.5; // fraction of base HP to auto-quaff a
 // si7.1 combat balance was calibrated with it).
 export const QUAFF_ENERGY = 2; // energy to drink a potion OUTSIDE an engagement
 export const SURVEY_ENERGY = 5; // energy to survey a POI at range (54f): ~half a plains step — the price of studying the glass, paid to resolve one far node's detail
+export const FIELD_CRAFT_ENERGY = 10; // ke3.4: flat energy to field-craft (spent before the craft, then waste-free auto-eat like gather). Half a herb gather (20) — a real "deliberate stop" cost, not free. Raise to make field crafting a heavier commitment
 export const DON_DOFF_ENERGY = 2; // energy to don/doff one piece of gear on the map
 export const UNARMED_DAMAGE = 1; // damage when wielding no weapon — ALSO a bow with no arrows left (D45: arrows-out = a club, never a soft-lock)
 
@@ -552,7 +556,7 @@ export const CATEGORY_LOOT_TABLE: Record<MonsterCategory, ItemStackSpec[]> = {
 // --- Consumable item catalogs (M5) ---
 // ENERGY_PER_FOOD / POTION_HEAL are flat, so these are single-item catalogs for
 // the POC; the list is what `pack`/`slotOf` validate a food/potion defId against.
-export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican", "apple", "smoked-venison", "blubber-stew"];
+export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican", "apple", "smoked-venison", "blubber-stew", "cooked-venison"];
 export const POTION: string[] = ["potion", "greater-potion"];
 export const BATTLE_ITEM: string[] = ["elixir-of-power", "warding-draught"]; // combat consumables (bzd); COMBAT_BUFF keys
 
@@ -644,6 +648,13 @@ export const RECIPE: Record<
   "fletchers-knife": { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "oak-log", qty: 1 }], output: { defId: "fletchers-knife", qty: 1 } },
   "arrow-shaft": { inputs: [{ defId: "oak-log", qty: 1 }], output: { defId: "arrow-shaft", qty: 1 }, requires: { tools: ["fletchers-knife"] }, outputScale: { capability: "fletch", qtyPer: ARROW_SHAFTS_PER_LOG } }, // qty REPLACED by qtyPer × knife quality
   "arrows-fletched": { inputs: [{ defId: "arrow-shaft", qty: ARROW_SHAFTS_PER_LOG }, { defId: "flint", qty: 1 }, { defId: "feather", qty: 1 }], output: { defId: "arrows", qty: ARROWS_PER_CRAFT } }, // shafts + heads + fletching → a batch; one q1-log's worth of shafts = one batch
+  // Field crafting (ke3.4) — the fire-kit is a carried kit-tool (flint-and-steel
+  // style: flint forage + iron), the heat gate for cooking. cooked-venison is the
+  // minimal field recipe: raw meat + a log of fuel, cooked over the kit → dense
+  // stamina mid-run. ke3.5 extends this into the full cooking loop. NO lit-fire
+  // state machine — fuel is a normal input, the fire-kit is the gate.
+  "fire-kit": { inputs: [{ defId: "flint", qty: 1 }, { defId: "iron-ore", qty: 1 }], output: { defId: "fire-kit", qty: 1 } },
+  "cooked-venison": { inputs: [{ defId: "rich-venison", qty: 1 }, { defId: "oak-log", qty: 1 }], output: { defId: "cooked-venison", qty: 1 }, requires: { tools: ["fire-kit"] }, field: true }, // fuel = oak-log; heat = fire-kit; field-only
   // Weapons — T1
   "iron-sword": { inputs: [{ defId: "iron-ore", qty: 3 }], output: { defId: "iron-sword", qty: 1 } },
   bow: { inputs: [{ defId: "oak-log", qty: 2 }, { defId: "bowstring", qty: 1 }], output: { defId: "bow", qty: 1 } }, // D45 rework: bowstring replaces deer-hide — the whole bow line stays pick-free (starter axe)

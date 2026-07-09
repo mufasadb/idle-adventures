@@ -146,6 +146,8 @@ export type RejectionReason =
   | "no-recipe"
   | "missing-station" // craft: a recipe's requires.station isn't among the built home stations (ke3.1)
   | "already-built" // craft: a buildsStation recipe whose station is already built (ke3.2)
+  | "not-field-craftable" // craft: a non-field recipe attempted via the field path (ke3.4)
+  | "not-near-terrain" // field-craft: recipe.requires.terrain isn't the current tile or a 4-neighbour (ke3.4)
   | "insufficient-materials"
   | "wrong-slot"
   | "insufficient"
@@ -208,7 +210,7 @@ export type GameEvent =
       hp: number;
       matchup: Matchup; // post-fight RPS/affinity lesson facts (9u9.2)
     }
-  | { type: "crafted"; recipeId: string; output: ItemStack }
+  | { type: "crafted"; recipeId: string; output: ItemStack; where?: "field" | "town" } // where (ke3.4): field crafts read distinctly in the log. Optional/absent = town.
   | { type: "pocketed-map"; mapSeed: string; biomeId: BiomeId; tier: number }
   | { type: "inked"; mapSeed: string; affix: string } // an ink rolled + wrote this affix onto a held map (cxq)
   | { type: "map-dropped"; at: { x: number; y: number }; mapSeed: string; biomeId: BiomeId; hints: string[]; carried: boolean; tier: number } // humanoid kill minted a map (8ec); carried=false → pack full, left behind

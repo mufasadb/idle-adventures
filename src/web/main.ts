@@ -16,7 +16,7 @@ import { costToReach } from "../engine/reach";
 import { carryCap } from "../engine/carry";
 import { heldFoodEnergy } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
-import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, TERRAIN_GATE, COMBAT_BUFF, SURVEY_ENERGY, INKS, AFFIX_EFFECTS } from "../data/constants";
+import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, TERRAIN_GATE, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, INKS, AFFIX_EFFECTS } from "../data/constants";
 import type { BiomeId } from "../data/constants";
 import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint, describe } from "../render/render";
 import { perceive } from "../engine/perceive";
@@ -145,7 +145,7 @@ function fmt(e: GameEvent): string {
         ? `⚔ beat the ${name(e.creature)} · −${round(e.hpLost)}hp${e.potionsUsed ? ` (${e.potionsUsed} potion${e.potionsUsed > 1 ? "s" : ""})` : ""} · loot ${e.loot.map((l) => `${l.qty}× ${name(l.defId)}`).join(", ") || "none"}`
         : `☠ the ${name(e.creature)} downed you · run ends, haul kept`) + tail;
     }
-    case "crafted": return `✦ crafted ${e.output.qty}× ${name(e.output.defId)}`;
+    case "crafted": return `✦ ${e.where === "field" ? "field-crafted 🔥 " : "crafted "}${e.output.qty}× ${name(e.output.defId)}`;
     case "pocketed-map": return `📜 pocketed a T${e.tier} ${name(e.biomeId)} map`;
     case "map-dropped": return e.carried
       ? `🗺️ looted a T${e.tier} ${name(e.biomeId)} map (takes 1 slot — banks home with you)`
@@ -424,6 +424,7 @@ function townView(): string {
           const built = new Set(state.stations ?? []); // ke3.2: an already-built station has no rebuild option
           for (const id of Object.keys(RECIPE)) {
             const r = RECIPE[id]!;
+            if (r.field) continue; // ke3.4: field-only recipes never render as town rows (they'd be permanently locked)
             if (r.buildsStation && built.has(r.buildsStation)) continue; // hide, don't render locked
             const out = r.output.defId;
             (byOutput.get(out) ?? byOutput.set(out, []).get(out)!).push(id);
@@ -644,6 +645,19 @@ function expeditionView(): string {
         <button data-act="toggle-auto-quaff" title="auto-drink a potion when HP drops below the threshold mid-fight">Auto-potion: <b>${(exp.autoQuaff ?? true) ? "on" : "off"}</b></button>
         <button data-act="return">⏎ Return to town</button>
       </div>
+      ${(() => {
+        // ke3.4: field-craft list — legal craft candidates on expedition (reduce
+        // has already filtered to field recipes you can make right here).
+        const fieldCrafts = legal.filter((a): a is Extract<Action, { type: "craft" }> => a.type === "craft");
+        if (!fieldCrafts.length) return "";
+        const pool = [...exp.loadout.equipment.tools, ...exp.carry.map((s) => s.defId)];
+        const rows = fieldCrafts.map((a) => {
+          const r = RECIPE[a.recipeId]!;
+          const ing = r.inputs.map((i) => `${i.qty}× ${name(i.defId)}`).join(" + ");
+          return `<div class="craftpath">🔥 <button data-craft="${a.recipeId}" title="field-craft (−${FIELD_CRAFT_ENERGY}e)">craft ✓</button> ${recipeOutputQty(r, pool)}× ${name(r.output.defId)} <span class="muted small">← ${ing}</span></div>`;
+        }).join("");
+        return `<h2>Field craft <span class="muted small">−${FIELD_CRAFT_ENERGY}e each</span></h2><div class="craftlist">${rows}</div>`;
+      })()}
       <h2>Bag <span class="muted small">${inv.used}/${cap} slots</span></h2>
       ${inv.html}
       <div class="muted small">food (green) is eaten to refill energy as you travel — freeing slots for loot (gold). Potions purple · battle items red · tools grey · worn gear ghosted (free).</div>

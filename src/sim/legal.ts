@@ -76,6 +76,9 @@ export function expeditionActions(state: GameState): Action[] {
   for (const p of perceive(grid, pos, state.expedition.loadout.equipment.tools, state.expedition.surveyed ?? [])) {
     if (p.detail === null) candidates.push({ type: "survey", at: { x: p.x, y: p.y } });
   }
+  // field craft (ke3.4): every recipe as a craft candidate; reduce filters
+  // non-field / missing-tool / not-near-terrain / insufficient / exhausted (D29)
+  if (!engaged) for (const recipeId of Object.keys(RECIPE)) candidates.push({ type: "craft", recipeId });
   // stamina (dtv): eat when there's food + room; toggle the auto-eat any time
   candidates.push({ type: "eat" });
   candidates.push({ type: "toggle-auto-eat" });

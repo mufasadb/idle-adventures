@@ -207,6 +207,14 @@ test("constants: requires.terrain only appears on field recipes (ke3.1)", () => 
   }
 });
 
+// ke3.4: a station is uncarriable, so a field:true recipe can never satisfy a
+// station gate — the catalog must never declare one (a dead recipe otherwise).
+test("constants: a field:true recipe never carries a station requirement (ke3.4)", () => {
+  for (const recipe of Object.values(RECIPE)) {
+    if (recipe.field) expect(recipe.requires?.station).toBeUndefined();
+  }
+});
+
 test("constants: the acceptance affinity pairing exists (silver ↔ werewolf)", () => {
   expect(WEAPONS["silver-sword"]!.tags).toContain("silver");
   expect(MONSTERS.werewolf!.tags).toContain("werewolf");
