@@ -19,7 +19,9 @@
     "AUTO_POTION_THRESHOLD": 0.5,
     "POTION_HEAL_BY": {
       "potion": 10,
-      "greater-potion": 20
+      "greater-potion": 20,
+      "draught": 8,
+      "greater-draught": 20
     },
     "AFFINITY_MULTIPLIER": 2
   },

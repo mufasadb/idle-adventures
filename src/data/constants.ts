@@ -294,6 +294,7 @@ export const TOOL_CAPABILITY: Record<string, string> = {
   "steel-fletchers-knife": "fletch", // data-only tier-2 fletch tool (like iron-pick): more shafts per log
   "fire-kit": "heat", // field-craft kit-tool (ke3.4): the heat gate for cooking. Carried into the field; NODE_TOOL never asks for "heat", so no gather impact
   "cooking-pot": "simmer", // field-craft kit-tool (ke3.5): the second cooking tool — a stew needs fire-kit AND cooking-pot (AND-gate). NODE_TOOL never asks for "simmer"
+  glassware: "alchemy", // field-craft kit-tool (ke3.6): the brewing gate for draughts. Carried into the field; NODE_TOOL never asks for "alchemy"
 }; // tool defId → capability; tiered tools (M5: "iron-pick": "pick") are data-only
 export const TOOL_QUALITY: Record<string, number> = {
   pick: 1,
@@ -315,6 +316,7 @@ export const TOOL_QUALITY: Record<string, number> = {
   "steel-fletchers-knife": 2, // tier-2: 2× shafts per log — the visible tool payoff (repays 57l)
   "fire-kit": 1, // ke3.4: quality irrelevant to the heat gate; present to satisfy the catalog invariant
   "cooking-pot": 1, // ke3.5: quality irrelevant to the simmer gate; present to satisfy the catalog invariant
+  glassware: 1, // ke3.6: quality irrelevant to the alchemy gate; present to satisfy the catalog invariant
 }; // gather-cost divisor AND tier gate (quality == max MATERIAL_TIER gatherable)
 export const GATHER_YIELD: Record<GatherableNodeType, number> = {
   mining: 3,
@@ -347,6 +349,8 @@ export const POTION_HEAL = 10; // default HP restored per potion use (fallback f
 export const POTION_HEAL_BY: Record<string, number> = {
   potion: 10,
   "greater-potion": 20,
+  draught: 8, // ke3.6: the herbal basic heal — a touch weaker than the town `potion`, but the ONLY potion you can brew mid-run (field-draught)
+  "greater-draught": 20, // ke3.6: the alchemical-desk strong heal — matches greater-potion (a parallel home-deep path, not power creep), but the field kit can't make it
 };
 export const AUTO_POTION_THRESHOLD = 0.5; // fraction of base HP to auto-quaff at
 // On-map item use (82r): using items outside combat "just costs energy" — about
@@ -561,7 +565,7 @@ export const CATEGORY_LOOT_TABLE: Record<MonsterCategory, ItemStackSpec[]> = {
 // ENERGY_PER_FOOD / POTION_HEAL are flat, so these are single-item catalogs for
 // the POC; the list is what `pack`/`slotOf` validate a food/potion defId against.
 export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican", "apple", "smoked-venison", "blubber-stew", "cooked-venison", "cooked-berries", "stew"];
-export const POTION: string[] = ["potion", "greater-potion"];
+export const POTION: string[] = ["potion", "greater-potion", "draught", "greater-draught"];
 export const BATTLE_ITEM: string[] = ["elixir-of-power", "warding-draught"]; // combat consumables (bzd); COMBAT_BUFF keys
 
 // --- Crafting (M5): direct & instant, materials → item (D10). One shared tree
@@ -667,6 +671,18 @@ export const RECIPE: Record<
   // Smokehouse (station) — gates the EXISTING smoked-venison recipe behind home
   // infra (ke3.5). Near-zero new content: proves the station gate on real food.
   smokehouse: { inputs: [{ defId: "oak-log", qty: 3 }, { defId: "iron-ore", qty: 2 }], output: { defId: "smokehouse", qty: 1 }, buildsStation: "smokehouse" },
+  // Alchemy thread (ke3.6) — the fullest home-vs-field split in one vertical. The
+  // FIELD kit (glassware + fire-kit) brews a basic healing draught from a river-
+  // filled vial; HOME the alchemical-desk (station) brews the strong version the
+  // field can't. Water is never an item from the sky (user): you fill a vial at a
+  // river in the field; at home the recipe just omits water.
+  glassware: { inputs: [{ defId: "flint", qty: 3 }], output: { defId: "glassware", qty: 1 } }, // the brewing tool (blown from flint-glass), carried into the field
+  "glass-vial": { inputs: [{ defId: "flint", qty: 2 }], output: { defId: "glass-vial", qty: 2 } }, // cheap empty containers — a stackable material
+  "water-vial": { inputs: [{ defId: "glass-vial", qty: 1 }], output: { defId: "water-vial", qty: 1 }, field: true, requires: { terrain: "river" } }, // FILL a vial at a river (on/adjacent) — no tools, field-only; river exists in every biome
+  draught: { inputs: [{ defId: "forest-herb", qty: 2 }], output: { defId: "draught", qty: 1 }, requires: { tools: ["glassware"] } }, // HOME brew: glassware + herbs, water omitted (user)
+  "field-draught": { inputs: [{ defId: "water-vial", qty: 1 }, { defId: "forest-herb", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "draught", qty: 1 }, requires: { tools: ["glassware", "fire-kit"] }, field: true }, // FIELD brew: same basic draught, needs a filled vial + heat; lands in loadout.potions so it's quaffable right away
+  "alchemical-desk": { inputs: [{ defId: "glass-vial", qty: 3 }, { defId: "iron-ore", qty: 2 }], output: { defId: "alchemical-desk", qty: 1 }, buildsStation: "alchemical-desk" }, // the deep home alchemy station
+  "greater-draught": { inputs: [{ defId: "forest-herb", qty: 2 }, { defId: "silver-ore", qty: 1 }], output: { defId: "greater-draught", qty: 1 }, requires: { station: "alchemical-desk" } }, // strong heal the field kit CAN'T make — station-gated, town-only
   // Weapons — T1
   "iron-sword": { inputs: [{ defId: "iron-ore", qty: 3 }], output: { defId: "iron-sword", qty: 1 } },
   bow: { inputs: [{ defId: "oak-log", qty: 2 }, { defId: "bowstring", qty: 1 }], output: { defId: "bow", qty: 1 } }, // D45 rework: bowstring replaces deer-hide — the whole bow line stays pick-free (starter axe)

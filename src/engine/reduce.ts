@@ -13,7 +13,7 @@ import { packItem, reserveLoadout, EQUIP_SLOTS } from "./pack";
 import type { EquipSlot } from "./pack";
 import { slotOf, isGear } from "./catalog";
 import { candidateMaps, previewHints } from "./town";
-import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, INKS, RECIPE } from "../data/constants";
+import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, POTION, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, INKS, RECIPE } from "../data/constants";
 import { visionRadius } from "./perceive";
 import type { GatherableNodeType } from "../data/constants";
 
@@ -253,30 +253,36 @@ function fieldCraftAction(state: GameState, recipeId: string): { state: GameStat
   const fed = autoRefill({ ...expedition, loadout: { ...loadout, food: consumed.food } }, expedition.energy - FIELD_CRAFT_ENERGY);
   const qty = recipeOutputQty(recipe, toolPool);
   const outDef = recipe.output.defId;
-  if (FOOD.includes(outDef)) {
-    // Cooked food appends to the BACK (auto-eat burns it last): merge with the
-    // trailing stack if it matches, else open a new one at the end.
-    const food = [...fed.food];
-    const last = food[food.length - 1];
-    const nextFood = last && last.defId === outDef
-      ? [...food.slice(0, -1), { defId: outDef, qty: last.qty + qty }]
-      : [...food, { defId: outDef, qty }];
-    const candidate = { ...loadout, food: nextFood };
+  const output = { defId: outDef, qty };
+  // A CONSUMABLE output lives in the loadout (food → food, potion → potions) and
+  // counts as slots; append to the BACK (food auto-eats last; a fresh potion is a
+  // reserve — quaff drinks the front). A material/gear output goes to carry. Food
+  // uses the post-auto-eat list; potions are untouched by auto-eat.
+  const target: "food" | "potions" | null = FOOD.includes(outDef) ? "food" : POTION.includes(outDef) ? "potions" : null;
+  if (target) {
+    const cur = target === "food" ? fed.food : loadout.potions;
+    const last = cur[cur.length - 1];
+    const nextList = last && last.defId === outDef
+      ? [...cur.slice(0, -1), { defId: outDef, qty: last.qty + qty }]
+      : [...cur, output];
+    const candidate = target === "food"
+      ? { ...loadout, food: nextList }
+      : { ...loadout, food: fed.food, potions: nextList };
     if (usedSlots(candidate, consumed.carry, expedition.carriedMaps) > carryCap(candidate.equipment)) {
       return rejected(state, "craft", "carry-full");
     }
     return {
       state: { ...state, expedition: { ...expedition, energy: fed.energy, carry: consumed.carry, loadout: candidate } },
-      events: [{ type: "crafted", recipeId, output: { defId: outDef, qty }, where: "field" }],
+      events: [{ type: "crafted", recipeId, output, where: "field" }],
     };
   }
-  // Non-food output → carry, slot-fit-checked against the post-consume inventory.
+  // Material/gear output → carry, slot-fit-checked against the post-consume inventory.
   const loadoutFed = { ...loadout, food: fed.food };
   const carry = addToCarry(consumed.carry, outDef, qty, freeLootStacks(loadoutFed, expedition.carriedMaps));
   if (carry === null) return rejected(state, "craft", "carry-full");
   return {
     state: { ...state, expedition: { ...expedition, energy: fed.energy, carry, loadout: loadoutFed } },
-    events: [{ type: "crafted", recipeId, output: { defId: outDef, qty }, where: "field" }],
+    events: [{ type: "crafted", recipeId, output, where: "field" }],
   };
 }
 
