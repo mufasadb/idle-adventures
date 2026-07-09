@@ -65,6 +65,7 @@ function fmtEvent(e: GameEvent): string {
     case "packed": return `packed ${e.defId} → ${e.slot}`;
     case "quaffed": return `🧪 quaffed ${e.defId} · +${e.healed}hp → ${e.hp}hp${e.energy !== undefined ? ` · energy → ${e.energy}e` : ""}`;
     case "item-used": return `⚗ used ${e.defId} this fight${e.damageAdd ? ` · +${e.damageAdd} dmg` : ""}${e.mitigationAdd ? ` · +${e.mitigationAdd} mitigation` : ""}`;
+    case "enhanced": return `🗡️ coated your weapon with ${e.id} · ${e.charges} charge${e.charges === 1 ? "" : "s"} (spent per strike; a new coating replaces this one)`;
     case "surveyed": return `🔭 surveyed the ${e.kind} at (${e.at.x},${e.at.y}) — its detail is now in focus`;
     case "inked": return `🖋 inked the map — it is now of ${AFFIX_EFFECTS[e.affix]?.label ?? e.affix}`;
     case "donned": return `🧤 donned ${e.defId}${e.displaced ? ` (stowed ${e.displaced} in the bag)` : ""} · energy → ${e.energy}e`;
@@ -98,7 +99,7 @@ console.log(`bank: ${s.bank.map((i) => `${i.qty}× ${i.defId}`).join(", ") || "(
 const active = state.expedition?.loadout ?? s.loadout;
 const eq = active.equipment;
 const worn = [eq.weapon, eq.helmet, eq.chest, eq.legs, eq.boots, eq.gloves, eq.transport, eq.backpack, eq.panniers, ...eq.tools].filter(Boolean);
-console.log(`equipped: ${worn.join(", ") || "(nothing)"} · food: ${active.food.map((f) => `${f.qty}× ${f.defId}`).join(", ") || "none"} · potions: ${active.potions.map((p) => `${p.qty}× ${p.defId}`).join(", ") || "none"}${active.battleItems?.length ? ` · battle: ${active.battleItems.map((b) => `${b.qty}× ${b.defId}`).join(", ")}` : ""}${active.spares?.length ? ` · spare gear (1 slot each, don mid-run to swap): ${active.spares.map((sp) => `${sp.qty}× ${sp.defId}`).join(", ")}` : ""}${active.ammo?.length ? ` · arrows: ${active.ammo.reduce((n, a) => n + a.qty, 0)} (a wielded bow shoots one per combat exchange; empty quiver = the bow swings like a club)` : wieldsRanged(active) ? " · arrows: 0 — ⚠ NO ARROWS: your bow swings like a CLUB (1 dmg). Craft arrows to shoot." : ""}`);
+console.log(`equipped: ${worn.join(", ") || "(nothing)"} · food: ${active.food.map((f) => `${f.qty}× ${f.defId}`).join(", ") || "none"} · potions: ${active.potions.map((p) => `${p.qty}× ${p.defId}`).join(", ") || "none"}${active.battleItems?.length ? ` · battle: ${active.battleItems.map((b) => `${b.qty}× ${b.defId}`).join(", ")}` : ""}${active.spares?.length ? ` · spare gear (1 slot each, don mid-run to swap): ${active.spares.map((sp) => `${sp.qty}× ${sp.defId}`).join(", ")}` : ""}${active.ammo?.length ? ` · arrows: ${active.ammo.reduce((n, a) => n + a.qty, 0)} (a wielded bow shoots one per combat exchange; empty quiver = the bow swings like a club)` : wieldsRanged(active) ? " · arrows: 0 — ⚠ NO ARROWS: your bow swings like a CLUB (1 dmg). Craft arrows to shoot." : ""}${active.enhancements?.length ? ` · enhancements (1 slot each; enhance id="…" to coat your weapon — engaged or not, no exchange): ${active.enhancements.map((en) => `${en.qty}× ${en.defId}`).join(", ")}` : ""}${state.expedition?.weaponBuff ? ` · 🗡️ active coating: ${state.expedition.weaponBuff.id} (${state.expedition.weaponBuff.charges} strikes left)` : ""}`);
 // Make transport/gating gear legible: what it does to a step's cost (mirrors the web).
 {
   const notes: string[] = [];
@@ -176,7 +177,7 @@ function printExpedition(st: GameState): void {
   if (exp.combat) {
     const c = exp.combat;
     const r1 = (n: number) => Math.round(n * 10) / 10; // c5l: % mitigation makes these floats — round for the console
-    const dmgOut = r1(playerDamage(exp.loadout, c.creature) + c.damageAdd);
+    const dmgOut = r1(playerDamage(exp.loadout, c.creature, exp.weaponBuff) + c.damageAdd); // D59: reflects the coating
     const dmgIn = r1(damageTaken(exp.loadout, c.creature, c.mitigationAdd));
     // 57l: quiver state in the fight header — a clubbed bow must be legible mid-fight.
     const quiver = wieldsRanged(exp.loadout)
@@ -186,7 +187,13 @@ function printExpedition(st: GameState): void {
     const battle = (exp.loadout.battleItems ?? []).length
       ? ` · battle items: ${(exp.loadout.battleItems ?? []).map((b) => `${b.qty}× ${b.defId}`).join(", ")} (use-item itemId="…" — this fight only)`
       : "";
-    console.log(`\n=== ENGAGED: ${c.creature} — ${c.monsterHp} HP · you hit ${dmgOut}, it hits ${dmgIn}${quiver}${battle} · actions: fight | flee | quaff${battle ? " | use-item" : ""} | toggle-auto-quaff ===`);
+    // D59: active coating + held enhancements + the enhance action (usable mid-fight).
+    const coating = exp.weaponBuff ? ` · 🗡️ coating: ${exp.weaponBuff.id} (${exp.weaponBuff.charges} strikes left)` : "";
+    const poisonHdr = c.poison ? ` · ☠ poisoned (${r1(c.poison.dmg)}/rd, ${c.poison.rounds} left)` : "";
+    const enh = (exp.loadout.enhancements ?? []).length
+      ? ` · enhancements: ${(exp.loadout.enhancements ?? []).map((en) => `${en.qty}× ${en.defId}`).join(", ")} (enhance id="…" — coat now, no exchange)`
+      : "";
+    console.log(`\n=== ENGAGED: ${c.creature} — ${c.monsterHp} HP · you hit ${dmgOut}, it hits ${dmgIn}${quiver}${coating}${poisonHdr}${battle}${enh} · actions: fight | flee | quaff${battle ? " | use-item" : ""}${enh ? " | enhance" : ""} | toggle-auto-quaff ===`);
   }
   console.log("\n=== MAP (▲ you · letters = node kinds · detail only resolves near you) ===");
   const rows: string[] = [];

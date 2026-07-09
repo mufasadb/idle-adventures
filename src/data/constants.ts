@@ -410,6 +410,29 @@ export const COMBAT_BUFF: Record<string, { damageAdd?: number; mitigationAdd?: n
   "warding-draught": { mitigationAdd: 3 }, // from ice-troll's troll-hide
 };
 
+// Weapon enhancements (D59, weapon-enhancement spec §2.2) — whetstone (flat
+// damage) + weapon oils (affinity/poison coating) merged into ONE charge-based
+// buff state. Applied mid-run via `enhance`; consumed by YOUR strikes. Rides the
+// expedition (Expedition.weaponBuff), never the weapon — no per-instance item state.
+//   charges     — how many player strikes the coating survives before clearing.
+//   flatDamage? — +N added to playerDamage per strike (the WHETSTONE flavour).
+//   affinityTag?— a MONSTER tag; if the engaged monster carries it, damage ×AFFINITY_MULTIPLIER
+//                 (the OIL flavour: silver-oil→werewolf, drake-oil→dragon). Matched-or-not,
+//                 never double: a weapon already matching this tag doesn't stack it.
+//   poison?     — on a coated hit set/refresh Engagement.poison to this {dmg,rounds}
+//                 (the VENOM-OIL flavour): a DoT the monster suffers each round.
+// Starting values are a feel-pass (tune in playtest). Enhancement defIds also live
+// in ENHANCEMENT (below) so slotOf→"enhancement" and the "every output real" invariant sees them.
+export const WEAPON_ENHANCEMENT: Record<string, { charges: number; flatDamage?: number; affinityTag?: string; poison?: { dmg: number; rounds: number } }> = {
+  whetstone: { charges: 6, flatDamage: 2 }, // anvil-forged grindstone: +2 flat dmg for 6 strikes
+  "silver-oil": { charges: 5, affinityTag: "werewolf" }, // still-brewed: ×2 vs werewolf-tagged
+  "drake-oil": { charges: 5, affinityTag: "dragon" }, // still-brewed: ×2 vs dragon-tagged (the Wyrm answer without full mithril)
+  "venom-oil": { charges: 5, poison: { dmg: 3, rounds: 4 } }, // still-brewed: coats a poison DoT the monster suffers each round
+};
+// Enhancement catalog (D59): defIds that pack as `enhancement` (1 slot/unit, no
+// stacking, like a battle-item) and are recognised by slotOf. WEAPON_ENHANCEMENT keys.
+export const ENHANCEMENT: string[] = ["whetstone", "silver-oil", "drake-oil", "venom-oil"];
+
 export const AFFINITY_MULTIPLIER = 2; // hidden affinity effect, e.g. silver↔werewolf
 export type Affinity = { monsterTag: string; itemTag: string };
 // ⚠ balance surface: changing this requires `bun run sim:tables` (test/balance-tables.test.ts enforces)
@@ -578,7 +601,7 @@ export const BATTLE_ITEM: string[] = ["elixir-of-power", "warding-draught"]; // 
 // (`state.stations`), never a carried stack — so a `requires.station` gate can by
 // definition never be satisfied in the field, which is what keeps hard recipes
 // home-bound. Built via a recipe's `buildsStation` (ke3.2).
-export type StationId = "smokehouse" | "alchemical-desk" | "anvil";
+export type StationId = "smokehouse" | "alchemical-desk" | "anvil" | "still";
 
 // A recipe can gate beyond its `inputs` (ke3.1, crafting-depth §4.1):
 //   requires.station — a home StationId (uncarriable → home-only)
@@ -757,6 +780,14 @@ export const RECIPE: Record<
   wyrmfang: { inputs: [{ defId: "dragonheart", qty: 1 }], output: { defId: "wyrmfang", qty: 1 } },
   // m0a: mid-game monster drops consuming recipes (roster.test invariant: every drop feeds the tree)
   "scale-jerky": { inputs: [{ defId: "hatchling-scale", qty: 1 }], output: { defId: "ration", qty: 2 } }, // hatchling chitin rendered = field rations (unusual but functional)
+  // Weapon enhancement (ke3.7 threads 3+4, D59) — merged whetstone + oils. The
+  // still station brews the OILS (affinity/poison coatings); the anvil forges the
+  // WHETSTONE (flat-damage grindstone — sharpening is smith work, reuses the forge).
+  still: { inputs: [{ defId: "glass-vial", qty: 3 }, { defId: "copper-ore", qty: 2 }], output: { defId: "still", qty: 1 }, buildsStation: "still" }, // a copper sink; reuses alchemy glass
+  "silver-oil": { inputs: [{ defId: "silver-ore", qty: 1 }, { defId: "forest-herb", qty: 1 }], output: { defId: "silver-oil", qty: 1 }, requires: { station: "still" } }, // affinity vs werewolf
+  "drake-oil": { inputs: [{ defId: "drake-hide", qty: 1 }, { defId: "fae-dust", qty: 1 }], output: { defId: "drake-oil", qty: 1 }, requires: { station: "still" } }, // affinity vs dragon — the Wyrm answer without full mithril
+  "venom-oil": { inputs: [{ defId: "thistle", qty: 1 }, { defId: "fae-dust", qty: 1 }], output: { defId: "venom-oil", qty: 1 }, requires: { station: "still" } }, // poison DoT
+  whetstone: { inputs: [{ defId: "flint", qty: 2 }, { defId: "iron-ore", qty: 1 }], output: { defId: "whetstone", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } }, // a grindstone block — forged at the anvil
 };
 
 type ItemStackSpec = { defId: string; qty: number; chance?: number }; // chance ∈ (0,1): drop probability, rolled per-encounter (LOOT_TABLE only); absent = always drops

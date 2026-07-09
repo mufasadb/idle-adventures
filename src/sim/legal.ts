@@ -70,6 +70,8 @@ export function expeditionActions(state: GameState): Action[] {
   candidates.push({ type: "toggle-auto-quaff" });
   // use-item (90j): each held battle item; reduce keeps it only while engaged (D29)
   for (const stack of state.expedition.loadout.battleItems ?? []) candidates.push({ type: "use-item", itemId: stack.defId });
+  // enhance (D59): each held weapon enhancement; usable engaged or not (reduce filters, D29)
+  for (const stack of state.expedition.loadout.enhancements ?? []) candidates.push({ type: "enhance", id: stack.defId });
   // survey (54f): each POI whose detail is NOT yet resolved from here; reduce
   // filters missing-tool / exhausted / already-resolved (D29)
   const grid = expeditionGrid(state.expedition);

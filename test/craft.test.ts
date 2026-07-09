@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { craft } from "../src/engine/craft";
-import { RECIPE, ARMOUR, WEAPONS, TOOL_CAPABILITY, BACKPACK_SLOTS, TRANSPORT_MULTIPLIER, FOOD, POTION, BATTLE_ITEM, PANNIERS, AMMO, INKS } from "../src/data/constants";
+import { RECIPE, ARMOUR, WEAPONS, TOOL_CAPABILITY, BACKPACK_SLOTS, TRANSPORT_MULTIPLIER, FOOD, POTION, BATTLE_ITEM, PANNIERS, AMMO, INKS, ENHANCEMENT } from "../src/data/constants";
 import { slotOf } from "../src/engine/catalog";
 
 // ke3.1 recipe-gate tests inject a throwaway recipe into the RECIPE catalog so the
@@ -158,6 +158,7 @@ test("recipes: every output is a real equippable/consumable defId — or a craft
   const known = (d: string) =>
     d in WEAPONS || d in ARMOUR || d in TOOL_CAPABILITY || d in BACKPACK_SLOTS ||
     d in TRANSPORT_MULTIPLIER || FOOD.includes(d) || POTION.includes(d) || BATTLE_ITEM.includes(d) || PANNIERS.includes(d) || AMMO.includes(d) ||
+    ENHANCEMENT.includes(d) || // weapon enhancements (D59): whetstone/oils packed as `enhancement`, applied by the `enhance` action
     d in INKS; // cartography inks (cxq): bank materials consumed by the `ink` action, not a recipe
   // Crafted intermediates (D45 ranged-combat spec, 2026-07-07): `bowstring` is the
   // first recipe OUTPUT that is itself a material — legal iff some other recipe
@@ -178,4 +179,31 @@ test("recipes: every output is a real equippable/consumable defId — or a craft
       expect(id === recipe.output.defId || id.startsWith(recipe.output.defId + "-")).toBe(true);
     }
   }
+});
+
+// --- D59: weapon-enhancement recipes (still oils + anvil whetstone) ----------
+
+test("weapon-enhancement: still oils reject missing-station, then craft once the still is built (D59)", () => {
+  const bank = [{ defId: "silver-ore", qty: 2 }, { defId: "forest-herb", qty: 2 }];
+  // no station → missing-station
+  expect(craft(bank, "silver-oil", [], [])).toEqual({ ok: false, reason: "missing-station" });
+  // still built → crafts
+  const r = craft(bank, "silver-oil", [], ["still"]);
+  expect(r.ok).toBe(true);
+  if (!r.ok) return;
+  expect(r.output).toEqual({ defId: "silver-oil", qty: 1 });
+});
+
+test("weapon-enhancement: whetstone is anvil+hammer gated (D59)", () => {
+  const bank = [{ defId: "flint", qty: 3 }, { defId: "iron-ore", qty: 2 }];
+  expect(craft(bank, "whetstone", [], [])).toEqual({ ok: false, reason: "missing-station" });
+  expect(craft(bank, "whetstone", [], ["anvil"])).toEqual({ ok: false, reason: "missing-tool" }); // station ok, hammer missing
+  const r = craft(bank, "whetstone", ["blacksmiths-hammer"], ["anvil"]);
+  expect(r.ok).toBe(true);
+  if (!r.ok) return;
+  expect(r.output).toEqual({ defId: "whetstone", qty: 1 });
+});
+
+test("weapon-enhancement: the still recipe builds the still station (D59)", () => {
+  expect(RECIPE.still!.buildsStation).toBe("still");
 });

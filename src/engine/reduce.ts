@@ -13,7 +13,7 @@ import { packItem, reserveLoadout, EQUIP_SLOTS } from "./pack";
 import type { EquipSlot } from "./pack";
 import { slotOf, isGear } from "./catalog";
 import { candidateMaps, previewHints } from "./town";
-import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, POTION, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, INKS, RECIPE } from "../data/constants";
+import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, POTION, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, INKS, RECIPE, WEAPON_ENHANCEMENT } from "../data/constants";
 import { visionRadius } from "./perceive";
 import type { GatherableNodeType } from "../data/constants";
 
@@ -51,6 +51,8 @@ export function reduce(
       return quaff(state);
     case "use-item":
       return useItem(state, action.itemId);
+    case "enhance":
+      return enhance(state, action.id);
     case "survey":
       return survey(state, action.at);
     case "toggle-auto-quaff":
@@ -569,6 +571,7 @@ function fight(state: GameState, at?: { x: number; y: number }): { state: GameSt
     expedition.loadout, expedition.hp, combat.monsterHp, combat.creature,
     combat.damageAdd, combat.mitigationAdd, expedition.autoQuaff ?? true,
     combat.opener ?? false, // ranged opener (D45): skip the monster's FIRST retaliation
+    expedition.weaponBuff, combat.poison, // D59: coating charges spent per strike; poison ticks per round (same math as resolveCombat)
   );
   let ammo = expedition.loadout.ammo ?? [];
   if (spendsArrow) {
@@ -581,6 +584,7 @@ function fight(state: GameState, at?: { x: number; y: number }): { state: GameSt
     type: "exchanged", creature: combat.creature, dmgDealt: round.dmgDealt,
     dmgTaken: round.dmgTaken, monsterHp: round.monsterHp, hp: round.hp, potionsUsed,
     ...(spendsArrow ? { arrowSpent: true } : {}),
+    ...(round.poisonDmg > 0 ? { poisonDmg: round.poisonDmg } : {}), // D59: poison DoT this round
   };
   const loadout = { ...expedition.loadout, potions: round.potionsAfter, ammo };
   // One roll, shared by the event and the carry apply (c5l): rollLoot is
@@ -596,12 +600,14 @@ function fight(state: GameState, at?: { x: number; y: number }): { state: GameSt
     hp: round.hp, matchup: explainMatchup(expedition.loadout, combat.creature),
   });
   if (round.defeated) {
-    const ended = endExpedition(state, { ...expedition, loadout, combat: undefined });
+    // D59: the coating clears with the run; endExpedition doesn't read weaponBuff, but drop it cleanly.
+    const ended = endExpedition(state, { ...expedition, loadout, weaponBuff: round.weaponBuffAfter, combat: undefined });
     return { state: ended, events: [exchanged, fought(false), { type: "run-ended", reason: "defeated" }] };
   }
   if (!round.victory) {
     return {
-      state: { ...state, expedition: { ...expedition, hp: round.hp, loadout, combat: { ...combat, monsterHp: round.monsterHp, potionsUsed, opener: false } } }, // opener spent after the first exchange (D45)
+      // D59: charges spent this strike ride the expedition; poison ticks on the engagement.
+      state: { ...state, expedition: { ...expedition, hp: round.hp, loadout, weaponBuff: round.weaponBuffAfter, combat: { ...combat, monsterHp: round.monsterHp, potionsUsed, opener: false, poison: round.poisonAfter } } }, // opener spent after the first exchange (D45)
       events: [exchanged],
     };
   }
@@ -630,6 +636,7 @@ function fight(state: GameState, at?: { x: number; y: number }): { state: GameSt
         ...expedition,
         pos: combat.moveOnWin ? { x: combat.at.x, y: combat.at.y } : expedition.pos,
         hp: round.hp, loadout, carry: carryWithLoot,
+        weaponBuff: round.weaponBuffAfter, // D59: charges spent on the killing strike
         cleared: [...expedition.cleared, { x: combat.at.x, y: combat.at.y }],
         carriedMaps: mapsAfter,
         combat: undefined,
@@ -727,6 +734,36 @@ function useItem(state: GameState, itemId: string): { state: GameState; events: 
       },
     },
     events: [{ type: "item-used", defId: itemId, damageAdd, mitigationAdd }],
+  };
+}
+
+// Apply a weapon enhancement (D59, weapon-enhancement spec §2.3): whetstone/oil
+// prep. Expedition-phase; usable ENGAGED or UNENGAGED (mirrors use-item/quaff),
+// runs NO exchange and costs NO energy. Consume one unit from the held enhancement
+// stack and set Expedition.weaponBuff to a fresh full-charge coating — applying
+// over an existing buff REPLACES it (the discarded charges are lost). Rejections
+// reuse existing reasons: not-on-expedition / wrong-slot / insufficient.
+function enhance(state: GameState, id: string): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) return rejected(state, "enhance", "not-on-expedition");
+  if (slotOf(id) !== "enhancement") return rejected(state, "enhance", "wrong-slot");
+  const held = expedition.loadout.enhancements ?? [];
+  const idx = held.findIndex((s) => s.defId === id);
+  if (idx === -1) return rejected(state, "enhance", "insufficient");
+  const charges = WEAPON_ENHANCEMENT[id]!.charges;
+  const next = held.map((s) => ({ ...s }));
+  next[idx]!.qty -= 1;
+  if (next[idx]!.qty <= 0) next.splice(idx, 1);
+  return {
+    state: {
+      ...state,
+      expedition: {
+        ...expedition,
+        loadout: { ...expedition.loadout, enhancements: next },
+        weaponBuff: { id, charges }, // replaces any current coating (old charges lost)
+      },
+    },
+    events: [{ type: "enhanced", id, charges }],
   };
 }
 

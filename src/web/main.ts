@@ -16,7 +16,7 @@ import { costToReach } from "../engine/reach";
 import { carryCap } from "../engine/carry";
 import { heldFoodEnergy } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
-import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, TERRAIN_GATE, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, INKS, AFFIX_EFFECTS } from "../data/constants";
+import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, TERRAIN_GATE, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, INKS, AFFIX_EFFECTS, WEAPON_ENHANCEMENT } from "../data/constants";
 import type { BiomeId } from "../data/constants";
 import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint, describe } from "../render/render";
 import { perceive } from "../engine/perceive";
@@ -87,6 +87,7 @@ function planActions(lo: Loadout): PackStep[] {
   units(lo.food, "food");
   units(lo.potions, "potion");
   units(lo.battleItems ?? [], "battle-item");
+  units(lo.enhancements ?? [], "enhancement"); // weapon enhancements (D59)
   units(lo.spares ?? [], "spare");
   units(lo.ammo ?? [], "ammo");
   return acts;
@@ -157,10 +158,11 @@ function fmt(e: GameEvent): string {
     case "engaged": return e.ranged
       ? `🏹 engaged the ${name(e.creature)} from a tile away — your opener lands before it can answer`
       : `⚔ engaged the ${name(e.creature)}`;
-    case "exchanged": return `⚔ traded blows with the ${name(e.creature)} — dealt ${round(e.dmgDealt)}, took ${round(e.dmgTaken)} · ${round(e.hp)}hp left${e.arrowSpent ? " · 🏹 −1 arrow" : ""}`;
+    case "exchanged": return `⚔ traded blows with the ${name(e.creature)} — dealt ${round(e.dmgDealt)}, took ${round(e.dmgTaken)} · ${round(e.hp)}hp left${e.arrowSpent ? " · 🏹 −1 arrow" : ""}${e.poisonDmg ? ` · ☠ poison ${round(e.poisonDmg)}` : ""}`;
     case "fled": return `🏃 fled the ${name(e.creature)} · −${round(e.partingHit)}hp → ${round(e.hp)}hp`;
     case "quaffed": return `🧪 quaffed ${name(e.defId)} · +${round(e.healed)}hp → ${round(e.hp)}hp${e.energy !== undefined ? ` · −${QUAFF_ENERGY}e → ${round(e.energy)}e` : ""}`;
     case "item-used": return `⚗ used ${name(e.defId)} this fight${e.damageAdd ? ` · +${round(e.damageAdd)} dmg` : ""}${e.mitigationAdd ? ` · +${round(e.mitigationAdd)} mitigation` : ""}`;
+    case "enhanced": return `🗡️ coated your weapon with ${name(e.id)} · ${e.charges} charge${e.charges === 1 ? "" : "s"}`;
     case "surveyed": return `🔭 surveyed the ${e.kind} at (${e.at.x},${e.at.y}) — its detail is now in focus`;
     case "inked": return `🖋 inked the map — it is now of ${AFFIX_EFFECTS[e.affix]?.label ?? e.affix}`;
     case "auto-quaff-toggled": return `auto-quaff ${e.on ? "on" : "off"}`;
@@ -303,6 +305,7 @@ function realSlots(loadout: Loadout, carry: ItemStack[], maps: MapItem[] = []): 
   units(loadout.food, "food");
   units(loadout.potions, "potion");
   units(loadout.battleItems ?? [], "battle");
+  units(loadout.enhancements ?? [], "battle"); // weapon enhancements (D59): 1 slot/unit, styled like battle items
   units(loadout.spares ?? [], "tool"); // spare gear (82r): 1 slot per piece, grey like tools; expands into carry at embark
   // ammo (D45): the one deep-stacking consumable — one box per ARROW_STACK_CAP slot, shown ×qty like loot
   for (const it of loadout.ammo ?? []) {
@@ -506,13 +509,29 @@ function herePanel(grid: Grid, exp: NonNullable<GameState["expedition"]>, legal:
   </div>`;
 }
 
+// Weapon-enhancement readout (D59): the active coating + charges left, or nothing.
+function coatingLine(exp: NonNullable<GameState["expedition"]>): string {
+  const b = exp.weaponBuff;
+  if (!b) return "";
+  return ` · 🗡️ ${name(b.id)} · ${b.charges} left`;
+}
+// An "Apply <enhancement>" button per carried enhancement (D59) — legality from
+// reduce (D29). Works engaged or unengaged; applying over an active coating replaces it.
+function enhanceButtons(exp: NonNullable<GameState["expedition"]>): string {
+  return (exp.loadout.enhancements ?? []).map((s) => {
+    const e = WEAPON_ENHANCEMENT[s.defId];
+    const eff = e ? [e.flatDamage ? `+${e.flatDamage} dmg` : "", e.affinityTag ? `×2 vs ${e.affinityTag}` : "", e.poison ? `poison ${e.poison.dmg}/rd ×${e.poison.rounds}` : ""].filter(Boolean).join(", ") : "";
+    return `<button data-enhance="${s.defId}" title="coat your weapon (${e?.charges ?? 0} charges: ${eff})${exp.weaponBuff ? " — replaces the current coating" : ""}">🗡️ Apply ${name(s.defId)}${s.qty > 1 ? ` ×${s.qty}` : ""}</button>`;
+  }).join("");
+}
+
 // The engagement panel replaces herePanel while a live fight is in progress
 // (exp.combat set): monster HP bar, per-round forecast (the honest race —
 // toKill vs toDie, no potion double-count), and Fight/Flee/Potion/auto-quaff.
 function engagementPanel(exp: NonNullable<GameState["expedition"]>, legal: Action[]): string {
   const c = exp.combat!;
   const maxHp = MONSTER_TIER_HP_CURVE[MONSTERS[c.creature]!.tier]!;
-  const dmgOut = playerDamage(exp.loadout, c.creature) + c.damageAdd;
+  const dmgOut = playerDamage(exp.loadout, c.creature, exp.weaponBuff) + c.damageAdd; // D59: forecast reflects the coating
   const dmgIn = damageTaken(exp.loadout, c.creature, c.mitigationAdd);
   const toKill = Math.ceil(c.monsterHp / dmgOut);
   const toDie = Math.ceil(exp.hp / dmgIn); // raw race — potions extend it (noted in the forecast line)
@@ -524,13 +543,14 @@ function engagementPanel(exp: NonNullable<GameState["expedition"]>, legal: Actio
   return `<div class="here monster engagement">
     <b>⚔ Engaged: ${name(c.creature)}</b>
     <div class="bar"><span>Its HP</span><div class="track"><div class="fill monster" style="width:${(c.monsterHp / maxHp) * 100}%"></div></div><b>${round(c.monsterHp)}/${maxHp}</b></div>
-    <div class="forecast">you hit for <b>${round(dmgOut)}</b> · it hits for <b>${round(dmgIn)}</b> · <b class="${winning ? "good" : "over"}">${winning ? `kill in ${toKill}` : `it kills you first (~${toDie} rounds)`}</b>${exp.loadout.potions.length ? ` · ${exp.loadout.potions.reduce((n, p) => n + p.qty, 0)} potion(s) extend that` : ""}${quiver}</div>
+    <div class="forecast">you hit for <b>${round(dmgOut)}</b> · it hits for <b>${round(dmgIn)}</b> · <b class="${winning ? "good" : "over"}">${winning ? `kill in ${toKill}` : `it kills you first (~${toDie} rounds)`}</b>${exp.loadout.potions.length ? ` · ${exp.loadout.potions.reduce((n, p) => n + p.qty, 0)} potion(s) extend that` : ""}${quiver}${coatingLine(exp)}${c.poison ? ` · ☠ poisoned (${round(c.poison.dmg)}/rd, ${c.poison.rounds} left)` : ""}</div>
     <div class="actions">
       <button data-act="fight">⚔ Fight (1 round)</button>
       <button data-act="flee" title="disengage — take one parting hit (${round(dmgIn)}); unused battle items keep for later">🏃 Flee (−${round(dmgIn)} HP)</button>
       ${canQuaff ? `<button data-act="quaff">🧪 Potion</button>` : `<button disabled title="no potions, or full HP">🧪 Potion</button>`}
       <button data-act="toggle-auto-quaff">Auto-potion: <b>${(exp.autoQuaff ?? true) ? "on" : "off"}</b></button>
       ${(exp.loadout.battleItems ?? []).map((s) => { const b = COMBAT_BUFF[s.defId] ?? {}; const eff = [b.damageAdd ? `+${b.damageAdd} dmg` : "", b.mitigationAdd ? `+${b.mitigationAdd} mitigation` : ""].filter(Boolean).join(", "); return `<button data-use-item="${s.defId}" title="use it this fight only (${eff})">⚗ ${name(s.defId)} (${eff})${s.qty > 1 ? ` ×${s.qty}` : ""}</button>`; }).join("")}
+      ${enhanceButtons(exp)}
     </div>
   </div>`;
 }
@@ -609,7 +629,7 @@ function expeditionView(): string {
   const savingClause = pending && Number.isFinite(saving) && saving > 0 ? ` · gear/transport saved ${round(saving)}e` : "";
   const forecastClause = pending?.fight
     ? (() => {
-        const dmgOut = playerDamage(exp.loadout, pending.fight!);
+        const dmgOut = playerDamage(exp.loadout, pending.fight!, exp.weaponBuff); // D59: forecast reflects an active coating
         const dmgIn = damageTaken(exp.loadout, pending.fight!, 0);
         const toKill = Math.ceil(MONSTER_TIER_HP_CURVE[MONSTERS[pending.fight!]!.tier]! / dmgOut);
         const toDie = Math.ceil(exp.hp / dmgIn);
@@ -643,8 +663,10 @@ function expeditionView(): string {
         ${legal.some((a) => a.type === "quaff") ? `<button data-act="quaff" title="drink a potion here (−${QUAFF_ENERGY}e)">🧪 Potion (−${QUAFF_ENERGY}e)</button>` : `<button disabled title="no potions, full HP, or too tired">🧪 Potion</button>`}
         <button data-act="toggle-auto-eat">Eat when hungry: <b>${(exp.autoEat ?? true) ? "on" : "off"}</b></button>
         <button data-act="toggle-auto-quaff" title="auto-drink a potion when HP drops below the threshold mid-fight">Auto-potion: <b>${(exp.autoQuaff ?? true) ? "on" : "off"}</b></button>
+        ${enhanceButtons(exp)}
         <button data-act="return">⏎ Return to town</button>
       </div>
+      ${exp.weaponBuff ? `<div class="muted small">🗡️ active coating: <b>${name(exp.weaponBuff.id)}</b> · ${exp.weaponBuff.charges} strike${exp.weaponBuff.charges === 1 ? "" : "s"} left</div>` : ""}
       ${(() => {
         // ke3.4: field-craft list — legal craft candidates on expedition (reduce
         // has already filtered to field recipes you can make right here).
@@ -684,6 +706,7 @@ function wire(): void {
   app.querySelectorAll<HTMLElement>("[data-doff]").forEach((el) => el.onclick = () => apply({ type: "doff", itemId: el.dataset.doff! }));
   app.querySelectorAll<HTMLElement>("[data-drop-map]").forEach((el) => el.onclick = () => apply({ type: "drop-map", mapSeed: el.dataset.dropMap! }));
   app.querySelectorAll<HTMLElement>("[data-use-item]").forEach((el) => el.onclick = () => apply({ type: "use-item", itemId: el.dataset.useItem! }));
+  app.querySelectorAll<HTMLElement>("[data-enhance]").forEach((el) => el.onclick = () => apply({ type: "enhance", id: el.dataset.enhance! }));
   app.querySelectorAll<HTMLElement>("[data-act]").forEach((el) => el.onclick = () => { pending = null; apply({ type: el.dataset.act! } as Action); });
   const reset = app.querySelector<HTMLElement>("[data-reset]"); if (reset) reset.onclick = () => planReset();
   const repack = app.querySelector<HTMLElement>("[data-repack]"); if (repack) repack.onclick = () => repackLast();
