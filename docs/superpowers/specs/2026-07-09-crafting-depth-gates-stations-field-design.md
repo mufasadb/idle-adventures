@@ -153,5 +153,11 @@ Separate parked bead (under si7.6): **Breadth charter** (§6) — `si7.6.4`, bio
 3. **`fire-kit`** (renamed from campfire) = carried kit-tool + **fuel-as-input** MVP; persistent lit-fire tile deferred (§3).
 4. **m7 is mostly already resolved** — §5.5 documents F1/F2/F4 as *already fixed* (do not re-touch); F3/preview is the one survivor, filed as its own bead (`3iq`) outside this epic; 868.8 closed.
 
+**Locked in pre-handoff review (2026-07-09, second pass — user-answered):**
+5. **`requires.tools` = defIds, AND semantics** (capability-gating rejected). Output scaling is a separate `outputScale?: { capability, qtyPer }` block resolved as `qtyPer × max TOOL_QUALITY` over available tools with that capability — gate and scale are decoupled, so the §4.1/§4.3 tension is resolved without capability gates. Known limitation (deliberate): a higher-tier tool alone does not satisfy a base-tool gate; revisit when tiered crafting tools land.
+6. **Field crafting costs energy**: new lever `FIELD_CRAFT_ENERGY` (start 10; herb gather = 20). Pay → reject `exhausted` → waste-free auto-eat, same shape as gather.
+7. **Re-crafting a built station is rejected** (`already-built`) and must not be presented — legalActions hides it via D29; the web town craftlist (which iterates `RECIPE` keys directly) must hide built-station and `field:true` recipes.
+8. **Water**: no free-floating water item. `glass-vial` (material, `{flint:2}→×2`) fills at a **river** tile via a `fill-vial` field recipe gated by a new `requires.terrain` field-position gate (on/adjacent); at home the draught recipe simply omits water (two recipe ids, same potion output).
+
 **Remaining:**
 - **Content scope** — confirmed intent is "implement them all" (§5.1–5.4 built incrementally as content children), *not* proof-slice-only. Flag if you'd rather sequence §5.4 strictly after §5.1–5.3 prove out.
