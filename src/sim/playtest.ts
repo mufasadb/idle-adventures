@@ -147,7 +147,13 @@ function printTown(st: GameState): void {
     legalActions(st).filter((a) => a.type === "craft").map((a) => (a as { recipeId: string }).recipeId),
   );
   console.log("\nRecipe book (every craftable output + its ingredients; where to FIND ingredients is for you to discover):");
-  const ids = Object.keys(RECIPE).sort((a, b) => (affordable.has(a) ? 0 : 1) - (affordable.has(b) ? 0 : 1));
+  // ke3.4/ke3.2 parity with the web town craftlist: field-only recipes never
+  // show in town (they surface in the field-craft list on expedition), and an
+  // already-built station has no rebuild row.
+  const built = new Set(st.stations ?? []);
+  const ids = Object.keys(RECIPE)
+    .filter((id) => !RECIPE[id]!.field && !(RECIPE[id]!.buildsStation && built.has(RECIPE[id]!.buildsStation!)))
+    .sort((a, b) => (affordable.has(a) ? 0 : 1) - (affordable.has(b) ? 0 : 1));
   // ke3.3: outputScale recipes report their REAL yield at the current knife tier.
   const townTools = [...st.bank.map((s) => s.defId), ...st.loadout.equipment.tools];
   for (const id of ids) {
