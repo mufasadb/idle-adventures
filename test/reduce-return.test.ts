@@ -34,7 +34,10 @@ test("return: banks carry + durables + potions + uneaten food (D26, pqp), back t
     { defId: "potion", qty: 1 },
     { defId: "ration", qty: 2 }, // uneaten food banks back (pqp)
   ]);
-  expect(events).toEqual([{ type: "run-ended", reason: "returned" }]);
+  expect(events).toHaveLength(1);
+  expect(events[0]).toMatchObject({ type: "run-ended", reason: "returned" });
+  // a voluntary return carries a cosmetic flavor beat (xwp)
+  expect(typeof (events[0] as { flavor?: string }).flavor).toBe("string");
 });
 
 test("return: rejected in town", () => {

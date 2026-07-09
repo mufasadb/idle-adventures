@@ -223,7 +223,7 @@ export type GameEvent =
   | { type: "map-dropped"; at: { x: number; y: number }; mapSeed: string; biomeId: BiomeId; hints: string[]; carried: boolean; tier: number } // humanoid kill minted a map (8ec); carried=false → pack full, left behind
   | { type: "map-discarded"; mapSeed: string } // drop-map (8ec): carried map thrown away mid-run
   | { type: "packed"; slot: LoadoutSlot; defId: string }
-  | { type: "run-ended"; reason: string }
+  | { type: "run-ended"; reason: string; flavor?: string } // flavor (xwp): a cosmetic return beat, present only on voluntary "returned"; absent on defeat
   | {
       type: "action-rejected";
       action: Action["type"];

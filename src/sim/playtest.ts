@@ -73,7 +73,7 @@ function fmtEvent(e: GameEvent): string {
     case "inked": return `🖋 inked the map — it is now of ${AFFIX_EFFECTS[e.affix]?.label ?? e.affix}`;
     case "donned": return `🧤 donned ${e.defId}${e.displaced ? ` (stowed ${e.displaced} in the bag)` : ""} · energy → ${e.energy}e`;
     case "doffed": return `🎒 doffed ${e.defId} to the bag (takes a slot) · energy → ${e.energy}e`;
-    case "run-ended": return `— run ended (${e.reason})`;
+    case "run-ended": return e.flavor ? `${e.flavor}\n— run ended (${e.reason})` : `— run ended (${e.reason})`;
     case "action-rejected": return `✗ ${e.action} rejected: ${e.reason}`;
     default: return JSON.stringify(e);
   }

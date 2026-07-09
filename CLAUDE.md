@@ -4,7 +4,7 @@ This file provides instructions and context for AI coding agents working on this
 
 ## This project — Idle Adventure (POC)
 
-A turn-based exploration RPG built as a "logistics puzzle on a grid": pack a loadout, drop onto a procedural 20×20 map, make routing/gather/fight/turn-back calls under an **energy + HP budget**, return, craft upgrades, go again. The POC validates exactly one thing — **is that loop fun?**
+A turn-based exploration RPG built as a "logistics puzzle on a grid": pack a loadout, drop onto a procedural 20×20 map, make routing/gather/fight calls to **extract as much value as you can before fatigue forces you home** (return is free — the tension is depth-vs-haul under an **energy + HP budget**, not turn-back timing; see D62), craft upgrades, go again. The POC validates exactly one thing — **is that loop fun?**
 
 **Read first (in `docs/`):**
 - `superpowers/specs/2026-06-30-idle-adventure-poc-core-loop-design.md` — the design (what + why), including the engine contract.

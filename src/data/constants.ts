@@ -808,6 +808,50 @@ type ItemStackSpec = { defId: string; qty: number; chance?: number }; // chance 
 // === Map tiers (2yn) — value-scaling generation axis. See spec 2026-07-08-map-tiers. ===
 export const MAP_TIER_MAX = 5; // deepest map tier; drop-mint caps here
 
+// === Return flavor (xwp) — cosmetic beat on VOLUNTARY return only (never defeat). ===
+// Reframes the loop as "how much value can you extract before fatigue forces you
+// home": a low-energy return reads as an exhausted trek, a high-energy one as
+// boredom/disdain. Pure flavor — no mechanic change; free return still stands.
+// Bucket picked from (energy, mapTier, leftover-cooked-food); a seeded rand picks
+// the variant. See engine/flavor.ts. No em dashes in copy by request.
+export const RETURN_FRESH_FRACTION = 0.5; // energy > this × maxEnergy = "fresh" (bored/beneath); ≤ = weary; ==0 = spent
+export const RETURN_TIER_HIGH = 3; // spent at mapTier ≥ this → the "long journey home" pool (epic at MAP_TIER_MAX)
+// Cooked/prepared keeper foods: leftover qty>0 of any of these + a fresh return = the "beneath you" snark.
+export const RETURN_COOKED_FOODS: string[] = ["cooked-venison", "cooked-berries", "stew", "smoked-venison", "blubber-stew"];
+export type ReturnFlavorBucket = "spent-low" | "spent-high" | "spent-epic" | "weary" | "bored" | "beneath";
+export const RETURN_FLAVOR: Record<ReturnFlavorBucket, string[]> = {
+  "spent-low": [
+    "Legs like lead, you start the trudge home.",
+    "Running on fumes, you set off on the walk back.",
+    "Spent, you point yourself at town and put one foot in front of the other.",
+  ],
+  "spent-high": [
+    "Bone-tired, you begin the long journey home.",
+    "Nothing left in the tank; the long road back stretches out ahead.",
+    "You barely make it home after days on the trail.",
+  ],
+  "spent-epic": [
+    "Utterly wrecked, you face the absurdly long trek back. This'll take a while.",
+    "You pushed too far; getting home from out here is its own expedition.",
+    "Empty, and a world away from town. Your bones already ache at the thought.",
+  ],
+  weary: [
+    "Tired but upright, you make your way back.",
+    "You've had enough for one trip and head home.",
+    "Legs aching, you turn for town.",
+  ],
+  bored: [
+    "You get bored and wander back.",
+    "Nothing here worth your time, you amble home.",
+    "You've seen enough. Back to town.",
+  ],
+  beneath: [
+    "You've decided this place is beneath you, and stroll home with provisions to spare.",
+    "Pockets full of good food, energy to burn; clearly this land wasn't worthy.",
+    "Rations untouched, chin up: this place simply didn't rise to your standard.",
+  ],
+};
+
 // Per-material weight multiplier by map tier. Sparse: absent defId/tier = 1 (identity).
 // MUST be 1 at tier 1 for every listed material (asserted in map-tier.test).
 export const MATERIAL_TIER_WEIGHT: Record<string, Record<number, number>> = {

@@ -10,9 +10,11 @@
 
 A deliberately stripped vertical slice built to answer **one question**:
 
-> Is choosing a loadout for a given map, then making routing / gather / fight / turn-back calls under tight budgets, fun — enough that you want to craft up and go again?
+> Is choosing a loadout for a given map, then making routing / gather / fight calls to extract **as much value as you can before fatigue forces you home**, fun — enough that you want to craft up and go again?
 
 Fun gates everything else. If this slice is fun, the game is fun. If not, we learn it in days, not months. Everything in §8 is deferred, not cancelled.
+
+**Framing note (xwp, D62).** The puzzle is *value-extraction under a fatigue budget*, not *turn-back timing*. Return is free and instant (anti-stranding — you can always get home), so "when do I turn back?" is a trivial call; the real, live decision is *how deep to push and how much to haul* before the trip home becomes a spent, exhausted slog. A cosmetic beat on return names this: limp home near-empty and the log reads as an exhausting trek; leave with energy and provisions to spare and it reads as boredom or disdain. No mechanic changes — the reframe is language plus flavor.
 
 ## 2. The Loop
 

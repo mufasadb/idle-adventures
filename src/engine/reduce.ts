@@ -7,6 +7,7 @@ import { toolQualityFor } from "./tools";
 import { strikeExchange, rollLoot, explainMatchup, damageTaken, wieldsRanged, hasAmmo } from "./combat";
 import { eatToRefill, foodEnergyOf } from "./food";
 import { endExpedition, subtractStacks } from "./bank";
+import { pickReturnFlavor } from "./flavor";
 import { rand } from "./rng";
 import { craft as applyRecipe, recipeOutputQty } from "./craft";
 import { packItem, reserveLoadout, EQUIP_SLOTS } from "./pack";
@@ -294,9 +295,17 @@ function returnHome(state: GameState): { state: GameState; events: GameEvent[] }
     return rejected(state, "return", "not-on-expedition");
   }
   if (expedition.combat) return rejected(state, "return", "engaged");
+  const flavor = pickReturnFlavor({
+    energy: expedition.energy,
+    maxEnergy: expedition.maxEnergy ?? MAX_ENERGY,
+    mapTier: expedition.mapTier ?? 1,
+    food: expedition.loadout.food,
+    seed: expedition.mapSeed,
+    runs: state.runs ?? 0,
+  });
   return {
     state: endExpedition(state, expedition),
-    events: [{ type: "run-ended", reason: "returned" }],
+    events: [{ type: "run-ended", reason: "returned", flavor }],
   };
 }
 

@@ -161,7 +161,7 @@ function fmt(e: GameEvent): string {
       : `🗺️ a T${e.tier} ${name(e.biomeId)} map dropped — pack full, left behind`;
     case "map-discarded": return `🗺️ discarded a carried map`;
     case "packed": return `packed ${name(e.defId)} → ${e.slot}`;
-    case "run-ended": return `— run ended (${e.reason}) —`;
+    case "run-ended": return e.flavor ? `${e.flavor}<br>— run ended (${e.reason}) —` : `— run ended (${e.reason}) —`;
     case "action-rejected": return `✗ ${e.action} — ${rejectCopy(e.reason)}`;
     case "engaged": return e.ranged
       ? `🏹 engaged the ${name(e.creature)} from a tile away — your opener lands before it can answer`
