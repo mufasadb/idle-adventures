@@ -1,7 +1,7 @@
 import type { GameState } from "../engine/types";
 import { expeditionGrid } from "../engine/grid";
 import type { Grid } from "../engine/grid";
-import { WEAPONS } from "../data/constants";
+import { WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_QUALITY, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, PANNIERS_SLOTS, INKS, MATERIAL_TIER, TENT_FOOD_MULTIPLIER } from "../data/constants";
 import type { Terrain, NodeType, DmgType, ArmourType } from "../data/constants";
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
@@ -37,6 +37,40 @@ const WEAPON_CLASS_HINT: Record<DmgType, string> = {
 export function weaponHint(defId: string): string | null {
   const w = WEAPONS[defId];
   return w ? WEAPON_CLASS_HINT[w.dmgType] : null;
+}
+
+// Item-constant tooltip (vb8): a one-line, DATA-DRIVEN description of what an
+// item does, for the web `title=` on every item chip. Numbers ARE allowed here
+// (the game is a deterministic math puzzle; hiding constants only pushes the
+// math into notebook reverse-engineering — playtest v3 §5, web precedent: fight
+// forecasts already print numbers). Inks stay VAGUE though — the cxq legibility
+// rule keeps the material spoiler in the affix NAME, not the recipe/tooltip.
+// Console does NOT use this (blind-playtest discovery pressure stays).
+export function describe(defId: string): string {
+  const w = WEAPONS[defId];
+  if (w) return `weapon · ${w.damage} ${w.dmgType} dmg — ${WEAPON_CLASS_HINT[w.dmgType]}`;
+  const a = ARMOUR[defId];
+  if (a) return `${a.slot} armour · ${a.defense} defense · ${a.armourType}`;
+  if (FOOD.includes(defId)) return `food · restores ${FOOD_ENERGY[defId] ?? ENERGY_PER_FOOD} energy per unit`;
+  if (POTION.includes(defId)) return `potion · heals ${POTION_HEAL_BY[defId] ?? POTION_HEAL} HP`;
+  const buff = COMBAT_BUFF[defId];
+  if (buff) {
+    const parts = [buff.damageAdd ? `+${buff.damageAdd} dmg` : "", buff.mitigationAdd ? `+${buff.mitigationAdd} mitigation` : ""].filter(Boolean);
+    return `battle item · ${parts.join(", ")} for one fight`;
+  }
+  if (ENERGY_CAP_BONUS[defId]) return `gear · +${ENERGY_CAP_BONUS[defId]} max energy`;
+  if (defId in TOOL_CAPABILITY) {
+    const cap = TOOL_CAPABILITY[defId];
+    const q = TOOL_QUALITY[defId];
+    if (defId === "tent") return `tool · camp — food restores +${Math.round((TENT_FOOD_MULTIPLIER - 1) * 100)}%`;
+    return `tool · ${cap}${q ? ` (tier ${q})` : ""}`;
+  }
+  if (defId in BACKPACK_SLOTS) return `backpack · ${BACKPACK_SLOTS[defId]} carry slots`;
+  if (defId in TRANSPORT_CARRY) return `transport · carries ${TRANSPORT_CARRY[defId]} slots`;
+  if (defId in PANNIERS_SLOTS) return `panniers · +${PANNIERS_SLOTS[defId]} carry slots (needs a mount)`;
+  if (defId in INKS) return `a cartographer's ink — apply to a held map to coax out a tendency`;
+  const tier = MATERIAL_TIER[defId];
+  return tier ? `tier-${tier} crafting material` : "a crafting material";
 }
 
 const MAGNITUDE_SUFFIX: Record<NodeType, Record<number, string>> = {

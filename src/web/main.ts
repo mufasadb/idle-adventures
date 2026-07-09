@@ -17,7 +17,7 @@ import { heldFoodEnergy } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
 import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, TERRAIN_GATE, COMBAT_BUFF, SURVEY_ENERGY, INKS, AFFIX_EFFECTS } from "../data/constants";
 import type { BiomeId } from "../data/constants";
-import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint } from "../render/render";
+import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint, describe } from "../render/render";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, LoadoutSlot, MapItem, RejectionReason } from "../engine/types";
 
@@ -288,13 +288,15 @@ function draw(): void {
 // backpack/panniers) is appended as semi-transparent GHOST boxes — you see your
 // whole kit in one place, but ghosts don't spend a real slot. Food burns down
 // over the run, so its boxes disappear live as they're eaten.
-function slotBox(cls: string, label: string, q: string): string {
-  return `<div class="slot ${cls}" title="${label}${q}">${label}${q ? `<span class="q">${q}</span>` : ""}</div>`;
+// vb8: `tip` (from describe(defId)) rides in the title after the name — item
+// constants are legible on hover without cluttering the chip.
+function slotBox(cls: string, label: string, q: string, tip = ""): string {
+  return `<div class="slot ${cls}" title="${label}${q}${tip ? ` — ${tip}` : ""}">${label}${q ? `<span class="q">${q}</span>` : ""}</div>`;
 }
 function realSlots(loadout: Loadout, carry: ItemStack[], maps: MapItem[] = []): string[] {
   const boxes: string[] = [];
   const units = (items: ItemStack[], cls: string) => {
-    for (const it of items) for (let i = 0; i < it.qty; i++) boxes.push(slotBox(cls, name(it.defId), ""));
+    for (const it of items) for (let i = 0; i < it.qty; i++) boxes.push(slotBox(cls, name(it.defId), "", describe(it.defId)));
   };
   units(loadout.food, "food");
   units(loadout.potions, "potion");
@@ -303,17 +305,17 @@ function realSlots(loadout: Loadout, carry: ItemStack[], maps: MapItem[] = []): 
   // ammo (D45): the one deep-stacking consumable — one box per ARROW_STACK_CAP slot, shown ×qty like loot
   for (const it of loadout.ammo ?? []) {
     for (let rest = it.qty; rest > 0; rest -= ARROW_STACK_CAP) {
-      boxes.push(slotBox("ammo", name(it.defId), `×${Math.min(rest, ARROW_STACK_CAP)}`));
+      boxes.push(slotBox("ammo", name(it.defId), `×${Math.min(rest, ARROW_STACK_CAP)}`, describe(it.defId)));
     }
   }
-  for (const t of loadout.equipment.tools) boxes.push(slotBox("tool", name(t), ""));
-  for (const s of carry) boxes.push(slotBox("loot", name(s.defId), `×${s.qty}`));
+  for (const t of loadout.equipment.tools) boxes.push(slotBox("tool", name(t), "", describe(t)));
+  for (const s of carry) boxes.push(slotBox("loot", name(s.defId), `×${s.qty}`, describe(s.defId)));
   for (const m of maps) boxes.push(slotBox("loot", `🗺️ T${m.tier ?? 1} ${name(m.biomeId)} map`, "")); // carried maps (8ec): 1 slot each
   return boxes;
 }
 function wornGhosts(eq: Equipment): string[] {
   const worn = [eq.weapon, eq.helmet, eq.chest, eq.legs, eq.boots, eq.gloves, eq.transport, eq.backpack, eq.panniers].filter(Boolean) as string[];
-  return worn.map((d) => `<div class="slot ghost" title="${name(d)} — worn, no slot">${name(d)}</div>`);
+  return worn.map((d) => `<div class="slot ghost" title="${name(d)} — worn, no slot · ${describe(d)}">${name(d)}</div>`);
 }
 // Returns { used, html }. used = real filled slots (ghosts excluded).
 function inventoryGrid(loadout: Loadout, carry: ItemStack[], cap: number, maps: MapItem[] = []): { used: number; html: string } {
@@ -402,7 +404,7 @@ function townView(): string {
           const canPack = slot !== null && legal.some((a) => a.type === "pack" && a.slot === slot && a.itemId === s.defId);
           const canSpare = legal.some((a) => a.type === "pack" && a.slot === "spare" && a.itemId === s.defId);
           return `<div class="bankitem">
-            <span class="chip">${name(s.defId)} ×${s.qty}</span>
+            <span class="chip" title="${describe(s.defId)}">${name(s.defId)} ×${s.qty}</span>
             ${canPack ? `<button data-pack="${s.defId}" data-slot="${slot}">pack</button>` : `<span class="muted small">${slot ?? "material"}</span>`}
             ${canSpare ? `<button data-pack="${s.defId}" data-slot="spare" title="a SPARE in the bag (1 slot) — don it mid-run to swap gear">+spare</button>` : ""}
           </div>`;
@@ -441,7 +443,7 @@ function townView(): string {
             }).join("");
             const hint = weaponHint(out); // 57l: weapon-class hint — the bow died 3/3 to invisibility
             return `<div class="craftgroup${anyCan ? "" : " locked"}">
-              <div class="craftname">${qty}× ${name(out)}${hint ? ` <span class="muted small">· ${hint}</span>` : ""}</div>
+              <div class="craftname" title="${describe(out)}">${qty}× ${name(out)}${hint ? ` <span class="muted small">· ${hint}</span>` : ""}</div>
               ${paths}
             </div>`;
           }).join("");
@@ -631,13 +633,14 @@ function expeditionView(): string {
         ${legal.some((a) => a.type === "eat") ? `<button data-act="eat">🍖 Eat${exp.loadout.equipment.tools.includes("tent") ? " (+50%)" : ""}</button>` : `<button disabled title="no food, or already full">🍖 Eat</button>`}
         ${legal.some((a) => a.type === "quaff") ? `<button data-act="quaff" title="drink a potion here (−${QUAFF_ENERGY}e)">🧪 Potion (−${QUAFF_ENERGY}e)</button>` : `<button disabled title="no potions, full HP, or too tired">🧪 Potion</button>`}
         <button data-act="toggle-auto-eat">Eat when hungry: <b>${(exp.autoEat ?? true) ? "on" : "off"}</b></button>
+        <button data-act="toggle-auto-quaff" title="auto-drink a potion when HP drops below the threshold mid-fight">Auto-potion: <b>${(exp.autoQuaff ?? true) ? "on" : "off"}</b></button>
         <button data-act="return">⏎ Return to town</button>
       </div>
       <h2>Bag <span class="muted small">${inv.used}/${cap} slots</span></h2>
       ${inv.html}
       <div class="muted small">food (green) is eaten to refill energy as you travel — freeing slots for loot (gold). Potions purple · battle items red · tools grey · worn gear ghosted (free).</div>
-      ${exp.carry.length ? `<div class="bank" style="margin-top:.5rem">${exp.carry.map((s) => `<div class="bankitem"><span class="chip">${name(s.defId)} ×${s.qty}</span>${legal.some((a) => a.type === "don" && a.itemId === s.defId) ? `<button data-don="${s.defId}" title="equip it (−${DON_DOFF_ENERGY}e; swaps the worn piece into the bag)">don</button>` : ""}<button data-drop="${s.defId}">drop</button></div>`).join("")}</div>` : ""}
-      ${(() => { const doffable = legal.filter((a) => a.type === "doff").map((a) => (a as { itemId: string }).itemId); return doffable.length ? `<div class="bank" style="margin-top:.5rem">${doffable.map((id) => `<div class="bankitem"><span class="chip" title="worn">${name(id)} (worn)</span><button data-doff="${id}" title="stow it in the bag (−${DON_DOFF_ENERGY}e; takes a slot)">doff</button></div>`).join("")}</div>` : ""; })()}
+      ${exp.carry.length ? `<div class="bank" style="margin-top:.5rem">${exp.carry.map((s) => `<div class="bankitem"><span class="chip" title="${describe(s.defId)}">${name(s.defId)} ×${s.qty}</span>${legal.some((a) => a.type === "don" && a.itemId === s.defId) ? `<button data-don="${s.defId}" title="equip it (−${DON_DOFF_ENERGY}e; swaps the worn piece into the bag)">don</button>` : ""}<button data-drop="${s.defId}">drop</button></div>`).join("")}</div>` : ""}
+      ${(() => { const doffable = legal.filter((a) => a.type === "doff").map((a) => (a as { itemId: string }).itemId); return doffable.length ? `<div class="bank" style="margin-top:.5rem">${doffable.map((id) => `<div class="bankitem"><span class="chip" title="worn · ${describe(id)}">${name(id)} (worn)</span><button data-doff="${id}" title="stow it in the bag (−${DON_DOFF_ENERGY}e; takes a slot)">doff</button></div>`).join("")}</div>` : ""; })()}
       ${(exp.carriedMaps ?? []).length ? `<div class="bank" style="margin-top:.5rem">${(exp.carriedMaps ?? []).map((m) => `<div class="bankitem"><span class="chip" title="1 slot — banks as a held map when the run ends">🗺️ T${m.tier ?? 1} ${name(m.biomeId)} map</span><button data-drop-map="${m.mapSeed}">drop</button></div>`).join("")}</div>` : ""}
     </section>
   </div>
