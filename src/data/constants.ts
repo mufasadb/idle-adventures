@@ -297,6 +297,19 @@ export const TOOL_CAPABILITY: Record<string, string> = {
   glassware: "alchemy", // field-craft kit-tool (ke3.6): the brewing gate for draughts. Carried into the field; NODE_TOOL never asks for "alchemy"
   "blacksmiths-hammer": "smith", // forge tool (ke3.7): gates all metal plate at the anvil. NODE_TOOL never asks for "smith"; it never needs to leave town but reuses the tool path
 }; // tool defId → capability; tiered tools (M5: "iron-pick": "pick") are data-only
+// gate-legibility (playtest 2026-07-09 finding #1): a kit-tool is an unmarked key —
+// 3/3 blind agents never found field crafting. This maps a tool CAPABILITY to a
+// short "what door it opens" clause, surfaced in item tooltips + the field-craft
+// affordance so the door is visible before you hold the key. Pure signposting; no
+// mechanic reads this. Capabilities absent here (movement/gather tools) speak for
+// themselves and get no clause.
+export const TOOL_PURPOSE: Record<string, string> = {
+  heat: "enables field cooking (with a cooking-pot, cooks stew)",
+  simmer: "with a fire-kit, cooks stew in the field",
+  alchemy: "enables field brewing (draughts)",
+  vision: "reveals a far node's material tier when you survey it",
+  smith: "forges metal plate at an anvil",
+};
 export const TOOL_QUALITY: Record<string, number> = {
   pick: 1,
   axe: 1,

@@ -1,8 +1,8 @@
 import type { GameState } from "../engine/types";
 import { expeditionGrid } from "../engine/grid";
 import type { Grid } from "../engine/grid";
-import { WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_QUALITY, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, PANNIERS_SLOTS, INKS, MATERIAL_TIER, TENT_FOOD_MULTIPLIER } from "../data/constants";
-import type { Terrain, NodeType, DmgType, ArmourType } from "../data/constants";
+import { WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_QUALITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, PANNIERS_SLOTS, INKS, MATERIAL_TIER, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL } from "../data/constants";
+import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType } from "../data/constants";
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
 
@@ -60,10 +60,13 @@ export function describe(defId: string): string {
   }
   if (ENERGY_CAP_BONUS[defId]) return `gear · +${ENERGY_CAP_BONUS[defId]} max energy`;
   if (defId in TOOL_CAPABILITY) {
-    const cap = TOOL_CAPABILITY[defId];
+    const cap = TOOL_CAPABILITY[defId]!;
     const q = TOOL_QUALITY[defId];
     if (defId === "tent") return `tool · camp — food restores +${Math.round((TENT_FOOD_MULTIPLIER - 1) * 100)}%`;
-    return `tool · ${cap}${q ? ` (tier ${q})` : ""}`;
+    // gate-legibility (playtest 2026-07-09 #1): kit-tools are unmarked keys — say
+    // what door each opens (field cooking/brewing, the forge, node-tier vision).
+    const purpose = TOOL_PURPOSE[cap];
+    return `tool · ${cap}${q ? ` (tier ${q})` : ""}${purpose ? ` — ${purpose}` : ""}`;
   }
   if (defId in BACKPACK_SLOTS) return `backpack · ${BACKPACK_SLOTS[defId]} carry slots`;
   if (defId in TRANSPORT_CARRY) return `transport · carries ${TRANSPORT_CARRY[defId]} slots`;
@@ -71,6 +74,46 @@ export function describe(defId: string): string {
   if (defId in INKS) return `a cartographer's ink — apply to a held map to coax out a tendency`;
   const tier = MATERIAL_TIER[defId];
   return tier ? `tier-${tier} crafting material` : "a crafting material";
+}
+
+// gate-legibility (playtest 2026-07-09 #1): a locked recipe/craft-reject must NAME
+// the gate, not say "you lack something." Reads RECIPE[id].requires and returns the
+// human "needs …" clause (station + tools joined with " + "), or null for a recipe
+// with no gate. `terrain` gates are field-craft-only; call `recipeTerrainGate` for
+// that clause where the current tile is known.
+export function recipeGateHint(recipeId: string): string | null {
+  const req = RECIPE[recipeId]?.requires;
+  if (!req) return null;
+  const parts: string[] = [];
+  if (req.station) parts.push(req.station);
+  if (req.tools) parts.push(...req.tools);
+  return parts.length ? `needs ${parts.join(" + ")}` : null;
+}
+
+// The terrain a field recipe must be crafted on/adjacent to (river for water-vial),
+// or null. Kept separate: it's only a "gate" when the player isn't already there.
+export function recipeTerrainGate(recipeId: string): Terrain | null {
+  return RECIPE[recipeId]?.requires?.terrain ?? null;
+}
+
+// gate-legibility (playtest 2026-07-09 #1): a gather `missing-tool` reject must name
+// the tool KIND (capability) the node wants — "needs a knife", not "no tool". Reads
+// NODE_TOOL[kind] (a capability string that reads as a noun: pick/axe/knife). Herb
+// nodes need no tool → null.
+export function nodeToolHint(kind: GatherableNodeType): string | null {
+  const cap = NODE_TOOL[kind];
+  return cap ? `needs a ${cap}` : null;
+}
+
+// gate-legibility (playtest 2026-07-09 #1, node tier/reach visibility): a surveyed /
+// in-vision node should read its MATERIAL TIER at range so players can plan which
+// veins are worth the trek — an agent mined ~12 nodes fishing for silver, then
+// trekked 50 tiles to learn a node was tier-2. Fed the PERCEIVED tier (range-gated
+// via perceive), so tier stays honest to what you can actually see. tier 1 → null
+// (no signpost needed). NOT for monsters (their size is flavored separately).
+export function nodeTierNote(detail: PoiDetail | null): string | null {
+  if (!detail || detail.creature) return null; // null or a monster detail
+  return detail.tier > 1 ? `tier ${detail.tier} — needs a tier-${detail.tier} tool` : null;
 }
 
 const MAGNITUDE_SUFFIX: Record<NodeType, Record<number, string>> = {
