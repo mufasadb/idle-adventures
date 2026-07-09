@@ -548,7 +548,31 @@ export const BATTLE_ITEM: string[] = ["elixir-of-power", "warding-draught"]; // 
 // --- Crafting (M5): direct & instant, materials → item (D10). One shared tree
 // so hauls from different biomes feed each other. Weighted materials (D27) make
 // cross-biome inputs a soft pull (silver best-farmed in tundra), not a hard gate.
-export const RECIPE: Record<string, { inputs: ItemStackSpec[]; output: ItemStackSpec }> = {
+// Stations (ke3, crafting-depth §2): non-bank, permanent, home-side infrastructure
+// that gates the deep home recipes. A station is a property of the base
+// (`state.stations`), never a carried stack — so a `requires.station` gate can by
+// definition never be satisfied in the field, which is what keeps hard recipes
+// home-bound. Built via a recipe's `buildsStation` (ke3.2).
+export type StationId = "smokehouse" | "alchemical-desk" | "anvil";
+
+// A recipe can gate beyond its `inputs` (ke3.1, crafting-depth §4.1):
+//   requires.station — a home StationId (uncarriable → home-only)
+//   requires.tools   — DEFIDS, AND semantics: EVERY listed tool must be present in
+//                      the caller's phase-scoped tool pool (town = bank∪equipped;
+//                      field = equipped∪carry). Recognised via TOOL_CAPABILITY.
+//   requires.terrain — a Terrain the crafter must stand on (field-only gate; the
+//                      runtime check lands in ke3.4). Invariant: only on field:true.
+// field — opt-in to expedition crafting (default absent = town-only, byte-for-byte).
+// Absent `requires`/`field` on every existing recipe → behaviour unchanged.
+export const RECIPE: Record<
+  string,
+  {
+    inputs: ItemStackSpec[];
+    output: ItemStackSpec;
+    requires?: { station?: StationId; tools?: string[]; terrain?: Terrain };
+    field?: boolean;
+  }
+> = {
   // Consumables — T1. Rations are FORAGED: any herb → food. Herbs need no tool
   // and every biome has herb nodes, so food is always sustainable wherever you
   // go (one variant per herb so the loop never depends on a specific biome).

@@ -1,6 +1,6 @@
 // The engine contract — single source of truth for state, actions, events.
 // Lifted from the design spec §10. Pure data; no behaviour here.
-import type { BiomeId, Terrain, NodeType } from "../data/constants";
+import type { BiomeId, Terrain, NodeType, StationId } from "../data/constants";
 import type { Matchup } from "./combat"; // type-only: erased at runtime, no import cycle
 
 export type ItemStack = { defId: string; qty: number }; // fungible; gear referenced by defId too
@@ -80,6 +80,7 @@ export type GameState = {
   expedition: Expedition | null;
   runs?: number; // completed expeditions — advances the candidate-map offer so town shows FRESH maps each visit (not the same 3 forever). Optional/absent = 0 (old saves, terse test states); reads guard with `?? 0`.
   maps?: MapItem[]; // held maps (xzx): pocketed from the offer, consumed on embark. Optional/absent = [] (old saves, terse test states); reads guard with `?? []`.
+  stations?: StationId[]; // built home stations (ke3): non-bank permanent infra that gates deep recipes. Optional/absent = [] (old saves, pre-ke3 states); reads guard with `?? []`. Write path (buildsStation) lands in ke3.2.
 };
 
 // Loadout slots an action can target when packing.
@@ -143,6 +144,7 @@ export type RejectionReason =
   | "no-monster"
   | "unaffordable"
   | "no-recipe"
+  | "missing-station" // craft: a recipe's requires.station isn't among the built home stations (ke3.1)
   | "insufficient-materials"
   | "wrong-slot"
   | "insufficient"

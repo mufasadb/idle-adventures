@@ -239,6 +239,7 @@ function rejectCopy(reason: RejectionReason): string {
     case "carry-full": return "bag full — a monster fight needs a free loot slot";
     case "exhausted": return "out of energy";
     case "engaged": return "you're engaged — fight or flee below";
+    case "missing-station": return "needs a station you haven't built";
     default: return reason;
   }
 }

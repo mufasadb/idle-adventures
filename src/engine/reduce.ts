@@ -193,7 +193,10 @@ function craftAction(
   recipeId: string,
 ): { state: GameState; events: GameEvent[] } {
   if (state.phase !== "town") return rejected(state, "craft", "not-in-town");
-  const result = applyRecipe(state.bank, recipeId);
+  // Town tool pool (ke3.1): home means everything's reachable — a required tool
+  // may sit in the bank OR the loadout. Stations come from base state.
+  const toolPool = [...state.bank.map((s) => s.defId), ...state.loadout.equipment.tools];
+  const result = applyRecipe(state.bank, recipeId, toolPool, state.stations ?? []);
   if (!result.ok) return rejected(state, "craft", result.reason);
   return {
     state: { ...state, bank: result.bank },

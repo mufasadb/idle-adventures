@@ -6,6 +6,7 @@ import {
   TERRAIN_COST,
   BACKPACK_SLOTS,
   TERRAINS,
+  RECIPE,
   NODE_TYPES,
   BIOME_IDS,
   BIOMES,
@@ -191,6 +192,19 @@ test("constants: armour pieces declare a valid body slot", () => {
 test("constants: consumable catalogs are non-empty", () => {
   expect(FOOD.length).toBeGreaterThan(0);
   expect(POTION.length).toBeGreaterThan(0);
+});
+
+// ke3.1: a `requires.terrain` gate only makes sense for a recipe you craft in the
+// field (the runtime terrain check lives in the field-craft bead). Assert the
+// catalog can never declare a terrain gate on a town-only recipe.
+test("constants: requires.terrain only appears on field recipes (ke3.1)", () => {
+  for (const recipe of Object.values(RECIPE)) {
+    if (recipe.requires?.terrain !== undefined) {
+      expect(recipe.field).toBe(true);
+      // terrain must be a real terrain
+      expect(TERRAINS).toContain(recipe.requires.terrain);
+    }
+  }
 });
 
 test("constants: the acceptance affinity pairing exists (silver ↔ werewolf)", () => {
