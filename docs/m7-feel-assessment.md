@@ -97,3 +97,19 @@ When you play the web view, the harness can't judge *fun* — you can. Specifica
 - **The pull:** after a run, did you *want* to craft something and go again — and did you know *which biome* to go to for the materials? (F4 — the want should be there; the pace may frustrate.)
 
 Jot which of these felt alive vs flat; that plus this doc is the go/iterate decision.
+
+---
+
+## 8. Reconciliation (2026-07-09) — most findings already resolved; DO NOT re-touch
+
+Re-verified against current code while designing the crafting-depth epic (`docs/superpowers/specs/2026-07-09-crafting-depth-gates-stations-field-design.md` §5.5). **The reworks since 2026-07-04 (si7.1 combat-alive, pqp/STACK_CAP, D27 iron reweight, D34 wyrm) already resolved F1/F2/F4.** Recording the evidence here so future work does **not** re-open fixed code and "correct" what is already correct.
+
+| Finding | Status | Evidence (current code) — the fix, so don't redo it |
+|---|---|---|
+| **F1** plate walls combat | ✅ **RESOLVED** | `combat.ts:damageTaken` uses diminishing `MONSTER_TIER_DMG_CURVE[tier] · K/(K+D)`, `D=Σ(def÷matrix)`, `MITIGATION_K=6` — full plate ≈ −50% (not chip). Comment at `constants.ts:329` explicitly notes "the M7 F1 collapse dies here." Plate is now weak-to-magic (÷1.5) and the **tier-4 ancient-wyrm (magic→plate, D34)** punishes the plate line. |
+| **F2** soft carry squeeze | ✅ **RESOLVED** | `STACK_CAP` 10→**5**; consumables **do not stack** (pqp) — food/potions are 1 slot/unit. The "how much food vs loot" call is live again. |
+| **F4** iron scarce / slow first upgrade | ✅ **RESOLVED (spot-check on play)** | Woodland mining now `iron-ore:7` (starter biome is the iron source, D27) — first upgrade lands early. |
+| **F3** preview fidelity | ⛔ **OPEN → own bead** | `PREVIEW_FIDELITY = 0` still. The one real survivor; the master dial on whether *preparation* is a decision. Also the playtest-v3 legibility drag. Tracked separately (not the crafting epic). |
+| **F5** pathfinding / **F6** frac-HP | ⚪ minor | v3: console-pathfinding is a harness artifact (web A* fine). HP rounding cosmetic. Not blocking. |
+
+**Bead 868.8 closed on this reconciliation:** the assessment exists, findings are triaged, the ITERATE decision was made and acted on, and the human-play verdict came via playtests v2/v3 ("core loop VALIDATED"). The only live thread — F3/preview — is carved into its own bead so it isn't lost.
