@@ -17,6 +17,7 @@ import {
   matchupLessons,
   weaponHint,
   logisticsEffect,
+  enhancementHint,
   recipeGateHint,
   nodeToolHint,
   affixMaterialHint,
@@ -107,7 +108,7 @@ console.log(`bank: ${s.bank.map((i) => `${i.qty}× ${i.defId}`).join(", ") || "(
 const active = state.expedition?.loadout ?? s.loadout;
 const eq = active.equipment;
 const worn = [eq.weapon, eq.helmet, eq.chest, eq.legs, eq.boots, eq.gloves, eq.transport, eq.backpack, eq.panniers, ...eq.tools].filter(Boolean);
-console.log(`equipped: ${worn.join(", ") || "(nothing)"} · food: ${active.food.map((f) => `${f.qty}× ${f.defId}`).join(", ") || "none"} · potions: ${active.potions.map((p) => `${p.qty}× ${p.defId}`).join(", ") || "none"}${active.battleItems?.length ? ` · battle: ${active.battleItems.map((b) => `${b.qty}× ${b.defId}`).join(", ")}` : ""}${active.spares?.length ? ` · spare gear (1 slot each, don mid-run to swap): ${active.spares.map((sp) => `${sp.qty}× ${sp.defId}`).join(", ")}` : ""}${active.ammo?.length ? ` · arrows: ${active.ammo.reduce((n, a) => n + a.qty, 0)} (a wielded bow shoots one per combat exchange; empty quiver = the bow swings like a club)` : wieldsRanged(active) ? " · arrows: 0 — ⚠ NO ARROWS: your bow swings like a CLUB (1 dmg). Craft arrows to shoot." : ""}${active.enhancements?.length ? ` · enhancements (1 slot each; enhance id="…" to coat your weapon — engaged or not, no exchange): ${active.enhancements.map((en) => `${en.qty}× ${en.defId}`).join(", ")}` : ""}${state.expedition?.weaponBuff ? ` · 🗡️ active coating: ${state.expedition.weaponBuff.id} (${state.expedition.weaponBuff.charges} strikes left)` : ""}`);
+console.log(`equipped: ${worn.join(", ") || "(nothing)"} · food: ${active.food.map((f) => `${f.qty}× ${f.defId}`).join(", ") || "none"} · potions: ${active.potions.map((p) => `${p.qty}× ${p.defId}`).join(", ") || "none"}${active.battleItems?.length ? ` · battle: ${active.battleItems.map((b) => `${b.qty}× ${b.defId}`).join(", ")}` : ""}${active.spares?.length ? ` · spare gear (1 slot each, don mid-run to swap): ${active.spares.map((sp) => `${sp.qty}× ${sp.defId}`).join(", ")}` : ""}${active.ammo?.length ? ` · arrows: ${active.ammo.reduce((n, a) => n + a.qty, 0)} (a wielded bow shoots one per combat exchange; empty quiver = the bow swings like a club)` : wieldsRanged(active) ? " · arrows: 0 — ⚠ NO ARROWS: your bow swings like a CLUB (1 dmg). Craft arrows to shoot." : ""}${active.enhancements?.length ? ` · enhancements (1 slot each; enhance id="…" to coat your weapon — engaged or not; mid-fight it costs a turn, 67e): ${active.enhancements.map((en) => `${en.qty}× ${en.defId} (${enhancementHint(en.defId)})`).join(", ")}` : ""}${state.expedition?.weaponBuff ? ` · 🗡️ active coating: ${state.expedition.weaponBuff.id} (${state.expedition.weaponBuff.charges} strikes left)` : ""}`);
 // Make transport/gating gear legible: what it does to a step's cost (mirrors the web).
 {
   const notes: string[] = [];
@@ -173,7 +174,7 @@ function printTown(st: GameState): void {
     // 2g7.7: print the EXACT recipeId — several recipes share an output defId
     // (ration vs ration-sage …), and crafting the wrong id was a silent rake.
     // 57l: weapon rows get their class hint — the bow died 3/3 to invisibility.
-    const hint = weaponHint(r.output.defId) ?? logisticsEffect(r.output.defId); // wzk: range/carry gear states its benefit inline
+    const hint = weaponHint(r.output.defId) ?? logisticsEffect(r.output.defId) ?? enhancementHint(r.output.defId); // wzk range/carry; 7ao coating effect
     // gate-legibility (playtest 2026-07-09 #1): a locked recipe with a STATION/TOOL
     // gate unmet names it — "[needs anvil + blacksmiths-hammer]" — so a blind player
     // stops inferring "I lack mats" for a hard gate (append-only).
@@ -210,7 +211,7 @@ function printExpedition(st: GameState): void {
     const coating = exp.weaponBuff ? ` · 🗡️ coating: ${exp.weaponBuff.id} (${exp.weaponBuff.charges} strikes left)` : "";
     const poisonHdr = c.poison ? ` · ☠ poisoned (${r1(c.poison.dmg)}/rd, ${c.poison.rounds} left)` : "";
     const enh = (exp.loadout.enhancements ?? []).length
-      ? ` · enhancements: ${(exp.loadout.enhancements ?? []).map((en) => `${en.qty}× ${en.defId}`).join(", ")} (enhance id="…" — coat now, no exchange)`
+      ? ` · enhancements: ${(exp.loadout.enhancements ?? []).map((en) => `${en.qty}× ${en.defId} (${enhancementHint(en.defId)})`).join(", ")} (enhance id="…" — coat now; costs a turn, 67e)`
       : "";
     console.log(`\n=== ENGAGED: ${c.creature} — ${c.monsterHp} HP · you hit ${dmgOut}, it hits ${dmgIn}${quiver}${coating}${poisonHdr}${battle}${enh} · actions: fight | flee | quaff${battle ? " | use-item" : ""}${enh ? " | enhance" : ""} | toggle-auto-quaff | toggle-auto-finish | don/doff (costs a turn) ===`);
   }

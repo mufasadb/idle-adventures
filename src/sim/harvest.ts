@@ -6,58 +6,13 @@
 import { reduce } from "../engine/reduce";
 import { generateGrid, rollBiome } from "../engine/grid";
 import { emptyLoadout } from "../engine/loadout";
-import { moveCost } from "../engine/move";
+import { dijkstraFrom, pathWaypoints } from "./route";
 import { MAP_WIDTH, MAP_HEIGHT } from "../data/constants";
-import type { BiomeId, Terrain } from "../data/constants";
+import type { BiomeId } from "../data/constants";
 import type { GameState, Action } from "../engine/types";
 
 export type PackSpec = { tools?: string[]; backpack?: string; transport?: string; food: { defId: string; qty: number }[] };
 export type HarvestResult = { mapSeed: string; mapTier: number; cleared: number; total: number; fraction: number };
-
-type Pt = { x: number; y: number };
-const NEIGHBORS: readonly (readonly [number, number])[] = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
-
-// One Dijkstra from `from` over passable, monster-free tiles → cost grid + prev
-// pointers. `blocked` = live monster tiles (obstacles), so a path never steps onto
-// a monster: the walker routes AROUND them and never engages. Linear-scan frontier
-// is fine at POC scale (20×60 = 1200 tiles). Absent/Infinity cost = unreachable.
-function dijkstraFrom(terrain: Terrain[][], from: Pt, transport: string | null, tools: string[], blocked: Set<string>): { cost: number[][]; prev: (string | null)[][] } {
-  const cost: number[][] = Array.from({ length: MAP_HEIGHT }, () => new Array<number>(MAP_WIDTH).fill(Infinity));
-  const prev: (string | null)[][] = Array.from({ length: MAP_HEIGHT }, () => new Array<string | null>(MAP_WIDTH).fill(null));
-  cost[from.y]![from.x] = 0;
-  const pq: [number, number, number][] = [[0, from.x, from.y]];
-  while (pq.length) {
-    let bi = 0;
-    for (let i = 1; i < pq.length; i++) if (pq[i]![0] < pq[bi]![0]) bi = i;
-    const [d, x, y] = pq.splice(bi, 1)[0]!;
-    if (d > cost[y]![x]!) continue;
-    for (const [dx, dy] of NEIGHBORS) {
-      const nx = x + dx, ny = y + dy;
-      if (nx < 0 || nx >= MAP_WIDTH || ny < 0 || ny >= MAP_HEIGHT) continue;
-      if (blocked.has(`${nx},${ny}`)) continue; // route around live monsters
-      const c = moveCost(terrain[ny]![nx]!, transport, tools, dx !== 0 && dy !== 0); // l2w: diagonal steps cost √2×
-      if (!Number.isFinite(c)) continue;
-      const nd = d + c;
-      if (nd < cost[ny]![nx]!) { cost[ny]![nx] = nd; prev[ny]![nx] = `${x},${y}`; pq.push([nd, nx, ny]); }
-    }
-  }
-  return { cost, prev };
-}
-
-// Reconstruct the adjacent-waypoint path to (tx,ty) from a dijkstraFrom result.
-function pathWaypoints(prev: (string | null)[][], from: Pt, tx: number, ty: number): Pt[] {
-  const start = `${from.x},${from.y}`;
-  const steps: Pt[] = [];
-  let cur = `${tx},${ty}`;
-  while (cur !== start) {
-    const [px, py] = cur.split(",").map(Number) as [number, number];
-    steps.unshift({ x: px, y: py });
-    const p = prev[py]![px];
-    if (p === null) return []; // no path (shouldn't happen: caller checks finite cost)
-    cur = p;
-  }
-  return steps;
-}
 
 export function simHarvest(pack: PackSpec, mapSeed: string, mapTier: number): HarvestResult {
   const biomeId = rollBiome(mapSeed) as BiomeId;

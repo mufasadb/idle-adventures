@@ -1,7 +1,7 @@
 import type { GameState } from "../engine/types";
 import { expeditionGrid } from "../engine/grid";
 import type { Grid } from "../engine/grid";
-import { WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_QUALITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_TIER, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL } from "../data/constants";
+import { WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_QUALITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_TIER, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER } from "../data/constants";
 import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType } from "../data/constants";
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
@@ -84,6 +84,20 @@ export function logisticsEffect(defId: string): string | null {
   return null;
 }
 
+// 7ao: the combat effect of a weapon enhancement (whetstone / oils), read from
+// WEAPON_ENHANCEMENT (no magic numbers — the ×N is AFFINITY_MULTIPLIER). D60 shipped
+// these buildable but with zero in-game hint of what they do. Returns null for
+// non-enhancement defIds. "hits" = charges (one strike each).
+export function enhancementHint(defId: string): string | null {
+  const e = WEAPON_ENHANCEMENT[defId];
+  if (!e) return null;
+  const parts: string[] = [];
+  if (e.flatDamage) parts.push(`+${e.flatDamage} damage per strike`);
+  if (e.affinityTag) parts.push(`×${AFFINITY_MULTIPLIER} damage vs ${e.affinityTag}`);
+  if (e.poison) parts.push(`poison ${e.poison.dmg}/round for ${e.poison.rounds} rounds`);
+  return `${parts.join(", ")} · ${e.charges} hits`;
+}
+
 // egd: the material an affix favours, for the ink confirmation. Material-specific
 // (user call): the ink names the boosted material AND keeps the affix label, so
 // applying it both pays off and teaches the "of gleaming = mithril" vocabulary.
@@ -129,6 +143,8 @@ export function describe(defId: string): string {
   }
   if (defId in PANNIERS_SLOTS) return `panniers · +${PANNIERS_SLOTS[defId]} carry slots (needs a mount)`;
   if (defId in INKS) return `a cartographer's ink — apply to a held map to coax out a tendency`;
+  const enh = enhancementHint(defId); // 7ao: whetstone/oils state their combat effect
+  if (enh) return `weapon coating · ${enh}`;
   const tier = MATERIAL_TIER[defId];
   return tier ? `tier-${tier} crafting material` : "a crafting material";
 }
