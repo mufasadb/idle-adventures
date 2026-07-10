@@ -1,7 +1,7 @@
 import type { GameState } from "../engine/types";
 import { expeditionGrid } from "../engine/grid";
 import type { Grid } from "../engine/grid";
-import { WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_QUALITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, MATERIAL_TIER, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL } from "../data/constants";
+import { WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_QUALITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_TIER, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL } from "../data/constants";
 import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType } from "../data/constants";
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
@@ -82,6 +82,17 @@ export function logisticsEffect(defId: string): string | null {
   }
   if (defId in BACKPACK_SLOTS) return `${BACKPACK_SLOTS[defId]} carry slots`;
   return null;
+}
+
+// egd: the material an affix favours, for the ink confirmation. Material-specific
+// (user call): the ink names the boosted material AND keeps the affix label, so
+// applying it both pays off and teaches the "of gleaming = mithril" vocabulary.
+// Returns the highest-weighted material defId, or null (unknown / material-less).
+export function affixMaterialHint(affix: string): string | null {
+  const mul = AFFIX_EFFECTS[affix]?.materialWeightMul;
+  if (!mul) return null;
+  const top = Object.entries(mul).sort((a, b) => b[1] - a[1])[0];
+  return top ? top[0] : null;
 }
 
 export function describe(defId: string): string {

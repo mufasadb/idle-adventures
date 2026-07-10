@@ -18,7 +18,7 @@ import { heldFoodEnergy } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
 import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, TERRAIN_GATE, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, INKS, AFFIX_EFFECTS, NODE_TOOL, TOOL_CAPABILITY, WEAPON_ENHANCEMENT } from "../data/constants";
 import type { BiomeId, GatherableNodeType } from "../data/constants";
-import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint, logisticsEffect, describe, recipeGateHint, recipeTerrainGate, nodeToolHint, nodeTierNote } from "../render/render";
+import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint, logisticsEffect, affixMaterialHint, describe, recipeGateHint, recipeTerrainGate, nodeToolHint, nodeTierNote } from "../render/render";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, LoadoutSlot, MapItem, RejectionReason } from "../engine/types";
 
@@ -177,7 +177,7 @@ function fmt(e: GameEvent): string {
     case "item-used": return `⚗ used ${name(e.defId)} this fight${e.damageAdd ? ` · +${round(e.damageAdd)} dmg` : ""}${e.mitigationAdd ? ` · +${round(e.mitigationAdd)} mitigation` : ""}`;
     case "enhanced": return `🗡️ coated your weapon with ${name(e.id)} · ${e.charges} charge${e.charges === 1 ? "" : "s"}`;
     case "surveyed": return `🔭 surveyed the ${e.kind} at (${e.at.x},${e.at.y}) — its detail is now in focus`;
-    case "inked": return `🖋 inked the map — it is now of ${AFFIX_EFFECTS[e.affix]?.label ?? e.affix}`;
+    case "inked": { const mat = affixMaterialHint(e.affix); return `🖋 inked — this map now favours ${mat ? name(mat) : "its domain"} (of ${AFFIX_EFFECTS[e.affix]?.label ?? e.affix})`; }
     case "auto-quaff-toggled": return `auto-quaff ${e.on ? "on" : "off"}`;
     case "auto-finish-toggled": return `auto-finish fights ${e.on ? "on" : "off"}`;
     case "provoked": return `⚔ the ${name(e.creature)} strikes while you act · −${round(e.hit)}hp → ${round(e.hp)}hp`;
@@ -382,7 +382,13 @@ function epithetSuffix(mapSeed: string, biomeId: BiomeId, tier = 1): string {
 // precedence over the q2k emergent epithet — the affix IS the notability signal.
 function heldMapSuffix(m: MapItem): string {
   const affixes = m.affixes ?? [];
-  if (affixes.length) return ` <span class="muted">of ${affixes.map((a) => AFFIX_EFFECTS[a]?.label ?? a).join(", ")}</span>`;
+  if (affixes.length) {
+    // egd: a title tooltip names the favoured material(s) so an inked map's benefit
+    // is legible on the card, not just the moment it was inked.
+    const favours = affixes.map(affixMaterialHint).filter(Boolean).map((mat) => name(mat!));
+    const tip = favours.length ? ` title="favours ${favours.join(", ")}"` : "";
+    return ` <span class="muted"${tip}>of ${affixes.map((a) => AFFIX_EFFECTS[a]?.label ?? a).join(", ")}</span>`;
+  }
   return epithetSuffix(m.mapSeed, m.biomeId, m.tier ?? 1);
 }
 

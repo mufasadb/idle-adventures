@@ -19,6 +19,7 @@ import {
   logisticsEffect,
   recipeGateHint,
   nodeToolHint,
+  affixMaterialHint,
   TERRAIN_CHAR,
   POI_CHAR,
   PLAYER_CHAR,
@@ -72,7 +73,7 @@ function fmtEvent(e: GameEvent): string {
     case "item-used": return `⚗ used ${e.defId} this fight${e.damageAdd ? ` · +${e.damageAdd} dmg` : ""}${e.mitigationAdd ? ` · +${e.mitigationAdd} mitigation` : ""}`;
     case "enhanced": return `🗡️ coated your weapon with ${e.id} · ${e.charges} charge${e.charges === 1 ? "" : "s"} (spent per strike; a new coating replaces this one)`;
     case "surveyed": return `🔭 surveyed the ${e.kind} at (${e.at.x},${e.at.y}) — its detail is now in focus`;
-    case "inked": return `🖋 inked the map — it is now of ${AFFIX_EFFECTS[e.affix]?.label ?? e.affix}`;
+    case "inked": { const mat = affixMaterialHint(e.affix); return `🖋 inked — this map now favours ${mat ?? "its domain"} (of ${AFFIX_EFFECTS[e.affix]?.label ?? e.affix})`; }
     case "donned": return `🧤 donned ${e.defId}${e.displaced ? ` (stowed ${e.displaced} in the bag)` : ""} · energy → ${e.energy}e`;
     case "doffed": return `🎒 doffed ${e.defId} to the bag (takes a slot) · energy → ${e.energy}e`;
     case "auto-finish-toggled": return `auto-finish fights ${e.on ? "on" : "off"}`;
@@ -144,8 +145,10 @@ function printTown(st: GameState): void {
   for (const m of held) {
     // cxq affix labels (player-inked) take precedence over the q2k emergent epithet.
     const affixes = m.affixes ?? [];
+    // egd: inked maps name the favoured material inline (console has no tooltips).
+    const favours = affixes.map(affixMaterialHint).filter(Boolean);
     const nameSuffix = affixes.length
-      ? ` of ${affixes.map((a) => AFFIX_EFFECTS[a]?.label ?? a).join(", ")}`
+      ? ` of ${affixes.map((a) => AFFIX_EFFECTS[a]?.label ?? a).join(", ")}${favours.length ? ` (favours ${favours.join(", ")})` : ""}`
       : (() => { const e = mapEpithet(m.mapSeed, m.biomeId, m.tier ?? 1); return e ? ` of ${e}` : ""; })();
     const inkActions = legalActions(st).filter((a) => a.type === "ink" && a.mapSeed === m.mapSeed) as Extract<Action, { type: "ink" }>[];
     const inkHint = inkActions.length ? `  ·  ink: ${inkActions.map((a) => `ink mapSeed="${m.mapSeed}" inkId="${a.inkId}"`).join(" | ")}` : "";
