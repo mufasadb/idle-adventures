@@ -1,7 +1,7 @@
 import type { GameState } from "../engine/types";
 import { expeditionGrid } from "../engine/grid";
 import type { Grid } from "../engine/grid";
-import { WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_QUALITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, PANNIERS_SLOTS, INKS, MATERIAL_TIER, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL } from "../data/constants";
+import { WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_QUALITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, MATERIAL_TIER, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL } from "../data/constants";
 import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType } from "../data/constants";
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
@@ -46,6 +46,44 @@ export function weaponHint(defId: string): string | null {
 // forecasts already print numbers). Inks stay VAGUE though — the cxq legibility
 // rule keeps the material spoiler in the affix NAME, not the recipe/tooltip.
 // Console does NOT use this (blind-playtest discovery pressure stays).
+// wzk (early-game legibility): the range-extenders read as inert names in blind
+// play — a transport looked like pure carry, terrain gear like jargon. These two
+// helpers state the MOVEMENT benefit, reading the movement levers (never hardcoded
+// numbers) so new gear/terrain gets legible for free.
+function terrainGearNote(defId: string): string | null {
+  const notes: string[] = [];
+  for (const terrain of Object.keys(TERRAIN_GATE) as Terrain[]) {
+    const g = TERRAIN_GATE[terrain]?.[defId];
+    if (!g) continue;
+    if (g.enable !== undefined) notes.push(`crosses ${terrain} (∞→${g.enable})`);
+    else if (g.discount !== undefined) notes.push(`${terrain} ${TERRAIN_COST[terrain]}→${TERRAIN_COST[terrain] - g.discount}`);
+  }
+  return notes.length ? notes.join(", ") : null;
+}
+function transportSpeedNote(defId: string): string | null {
+  const mult = TRANSPORT_MULTIPLIER[defId];
+  if (!mult) return null;
+  const faster = (Object.entries(mult) as [Terrain, number][]).filter(([, m]) => m > 1).map(([t, m]) => `×${m} on ${t}`);
+  return faster.length ? `${faster.join(", ")} speed` : null;
+}
+
+// Concise range/logistics benefit for the craft book (wzk): blind players never
+// hovered the describe() tooltip, so the range-extenders' payoff was invisible at
+// craft time. Returns a short inline label for movement/carry/food gear, or null
+// for items whose value is already obvious (weapons carry weaponHint; raw mats).
+export function logisticsEffect(defId: string): string | null {
+  if (ENERGY_CAP_BONUS[defId]) return `+${ENERGY_CAP_BONUS[defId]} max energy`;
+  if (defId === "tent") return `food +${Math.round((TENT_FOOD_MULTIPLIER - 1) * 100)}%`;
+  const terr = terrainGearNote(defId);
+  if (terr) return terr;
+  if (defId in TRANSPORT_CARRY) {
+    const speed = transportSpeedNote(defId);
+    return speed ? `${speed}, +${TRANSPORT_CARRY[defId]} carry` : `+${TRANSPORT_CARRY[defId]} carry`;
+  }
+  if (defId in BACKPACK_SLOTS) return `${BACKPACK_SLOTS[defId]} carry slots`;
+  return null;
+}
+
 export function describe(defId: string): string {
   const w = WEAPONS[defId];
   if (w) return `weapon · ${w.damage} ${w.dmgType} dmg — ${WEAPON_CLASS_HINT[w.dmgType]}`;
@@ -59,6 +97,11 @@ export function describe(defId: string): string {
     return `battle item · ${parts.join(", ")} for one fight`;
   }
   if (ENERGY_CAP_BONUS[defId]) return `gear · +${ENERGY_CAP_BONUS[defId]} max energy`;
+  // wzk: terrain gear before the generic tool branch — raft/waders/ice-cleats/
+  // climbing-pick are TOOL_CAPABILITY entries, but their VALUE is the terrain
+  // discount, not the "ford/wade/trek" jargon word.
+  const terr = terrainGearNote(defId);
+  if (terr) return `gear · ${terr}`;
   if (defId in TOOL_CAPABILITY) {
     const cap = TOOL_CAPABILITY[defId]!;
     const q = TOOL_QUALITY[defId];
@@ -69,7 +112,10 @@ export function describe(defId: string): string {
     return `tool · ${cap}${q ? ` (tier ${q})` : ""}${purpose ? ` — ${purpose}` : ""}`;
   }
   if (defId in BACKPACK_SLOTS) return `backpack · ${BACKPACK_SLOTS[defId]} carry slots`;
-  if (defId in TRANSPORT_CARRY) return `transport · carries ${TRANSPORT_CARRY[defId]} slots`;
+  if (defId in TRANSPORT_CARRY) {
+    const speed = transportSpeedNote(defId); // wzk: name the speed benefit, not only carry
+    return `transport · ${speed ? `${speed} · ` : ""}carries ${TRANSPORT_CARRY[defId]} slots`;
+  }
   if (defId in PANNIERS_SLOTS) return `panniers · +${PANNIERS_SLOTS[defId]} carry slots (needs a mount)`;
   if (defId in INKS) return `a cartographer's ink — apply to a held map to coax out a tendency`;
   const tier = MATERIAL_TIER[defId];

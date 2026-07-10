@@ -16,6 +16,7 @@ import {
   flavorDetail,
   matchupLessons,
   weaponHint,
+  logisticsEffect,
   recipeGateHint,
   nodeToolHint,
   TERRAIN_CHAR,
@@ -166,7 +167,7 @@ function printTown(st: GameState): void {
     // 2g7.7: print the EXACT recipeId — several recipes share an output defId
     // (ration vs ration-sage …), and crafting the wrong id was a silent rake.
     // 57l: weapon rows get their class hint — the bow died 3/3 to invisibility.
-    const hint = weaponHint(r.output.defId);
+    const hint = weaponHint(r.output.defId) ?? logisticsEffect(r.output.defId); // wzk: range/carry gear states its benefit inline
     // gate-legibility (playtest 2026-07-09 #1): a locked recipe with a STATION/TOOL
     // gate unmet names it — "[needs anvil + blacksmiths-hammer]" — so a blind player
     // stops inferring "I lack mats" for a hard gate (append-only).
