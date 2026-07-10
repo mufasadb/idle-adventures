@@ -207,6 +207,12 @@ export const FOOD_ENERGY: Record<string, number> = {
 // enforce themselves with no extra rule.
 export const FRESH_TO_STALE: Record<string, string> = { berries: "stale-berries", apple: "bruised-apple" };
 export const MIN_STEP = 5; // a discounted step never costs less than this (svz)
+// Diagonal steps cover √2 tiles of distance, so they cost √2× the orthogonal step,
+// rounded DOWN (l2w): floor(orthogonalFinal × DIAGONAL_MULTIPLIER). Applied by every
+// pathfinder via moveCost's `diagonal` flag so reach/route costs never drift (D29
+// spirit). Lower toward 1 to make diagonals cheaper (back to the old free shortcut);
+// this is geometry, not balance — leave at √2 unless you deliberately want octile bias.
+export const DIAGONAL_MULTIPLIER = Math.SQRT2; // ≈1.41421
 // Movement is GRADED (svz): TERRAIN_COST is ABSOLUTE step energy on a ×10 scale.
 // Gear subtracts point-discounts (TERRAIN_GATE), transport divides per-terrain.
 // Mountains stay the one hard gate (Infinity) until a tool ENABLES them.

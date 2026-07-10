@@ -350,7 +350,7 @@ function move(
     return engage(state, expedition, step, poiAtStep.creature, "move", true);
   }
   const terrain = grid.terrain[step.y]![step.x]!;
-  const cost = moveCost(terrain, expedition.loadout.equipment.transport, expedition.loadout.equipment.tools);
+  const cost = moveCost(terrain, expedition.loadout.equipment.transport, expedition.loadout.equipment.tools, from.x !== step.x && from.y !== step.y); // l2w: diagonal steps cost √2×
   if (!Number.isFinite(cost)) return rejected(state, "move", "impassable");
   if (cost > expedition.energy) return rejected(state, "move", "exhausted");
   const fed = autoRefill(expedition, expedition.energy - cost); // drain, then waste-free auto-eat (dtv)

@@ -14,6 +14,7 @@ The POC ships with *feel-pass* values, not balanced ones. The discipline that ke
 - (retired) `BASE_ENERGY_FLOOR` — removed by D41; its "recoverable short run" role is now "embark at `MAX_ENERGY`, just nothing to refill with"
 - `TERRAIN_COST{plains 10, mud 15, ice 20, river 30, mountain ∞}` — **absolute** step energy on a ×10 scale (svz, graded movement); `Infinity` = the one hard gate (mountain), enabled by `climbing-pick`
 - `MIN_STEP` (5) — floor: a discounted step never costs less than this
+- `DIAGONAL_MULTIPLIER` (√2 ≈ 1.41421, l2w, D64) — a diagonal step covers √2 tiles, so it costs `floor(orthogonalFinal × this)` (plains 10→14, mud 15→21, ice 20→28). Applied by EVERY pathfinder via `moveCost`'s `diagonal` flag (engine reach, reducer, web A*, sim harness) so route/reach costs never drift. This is *geometry*, not a difficulty dial — leave at √2 unless you deliberately want an octile bias (toward 1 = the old "free diagonal shortcut"). Note: it feeds `costToReach`, so changing it reshuffles the value-vs-reach POI pairing (map layouts shift).
 - `TERRAIN_GATE{terrain → toolDefId → {enable?, discount?}}` — gear modifiers: `enable` turns an impassable terrain finite (climbing-pick/mountain → 40); `discount` subtracts points (raft/river −20, waders/mud −5, ice-cleats/ice −15 → glide). Each tool = one slot
 - `TRANSPORT_MULTIPLIER{transport → terrain → divisor}` — **per-terrain** move-cost divisor (svz): horse fast on open ground (plains ÷2), wagon the ice answer (ice ÷2), mule slow-but-hauler (÷0.8); absent terrain / on-foot = ÷1
 

@@ -66,7 +66,7 @@ export function costToReach(
         if (!dx && !dy) continue;
         const nx = bx + dx, ny = by + dy;
         if (nx < 0 || ny < 0 || nx >= MAP_WIDTH || ny >= MAP_HEIGHT) continue;
-        const step = moveCost(terrain[ny]![nx]!, transport, tools);
+        const step = moveCost(terrain[ny]![nx]!, transport, tools, dx !== 0 && dy !== 0); // l2w: diagonal edges cost √2×
         if (!Number.isFinite(step)) continue; // impassable neighbor
         const nc = best + step;
         if (nc < cost[ny]![nx]!) cost[ny]![nx] = nc;

@@ -229,7 +229,7 @@ function findPath(grid: Grid, start: Pos, goal: Pos, transport: string | null, t
       if (nx < 0 || ny < 0 || nx >= MAP_WIDTH || ny >= MAP_HEIGHT) continue;
       const nk = `${nx},${ny}`;
       if (blocked.has(nk) && nk !== goalK) continue; // route around other monsters
-      const step = moveCost(grid.terrain[ny]![nx]!, transport, tools);
+      const step = moveCost(grid.terrain[ny]![nx]!, transport, tools, dx !== 0 && dy !== 0); // l2w: diagonal steps cost √2×
       if (!Number.isFinite(step)) continue;
       const tentative = (g.get(cur) ?? Infinity) + step;
       if (tentative < (g.get(nk) ?? Infinity)) {
@@ -680,7 +680,10 @@ function expeditionView(): string {
     <div class="bar"><span>HP</span><div class="track"><div class="fill hp" style="width:${Math.min(100, (exp.hp / 30) * 100)}%"></div></div><b>${round(exp.hp)}</b></div>`;
 
   const saving = pending
-    ? pending.path.reduce((s, p) => s + moveCostBreakdown(grid.terrain[p.y]![p.x]!, null, []).final, 0) - pending.cost
+    ? pending.path.reduce((s, p, i) => {
+        const prev = i === 0 ? exp.pos : pending!.path[i - 1]!; // l2w: diagonal cost depends on the incoming step
+        return s + moveCostBreakdown(grid.terrain[p.y]![p.x]!, null, [], prev.x !== p.x && prev.y !== p.y).final;
+      }, 0) - pending.cost
     : 0;
   const savingClause = pending && Number.isFinite(saving) && saving > 0 ? ` · gear/transport saved ${round(saving)}e` : "";
   const forecastClause = pending?.fight

@@ -35,7 +35,7 @@ function dijkstraFrom(terrain: Terrain[][], from: Pt, transport: string | null, 
       const nx = x + dx, ny = y + dy;
       if (nx < 0 || nx >= MAP_WIDTH || ny < 0 || ny >= MAP_HEIGHT) continue;
       if (blocked.has(`${nx},${ny}`)) continue; // route around live monsters
-      const c = moveCost(terrain[ny]![nx]!, transport, tools);
+      const c = moveCost(terrain[ny]![nx]!, transport, tools, dx !== 0 && dy !== 0); // l2w: diagonal steps cost √2×
       if (!Number.isFinite(c)) continue;
       const nd = d + c;
       if (nd < cost[ny]![nx]!) { cost[ny]![nx] = nd; prev[ny]![nx] = `${x},${y}`; pq.push([nd, nx, ny]); }
