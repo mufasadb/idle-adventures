@@ -68,6 +68,7 @@ export type Expedition = {
   carriedMaps?: MapItem[]; // map-scroll drops carried home (8ec): each costs ONE carry slot for the run; banked into GameState.maps at run end. Optional/absent = [] (old saves, terse test states); reads guard with `?? []`.
   combat?: Engagement; // live engagement (si7.1). Optional/absent = not engaged; reads guard with `?? undefined` checks.
   autoQuaff?: boolean; // auto-potion at the threshold inside exchanges (si7.1, mirrors autoEat). Optional/absent = true; reads guard with `?? true`.
+  autoFinish?: boolean; // auto-finish fights (67e): when true, a fight/engage resolves the WHOLE fight to victory or defeat in one action. Optional/absent = OFF; reads guard with `?? false`.
   mapTier?: number; // this run's map tier (2yn): set at embark from the chosen map's tier
                     // (offered map = 1, held MapItem = its tier). Optional/absent = 1.
   surveyed?: { x: number; y: number }[]; // POIs resolved at range by the survey action (54f): perceive treats these as always-in-radius. Optional/absent = [] (old saves, terse test states); reads guard with `?? []`.
@@ -122,6 +123,7 @@ export type Action =
   | { type: "don"; itemId: string } // equip a carried gear piece into its slot, displacing the worn one to carry (82r)
   | { type: "doff"; itemId: string } // unequip a worn piece / remove a tool to carry (82r)
   | { type: "toggle-auto-quaff" } // flip auto-potion-at-threshold (si7.1)
+  | { type: "toggle-auto-finish" } // flip auto-finish-fights (67e): resolve a whole fight in one action
   | { type: "eat" } // eat one food unit now → refill current energy toward max (dtv)
   | { type: "set-auto-eat-food"; defId: string | null } // designate the food that auto-eats waste-free (mco); null clears it (auto-eat off). Supersedes toggle-auto-eat.
   | { type: "drop"; itemId: string }
@@ -204,6 +206,8 @@ export type GameEvent =
   | { type: "enhanced"; id: string; charges: number } // weapon enhancement applied (D60): the coating `id` now rides the expedition with `charges` strikes left
   | { type: "surveyed"; at: { x: number; y: number }; kind: NodeType } // spyglass survey resolved a far POI's detail (54f); qualitative only
   | { type: "auto-quaff-toggled"; on: boolean }
+  | { type: "auto-finish-toggled"; on: boolean } // 67e
+  | { type: "provoked"; creature: string; hit: number; hp: number } // 67e: a non-flee in-combat action (coat/potion/gear-swap) cost a turn — the monster landed one hit
   | { type: "donned"; defId: string; slot: LoadoutSlot; displaced: string | null; energy: number } // equipped from carry (82r)
   | { type: "doffed"; defId: string; slot: LoadoutSlot; energy: number } // unequipped to carry (82r)
   | {
@@ -216,6 +220,7 @@ export type GameEvent =
       loot: ItemStack[];
       hp: number;
       matchup: Matchup; // post-fight RPS/affinity lesson facts (9u9.2)
+      rounds?: number; // 67e: set when auto-finish resolved the fight in one action (the N rounds it collapsed); absent for a single manual round
     }
   | { type: "crafted"; recipeId: string; output: ItemStack; where?: "field" | "town" } // where (ke3.4): field crafts read distinctly in the log. Optional/absent = town.
   | { type: "pocketed-map"; mapSeed: string; biomeId: BiomeId; tier: number }

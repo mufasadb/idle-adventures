@@ -56,9 +56,10 @@ function fmtEvent(e: GameEvent): string {
     case "fought": {
       const lessons = matchupLessons(e.matchup, null);
       const tail = lessons.length ? ` · ${lessons.join(" · ")}` : "";
+      const ff = e.rounds ? ` ⏩ (${e.rounds} rounds)` : ""; // 67e: auto-finish collapsed the fight
       return (e.victory
-        ? `⚔ beat it · −${e.hpLost}hp · loot ${e.loot.map((l) => `${l.qty}× ${l.defId}`).join(", ") || "none"}`
-        : `☠ you were downed · run ends, haul kept`) + tail;
+        ? `⚔ beat it${ff} · −${e.hpLost}hp · loot ${e.loot.map((l) => `${l.qty}× ${l.defId}`).join(", ") || "none"}`
+        : `☠ you were downed${ff} · run ends, haul kept`) + tail;
     }
     case "crafted": return `✦ ${e.where === "field" ? "field-crafted 🔥 " : "crafted "}${e.output.qty}× ${e.output.defId}`;
     case "pocketed-map": return `📜 pocketed a T${e.tier} ${e.biomeId} map`;
@@ -74,6 +75,8 @@ function fmtEvent(e: GameEvent): string {
     case "inked": return `🖋 inked the map — it is now of ${AFFIX_EFFECTS[e.affix]?.label ?? e.affix}`;
     case "donned": return `🧤 donned ${e.defId}${e.displaced ? ` (stowed ${e.displaced} in the bag)` : ""} · energy → ${e.energy}e`;
     case "doffed": return `🎒 doffed ${e.defId} to the bag (takes a slot) · energy → ${e.energy}e`;
+    case "auto-finish-toggled": return `auto-finish fights ${e.on ? "on" : "off"}`;
+    case "provoked": return `⚔ the ${e.creature} strikes while you act · −${e.hit}hp → ${e.hp}hp`;
     case "run-ended": return e.flavor ? `${e.flavor}\n— run ended (${e.reason})` : `— run ended (${e.reason})`;
     case "action-rejected": return `✗ ${e.action} rejected: ${e.reason}`;
     default: return JSON.stringify(e);
@@ -88,7 +91,7 @@ for (const e of events) console.log(fmtEvent(e));
 const s = summarize(state);
 console.log("\n=== YOU ===");
 console.log(`phase: ${s.phase} · runs completed: ${state.runs ?? 0}`);
-if (s.expedition) console.log(`energy: ${s.expedition.energy}/${s.expedition.maxEnergy} · auto-eat: ${s.expedition.autoEatFood ?? "off"}${state.expedition?.loadout.equipment.tools.includes("tent") ? " · tent (food +50%)" : ""} · hp: ${s.expedition.hp} · pos (${s.expedition.pos.x},${s.expedition.pos.y}) · nodes cleared: ${s.expedition.cleared} · auto-potion-in-fights: ${(state.expedition?.autoQuaff ?? true) ? "on" : "off"}`);
+if (s.expedition) console.log(`energy: ${s.expedition.energy}/${s.expedition.maxEnergy} · auto-eat: ${s.expedition.autoEatFood ?? "off"}${state.expedition?.loadout.equipment.tools.includes("tent") ? " · tent (food +50%)" : ""} · hp: ${s.expedition.hp} · pos (${s.expedition.pos.x},${s.expedition.pos.y}) · nodes cleared: ${s.expedition.cleared} · auto-potion-in-fights: ${(state.expedition?.autoQuaff ?? true) ? "on" : "off"} · auto-finish-fights: ${(state.expedition?.autoFinish ?? false) ? "on" : "off"}`);
 if (state.expedition) {
   // Carry + carried maps (8ec; si7.4 parity): maps cost a slot each mid-run.
   const cmaps = state.expedition.carriedMaps ?? [];
@@ -206,7 +209,7 @@ function printExpedition(st: GameState): void {
     const enh = (exp.loadout.enhancements ?? []).length
       ? ` · enhancements: ${(exp.loadout.enhancements ?? []).map((en) => `${en.qty}× ${en.defId}`).join(", ")} (enhance id="…" — coat now, no exchange)`
       : "";
-    console.log(`\n=== ENGAGED: ${c.creature} — ${c.monsterHp} HP · you hit ${dmgOut}, it hits ${dmgIn}${quiver}${coating}${poisonHdr}${battle}${enh} · actions: fight | flee | quaff${battle ? " | use-item" : ""}${enh ? " | enhance" : ""} | toggle-auto-quaff ===`);
+    console.log(`\n=== ENGAGED: ${c.creature} — ${c.monsterHp} HP · you hit ${dmgOut}, it hits ${dmgIn}${quiver}${coating}${poisonHdr}${battle}${enh} · actions: fight | flee | quaff${battle ? " | use-item" : ""}${enh ? " | enhance" : ""} | toggle-auto-quaff | toggle-auto-finish | don/doff (costs a turn) ===`);
   }
   console.log("\n=== MAP (▲ you · letters = node kinds · detail only resolves near you) ===");
   const rows: string[] = [];

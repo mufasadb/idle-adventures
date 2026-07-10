@@ -49,6 +49,10 @@ let state: GameState = load() ?? newGame(seed);
 let log: string[] = loadLog();
 let pending: Pending = null; // a proposed walk awaiting a confirm click
 let hint: string | null = null; // transient path banner when a click can't be routed (si7.5)
+// 67e: the engagement forecast from the LAST render, so the panel can show a delta
+// ("kill in 5 → 3") after a coat/swap/potion. Keyed on the engagement so a new fight
+// resets it. Purely presentational.
+let lastForecast: { key: string; dmgOut: number; toKill: number } | null = null;
 const app = document.querySelector<HTMLDivElement>("#app")!;
 
 // --- persistence: survive a page refresh (the run isn't lost) ----------------
@@ -150,9 +154,10 @@ function fmt(e: GameEvent): string {
     case "fought": {
       const lessons = matchupLessons(e.matchup, null);
       const tail = lessons.length ? ` · ${lessons.join(" · ")}` : "";
+      const ff = e.rounds ? ` ⏩ (${e.rounds} rounds)` : ""; // 67e: auto-finish collapsed the fight
       return (e.victory
-        ? `⚔ beat the ${name(e.creature)} · −${round(e.hpLost)}hp${e.potionsUsed ? ` (${e.potionsUsed} potion${e.potionsUsed > 1 ? "s" : ""})` : ""} · loot ${e.loot.map((l) => `${l.qty}× ${name(l.defId)}`).join(", ") || "none"}`
-        : `☠ the ${name(e.creature)} downed you · run ends, haul kept`) + tail;
+        ? `⚔ beat the ${name(e.creature)}${ff} · −${round(e.hpLost)}hp${e.potionsUsed ? ` (${e.potionsUsed} potion${e.potionsUsed > 1 ? "s" : ""})` : ""} · loot ${e.loot.map((l) => `${l.qty}× ${name(l.defId)}`).join(", ") || "none"}`
+        : `☠ the ${name(e.creature)} downed you${ff} · run ends, haul kept`) + tail;
     }
     case "crafted": return `✦ ${e.where === "field" ? "field-crafted 🔥 " : "crafted "}${e.output.qty}× ${name(e.output.defId)}`;
     case "pocketed-map": return `📜 pocketed a T${e.tier} ${name(e.biomeId)} map`;
@@ -174,6 +179,8 @@ function fmt(e: GameEvent): string {
     case "surveyed": return `🔭 surveyed the ${e.kind} at (${e.at.x},${e.at.y}) — its detail is now in focus`;
     case "inked": return `🖋 inked the map — it is now of ${AFFIX_EFFECTS[e.affix]?.label ?? e.affix}`;
     case "auto-quaff-toggled": return `auto-quaff ${e.on ? "on" : "off"}`;
+    case "auto-finish-toggled": return `auto-finish fights ${e.on ? "on" : "off"}`;
+    case "provoked": return `⚔ the ${name(e.creature)} strikes while you act · −${round(e.hit)}hp → ${round(e.hp)}hp`;
     case "donned": return `🧤 donned ${name(e.defId)}${e.displaced ? ` (stowed ${name(e.displaced)})` : ""} · −${DON_DOFF_ENERGY}e → ${round(e.energy)}e`;
     case "doffed": return `🎒 doffed ${name(e.defId)} to the bag · −${DON_DOFF_ENERGY}e → ${round(e.energy)}e`;
   }
@@ -590,19 +597,40 @@ function engagementPanel(exp: NonNullable<GameState["expedition"]>, legal: Actio
   // Quiver readout (D45): a wielded bow spends an arrow per round; empty = club.
   const arrows = (exp.loadout.ammo ?? []).reduce((n, s) => n + s.qty, 0);
   const quiver = wieldsRanged(exp.loadout) ? ` · 🏹 ${arrows} arrow${arrows === 1 ? "" : "s"}${arrows === 0 ? " — swinging it like a club!" : ""}` : "";
+  // 67e: damage-change feedback — diff this forecast against the last render's so a
+  // coat/swap/potion shows its effect ("→ kill in 3", "(was 4.5)"). Reset per fight.
+  const key = `${c.creature}@${c.at.x},${c.at.y}`;
+  const prev = lastForecast && lastForecast.key === key ? lastForecast : null;
+  const dmgWas = prev && round(prev.dmgOut) !== round(dmgOut) ? ` <span class="was">(was ${round(prev.dmgOut)})</span>` : "";
+  const killWas = prev && winning && prev.toKill !== toKill ? ` <span class="was">(was ${prev.toKill})</span>` : "";
+  lastForecast = { key, dmgOut, toKill };
   return `<div class="here monster engagement">
     <b>⚔ Engaged: ${name(c.creature)}</b>
     <div class="bar"><span>Its HP</span><div class="track"><div class="fill monster" style="width:${(c.monsterHp / maxHp) * 100}%"></div></div><b>${round(c.monsterHp)}/${maxHp}</b></div>
-    <div class="forecast">you hit for <b>${round(dmgOut)}</b> · it hits for <b>${round(dmgIn)}</b> · <b class="${winning ? "good" : "over"}">${winning ? `kill in ${toKill}` : `it kills you first (~${toDie} rounds)`}</b>${exp.loadout.potions.length ? ` · ${exp.loadout.potions.reduce((n, p) => n + p.qty, 0)} potion(s) extend that` : ""}${quiver}${coatingLine(exp)}${c.poison ? ` · ☠ poisoned (${round(c.poison.dmg)}/rd, ${c.poison.rounds} left)` : ""}</div>
+    <div class="forecast">you hit for <b>${round(dmgOut)}</b>${dmgWas} · it hits for <b>${round(dmgIn)}</b> · <b class="${winning ? "good" : "over"}">${winning ? `kill in ${toKill}` : `it kills you first (~${toDie} rounds)`}</b>${killWas}${exp.loadout.potions.length ? ` · ${exp.loadout.potions.reduce((n, p) => n + p.qty, 0)} potion(s) extend that` : ""}${quiver}${coatingLine(exp)}${c.poison ? ` · ☠ poisoned (${round(c.poison.dmg)}/rd, ${c.poison.rounds} left)` : ""}</div>
     <div class="actions">
       <button data-act="fight">⚔ Fight (1 round)</button>
       <button data-act="flee" title="disengage — take one parting hit (${round(dmgIn)}); unused battle items keep for later">🏃 Flee (−${round(dmgIn)} HP)</button>
-      ${canQuaff ? `<button data-act="quaff">🧪 Potion</button>` : `<button disabled title="no potions, or full HP">🧪 Potion</button>`}
+      ${canQuaff ? `<button data-act="quaff" title="drink a potion — costs a turn (the ${name(c.creature)} strikes)">🧪 Potion</button>` : `<button disabled title="no potions, or full HP">🧪 Potion</button>`}
       <button data-act="toggle-auto-quaff">Auto-potion: <b>${(exp.autoQuaff ?? true) ? "on" : "off"}</b></button>
+      <button data-act="toggle-auto-finish" title="fast-forward whole fights to victory or defeat in one click">Auto-finish: <b>${(exp.autoFinish ?? false) ? "on" : "off"}</b></button>
       ${(exp.loadout.battleItems ?? []).map((s) => { const b = COMBAT_BUFF[s.defId] ?? {}; const eff = [b.damageAdd ? `+${b.damageAdd} dmg` : "", b.mitigationAdd ? `+${b.mitigationAdd} mitigation` : ""].filter(Boolean).join(", "); return `<button data-use-item="${s.defId}" title="use it this fight only (${eff})">⚗ ${name(s.defId)} (${eff})${s.qty > 1 ? ` ×${s.qty}` : ""}</button>`; }).join("")}
       ${enhanceButtons(exp)}
+      ${swapGearButtons(exp, legal)}
     </div>
   </div>`;
+}
+
+// 67e: mid-fight gear swaps — don from carry / doff worn, each costs a monster turn
+// (legality from reduce, D29). Prominent in the panel so "swap to the armour that
+// resists this" is a real in-fight verb.
+function swapGearButtons(exp: NonNullable<GameState["expedition"]>, legal: Action[]): string {
+  const creature = name(exp.combat!.creature);
+  const dons = legal.filter((a): a is Extract<Action, { type: "don" }> => a.type === "don")
+    .map((a) => `<button data-don="${a.itemId}" title="equip ${name(a.itemId)} — costs a turn (the ${creature} strikes)">🛡 Don ${name(a.itemId)}</button>`);
+  const doffs = legal.filter((a): a is Extract<Action, { type: "doff" }> => a.type === "doff")
+    .map((a) => `<button data-doff="${a.itemId}" title="stow ${name(a.itemId)} — costs a turn (the ${creature} strikes)">🎒 Doff ${name(a.itemId)}</button>`);
+  return [...dons, ...doffs].join("");
 }
 
 function expeditionView(): string {
@@ -721,6 +749,7 @@ function expeditionView(): string {
         ${legal.some((a) => a.type === "eat") ? `<button data-act="eat">🍖 Eat${exp.loadout.equipment.tools.includes("tent") ? " (+50%)" : ""}</button>` : `<button disabled title="no food, or already full">🍖 Eat</button>`}
         ${legal.some((a) => a.type === "quaff") ? `<button data-act="quaff" title="drink a potion here (−${QUAFF_ENERGY}e)">🧪 Potion (−${QUAFF_ENERGY}e)</button>` : `<button disabled title="no potions, full HP, or too tired">🧪 Potion</button>`}
         <button data-act="toggle-auto-quaff" title="auto-drink a potion when HP drops below the threshold mid-fight">Auto-potion: <b>${(exp.autoQuaff ?? true) ? "on" : "off"}</b></button>
+        <button data-act="toggle-auto-finish" title="67e: fast-forward whole fights to victory or defeat in one click — flip off to make in-fight decisions">Auto-finish fights: <b>${(exp.autoFinish ?? false) ? "on" : "off"}</b></button>
         ${enhanceButtons(exp)}
         <button data-act="return">⏎ Return to town</button>
       </div>

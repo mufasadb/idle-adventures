@@ -58,6 +58,8 @@ export function reduce(
       return survey(state, action.at);
     case "toggle-auto-quaff":
       return toggleAutoQuaff(state);
+    case "toggle-auto-finish":
+      return toggleAutoFinish(state);
     case "don":
       return don(state, action.itemId);
     case "doff":
@@ -347,7 +349,7 @@ function move(
   const poiAtStep = grid.pois.find((p) => p.x === step.x && p.y === step.y);
   const stepCleared = expedition.cleared.some((c) => c.x === step.x && c.y === step.y);
   if (poiAtStep && poiAtStep.kind === "monster" && poiAtStep.creature !== null && !stepCleared) {
-    return engage(state, expedition, step, poiAtStep.creature, "move", true);
+    return maybeAutoFinish(engage(state, expedition, step, poiAtStep.creature, "move", true), expedition); // 67e: auto-finish resolves a walked-into fight
   }
   const terrain = grid.terrain[step.y]![step.x]!;
   const cost = moveCost(terrain, expedition.loadout.equipment.transport, expedition.loadout.equipment.tools, from.x !== step.x && from.y !== step.y); // l2w: diagonal steps cost √2×
@@ -557,7 +559,7 @@ function fight(state: GameState, at?: { x: number; y: number }): { state: GameSt
       if (!wieldsRanged(expedition.loadout) || !hasAmmo(expedition.loadout)) {
         return rejected(state, "fight", "missing-tool");
       }
-      return engage(state, expedition, at, poi.creature, "fight", false, true);
+      return maybeAutoFinish(engage(state, expedition, at, poi.creature, "fight", false, true), expedition);
     }
     // Not engaged, no target: engage the live monster on the CURRENT tile (as before).
     const poi = grid.pois.find((p) => p.x === pos.x && p.y === pos.y);
@@ -565,13 +567,23 @@ function fight(state: GameState, at?: { x: number; y: number }): { state: GameSt
     if (!poi || poi.kind !== "monster" || alreadyCleared || poi.creature === null) {
       return rejected(state, "fight", "no-monster");
     }
-    return engage(state, expedition, pos, poi.creature, "fight", false);
+    return maybeAutoFinish(engage(state, expedition, pos, poi.creature, "fight", false), expedition);
   }
   // Engaged: one exchange. A `fight at` aimed at a DIFFERENT tile mid-engagement
   // is rejected (you're locked in); re-targeting the engaged monster just swings.
   if (at !== undefined && (at.x !== combat.at.x || at.y !== combat.at.y)) {
     return rejected(state, "fight", "engaged");
   }
+  // 67e: auto-finish resolves the whole fight in one action; else a single round.
+  if (expedition.autoFinish ?? false) return resolveEngagedFully(state);
+  return fightRound(state);
+}
+
+// One engaged exchange (67e: extracted from fight() so the auto-finish loop can
+// re-run it). Assumes state.expedition.combat is set.
+function fightRound(state: GameState): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition!;
+  const combat = expedition.combat!;
   // Arrow economy (D45): a wielded bow with ammo shoots — and spends — one arrow
   // per exchange, walk-in fights included (the bow always shoots if it can).
   // Arrows-out: playerDamage degrades the bow to UNARMED_DAMAGE (a club).
@@ -655,6 +667,38 @@ function fight(state: GameState, at?: { x: number; y: number }): { state: GameSt
   };
 }
 
+// 67e: after an engage, if auto-finish is on, resolve the whole fight now (else the
+// player would have to click Fight). No-op when not engaged or the flag is off.
+function maybeAutoFinish(
+  r: { state: GameState; events: GameEvent[] },
+  before: Expedition,
+): { state: GameState; events: GameEvent[] } {
+  if (!(before.autoFinish ?? false) || !r.state.expedition?.combat) return r;
+  const resolved = resolveEngagedFully(r.state);
+  return { state: resolved.state, events: [...r.events, ...resolved.events] };
+}
+
+// 67e auto-finish: loop fightRound until the engagement ends (victory or defeat).
+// Fights terminate — monster HP strictly decreases each round (dmgDealt ≥ CHIP_MIN) —
+// so the guard is a backstop, not the exit. Collapses the log: drops per-round
+// `exchanged` spam, keeps the terminal fought/run-ended/map events, and stamps the
+// fought event with the round count.
+function resolveEngagedFully(state: GameState): { state: GameState; events: GameEvent[] } {
+  let s = state;
+  let rounds = 0;
+  const collected: GameEvent[] = [];
+  while (s.expedition?.combat && rounds < 500) {
+    const r = fightRound(s);
+    s = r.state;
+    collected.push(...r.events);
+    rounds++;
+  }
+  const events = collected
+    .filter((e) => e.type !== "exchanged")
+    .map((e) => (e.type === "fought" ? { ...e, rounds } : e));
+  return { state: s, events };
+}
+
 function flee(state: GameState): { state: GameState; events: GameEvent[] } {
   const expedition = state.expedition;
   if (state.phase !== "expedition" || !expedition) return rejected(state, "flee", "not-on-expedition");
@@ -701,17 +745,14 @@ function quaff(state: GameState): { state: GameState; events: GameEvent[] } {
       events: [{ type: "quaffed", defId: front.defId, healed: hp - expedition.hp, hp, energy: fed.energy }],
     };
   }
-  return {
-    state: {
-      ...state,
-      expedition: {
-        ...expedition, hp,
-        loadout: { ...expedition.loadout, potions: next },
-        combat: { ...combat, potionsUsed: combat.potionsUsed + 1 },
-      },
-    },
-    events: [{ type: "quaffed", defId: front.defId, healed: hp - expedition.hp, hp }],
+  // 67e: a manual mid-fight potion now costs a monster turn (auto-quaff, folded into
+  // a Fight round, stays free — pre-setting it is the efficient heal).
+  const nextExp = {
+    ...expedition, hp,
+    loadout: { ...expedition.loadout, potions: next },
+    combat: { ...combat, potionsUsed: combat.potionsUsed + 1 },
   };
+  return provokeTurn(state, nextExp, [{ type: "quaffed", defId: front.defId, healed: hp - expedition.hp, hp }]);
 }
 
 // Use one packed battle item mid-fight (90j, mirrors quaff): manual-only, no
@@ -763,16 +804,17 @@ function enhance(state: GameState, id: string): { state: GameState; events: Game
   const next = held.map((s) => ({ ...s }));
   next[idx]!.qty -= 1;
   if (next[idx]!.qty <= 0) next.splice(idx, 1);
+  const nextExp = {
+    ...expedition,
+    loadout: { ...expedition.loadout, enhancements: next },
+    weaponBuff: { id, charges }, // replaces any current coating (old charges lost)
+  };
+  const enhanced: GameEvent = { type: "enhanced", id, charges };
+  // 67e: coating mid-fight now costs a monster turn (D60 reversal — was free/no-exchange).
+  if (nextExp.combat) return provokeTurn(state, nextExp, [enhanced]);
   return {
-    state: {
-      ...state,
-      expedition: {
-        ...expedition,
-        loadout: { ...expedition.loadout, enhancements: next },
-        weaponBuff: { id, charges }, // replaces any current coating (old charges lost)
-      },
-    },
-    events: [{ type: "enhanced", id, charges }],
+    state: { ...state, expedition: nextExp },
+    events: [enhanced],
   };
 }
 
@@ -818,6 +860,33 @@ function toggleAutoQuaff(state: GameState): { state: GameState; events: GameEven
   return { state: { ...state, expedition: { ...expedition, autoQuaff: on } }, events: [{ type: "auto-quaff-toggled", on }] };
 }
 
+function toggleAutoFinish(state: GameState): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) return rejected(state, "toggle-auto-finish", "not-on-expedition");
+  const on = !(expedition.autoFinish ?? false);
+  return { state: { ...state, expedition: { ...expedition, autoFinish: on } }, events: [{ type: "auto-finish-toggled", on }] };
+}
+
+// 67e: a non-flee in-combat action (coat / manual potion / gear-swap) costs a TURN —
+// the engaged monster lands one damageTaken hit (no player swing), exactly like flee's
+// parting hit, and it can soft-fail. `exp` is the post-action expedition (combat still
+// set); `events` are the action's own events, which the retaliation is appended to.
+function provokeTurn(
+  state: GameState,
+  exp: Expedition,
+  events: GameEvent[],
+): { state: GameState; events: GameEvent[] } {
+  const combat = exp.combat!;
+  const hit = damageTaken(exp.loadout, combat.creature, combat.mitigationAdd);
+  const hp = Math.max(0, exp.hp - hit);
+  const provoked: GameEvent = { type: "provoked", creature: combat.creature, hit, hp };
+  if (hp <= 0) {
+    const ended = endExpedition(state, { ...exp, combat: undefined });
+    return { state: ended, events: [...events, provoked, { type: "run-ended", reason: "defeated" }] };
+  }
+  return { state: { ...state, expedition: { ...exp, hp } }, events: [...events, provoked] };
+}
+
 // Remove ONE unit of defId from carry (gear stacks are qty 1 via stackCapOf, but
 // this is written generically). Returns null when the defId isn't carried.
 function removeOneFromCarry(carry: ItemStack[], defId: string): ItemStack[] | null {
@@ -840,8 +909,9 @@ function donDoffChecks(
 ): { expedition: Expedition } | { rejected: { state: GameState; events: GameEvent[] } } {
   const expedition = state.expedition;
   if (state.phase !== "expedition" || !expedition) return { rejected: rejected(state, action, "not-on-expedition") };
-  if (expedition.combat) return { rejected: rejected(state, action, "engaged") };
-  if (DON_DOFF_ENERGY > expedition.energy) return { rejected: rejected(state, action, "exhausted") };
+  // 67e: gear-swap is now ALLOWED while engaged — it costs a monster turn (applied
+  // in don/doff via provokeTurn), not energy. The energy gate only bites out of combat.
+  if (!expedition.combat && DON_DOFF_ENERGY > expedition.energy) return { rejected: rejected(state, action, "exhausted") };
   return { expedition };
 }
 
@@ -869,14 +939,13 @@ function don(state: GameState, itemId: string): { state: GameState; events: Game
   if (usedSlots(loadout, carryNext, expedition.carriedMaps) > carryCap(equipment)) {
     return rejected(state, "don", "carry-full");
   }
-  const fed = autoRefill({ ...expedition, loadout }, expedition.energy - DON_DOFF_ENERGY);
-  return {
-    state: {
-      ...state,
-      expedition: { ...expedition, energy: fed.energy, loadout: { ...loadout, food: fed.food }, carry: carryNext },
-    },
-    events: [{ type: "donned", defId: itemId, slot, displaced, energy: fed.energy }],
-  };
+  // 67e: in-combat swap costs the monster's turn, NOT energy; out-of-combat keeps DON_DOFF_ENERGY.
+  const spend = expedition.combat ? 0 : DON_DOFF_ENERGY;
+  const fed = autoRefill({ ...expedition, loadout }, expedition.energy - spend);
+  const nextExp = { ...expedition, energy: fed.energy, loadout: { ...loadout, food: fed.food }, carry: carryNext };
+  const donned: GameEvent = { type: "donned", defId: itemId, slot, displaced, energy: fed.energy };
+  if (nextExp.combat) return provokeTurn(state, nextExp, [donned]);
+  return { state: { ...state, expedition: nextExp }, events: [donned] };
 }
 
 function doff(state: GameState, itemId: string): { state: GameState; events: GameEvent[] } {
@@ -900,14 +969,13 @@ function doff(state: GameState, itemId: string): { state: GameState; events: Gam
   if (usedSlots(loadout, carryNext, expedition.carriedMaps) > carryCap(equipment)) {
     return rejected(state, "doff", "carry-full");
   }
-  const fed = autoRefill({ ...expedition, loadout }, expedition.energy - DON_DOFF_ENERGY);
-  return {
-    state: {
-      ...state,
-      expedition: { ...expedition, energy: fed.energy, loadout: { ...loadout, food: fed.food }, carry: carryNext },
-    },
-    events: [{ type: "doffed", defId: itemId, slot, energy: fed.energy }],
-  };
+  // 67e: in-combat swap costs the monster's turn, NOT energy (mirrors don).
+  const spend = expedition.combat ? 0 : DON_DOFF_ENERGY;
+  const fed = autoRefill({ ...expedition, loadout }, expedition.energy - spend);
+  const nextExp = { ...expedition, energy: fed.energy, loadout: { ...loadout, food: fed.food }, carry: carryNext };
+  const doffed: GameEvent = { type: "doffed", defId: itemId, slot, energy: fed.energy };
+  if (nextExp.combat) return provokeTurn(state, nextExp, [doffed]);
+  return { state: { ...state, expedition: nextExp }, events: [doffed] };
 }
 
 // Restore-per-food multiplier for this loadout: a tent (durable "camp" tool)

@@ -68,6 +68,7 @@ export function expeditionActions(state: GameState): Action[] {
   candidates.push({ type: "flee" });
   candidates.push({ type: "quaff" });
   candidates.push({ type: "toggle-auto-quaff" });
+  candidates.push({ type: "toggle-auto-finish" }); // 67e
   // use-item (90j): each held battle item; reduce keeps it only while engaged (D29)
   for (const stack of state.expedition.loadout.battleItems ?? []) candidates.push({ type: "use-item", itemId: stack.defId });
   // enhance (D60): each held weapon enhancement; usable engaged or not (reduce filters, D29)
@@ -90,7 +91,7 @@ export function expeditionActions(state: GameState): Action[] {
   // drop each carried stack
   for (const stack of carry) candidates.push({ type: "drop", itemId: stack.defId });
   // don each carried gear piece; doff each worn piece + tool (82r) — reduce
-  // filters engaged / exhausted / capacity, per D29
+  // filters exhausted / capacity, per D29 (67e: now legal while engaged — costs a turn)
   for (const stack of carry) {
     if (isGear(stack.defId)) candidates.push({ type: "don", itemId: stack.defId });
   }

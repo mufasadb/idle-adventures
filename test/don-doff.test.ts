@@ -83,15 +83,22 @@ test("don a tool adds it; doff removes it to carry", () => {
   expect(doffed.state.expedition!.carry).toEqual([{ defId: "pick", qty: 1 }]);
 });
 
-test("don/doff rejections: not-carried, not-worn, engaged, exhausted", () => {
+test("don/doff rejections: not-carried, not-worn, wrong-slot, exhausted", () => {
   expect(reduce(onMap(), { type: "don", itemId: "silver-sword" }).events[0]).toMatchObject({ type: "action-rejected", reason: "not-carried" });
   expect(reduce(onMap(), { type: "doff", itemId: "pick" }).events[0]).toMatchObject({ type: "action-rejected", reason: "not-worn" });
   expect(reduce(onMap({ carry: [{ defId: "iron-ore", qty: 1 }] }), { type: "don", itemId: "iron-ore" }).events[0]).toMatchObject({ type: "action-rejected", reason: "wrong-slot" });
-  const engaged = onMap({ carry: [{ defId: "silver-sword", qty: 1 }] });
-  engaged.expedition!.combat = { at: { x: 0, y: 18 }, creature: "wolf", monsterHp: 8, moveOnWin: false, damageAdd: 0, mitigationAdd: 0, startHp: 30, potionsUsed: 0 };
-  expect(reduce(engaged, { type: "don", itemId: "silver-sword" }).events[0]).toMatchObject({ type: "action-rejected", reason: "engaged" });
+  // exhausted only bites OUT of combat (67e: in-combat swap costs a monster turn, not energy)
   const tired = onMap({ carry: [{ defId: "silver-sword", qty: 1 }], energy: DON_DOFF_ENERGY - 1 });
   expect(reduce(tired, { type: "don", itemId: "silver-sword" }).events[0]).toMatchObject({ type: "action-rejected", reason: "exhausted" });
+});
+
+test("don while engaged is now allowed — it costs a monster turn, not energy (67e)", () => {
+  const engaged = onMap({ carry: [{ defId: "silver-sword", qty: 1 }], energy: 0 }); // 0 energy: proves it's not an energy cost
+  engaged.expedition!.combat = { at: { x: 0, y: 18 }, creature: "werewolf", monsterHp: 8, moveOnWin: false, damageAdd: 0, mitigationAdd: 0, startHp: 30, potionsUsed: 0 };
+  const r = reduce(engaged, { type: "don", itemId: "silver-sword" });
+  expect(r.events.find((e) => e.type === "donned")).toBeDefined(); // swap succeeded despite 0 energy
+  expect(r.events.find((e) => e.type === "provoked")).toMatchObject({ creature: "werewolf" }); // the monster took its turn
+  expect(r.state.expedition!.loadout.equipment.weapon).toBe("silver-sword");
 });
 
 test("doffing the backpack is rejected when the smaller kit can't hold the bag", () => {
