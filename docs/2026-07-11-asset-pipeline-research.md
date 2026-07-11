@@ -72,7 +72,7 @@ Recommended AI stages:
 
 Ballpark for our whole catalog: ~200 assets × 4 candidates × $0.06 ≈ **$50** on RD Plus. Generation cost is a non-issue; the scarce resource is review attention — which is what the QA stages optimize.
 
-**⚠️ Unresolved:** commercial-licensing terms for RD/Scenario output were not verified in this run — read the ToS before committing (flagged as pipeline-bead task).
+**⚠️ Unresolved:** commercial-licensing terms for RD/Scenario output were not verified in this run — read the ToS before committing (flagged as pipeline-bead task). **Update (48l.2, 2026-07-11):** RD is explicitly built and sold for commercial game assets (paid API, marketed "for Games & Sprites"); paid output is usable in the game — no POC blocker. The `/terms` page is JS-rendered (not machine-fetchable), so the exact clause wasn't captured verbatim. General legal caveat (industry-wide, not RD-specific): purely AI-generated art gets **no US copyright protection** — shippable, but you can't stop others copying it. Irrelevant for a POC; **read the exact ToS clause at retrodiffusion.ai/terms before any commercial launch.**
 
 ## Recommended architecture — `idle-adventure-assets` mini-repo
 
@@ -89,3 +89,23 @@ manifest  →  prompt  →  generate  →  post  →  qa  →  pack  →  delive
 - **Deliver:** the game repo consumes only the packed atlas + manifest, keyed by defId. The web app never knows the pipeline exists.
 
 **Decisions needed before building:** art direction sign-off (pixel art? tile size? palette — pick a Lospec palette or derive one), RD licensing check, and whether backdrops are pixel-consistent or a deliberately different painted style.
+
+## Pilot findings (48l.7 — 2026-07-11)
+
+Ran 5 real catalog assets through Retro Diffusion end-to-end with zero infrastructure (throwaway Python), then the review ladder: Claude first-gate → user judgment (hosted contact-sheet artifact) → **GO verdict, build the pipeline stage-by-stage.** 20 candidates, $0.54 spent.
+
+**Assets & styles that worked** (live `/v1/styles/selector`, auth `X-RD-Token`):
+- terrain tile → `rd_tile__single_tile` **and** `rd_plus__mc_texture` — *both tile seamlessly* (verified 3×3 self-adjacency). `mc_texture` is the more uniform ground/stone. Native 32px, no `remove_bg`.
+- monster → `rd_plus__default`, 64px native, `remove_bg:true` → clean RGBA.
+- icon → `rd_plus__topdown_item`, `remove_bg:true`.
+- Cost dry-run: POST `/v1/inferences` with `check_cost:true` returns `balance_cost` free — **always price a batch before spending.**
+
+**Verified vendor facts (this run):** RD returns **true native pixel resolution** — 32px tiles came back as exact 32×32 grids, 64px sprites as clean 64px RGBA. The heavy pixel-snap stage the research feared is a *Gemini* problem; for RD it's near-nil. Response shape: `{ base64_images: [raw-b64-png], balance_cost, remaining_balance, model }`, no `data:` prefix. New account seeded ~$5 balance; 429 carries Retry-After.
+
+**Calibration findings baked into the pipeline profiles:**
+1. **Sizes locked at 32 (terrain) / 48 (monster) / 24 (icon)** — user confirmed the downscaled target sizes are right. Generate at a clean multiple of the target and **nearest-neighbour snap** — the pilot's non-integer 64→48 / 64→24 LANCZOS downscale smeared the grid and made sprites read "taller than wide." Never non-integer downscale pixel art.
+2. **24px weapon icons** — a thin vertical blade collapses to ~1px and nearly vanishes at 24px. User held the 24px cell, so fix via **prompt composition** (diagonal, chunkier blade filling the frame), not a bigger cell.
+3. **Prompt vocabulary matters** — "grass tile" rendered as bare dirt; terrain prompts need explicit "mossy/overgrown green." Feeds the 48l.2 style-bible prompt preamble.
+4. **Grid busy-ness risk** — tiles are high-frequency speckle with no larger-scale structure; may read noisy tiled across the 20×60 board. Deferred to the in-game trial (folded into 48l.6 game consumption).
+
+**Winners (user pick):** leftmost/#1 candidate for every asset (boar_1, iron-sword_1, ration_1, plains_1, mountain_1). Pilot artifacts (candidates, contact sheet, gen/post scripts) live in the session scratchpad; not committed (throwaway by design).
