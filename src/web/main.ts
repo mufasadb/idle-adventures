@@ -12,6 +12,7 @@ import type { Grid } from "../engine/grid";
 import { slotOf } from "../engine/catalog";
 import { recipeOutputQty } from "../engine/craft";
 import { moveCost, moveCostBreakdown } from "../engine/move";
+import { ASSET_TRIAL, TILE_BG, MONSTER_SPRITES, NODE_ICON } from "./assets-trial";
 import { costToReach } from "../engine/reach";
 import { carryCap } from "../engine/carry";
 import { heldFoodEnergy } from "../engine/food";
@@ -688,7 +689,26 @@ function expeditionView(): string {
           ? `${poi.kind} · ${flavorDetail(per.detail, poi.kind)}${tierNote ? ` · ${tierNote}` : ""}`
           : poi.kind === "monster" ? "a monster" : `a ${poi.kind} node`)
       : grid.terrain[y]![x]!;
-    cells += `<div class="${cls.join(" ")}" data-x="${x}" data-y="${y}" title="${title}">${ch}</div>`;
+    // 48l.6 trial: paint the terrain tile texture + overlay a ¾ billboard sprite
+    // on monster POIs / a node icon where we have one. Flag-gated; the real
+    // delivery is an atlas+manifest keyed by defId.
+    let trialStyle = "";
+    let overlay = "";
+    if (ASSET_TRIAL) {
+      const bg = TILE_BG[grid.terrain[y]![x]!];
+      if (bg) trialStyle = ` style="background-image:url('${bg}')"`;
+      if (poi && !isCleared) {
+        if (poi.kind === "monster") {
+          const keys = Object.keys(MONSTER_SPRITES);
+          const sp = (poi.creature && MONSTER_SPRITES[poi.creature]) || MONSTER_SPRITES[keys[(x * 31 + y * 17) % keys.length]!];
+          if (sp) overlay = `<img class="sprite" src="${sp}" alt="">`;
+        } else if (NODE_ICON[poi.kind]) {
+          overlay = `<img class="nodeicon" src="${NODE_ICON[poi.kind]}" alt="">`;
+        }
+      }
+    }
+    const glyph = ASSET_TRIAL && !isPlayer && (overlay !== "" || !poi) ? "" : ch;
+    cells += `<div class="${cls.join(" ")}"${trialStyle} data-x="${x}" data-y="${y}" title="${title}">${overlay}${glyph}</div>`;
   }
 
   const maxEnergy = exp.maxEnergy ?? MAX_ENERGY;
@@ -746,7 +766,7 @@ function expeditionView(): string {
     <section class="mapwrap">
       ${bars}
       ${pathBanner}
-      <div class="gridscroll"><div class="grid" style="grid-template-columns:repeat(${MAP_WIDTH}, 1.4rem);">${cells}</div></div>
+      <div class="gridscroll"><div class="grid${ASSET_TRIAL ? " asset-trial" : ""}" style="grid-template-columns:repeat(${MAP_WIDTH}, ${ASSET_TRIAL ? "32px" : "1.4rem"});">${cells}</div></div>
     </section>
     <section>
       ${exp.combat ? engagementPanel(exp, legal) : herePanel(grid, exp, legal)}
