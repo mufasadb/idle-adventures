@@ -12,7 +12,7 @@ import type { Grid } from "../engine/grid";
 import { slotOf } from "../engine/catalog";
 import { recipeOutputQty } from "../engine/craft";
 import { moveCost, moveCostBreakdown } from "../engine/move";
-import { ASSET_TRIAL, TILE_BG, MONSTER_SPRITES, NODE_ICON } from "./assets-trial";
+import { ASSET_TRIAL, TILE_BG, MONSTER_SPRITES, MONSTER_SIZE, NODE_ICON } from "./assets-trial";
 import { costToReach } from "../engine/reach";
 import { carryCap } from "../engine/carry";
 import { heldFoodEnergy } from "../engine/food";
@@ -700,8 +700,10 @@ function expeditionView(): string {
       if (poi && !isCleared) {
         if (poi.kind === "monster") {
           const keys = Object.keys(MONSTER_SPRITES);
-          const sp = (poi.creature && MONSTER_SPRITES[poi.creature]) || MONSTER_SPRITES[keys[(x * 31 + y * 17) % keys.length]!];
-          if (sp) overlay = `<img class="sprite" src="${sp}" alt="">`;
+          const cr = poi.creature && MONSTER_SPRITES[poi.creature] ? poi.creature : keys[(x * 31 + y * 17) % keys.length]!;
+          const sp = MONSTER_SPRITES[cr];
+          const msz = MONSTER_SIZE[cr] ?? 48;
+          if (sp) overlay = `<img class="sprite" src="${sp}" style="width:${msz}px;height:${msz}px" alt="">`;
         } else if (NODE_ICON[poi.kind]) {
           overlay = `<img class="nodeicon" src="${NODE_ICON[poi.kind]}" alt="">`;
         }
