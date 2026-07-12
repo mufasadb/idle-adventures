@@ -1,4 +1,4 @@
-import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot, RejectionReason, Expedition, Equipment } from "./types";
+import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot, RejectionReason, Expedition, Equipment, Loadout } from "./types";
 import { expeditionGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
@@ -632,11 +632,16 @@ function fightRound(state: GameState): { state: GameState; events: GameEvent[] }
       events: [exchanged],
     };
   }
-  // Victory: apply loot/maps/cleared/relocation exactly as the old fightAt did.
+  // Victory: apply loot/maps/cleared/relocation exactly as the old fightAt did. The
+  // fit was checked at engage AND re-checked by any mid-fight don/doff (xe4,
+  // pendingLootFits) — so this can't overflow; fail loudly if that invariant ever
+  // breaks again rather than writing carry:null into state.
   const maxStacks = freeLootStacks(loadout, expedition.carriedMaps);
   let carryWithLoot: typeof expedition.carry = expedition.carry;
   for (const stack of loot) {
-    carryWithLoot = addToCarry(carryWithLoot, stack.defId, stack.qty, maxStacks)!; // fit-checked at engage; carry can't change while engaged
+    const next = addToCarry(carryWithLoot, stack.defId, stack.qty, maxStacks);
+    if (next === null) throw new Error(`victory loot overflow at ${combat.at.x},${combat.at.y}: mid-fight carry mutation escaped the pending-loot fit-check (xe4)`);
+    carryWithLoot = next;
   }
   const carriedMaps = expedition.carriedMaps ?? [];
   let mapsAfter = carriedMaps;
@@ -915,6 +920,28 @@ function donDoffChecks(
   return { expedition };
 }
 
+// idle-adventure-xe4: the victory path applies the engaged monster's rolled loot
+// with a bare addToCarry(...)! trusting the fit-check that ran at engage. Since 67e
+// a mid-fight don/doff is legal and mutates carry, so any in-combat swap must RE-
+// verify the pending loot still fits the candidate kit — else victory would write
+// carry:null (silent state corruption). Mirrors engage()'s pre-check (reduce ~513).
+function pendingLootFits(
+  state: GameState,
+  combat: NonNullable<Expedition["combat"]>,
+  loadout: Loadout,
+  carry: ItemStack[],
+  carriedMaps: Expedition["carriedMaps"],
+): boolean {
+  const loot = rollLoot(state.seed, combat.creature, combat.at).filter((s) => s.defId !== MAP_SCROLL_ID);
+  const maxStacks = freeLootStacks(loadout, carriedMaps);
+  let c: ItemStack[] | null = carry;
+  for (const stack of loot) {
+    c = addToCarry(c, stack.defId, stack.qty, maxStacks);
+    if (c === null) return false;
+  }
+  return true;
+}
+
 function don(state: GameState, itemId: string): { state: GameState; events: GameEvent[] } {
   const checks = donDoffChecks(state, "don");
   if ("rejected" in checks) return checks.rejected;
@@ -937,6 +964,10 @@ function don(state: GameState, itemId: string): { state: GameState; events: Game
   }
   const loadout = { ...expedition.loadout, equipment };
   if (usedSlots(loadout, carryNext, expedition.carriedMaps) > carryCap(equipment)) {
+    return rejected(state, "don", "carry-full");
+  }
+  // xe4: while engaged, the swap must also leave room for the pending victory loot.
+  if (expedition.combat && !pendingLootFits(state, expedition.combat, loadout, carryNext, expedition.carriedMaps)) {
     return rejected(state, "don", "carry-full");
   }
   // 67e: in-combat swap costs the monster's turn, NOT energy; out-of-combat keeps DON_DOFF_ENERGY.
@@ -967,6 +998,10 @@ function doff(state: GameState, itemId: string): { state: GameState; events: Gam
   const carryNext = [...expedition.carry, { defId: itemId, qty: 1 }];
   const loadout = { ...expedition.loadout, equipment };
   if (usedSlots(loadout, carryNext, expedition.carriedMaps) > carryCap(equipment)) {
+    return rejected(state, "doff", "carry-full");
+  }
+  // xe4: while engaged, the swap must also leave room for the pending victory loot.
+  if (expedition.combat && !pendingLootFits(state, expedition.combat, loadout, carryNext, expedition.carriedMaps)) {
     return rejected(state, "doff", "carry-full");
   }
   // 67e: in-combat swap costs the monster's turn, NOT energy (mirrors don).

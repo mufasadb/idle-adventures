@@ -7,7 +7,9 @@ import { emptyLoadout } from "../src/engine/loadout";
 import { legalActions } from "../src/sim/legal";
 import { candidateMaps } from "../src/engine/town";
 import { stackCapOf } from "../src/engine/carry";
-import { DON_DOFF_ENERGY, STACK_CAP, BASE_CARRY_SLOTS } from "../src/data/constants";
+import { generateGrid, rollBiome } from "../src/engine/grid";
+import { rollLoot } from "../src/engine/combat";
+import { DON_DOFF_ENERGY, STACK_CAP, BASE_CARRY_SLOTS, PLAYER_BASE_HP } from "../src/data/constants";
 import type { GameState, ItemStack } from "../src/engine/types";
 
 function onMap(opts: {
@@ -133,4 +135,48 @@ test("legalActions surfaces don/doff/pack-spare candidates through speculative r
   expect(legal).toContainEqual({ type: "doff", itemId: "pick" });
   const town: GameState = { seed: "t3", phase: "town", bank: [{ defId: "silver-sword", qty: 1 }], loadout: emptyLoadout(), expedition: null };
   expect(legalActions(town)).toContainEqual({ type: "pack", slot: "spare", itemId: "silver-sword" });
+});
+
+// idle-adventure-xe4: don/doff ARE legal mid-engagement (67e) and mutate carry.
+// Doffing armour adds a carry stack without touching freeLootStacks, so the
+// engage-time loot fit-check is invalidated — victory's addToCarry(...)! then
+// returns null and carry:null gets written into state (silent corruption).
+function mapWithMonster(creature: string): { seed: string; poi: { x: number; y: number; creature: string } } {
+  for (let i = 0; i < 500; i++) {
+    const seed = `xe4-scan-${i}`;
+    const grid = generateGrid(seed, rollBiome(seed), 1);
+    const poi = grid.pois.find((p) => p.kind === "monster" && p.creature === creature);
+    if (poi) return { seed, poi: { x: poi.x, y: poi.y, creature: poi.creature! } };
+  }
+  throw new Error("no map with " + creature);
+}
+
+test("doff mid-fight with the bag at the loot edge is rejected carry-full (xe4)", () => {
+  const { seed, poi } = mapWithMonster("forest-boar");
+  const loot = rollLoot("g", poi.creature, { x: poi.x, y: poi.y }).filter((s) => s.defId !== "map-scroll");
+  expect(loot.length).toBeGreaterThan(0); // the fit-check must have something to reject on
+  const loadout = emptyLoadout();
+  loadout.equipment.weapon = "sword";
+  loadout.equipment.helmet = "light-helmet";
+  // fill carry so exactly `loot.length` free stacks remain at engage
+  const junk = Array.from({ length: BASE_CARRY_SLOTS - loot.length }, (_, i) => ({ defId: `junk-${i}`, qty: 1 }));
+  const base: GameState = {
+    seed: "g", phase: "expedition", bank: [], loadout: emptyLoadout(),
+    expedition: {
+      mapSeed: seed, pos: { x: poi.x, y: poi.y }, energy: 50, hp: PLAYER_BASE_HP,
+      loadout, carry: junk, cleared: [],
+    },
+  };
+  // engage: fit-check passes because the loot exactly fits the free stacks
+  const engaged = reduce(base, { type: "fight" });
+  expect(engaged.state.expedition?.combat).toBeDefined();
+  // doffing the helmet would add a carry stack and break the pending-loot fit —
+  // it must be rejected so the invariant the victory path relies on holds.
+  const afterDoff = reduce(engaged.state, { type: "doff", itemId: "light-helmet" });
+  expect(afterDoff.events[0]).toMatchObject({ type: "action-rejected", reason: "carry-full" });
+  // fight to the end; carry must never come out null
+  let s = afterDoff.state;
+  let guard = 0;
+  while (s.expedition?.combat && ++guard < 100) s = reduce(s, { type: "fight" }).state;
+  expect(s.expedition?.carry).not.toBeNull();
 });
