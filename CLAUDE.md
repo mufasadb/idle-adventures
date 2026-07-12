@@ -122,6 +122,12 @@ One pure engine, three thin surfaces. The reducer is the single source of truth 
 
 **`src/web/`** — `main.ts` (the whole UI: string templates re-rendered from state on every action, one generic `data-act` click delegation in `wire()`) + `index.html` (all CSS).
 
+## Pixel-art assets (epic idle-adventure-48l)
+
+Art is produced by a **separate pipeline repo** at `../idle-adventure-assets` (bun/TS + `py/`, Retro Diffusion) — it imports this repo's `src/data` as pure data and delivers game-ready sprites keyed by `defId`. As of 2026-07-13: **162 assets approved** (all terrains/monsters/icons), reviewed over two user rounds. Art direction (see `bd memories`): **pixel art, Diablo-2 mood, top-down floor + ¾ billboard monster sprites, per-creature size classes**; palette coercion deferred (ship raw). Full state + commands: `bd memories asset-pipeline-state`, and that repo's `README.md` / `review/round-1.md`.
+
+In THIS repo, `src/web/assets-trial.ts` (behind the `ASSET_TRIAL` flag in `main.ts`) is a **throwaway** woodland-only render test — the real delivery (atlas + manifest) is bead `idle-adventure-48l.10`, not yet built.
+
 ## Conventions & Patterns
 
 - Grids are `[y][x]`; `x ∈ [0, MAP_WIDTH)`, `y ∈ [0, MAP_HEIGHT)` (20×60 portrait strip).
