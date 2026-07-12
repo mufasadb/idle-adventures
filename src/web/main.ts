@@ -309,7 +309,18 @@ function confirmWalk(path: Pos[]): void {
 
 // --- rendering ---------------------------------------------------------------
 function draw(): void {
+  // boc: every action rebuilds app.innerHTML, which discards the scrollable play
+  // window (.gridscroll) and snaps it back to origin. Preserve its scroll offsets
+  // across the re-render (save before, restore after) so the view stays put. Only
+  // restores when a .gridscroll existed both before and after — phase transitions
+  // (town has none) correctly fall through to the fresh element's default 0,0.
+  const prev = app.querySelector<HTMLElement>(".gridscroll");
+  const keepScroll = prev ? { top: prev.scrollTop, left: prev.scrollLeft } : null;
   app.innerHTML = state.phase === "town" ? townView() : expeditionView();
+  if (keepScroll) {
+    const next = app.querySelector<HTMLElement>(".gridscroll");
+    if (next) { next.scrollTop = keepScroll.top; next.scrollLeft = keepScroll.left; }
+  }
   wire(); save();
 }
 
