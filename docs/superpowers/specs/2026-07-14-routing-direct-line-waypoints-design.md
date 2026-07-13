@@ -83,6 +83,18 @@ remainder dropped; click onward to route around.
   planned route's** total cost, and **clamps** the spend segment to the bar width
   when planned cost ≥ current energy (the `over` class flags it red) — a route that
   costs far more than you have must not blow out the bar's layout.
+- **Projected cost is shown as a SPLIT — walk points + action points.** The
+  preview breaks total energy into two labelled parts rather than one lumped number:
+  `−32 walk + −5 gather = −37e`. The **action-points** part sums
+  `gatherCost(node, tools)` for every node the line passes **over** whose identity
+  is already **resolved** (near/surveyed) — and **only when auto-gather is ON**
+  (toggle off ⇒ no action points projected, since you won't auto-do it). Unresolved
+  nodes (fog) contribute nothing to the preview and surprise you when reached. A
+  pure `gatherCost(poi, tools)` helper is extracted from `gather` (same
+  `NODE_HARDNESS[kind] / toolQuality` math) so preview and execution never drift.
+  Players wanting exact control route in smaller parts (separate legs / short
+  routes) — the split display plus part-wise routing is the "get picky" affordance,
+  no extra UI needed.
 - **Walk ▶** is **disabled while any leg is blocked** (forces a clean plan rather
   than walking a partial prefix into a wall).
 - The final-tile affordances re-key off the **last waypoint** instead of a single
@@ -102,9 +114,13 @@ A single **Walk ▶** runs every leg's tiles in order through
 the loop and opens the engagement; an unexpected rejection stops and reports its
 cause via `rejectCopy`.
 
-**New — auto-interact with nodes on the way.** After each successful `move`, the
-walk speculatively runs `reduce({type:"gather"})` (gather acts on the tile the
-player stands on):
+**New — auto-interact with nodes on the way.** Gated by a persistent
+`autoGather` toggle (Expedition field, default **on**, read `?? true`; flipped by a
+new engine `toggle-auto-gather` action mirroring `toggle-auto-quaff`). When **off**,
+the walk never auto-gathers — you cross nodes untouched and harvest manually with a
+click (this is how you skip a node without routing around it). When **on**, after
+each successful `move` the walk speculatively runs `reduce({type:"gather"})` (gather
+acts on the tile the player stands on):
 
 - node present + room in bag → auto-gather, keep the new state, log it, continue;
 - **`carry-full`** → **pause** the walk at this tile ("bag full — dropped anchor at
@@ -143,6 +159,11 @@ this spec does not build it.
 ### 6. Files
 
 - `src/engine/line.ts` — **new**, pure `lineTiles(a, b)`. Boundary-clean.
+- **Engine additions (foundations):** `autoGather?: boolean` on `Expedition`
+  (`types.ts`, documented default `?? true`); `toggle-auto-gather` Action +
+  reducer case + `GameEvent` log line (exhaustive `fmt()` switch); a pure
+  `gatherCost(poi, tools): number` helper extracted from `gather` and reused by
+  both the cost preview and (implicitly) the existing gather path.
 - `src/web/main.ts` — replace `findPath` A* + `pending`/`confirmWalk` with the
   route model (§1–4). Delete the web-local A*. Keep `expeditionGrid`, `moveCost`,
   the energy-bar split, Fight/Shoot/Survey affordances (re-keyed to last waypoint).
@@ -150,6 +171,13 @@ this spec does not build it.
   `routeTo`/`dijkstraFrom`/`pathWaypoints` parked for the future balance calculator.
 - `src/sim/play.ts` / `cli.ts` — swap the `travel` directive help/handling for
   `route`; keep output-append discipline (never reshape existing lines).
+- `.claude/skills/blind-playtest/SKILL.md` — **update the routing methodology.**
+  Today it calls web A* "the true human interface" and tells the synthesis to
+  **discount single-step / no-pathfinding routing complaints as a harness artifact**
+  (lines ~20, ~65). Post-change, manual routing is a *real mechanic on both
+  surfaces* — routing friction findings are now signal, not artifact. Rewrite that
+  guidance and the `travel`→`route` directive references so the next playtest reads
+  routing findings correctly.
 - `docs/decisions.md` — new **D74** row: "Routing is the player's job —
   direct-line + player-planned waypoints; retire the auto-router from play (park
   the solver for a future balance calculator). Cite core-loop spec." 
@@ -177,6 +205,12 @@ this spec does not build it.
   double-counts the revisited tile correctly; the energy-bar spend segment clamps to
   the bar width when planned cost ≥ current energy (no layout overflow — the "bar
   explosion" guard).
+- **Cost split + toggle:** with auto-gather ON, a route over a resolved node shows
+  `walk + gather` split and the action-points part equals `gatherCost`; over an
+  UNresolved node, action points stay 0; with auto-gather OFF, action points are 0
+  regardless. `gatherCost` unit test matches the energy `gather` actually spends.
+- **Auto-gather toggle:** `toggle-auto-gather` flips `autoGather`; default reads as
+  `true` when absent; a walk with it OFF crosses nodes without harvesting.
 - **Boundary test** (`test/boundary.test.ts`) still green — `line.ts` imports
   nothing from render/sim/web and uses no RNG/DOM/Date.
 - Quality gates: `bun test` + `bun run typecheck` + `bun run lint` green.
