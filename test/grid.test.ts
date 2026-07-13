@@ -206,7 +206,7 @@ test("generateGrid: reachability guard — every seed keeps >= FOOD_REACH_MIN fo
 // the sample size that gives the guard its statistical confidence.
 }, 20000);
 
-test("generateGrid: prizes trend farther to reach than food (statistical, across seeds)", () => {
+test("generateGrid: POI kind does NOT correlate with reach — monsters and food sit at the same average distance (57r/D73)", () => {
   let prizeSum = 0, prizeN = 0, foodSum = 0, foodN = 0;
   for (let i = 0; i < 120; i++) {
     const seed = `trend-${i}`;
@@ -219,5 +219,9 @@ test("generateGrid: prizes trend farther to reach than food (statistical, across
       else if (p.kind === "herb" || p.kind === "animal") { foodSum += r; foodN++; }
     }
   }
-  expect(prizeSum / prizeN).toBeGreaterThan(foodSum / foodN); // monsters farther than food on average
+  // D73: placement is value-AGNOSTIC — kind is uncorrelated with position, so
+  // across seeds monster and food average reach converge (measured ~1% apart).
+  // The old pairing pinned monsters strictly farther; that segregation is retired.
+  const avgPrize = prizeSum / prizeN, avgFood = foodSum / foodN;
+  expect(Math.abs(avgPrize - avgFood) / avgFood).toBeLessThan(0.1);
 }, 20000);

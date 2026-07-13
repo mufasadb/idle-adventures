@@ -20,7 +20,7 @@ export const BARRIER_THRESHOLD = 0.68; // the "how walled is the world" dial: lo
 export const POI_DENSITY = 60; // POIs per 20×60 map (e3j): ~3× area × slightly denser — a geared+provisioned run should harvest ~half and CHOOSE which half. Was 18 on 20×20.
 export const POI_MIN_SPACING = 3; // min Chebyshev distance between POIs (spec: 3–4 tiles apart)
 export const POI_PLACEMENT_ATTEMPTS = 2000; // seeded rejection-sampling budget per map (scaled with density, e3j)
-export const FOOD_REACH_MIN = 2; // Phase 3 (b91): min forageable (herb/animal) nodes that must sit on finite on-foot cost-to-reach tiles; the guard holds by construction of the value-vs-reach pairing (low-value forage takes the most-reachable tiles — see grid.ts pairing comment), so a bare loadout is never walled off from food
+export const FOOD_REACH_MIN = 2; // min forageable (herb/animal) nodes on finite on-foot cost-to-reach tiles (grid.test reachability guard). D73 (57r): placement is value-agnostic — forage is NO LONGER pulled near entry, so this only promises forage sits on REACHABLE tiles (guaranteed by the walkable-connectivity carve, since all POIs land on walkable tiles), NOT that it's cheap to reach. Food SUFFICIENCY at scale is a density concern (biome nodeTypeWeights), validated by the pinned harness-sustainability test, not by placement
 // Perception (9u9.2): node KIND is always visible; a node's qualitative identity
 // (species/material/tier/dmg+armour type — never the fight outcome) resolves only
 // within this Chebyshev radius of the player. Tools in VISION_RANGE_BONUS widen it

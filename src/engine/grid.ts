@@ -13,7 +13,6 @@ import {
   POI_MIN_SPACING,
   POI_PLACEMENT_ATTEMPTS,
   NODE_TYPES,
-  MATERIAL_TIER,
   MATERIAL_TIER_WEIGHT,
   MAP_TIER_CREATURE_ADD,
   POI_DENSITY_BY_TIER,
@@ -24,7 +23,7 @@ import {
 import type { Terrain, NodeType, BiomeId, Biome } from "../data/constants";
 import { rand, weightedPick } from "./rng";
 import { perlin2 } from "./noise";
-import { costToReach, reachableTiles } from "./reach";
+import { reachableTiles } from "./reach";
 import { moveCost } from "./move";
 
 export type Poi = {
@@ -251,8 +250,9 @@ function buildGrid(mapSeed: string, biomeId: BiomeId, mapTier: number, affixes: 
   carveConnectivity(terrain, biome);
   // Entry (b91): embark lands on the bottom row. Pick the x that opens onto the
   // LARGEST on-foot reachable region, so a bare loadout is never boxed into a
-  // dead corner pocket (the food reachability guarantee starts here). Ties break
-  // toward a seeded preferred x for determinism + variety.
+  // dead corner pocket — every POI (food included) stays reachable at all. (D73:
+  // placement no longer pulls forage NEAR entry; only this connectivity keeps it
+  // reachable.) Ties break toward a seeded preferred x for determinism + variety.
   // Constraint (e3j final review): the entry tile itself MUST be walkable — you
   // must be able to return to it. Skip impassable bottom-row candidates; without
   // this, a bottom-row wall tile adjacent to the one walkable component can tie
@@ -325,31 +325,19 @@ function buildGrid(mapSeed: string, biomeId: BiomeId, mapTier: number, affixes: 
         : rollMagnitude(NODE_MAGNITUDE_WEIGHTS[mapTier] ?? { 1: 1 }, rand(mapSeed, "poi-magnitude", i));
     return { kind, material, creature, magnitude };
   });
-  // (c) Value score: monster (combat reward) > higher-tier material > basic forage.
-  const value = (s: { kind: NodeType; material: string | null }): number => {
-    if (s.kind === "monster") return 3;
-    if (s.material && (MATERIAL_TIER[s.material] ?? 1) >= 2) return 2;
-    return 1;
-  };
-  // (d) Continuous pairing: sort specs by value desc, positions by on-foot
-  //     cost-to-reach desc, pair index-for-index — highest-value spec lands on
-  //     the hardest-to-reach position, food/basic drifts to the reachable core.
-  //     This also protects the food reachability guard: low-value forage takes
-  //     the LOWEST cost-to-reach (most reachable) tiles by construction.
-  const reach = costToReach(terrain, entry); // on-foot, no gear — the baseline
-  const reachCost = positions.map((p) => reach[p.y]![p.x]!);
-  const specOrder = specs.map((_, i) => i).sort((a, b) => {
-    const d = value(specs[b]!) - value(specs[a]!);
-    return d !== 0 ? d : a - b; // stable index tiebreak → deterministic
-  });
-  const posOrder = positions.map((_, i) => i).sort((a, b) => {
-    const ca = reachCost[a]!, cb = reachCost[b]!;
-    if (ca === cb) return a - b;
-    return ca < cb ? 1 : -1; // descending, Infinity-safe (no arithmetic)
-  });
-  const pois: Poi[] = specOrder.map((si, k) => {
-    const p = positions[posOrder[k]!]!;
-    const s = specs[si]!;
+  // (c) 57r/D73: POI placement is value-AGNOSTIC — each spec keeps the position it
+  //     was accepted on (uniform rejection-sampled tiles), independent of its value
+  //     or distance from entry. Specs are rolled per index (step b) with no spatial
+  //     bias, so spec[i] → position[i] scatters monsters, rich nodes, and forage
+  //     evenly across the reach gradient. The old value-vs-reach pairing (monsters→
+  //     far, forage→core) is retired: value variation now rides the MAP TIER
+  //     (POI_DENSITY_BY_TIER + NODE_MAGNITUDE_WEIGHTS), never tile position.
+  //     Food-reachability is deliberately NOT guarded by placement anymore — forage
+  //     SUFFICIENCY is a density concern (biome nodeTypeWeights), accepted to "run
+  //     dry rarely at scale" rather than "never" (user call, 2026-07-13). Every POI
+  //     still sits on a walkable, connectivity-carved tile, so all remain reachable.
+  const pois: Poi[] = positions.map((p, i) => {
+    const s = specs[i]!;
     return { x: p.x, y: p.y, kind: s.kind, material: s.material, creature: s.creature,
              ...(s.magnitude && s.magnitude > 1 ? { magnitude: s.magnitude } : {}) };
   });
