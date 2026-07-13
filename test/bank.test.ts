@@ -57,8 +57,8 @@ test("endExpedition: banks carry + durables + potions + uneaten food (D26, pqp)"
     { defId: "spyglass", qty: 1 },
     { defId: "horse", qty: 1 },
     { defId: "starter", qty: 1 },
+    { defId: "bread", qty: 2 }, // uneaten food banks back (pqp); 0ps: consumables bank in registry order (food before potions)
     { defId: "healing-potion", qty: 1 },
-    { defId: "bread", qty: 2 }, // uneaten food banks back (pqp)
   ]);
   expect(state.phase).toBe("expedition"); // pure — input untouched
 });
@@ -87,4 +87,20 @@ test("endExpedition banks carried maps into state.maps (D26: they follow the car
     { mapSeed: "run:drop:1,2", biomeId: "tundra", vintage: 2 },
   ]);
   expect(ended.phase).toBe("town");
+});
+
+test("endExpedition banks back unspent battle-items, ammo, and enhancements (0ps: every consumable kind returns; D60 enhancement gap closed)", () => {
+  const loadout = emptyLoadout();
+  loadout.battleItems = [{ defId: "elixir-of-power", qty: 1 }];
+  loadout.ammo = [{ defId: "arrows", qty: 12 }];
+  loadout.enhancements = [{ defId: "whetstone", qty: 2 }, { defId: "venom-oil", qty: 1 }]; // unused — must come home (D60)
+  const state: GameState = {
+    seed: "g", phase: "expedition", bank: [], loadout: emptyLoadout(),
+    expedition: { mapSeed: "m", pos: { x: 0, y: 0 }, energy: 10, hp: 10, loadout, carry: [], cleared: [] },
+  };
+  const bank = endExpedition(state, state.expedition!).bank;
+  expect(bank).toContainEqual({ defId: "elixir-of-power", qty: 1 });
+  expect(bank).toContainEqual({ defId: "arrows", qty: 12 });
+  expect(bank).toContainEqual({ defId: "whetstone", qty: 2 });
+  expect(bank).toContainEqual({ defId: "venom-oil", qty: 1 });
 });

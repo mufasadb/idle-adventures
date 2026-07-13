@@ -5,6 +5,7 @@
 // Used by fight's soft-fail (M4) and return (M5).
 import type { GameState, Expedition, ItemStack } from "./types";
 import { emptyLoadout } from "./loadout";
+import { CONSUMABLE_KEYS } from "./catalog";
 import { FRESH_TO_STALE } from "../data/constants";
 
 export function bankStacks(bank: ItemStack[], stacks: ItemStack[]): ItemStack[] {
@@ -46,23 +47,27 @@ export function endExpedition(state: GameState, expedition: Expedition): GameSta
   if (equipment.transport !== null) durables.push({ defId: equipment.transport, qty: 1 });
   if (equipment.backpack !== null) durables.push({ defId: equipment.backpack, qty: 1 });
   if (equipment.panniers !== null) durables.push({ defId: equipment.panniers, qty: 1 });
-  // Fresh forage stales at the door (e3j): berries → stale-berries. Stale forms
-  // are materials (jam inputs), not food, so they can never be packed back out —
-  // "good now" food is only good now.
-  const foodHome = expedition.loadout.food.map((s) => ({
-    defId: FRESH_TO_STALE[s.defId] ?? s.defId,
-    qty: s.qty,
-  }));
+  // 0ps: every consumable kind banks back — one loop over the registry, with the
+  // FRESH_TO_STALE per-defId transform applied uniformly (only fresh forage is a
+  // key, so it's a no-op for potions/battle-items/ammo/enhancements). This closes
+  // a latent gap where unspent enhancements were dropped instead of banked back
+  // (D60: "unused ones bank back"); spares are [] during expeditions (expanded
+  // into carry at embark), so they contribute nothing here. Fresh forage stales at
+  // the door (e3j): berries → stale-berries — a material (jam input), never food
+  // again, so "good now" food is only good now.
+  const consumablesHome: ItemStack[] = [];
+  for (const key of CONSUMABLE_KEYS) {
+    for (const s of expedition.loadout[key] ?? []) {
+      consumablesHome.push({ defId: FRESH_TO_STALE[s.defId] ?? s.defId, qty: s.qty });
+    }
+  }
   return {
     ...state,
     phase: "town",
     bank: bankStacks(state.bank, [
       ...expedition.carry,
       ...durables,
-      ...expedition.loadout.potions,
-      ...foodHome, // uneaten food banks back (pqp); fresh forage stales (e3j)
-      ...(expedition.loadout.battleItems ?? []), // unused battle items bank back (bzd)
-      ...(expedition.loadout.ammo ?? []), // unspent arrows bank back (D45)
+      ...consumablesHome, // all consumable kinds bank back (0ps); fresh forage stales (e3j)
     ]),
     maps: [...(state.maps ?? []), ...(expedition.carriedMaps ?? [])], // carried map drops bank as held maps (8ec) — same fate as the carry in every run-end path incl. defeat's soft fail (D26)
     loadout: emptyLoadout(),

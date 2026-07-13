@@ -31,8 +31,8 @@ test("return: banks carry + durables + potions + uneaten food (D26, pqp), back t
     { defId: "silver-ore", qty: 4 },
     { defId: "iron-sword", qty: 1 },
     { defId: "pick", qty: 1 },
+    { defId: "ration", qty: 2 }, // uneaten food banks back (pqp); 0ps: consumables bank in registry order (food before potions)
     { defId: "potion", qty: 1 },
-    { defId: "ration", qty: 2 }, // uneaten food banks back (pqp)
   ]);
   expect(events).toHaveLength(1);
   expect(events[0]).toMatchObject({ type: "run-ended", reason: "returned" });

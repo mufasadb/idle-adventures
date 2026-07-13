@@ -3,7 +3,7 @@
 // so it never exceeds holdings. The bank is only debited at embark. There is no
 // unpack action — reduce a mis-planned consumable by embarking and re-planning.
 import type { ItemStack, Loadout, LoadoutSlot } from "./types";
-import { validForSlot } from "./catalog";
+import { validForSlot, CONSUMABLE_KEYS, consumableKeyForSlot } from "./catalog";
 import { carryCap, consumableSlots } from "./carry";
 
 // Add one unit of a consumable, merging into an existing same-defId stack
@@ -24,7 +24,7 @@ export type EquipSlot = (typeof EQUIP_SLOTS)[number];
 // exact set embark debits (D28) and mirrors what endExpedition banks back (D26,
 // minus food).
 export function reserveLoadout(loadout: Loadout): ItemStack[] {
-  const { equipment, food, potions } = loadout;
+  const { equipment } = loadout;
   const out: ItemStack[] = [];
   for (const piece of [equipment.weapon, equipment.helmet, equipment.chest, equipment.legs, equipment.boots, equipment.gloves]) {
     if (piece !== null) out.push({ defId: piece, qty: 1 });
@@ -33,12 +33,11 @@ export function reserveLoadout(loadout: Loadout): ItemStack[] {
   if (equipment.transport !== null) out.push({ defId: equipment.transport, qty: 1 });
   if (equipment.backpack !== null) out.push({ defId: equipment.backpack, qty: 1 });
   if (equipment.panniers !== null) out.push({ defId: equipment.panniers, qty: 1 });
-  for (const stack of food) out.push({ defId: stack.defId, qty: stack.qty });
-  for (const stack of potions) out.push({ defId: stack.defId, qty: stack.qty });
-  for (const stack of loadout.battleItems ?? []) out.push({ defId: stack.defId, qty: stack.qty });
-  for (const stack of loadout.enhancements ?? []) out.push({ defId: stack.defId, qty: stack.qty }); // weapon enhancements (D60)
-  for (const stack of loadout.spares ?? []) out.push({ defId: stack.defId, qty: stack.qty }); // spare gear (82r)
-  for (const stack of loadout.ammo ?? []) out.push({ defId: stack.defId, qty: stack.qty }); // arrows (D45)
+  // 0ps: every consumable kind's units reserve from the bank (food/potions/
+  // battle-items/spares/ammo/enhancements) — one loop over the registry.
+  for (const key of CONSUMABLE_KEYS) {
+    for (const stack of loadout[key] ?? []) out.push({ defId: stack.defId, qty: stack.qty });
+  }
   return out;
 }
 
@@ -93,18 +92,10 @@ export function packItem(
   // food-vs-loot commitment; a spare sword competes with those same slots.
   // Ammo (D45) packs the same way but consumableSlots counts it as
   // ceil(units/ARROW_STACK_CAP) — the one deep-stacking consumable.
-  const candidate: Loadout =
-    slot === "food"
-      ? { ...loadout, food: addConsumable(loadout.food, itemId) }
-      : slot === "potion"
-        ? { ...loadout, potions: addConsumable(loadout.potions, itemId) }
-        : slot === "spare"
-          ? { ...loadout, spares: addConsumable(loadout.spares ?? [], itemId) }
-          : slot === "ammo"
-            ? { ...loadout, ammo: addConsumable(loadout.ammo ?? [], itemId) }
-            : slot === "enhancement"
-              ? { ...loadout, enhancements: addConsumable(loadout.enhancements ?? [], itemId) }
-              : { ...loadout, battleItems: addConsumable(loadout.battleItems, itemId) };
+  // 0ps: the slot → which-list mapping is one registry lookup. validForSlot above
+  // guaranteed this is a real consumable slot, so the key is always defined.
+  const key = consumableKeyForSlot(slot)!;
+  const candidate: Loadout = { ...loadout, [key]: addConsumable(loadout[key] ?? [], itemId) };
   if (consumableSlots(candidate) > cap) return { ok: false, reason: "no-slot" };
   if (reservedQty(candidate, itemId) > bankQty(bank, itemId)) {
     return { ok: false, reason: "insufficient" };

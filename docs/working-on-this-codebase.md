@@ -17,6 +17,7 @@ All three green before every commit. Lint enforces the engine-purity boundary (n
 - **Items are `{defId, qty}`** — no per-instance state, ever. State transitions (freshness, etc.) are defId swaps at run boundaries.
 - **Rejected actions return the ORIGINAL state** plus an `action-rejected` event — no mutation leaks from partially-computed candidates.
 - **`legalActions` filters candidates through speculative `reduce` (D29)** — never encode legality rules anywhere but the reducer.
+- **New consumable category (0ps):** a new `ItemStack[]` list on `Loadout` = a `Loadout` field + a `CONSUMABLE_KINDS` row (`catalog.ts`) + a catalog list in `constants.ts`. The registry drives slot accounting / packing / banking; omitting the row is a compile error. The per-kind ACTION handler (eat/quaff/use-item/enhance) is still bespoke — the registry does not genericize consumption semantics.
 
 ## Harness invariants (tune levers, never these tests)
 
