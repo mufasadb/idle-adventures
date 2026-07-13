@@ -60,6 +60,15 @@ One click handler (`onTileClick`), three cases:
 3. Click **any other tile** → **append** it as a new waypoint; a fresh straight leg
    is drawn from the current end to it.
 
+**Self-crossing routes.** A route may cross itself (draw a cross/plus). A clicked
+tile can then appear at **multiple positions** along the walk order. Truncation
+snaps to the **earliest occurrence in walk order** (the first time the walk would be
+on that tile) — deterministic and least-surprising: you unwind back to the first
+visit. Cost is summed over tiles *as walked*, so a route that revisits a tile pays
+for it each time (correct — you walk it twice); the render must not double-highlight
+in a way that breaks, and the energy bar must **clamp** (see §3), never overflow its
+container when planned cost exceeds current energy.
+
 Worked example (user's): on (1,1), click (4,4), a rock blocks the leg — the line
 stays fully drawn, a red marker sits on the block tile, Walk is disabled. Click
 (2,2) (a tile the line passes through) → the route becomes (1,1)→(2,2), the blocked
@@ -71,7 +80,9 @@ remainder dropped; click onward to route around.
 - **Red marker** on every leg's `blockedAt` tile — the "this won't work" signal.
 - Waypoints get a distinct marker (numbered pip) so multi-leg plans read clearly.
 - The energy-bar keep/spend split (already implemented) reflects the **whole
-  planned route's** total cost.
+  planned route's** total cost, and **clamps** the spend segment to the bar width
+  when planned cost ≥ current energy (the `over` class flags it red) — a route that
+  costs far more than you have must not blow out the bar's layout.
 - **Walk ▶** is **disabled while any leg is blocked** (forces a clean plan rather
   than walking a partial prefix into a wall).
 - The final-tile affordances re-key off the **last waypoint** instead of a single
@@ -161,6 +172,11 @@ this spec does not build it.
 - **Auto-gather pause:** a walk over a node with a full bag pauses at that tile with
   route intact; over a node with room, gathers and continues; over a too-weak node,
   skips without stopping.
+- **Self-crossing route:** build a cross/plus route; truncation on the shared centre
+  tile snaps to the earliest walk-order occurrence (not the later leg); total cost
+  double-counts the revisited tile correctly; the energy-bar spend segment clamps to
+  the bar width when planned cost ≥ current energy (no layout overflow — the "bar
+  explosion" guard).
 - **Boundary test** (`test/boundary.test.ts`) still green — `line.ts` imports
   nothing from render/sim/web and uses no RNG/DOM/Date.
 - Quality gates: `bun test` + `bun run typecheck` + `bun run lint` green.
