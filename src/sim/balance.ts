@@ -27,7 +27,7 @@ import {
 import type { DmgType, NodeType, BiomeId } from "../data/constants";
 import type { ItemStack, Loadout } from "../engine/types";
 import { emptyLoadout } from "../engine/loadout";
-import { strikeExchange, battleBuff, mitigation } from "../engine/combat";
+import { strikeExchange, mitigation } from "../engine/combat";
 import { generateGrid, rollBiome } from "../engine/grid";
 import { costToReach } from "../engine/reach";
 
@@ -152,19 +152,18 @@ export type FightReport = {
   potionsUsed: number;
 };
 
-// Mirrors resolveCombat's composition exactly (buff consumed up front, autoQuaff
-// on) but records every round. The equivalence is pinned by test.
+// Mirrors resolveCombat's composition exactly (autoQuaff on, no auto battle-item
+// buff — yoo) but records every round. The equivalence is pinned by test.
 export function simFight(loadout: Loadout, monsterId: string): FightReport {
   known(monsterId, MONSTERS, "monster");
   const monster = MONSTERS[monsterId]!;
-  const buff = battleBuff(loadout.battleItems ?? []);
   let hp = PLAYER_BASE_HP;
   let monsterHp = MONSTER_TIER_HP_CURVE[monster.tier]!;
   let potions = loadout.potions;
   let potionsUsed = 0;
   const rounds: FightRound[] = [];
   for (let round = 1; ; round++) {
-    const r = strikeExchange({ ...loadout, potions }, hp, monsterHp, monsterId, buff.damageAdd, buff.mitigationAdd, true);
+    const r = strikeExchange({ ...loadout, potions }, hp, monsterHp, monsterId, 0, 0, true);
     rounds.push({ round, dmgDealt: round1(r.dmgDealt), dmgTaken: round1(r.dmgTaken), monsterHp: round1(r.monsterHp), hp: round1(r.hp), quaffed: r.potionsUsed > 0 });
     hp = r.hp;
     monsterHp = r.monsterHp;

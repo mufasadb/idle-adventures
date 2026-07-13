@@ -33,11 +33,12 @@ export type CombatResult = {
   hpLost: number;
   potionsUsed: number;
   potionsAfter: ItemStack[];
-  battleItemsAfter: ItemStack[]; // battle items are all consumed at fight start (bzd) → []
 };
 
-// Sum the packed battle-item buffs (bzd). All are consumed at fight start, so
-// their damageAdd/mitigationAdd apply to THIS fight and nothing banks back.
+// Sum the packed battle-item buffs (bzd). Kept as the canonical buff-value helper
+// (COMBAT_BUFF summing) — harness callers that want to model a fully-buffed fight
+// pass battleBuff(kit.battleItems) into resolveCombat's damageAdd/mitigationAdd
+// (yoo: resolveCombat no longer applies these automatically — see its header).
 export function battleBuff(battleItems: ItemStack[]): { damageAdd: number; mitigationAdd: number } {
   let damageAdd = 0;
   let mitigationAdd = 0;
@@ -281,16 +282,22 @@ export function strikeExchange(
 // Atomic combat (sim/harness API). Reads Expedition.weaponBuff at fight start (D60)
 // and models it strike-by-strike EXACTLY as the interactive fight does — charges
 // spent per strike, poison ticking each round — so atomic == interactive.
-// No weaponBuff = today's behaviour byte-identical (the balance harness passes un-edited).
+//
+// yoo: battle-item buffs are NO LONGER auto-applied. The interactive game (90j)
+// starts engagements at damageAdd/mitigationAdd 0 and only buffs when the player
+// spends a battle item mid-fight via use-item — auto-buffing every strike modelled
+// a stronger player than the game delivers. Callers that WANT to model a buffed
+// fight pass damageAdd/mitigationAdd explicitly (e.g. battleBuff(kit.battleItems)).
 export function resolveCombat(
   loadout: Loadout,
   hp: number,
   monsterId: string,
   weaponBuff?: { id: string; charges: number },
+  damageAdd = 0,
+  mitigationAdd = 0,
 ): CombatResult {
   const monster = MONSTERS[monsterId];
   if (!monster) throw new Error(`unknown monster: ${monsterId}`);
-  const buff = battleBuff(loadout.battleItems ?? []);
   let current = hp;
   let monsterHp = MONSTER_TIER_HP_CURVE[monster.tier]!;
   let potions = loadout.potions;
@@ -302,7 +309,7 @@ export function resolveCombat(
   for (;;) {
     const round = strikeExchange(
       { ...loadout, potions }, current, monsterHp, monsterId,
-      buff.damageAdd, buff.mitigationAdd, true, false, coating, poison,
+      damageAdd, mitigationAdd, true, false, coating, poison,
     );
     current = round.hp;
     monsterHp = round.monsterHp;
@@ -317,7 +324,6 @@ export function resolveCombat(
         hpLost: hp - current,
         potionsUsed,
         potionsAfter: potions,
-        battleItemsAfter: [],
       };
     }
   }

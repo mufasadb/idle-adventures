@@ -153,26 +153,24 @@ test("resolveCombat: pure and deterministic", () => {
   expect(a).toEqual(resolveCombat(loadout, PLAYER_BASE_HP, "frost-fae"));
 });
 
-test("battle items (bzd): elixir adds damage, warding adds mitigation, both consumed", () => {
-  // A survivable fight so the buff's effect on HP lost shows. si7.1: bare-kit
-  // sword vs werewolf (tier 2) no longer survives under the steepened curves
-  // (4 retaliations × 8 dmg = 32 > 30 HP) — forest-boar (tier 1, neutral
-  // matchup) is the bare-kit-survivable fight the old werewolf case relied on.
+test("resolveCombat: explicit damageAdd/mitigationAdd buff a fight; battle items do NOT auto-apply (yoo)", () => {
+  // A survivable fight so a buff's effect on HP lost shows. si7.1: bare-kit sword
+  // vs werewolf (tier 2) no longer survives under the steepened curves — forest-
+  // boar (tier 1, neutral) is the bare-kit-survivable case.
   const plain = resolveCombat(armed("sword"), PLAYER_BASE_HP, "forest-boar");
   expect(plain.victory).toBe(true);
-  // elixir-of-power (+2 dmg) ends the fight sooner → less HP lost
-  const withElixir = armed("sword");
-  withElixir.battleItems = [{ defId: "elixir-of-power", qty: 1 }];
-  const elixir = resolveCombat(withElixir, PLAYER_BASE_HP, "forest-boar");
-  expect(elixir.hpLost).toBeLessThan(plain.hpLost);
-  // warding-draught (+3 mitigation) softens every incoming hit → less HP lost
-  const withWard = armed("sword");
-  withWard.battleItems = [{ defId: "warding-draught", qty: 1 }];
-  const ward = resolveCombat(withWard, PLAYER_BASE_HP, "forest-boar");
-  expect(ward.hpLost).toBeLessThan(plain.hpLost);
-  // consumed at fight start — nothing carries over
-  expect(elixir.battleItemsAfter).toEqual([]);
-  expect(ward.battleItemsAfter).toEqual([]);
+  // Explicit damageAdd (+2, an elixir's worth) ends the fight sooner → less HP lost.
+  const dmg = resolveCombat(armed("sword"), PLAYER_BASE_HP, "forest-boar", undefined, 2, 0);
+  expect(dmg.hpLost).toBeLessThan(plain.hpLost);
+  // Explicit mitigationAdd (+3, a warding-draught's worth) softens every hit → less HP lost.
+  const mit = resolveCombat(armed("sword"), PLAYER_BASE_HP, "forest-boar", undefined, 0, 3);
+  expect(mit.hpLost).toBeLessThan(plain.hpLost);
+  // yoo: packing battle items no longer auto-buffs the atomic fight — the
+  // interactive game buffs only when use-item is spent mid-fight (90j). A kit that
+  // merely CARRIES an elixir fights identically to one that doesn't.
+  const carriesElixir = armed("sword");
+  carriesElixir.battleItems = [{ defId: "elixir-of-power", qty: 1 }];
+  expect(resolveCombat(carriesElixir, PLAYER_BASE_HP, "forest-boar")).toEqual(plain);
 });
 
 test("tier curves: bigger tiers are tougher (sanity)", () => {
