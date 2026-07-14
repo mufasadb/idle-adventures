@@ -30,6 +30,19 @@ export const VISION_RANGE_BONUS: Record<string, number> = { spyglass: 3 }; // sp
 export const CANDIDATE_MAP_COUNT = 3; // town map choices (spec §11)
 export const PREVIEW_FIDELITY = 0; // how much a preview reveals (placeholder — M5)
 
+// Fresh-game starter bank (e96): the kit a new game begins with — a tunable lever,
+// not a literal buried in town.ts. Modest + functional: enough to run a real first
+// expedition. You start with NO backpack (bare BASE_CARRY_SLOTS); the ration stack
+// is exactly one STACK_CAP while you bootstrap the food loop.
+export const STARTER_BANK: { defId: string; qty: number }[] = [
+  { defId: "pick", qty: 1 },
+  { defId: "axe", qty: 1 },
+  { defId: "knife", qty: 1 },
+  { defId: "sword", qty: 1 },
+  { defId: "ration", qty: 5 },
+  { defId: "potion", qty: 2 },
+];
+
 // Terrain vocabulary. Array order = elevation band order for noise→terrain
 // mapping (river lowest … mountain highest) — reordering it reshapes maps.
 export const TERRAINS = ["river", "mud", "plains", "ice", "mountain"] as const;

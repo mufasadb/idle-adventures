@@ -7,7 +7,7 @@ import type { BiomeId } from "../data/constants";
 import type { Grid } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { rollBiome, generateGrid } from "./grid";
-import { CANDIDATE_MAP_COUNT, PREVIEW_FIDELITY, EPITHETS, MONSTERS } from "../data/constants";
+import { CANDIDATE_MAP_COUNT, PREVIEW_FIDELITY, EPITHETS, MONSTERS, STARTER_BANK } from "../data/constants";
 
 // Modest, functional starter kit: enough to run a real first expedition. You
 // start with NO backpack (bare BASE_CARRY_SLOTS) — the "starter" pack is your
@@ -16,14 +16,7 @@ export function newGame(seed: string): GameState {
   return {
     seed,
     phase: "town",
-    bank: [
-      { defId: "pick", qty: 1 },
-      { defId: "axe", qty: 1 },
-      { defId: "knife", qty: 1 },
-      { defId: "sword", qty: 1 },
-      { defId: "ration", qty: 5 }, // exactly one stack (STACK_CAP) — 1 slot, ~a run's buffer while you bootstrap the food loop
-      { defId: "potion", qty: 2 },
-    ],
+    bank: STARTER_BANK.map((s) => ({ ...s })), // clone the lever so run-state never mutates it (e96)
     loadout: emptyLoadout(),
     expedition: null,
     runs: 0,

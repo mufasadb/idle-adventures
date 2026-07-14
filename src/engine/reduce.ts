@@ -1021,10 +1021,11 @@ function doff(state: GameState, itemId: string): { state: GameState; events: Gam
   return { state: { ...state, expedition: nextExp }, events: [doffed] };
 }
 
-// Restore-per-food multiplier for this loadout: a tent (durable "camp" tool)
-// stretches each ration (dtv). NODE_TOOL never asks for "camp", so no gather impact.
+// Restore-per-food multiplier for this loadout: a "camp" tool (a tent) stretches
+// each ration (dtv). Checks the CAPABILITY, not a defId — any camp-capable tool
+// (future tiered tents) counts, keeping the tool a data-only addition (e96).
 function tentMultOf(expedition: Expedition): number {
-  return expedition.loadout.equipment.tools.includes("tent") ? TENT_FOOD_MULTIPLIER : 1;
+  return toolQualityFor(expedition.loadout.equipment.tools, "camp") !== null ? TENT_FOOD_MULTIPLIER : 1;
 }
 
 // Sum of ENERGY_CAP_BONUS over equipped tools (si7.2): the flat maxEnergy raise

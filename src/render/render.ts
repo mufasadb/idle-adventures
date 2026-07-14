@@ -19,7 +19,11 @@ const HIDE_FLAVOR: Record<ArmourType, string> = {
   light: "a lean, quick frame",
   robe: "a soft, unarmoured shape",
 };
-const SIZE_FLAVOR = ["", "a small", "a fair-sized", "a large", "a towering"]; // by tier 1-4
+// Monster size flavor keyed by tier (e96: was a positional array whose index-0 ""
+// was a landmine — a defined empty string that `?? "a"` never replaced, so a tier-0
+// creature rendered as " creature". A tier→flavor map has no hole; any tier outside
+// 1-4 falls through to the "a" default.)
+const SIZE_FLAVOR: Record<number, string> = { 1: "a small", 2: "a fair-sized", 3: "a large", 4: "a towering" };
 
 // Weapon-class mechanical hint (57l, playtest v3): ONE clause saying what a
 // weapon class DOES — all three blind agents abandoned the bow line because
