@@ -1,6 +1,3 @@
-import type { GameState } from "../engine/types";
-import { expeditionGrid } from "../engine/grid";
-import type { Grid } from "../engine/grid";
 import { WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_QUALITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_TIER, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER } from "../data/constants";
 import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType } from "../data/constants";
 import type { PoiDetail } from "../engine/perceive";
@@ -239,47 +236,8 @@ export const POI_CHAR: Record<NodeType, string> = {
   monster: "X",
 };
 
+// TERRAIN_CHAR / POI_CHAR / PLAYER_CHAR are the shared tile glyphs; the web
+// (main.ts) and headless console (playtest.ts) each draw their own grid from them.
+// (1z7: the three render.ts grid drawers — render/renderGridText/renderGridHtml —
+// were used by zero shipped surfaces and are gone; the glyph maps stay.)
 export const PLAYER_CHAR = "@";
-
-export function render(state: GameState): string {
-  if (!state.expedition) return "(town)";
-  const { pos } = state.expedition;
-  const grid = expeditionGrid(state.expedition);
-  return renderGridText(grid, pos);
-}
-
-export function renderGridText(grid: Grid, pos?: { x: number; y: number }): string {
-  const poiAt = new Map(grid.pois.map((p) => [`${p.x},${p.y}`, p.kind]));
-  return grid.terrain
-    .map((row, y) =>
-      row
-        .map((terrain, x) => {
-          if (pos && pos.x === x && pos.y === y) return PLAYER_CHAR;
-          const kind = poiAt.get(`${x},${y}`);
-          return kind ? POI_CHAR[kind] : TERRAIN_CHAR[terrain];
-        })
-        .join(""),
-    )
-    .join("\n");
-}
-
-// HTML twin of renderGridText: same tile walk, CSS classes instead of chars.
-// Styling lives in the web page; this stays a pure string serialization.
-export function renderGridHtml(grid: Grid, pos?: { x: number; y: number }): string {
-  const poiAt = new Map(grid.pois.map((p) => [`${p.x},${p.y}`, p.kind]));
-  const cols = grid.terrain[0]?.length ?? 0;
-  const tiles = grid.terrain
-    .map((row, y) =>
-      row
-        .map((terrain, x) => {
-          const kind = poiAt.get(`${x},${y}`);
-          const isPlayer = pos !== undefined && pos.x === x && pos.y === y;
-          const classes = `tile terrain-${terrain}${kind ? ` poi poi-${kind}` : ""}${isPlayer ? " player" : ""}`;
-          const char = isPlayer ? PLAYER_CHAR : kind ? POI_CHAR[kind] : TERRAIN_CHAR[terrain];
-          return `<div class="${classes}">${char}</div>`;
-        })
-        .join(""),
-    )
-    .join("");
-  return `<div class="grid" style="display: grid; grid-template-columns: repeat(${cols}, 1.5rem);">${tiles}</div>`;
-}
