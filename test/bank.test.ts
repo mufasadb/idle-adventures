@@ -27,7 +27,7 @@ test("endExpedition: banks carry + durables + potions + uneaten food (D26, pqp)"
   loadout.equipment.chest = "plate-chest";
   loadout.equipment.tools = ["pick", "spyglass"];
   loadout.equipment.transport = "horse";
-  loadout.equipment.backpack = "starter";
+  loadout.equipment.backpack = "small-backpack";
   loadout.food = [{ defId: "bread", qty: 2 }]; // uneaten — banks back (pqp)
   loadout.potions = [{ defId: "healing-potion", qty: 1 }];
   const state: GameState = {
@@ -56,7 +56,7 @@ test("endExpedition: banks carry + durables + potions + uneaten food (D26, pqp)"
     { defId: "pick", qty: 1 },
     { defId: "spyglass", qty: 1 },
     { defId: "horse", qty: 1 },
-    { defId: "starter", qty: 1 },
+    { defId: "small-backpack", qty: 1 },
     { defId: "bread", qty: 2 }, // uneaten food banks back (pqp); 0ps: consumables bank in registry order (food before potions)
     { defId: "healing-potion", qty: 1 },
   ]);

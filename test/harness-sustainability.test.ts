@@ -30,7 +30,7 @@ const FOOD_MATS = Object.keys(RATION_RECIPE);
 // and as many rations as the herbs allow.
 function oneRun(s: GameState, mapSeed: string): GameState {
   if (qtyOf(s, "leather") > 0) s = reduce(s, { type: "pack", slot: "backpack", itemId: "leather" }).state;
-  else if (qtyOf(s, "starter") > 0) s = reduce(s, { type: "pack", slot: "backpack", itemId: "starter" }).state;
+  else if (qtyOf(s, "small-backpack") > 0) s = reduce(s, { type: "pack", slot: "backpack", itemId: "small-backpack" }).state;
   if (qtyOf(s, "knife") > 0) s = reduce(s, { type: "pack", slot: "tool", itemId: "knife" }).state;
   const packN = Math.min(qtyOf(s, "ration"), STACK_CAP); // one stack → one slot, keep room to gather
   for (let i = 0; i < packN; i++) s = reduce(s, { type: "pack", slot: "food", itemId: "ration" }).state;
@@ -79,8 +79,8 @@ function oneRun(s: GameState, mapSeed: string): GameState {
 
   // bootstrap a backpack once (reserves one deer-hide), then convert every other
   // food material — foraged herbs AND hunted hides — into rations.
-  if (qtyOf(s, "starter") === 0 && qtyOf(s, "leather") === 0 && qtyOf(s, "deer-hide") >= 1) {
-    const r = reduce(s, { type: "craft", recipeId: "starter" }); if (!r.events.some((e) => e.type === "action-rejected")) s = r.state;
+  if (qtyOf(s, "small-backpack") === 0 && qtyOf(s, "leather") === 0 && qtyOf(s, "deer-hide") >= 1) {
+    const r = reduce(s, { type: "craft", recipeId: "small-backpack" }); if (!r.events.some((e) => e.type === "action-rejected")) s = r.state;
   }
   for (const mat of FOOD_MATS) {
     while (accepts(s, { type: "craft", recipeId: RATION_RECIPE[mat]! })) {
@@ -126,5 +126,5 @@ test("sustainability: a biome-diverse rotation sustains AND bootstraps a backpac
   let s = newGame("rot");
   for (let i = 0; i < 10; i++) s = sustainingRun(s, "rot"); // any biome the offer gives
   expect(qtyOf(s, "ration")).toBeGreaterThan(0);
-  expect(qtyOf(s, "starter") + qtyOf(s, "leather")).toBeGreaterThan(0); // earned a pack from the haul
+  expect(qtyOf(s, "small-backpack") + qtyOf(s, "leather")).toBeGreaterThan(0); // earned a pack from the haul
 });

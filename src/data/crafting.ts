@@ -80,9 +80,9 @@ export const RECIPE: Record<
   "ice-cleats": { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "wolf-pelt", qty: 1 }], output: { defId: "ice-cleats", qty: 1 } }, // glide on ice (20 → 5)
   tent: { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "pine-log", qty: 2 }], output: { defId: "tent", qty: 1 } }, // camp gear (dtv): food restores +50% energy
   canteen: { inputs: [{ defId: "copper-ore", qty: 2 }, { defId: "deer-hide", qty: 1 }], output: { defId: "canteen", qty: 1 } }, // provision gear (si7.2): +maxEnergy; a copper sink
-  // Backpack — carry upgrades. `starter` is your FIRST pack (you start bare):
-  // cheap, one hunt's worth of hide. Then leather (5), large-pack (7, T2).
-  starter: { inputs: [{ defId: "deer-hide", qty: 1 }], output: { defId: "starter", qty: 1 } },
+  // Backpack — carry upgrades. `small-backpack` is your FIRST pack (you start
+  // bare): cheap, one hunt's worth of hide. Then leather (5), large-pack (7, T2).
+  "small-backpack": { inputs: [{ defId: "deer-hide", qty: 1 }], output: { defId: "small-backpack", qty: 1 } },
   leather: { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "leather", qty: 1 } },
   "large-pack": { inputs: [{ defId: "drake-hide", qty: 2 }, { defId: "ironwood-log", qty: 1 }], output: { defId: "large-pack", qty: 1 } },
   // Transport

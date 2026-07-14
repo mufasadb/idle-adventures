@@ -39,7 +39,7 @@ test("e3j report: starter-kit harvest fraction", () => {
   const c = candidateMaps("rf", 0)[0]!;
   let state: GameState = newGame("rf");
   const act = (a: Action) => reduce(state, a);
-  // Affordable kit: a fresh bank has no "starter" backpack yet (that's a
+  // Affordable kit: a fresh bank has no small-backpack yet (that's a
   // craft output — see town.ts), so pack only what the bare BASE_CARRY_SLOTS
   // bag fits: pick + knife tools, 2 ration food (4/6 slots). Assert each pack
   // actually lands so an unaffordable/oversized kit can't silently regress

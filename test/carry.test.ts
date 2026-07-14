@@ -5,7 +5,7 @@ import { emptyLoadout } from "../src/engine/loadout";
 
 test("slotCap: no backpack gives base slots; backpack defines the cap", () => {
   expect(slotCap(null)).toBe(BASE_CARRY_SLOTS);
-  expect(slotCap("starter")).toBe(BACKPACK_SLOTS.starter!);
+  expect(slotCap("small-backpack")).toBe(BACKPACK_SLOTS["small-backpack"]!);
   expect(slotCap("unknown-pack")).toBe(BASE_CARRY_SLOTS);
 });
 
@@ -32,7 +32,7 @@ test("carryCap: carry sources stack — backpack + transport + panniers (zhn)", 
 test("carry squeeze: bare 6 → starter 8 → leather 12 → large-pack 16, STACK_CAP firm (pqp)", () => {
   expect(STACK_CAP).toBe(5); // loot stacks; consumables are 1 unit/slot (pqp)
   expect(BASE_CARRY_SLOTS).toBe(6); // bare opening is playable: a tool + a little food + some loot
-  expect(slotCap("starter")).toBe(8);
+  expect(slotCap("small-backpack")).toBe(8);
   expect(slotCap("leather")).toBe(12);
   expect(slotCap("large-pack")).toBe(16);
 });
@@ -70,9 +70,9 @@ test("addToCarry: zero free stacks still allows a pure merge", () => {
 test("freeCarryStacks: consumable units + tools each take a slot (pqp)", () => {
   const loadout = emptyLoadout();
   expect(freeCarryStacks(loadout)).toBe(BASE_CARRY_SLOTS);
-  loadout.equipment.backpack = "starter";
+  loadout.equipment.backpack = "small-backpack";
   loadout.food = [{ defId: "bread", qty: 3 }]; // 3 units → 3 slots (no stacking)
   loadout.potions = [{ defId: "healing-potion", qty: 2 }]; // 2 units → 2 slots
   loadout.equipment.tools = ["pick"]; // tools cost a slot too
-  expect(freeCarryStacks(loadout)).toBe(BACKPACK_SLOTS.starter! - 3 - 2 - 1);
+  expect(freeCarryStacks(loadout)).toBe(BACKPACK_SLOTS["small-backpack"]! - 3 - 2 - 1);
 });

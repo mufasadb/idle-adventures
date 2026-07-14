@@ -34,7 +34,7 @@ function runLoop(seed: string, mapSeed: string, runs: number): { state: GameStat
   pack({ type: "pack", slot: "tool", itemId: "pick" });
   pack({ type: "pack", slot: "tool", itemId: "axe" });
   pack({ type: "pack", slot: "tool", itemId: "knife" });
-  pack({ type: "pack", slot: "backpack", itemId: "starter" });
+  pack({ type: "pack", slot: "backpack", itemId: "small-backpack" });
   for (let i = 0; i < 4; i++) pack({ type: "pack", slot: "food", itemId: "ration" }); // 40 energy
   state = reduce(state, { type: "embark", mapSeed }).state;
   expect(state.phase).toBe("expedition");
@@ -100,7 +100,7 @@ test("harness: a JSON action stream drives a full loop on two different biomes",
     }
   }
   expect(done.size).toBe(2); // two biomes drove a full gather loop
-  const starter = new Set(["starter", "pick", "axe", "knife", "sword", "ration", "potion"]);
+  const starter = new Set(["small-backpack", "pick", "axe", "knife", "sword", "ration", "potion"]);
   for (const { state, gathered } of done.values()) {
     expect(state.phase).toBe("town");
     expect(gathered).toBe(true);

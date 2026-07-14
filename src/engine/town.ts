@@ -10,7 +10,7 @@ import { rollBiome, generateGrid } from "./grid";
 import { CANDIDATE_MAP_COUNT, PREVIEW_FIDELITY, EPITHETS, MONSTERS, STARTER_BANK } from "../data/constants";
 
 // Modest, functional starter kit: enough to run a real first expedition. You
-// start with NO backpack (bare BASE_CARRY_SLOTS) — the "starter" pack is your
+// start with NO backpack (bare BASE_CARRY_SLOTS) — the small-backpack is your
 // first craftable upgrade. Everything else comes from crafting the haul.
 export function newGame(seed: string): GameState {
   return {

@@ -278,7 +278,7 @@ export const PANNIERS_SLOTS: Record<string, number> = {
 // the food↔loot squeeze live. Loot still compresses (STACK_CAP), consumables don't.
 export const BASE_CARRY_SLOTS = 6; // slots with NO backpack (bare) — a minimal run: a tool + a little food + some loot
 export const BACKPACK_SLOTS: Record<string, number> = {
-  starter: 8, // your first craftable pack
+  "small-backpack": 8, // your first craftable pack
   leather: 12,
   "large-pack": 16, // top tier
 }; // TOTAL inventory slots by backpack defId (replaces the base, not added to it)

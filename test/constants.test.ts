@@ -44,7 +44,7 @@ test("constants: lever groups exist with the documented shape", () => {
   expect(typeof MAP_WIDTH).toBe("number");
   expect(typeof MAP_HEIGHT).toBe("number");
   expect(TERRAIN_COST).toHaveProperty("ice");
-  expect(BACKPACK_SLOTS).toHaveProperty("starter");
+  expect(BACKPACK_SLOTS).toHaveProperty("small-backpack");
 });
 
 test("constants: M1 map levers are filled", () => {
@@ -95,7 +95,7 @@ test("constants: M2 energy levers are filled", () => {
 
 test("constants: M3 carry + gathering levers are filled", () => {
   expect(BASE_CARRY_SLOTS).toBeGreaterThan(0);
-  expect(BACKPACK_SLOTS.starter).toBeGreaterThan(BASE_CARRY_SLOTS);
+  expect(BACKPACK_SLOTS["small-backpack"]).toBeGreaterThan(BASE_CARRY_SLOTS);
   expect(STACK_CAP).toBeGreaterThan(0);
   expect(NODE_TOOL.mining).toBe("pick"); // bead acceptance hinges on this gate
   expect(NODE_TOOL.herb).toBeNull(); // herbs gather bare-handed

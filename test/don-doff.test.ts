@@ -107,14 +107,14 @@ test("doffing the backpack is rejected when the smaller kit can't hold the bag",
   // starter pack = 8 slots; bare = BASE_CARRY_SLOTS (6). 7 loot stacks + the
   // doffed pack itself (8) exceed the bare cap → carry-full, state untouched.
   const loot = Array.from({ length: 7 }, (_, i) => ({ defId: `ore-${i}`, qty: 1 }));
-  const s = onMap({ backpack: "starter", carry: loot });
-  const { state, events } = reduce(s, { type: "doff", itemId: "starter" });
+  const s = onMap({ backpack: "small-backpack", carry: loot });
+  const { state, events } = reduce(s, { type: "doff", itemId: "small-backpack" });
   expect(events[0]).toMatchObject({ type: "action-rejected", reason: "carry-full" });
   expect(state).toBe(s); // rejected actions return the ORIGINAL state
   // With a light bag it fits: 3 stacks + the pack = 4 ≤ 6 bare slots.
-  const light = onMap({ backpack: "starter", carry: loot.slice(0, 3) });
-  const ok = reduce(light, { type: "doff", itemId: "starter" });
-  expect(ok.events[0]).toMatchObject({ type: "doffed", defId: "starter", slot: "backpack" });
+  const light = onMap({ backpack: "small-backpack", carry: loot.slice(0, 3) });
+  const ok = reduce(light, { type: "doff", itemId: "small-backpack" });
+  expect(ok.events[0]).toMatchObject({ type: "doffed", defId: "small-backpack", slot: "backpack" });
   expect(ok.state.expedition!.carry).toHaveLength(4);
 });
 

@@ -8,7 +8,7 @@ test("newGame: a town state with a functional starter bank", () => {
   expect(g.phase).toBe("town");
   expect(g.expedition).toBeNull();
   const has = (d: string) => g.bank.some((s) => s.defId === d && s.qty > 0);
-  expect(has("starter")).toBe(false); // you start WITHOUT a backpack — it's the first craft
+  expect(has("small-backpack")).toBe(false); // you start WITHOUT a backpack — it's the first craft
   expect(has("pick")).toBe(true);
   expect(has("ration")).toBe(true); // enough to embark with energy
 });

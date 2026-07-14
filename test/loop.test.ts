@@ -30,7 +30,7 @@ test("loop: crafting iron-pick makes the second run's mining measurably cheaper 
   // --- Run 1: basic pick ---
   let state = newGame("loop");
   state = reduce(state, { type: "pack", slot: "tool", itemId: "pick" }).state;
-  state = reduce(state, { type: "pack", slot: "backpack", itemId: "starter" }).state;
+  state = reduce(state, { type: "pack", slot: "backpack", itemId: "small-backpack" }).state;
   state = reduce(state, { type: "pack", slot: "food", itemId: "ration" }).state;
   state = reduce(state, { type: "pack", slot: "food", itemId: "ration" }).state;
   state = reduce(state, { type: "embark", mapSeed: candidateMaps("loop", state.runs ?? 0)[0]!.mapSeed }).state;
@@ -54,7 +54,7 @@ test("loop: crafting iron-pick makes the second run's mining measurably cheaper 
 
   // --- Run 2: iron-pick (quality 2) ---
   state = reduce(state, { type: "pack", slot: "tool", itemId: "iron-pick" }).state;
-  state = reduce(state, { type: "pack", slot: "backpack", itemId: "starter" }).state;
+  state = reduce(state, { type: "pack", slot: "backpack", itemId: "small-backpack" }).state;
   state = reduce(state, { type: "pack", slot: "food", itemId: "ration" }).state;
   state = reduce(state, { type: "pack", slot: "food", itemId: "ration" }).state;
   state = reduce(state, { type: "embark", mapSeed: candidateMaps("loop", state.runs ?? 0)[0]!.mapSeed }).state;

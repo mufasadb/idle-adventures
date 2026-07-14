@@ -66,5 +66,5 @@ test("move: transport is terrain-specific — wagon wins on ice, horse wins on o
 test("backpack: large-pack (16) tops the leather (12) / starter (8) ladder", () => {
   expect(slotCap("large-pack")).toBe(16);
   expect(slotCap("large-pack")).toBeGreaterThan(slotCap("leather"));
-  expect(slotCap("leather")).toBeGreaterThan(slotCap("starter"));
+  expect(slotCap("leather")).toBeGreaterThan(slotCap("small-backpack"));
 });

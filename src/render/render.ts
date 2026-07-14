@@ -12,9 +12,10 @@ import type { Loadout, RejectionReason } from "../engine/types";
 // any surface (the web today, a real UI later) can format. The web-only HTML builders
 // (recipe-book rows, held-map card) stay in main.ts until a second UI actually exists.
 
-// Display names for defIds whose title-cased id reads wrong ("starter" → not a
-// fire-starter). Everything else title-cases its kebab defId.
-const DISPLAY_NAMES: Record<string, string> = { starter: "Starter Backpack", leather: "Leather Backpack", "large-pack": "Large Pack" };
+// Display names for defIds whose title-cased id reads wrong ("leather" alone →
+// which leather?). Everything else title-cases its kebab defId — e.g.
+// "small-backpack" → "Small Backpack" (m3o renamed it from the ambiguous "starter").
+const DISPLAY_NAMES: Record<string, string> = { leather: "Leather Backpack", "large-pack": "Large Pack" };
 export function name(defId: string): string {
   if (DISPLAY_NAMES[defId]) return DISPLAY_NAMES[defId]!;
   return defId.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
