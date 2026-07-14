@@ -58,7 +58,7 @@ test("frost-hatchling drops a map-scroll (the wyrm herald)", () => {
 test("mid-game recipes craft from their inputs", () => {
   const a = craft([{ defId: "rich-venison", qty: 1 }, { defId: "salt", qty: 1 }], "smoked-venison", ["smokehouse"]); // ke3.5: now gated behind the smokehouse station
   expect(a.state.bank.find((x) => x.defId === "smoked-venison")?.qty).toBe(1);
-  const b = craft([{ defId: "seal-blubber", qty: 1 }, { defId: "ice-moss", qty: 1 }], "blubber-stew");
+  const b = craft([{ defId: "seal", qty: 1 }, { defId: "ice-moss", qty: 1 }], "blubber-stew"); // 7pi: seal is the real tundra animal gather (BIOMES.tundra.materialTable.animal.seal), not a phantom seal-blubber
   expect(b.state.bank.find((x) => x.defId === "blubber-stew")?.qty).toBe(1);
   const c = craft([{ defId: "bruised-apple", qty: 3 }], "apple-jam");
   expect(c.state.bank.find((x) => x.defId === "jam")?.qty).toBe(1);

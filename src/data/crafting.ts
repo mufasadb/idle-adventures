@@ -191,7 +191,7 @@ export const RECIPE: Record<
   "warding-draught": { inputs: [{ defId: "troll-hide", qty: 2 }], output: { defId: "warding-draught", qty: 1 } }, // +3 mitigation, one fight
   // m0a: mid-game tier foods — dense reserves that reward routing cross-biome materials
   "smoked-venison": { inputs: [{ defId: "rich-venison", qty: 1 }, { defId: "salt", qty: 1 }], output: { defId: "smoked-venison", qty: 1 }, requires: { station: "smokehouse" } }, // m0a food, now gated behind the smokehouse station (ke3.5): the deep home-cured version (200) vs the field roast (cooked-venison, 150)
-  "blubber-stew": { inputs: [{ defId: "seal-blubber", qty: 1 }, { defId: "ice-moss", qty: 1 }], output: { defId: "blubber-stew", qty: 1 } }, // m0a: tundra tier-food
+  "blubber-stew": { inputs: [{ defId: "seal", qty: 1 }, { defId: "ice-moss", qty: 1 }], output: { defId: "blubber-stew", qty: 1 } }, // m0a: tundra tier-food (7pi: raw seal, matching other biome tier-foods that consume the gather directly)
   "apple-jam": { inputs: [{ defId: "bruised-apple", qty: 3 }], output: { defId: "jam", qty: 1 } }, // m0a: staled orchard fruit → jam (mirrors stale-berries→jam)
   "elixir-of-power-thistle": { inputs: [{ defId: "thistle", qty: 2 }, { defId: "djinn-ember", qty: 1 }], output: { defId: "elixir-of-power", qty: 1 } }, // m0a: breaks the vampire-only gate on the battle-item line
   // Boss capstone (D34)
