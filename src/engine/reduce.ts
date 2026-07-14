@@ -16,7 +16,6 @@ import { slotOf, isGear } from "./catalog";
 import { candidateMaps, previewHints } from "./town";
 import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, POTION, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, INKS, RECIPE, WEAPON_ENHANCEMENT } from "../data/constants";
 import { visionRadius } from "./perceive";
-import type { GatherableNodeType } from "../data/constants";
 
 // Pure reducer. M2 fills embark/move; M3 fills gather/drop; M4 fills fight; remaining cases are no-op stubs:
 //   craft/pack/return             → M5
@@ -384,7 +383,7 @@ function gather(state: GameState): { state: GameState; events: GameEvent[] } {
   if (poi.kind === "monster" || poi.material === null) {
     return rejected(state, "gather", "not-gatherable");
   }
-  const kind = poi.kind as GatherableNodeType;
+  const kind = poi.kind; // narrowed to GatherableNodeType by the guard above (1gp: no cast)
   const quality = toolQualityFor(expedition.loadout.equipment.tools, NODE_TOOL[kind]);
   if (quality === null) return rejected(state, "gather", "missing-tool");
   // Tier gate (2026-07-04): a tool's quality doubles as its tier. A material

@@ -2,7 +2,6 @@
 // tool defIds map to capabilities via TOOL_CAPABILITY, so tiered tools
 // (M5: "iron-pick") are pure data additions.
 import { TOOL_CAPABILITY, TOOL_QUALITY, NODE_TOOL, NODE_HARDNESS, MATERIAL_TIER } from "../data/constants";
-import type { GatherableNodeType } from "../data/constants";
 import type { Poi } from "./grid";
 
 // Best equipped quality for a capability. null capability = bare hands
@@ -30,7 +29,7 @@ export function toolQualityFor(
 // tier) is below the material's tier. cost = NODE_HARDNESS[kind] / quality.
 export function gatherCost(poi: Poi, tools: string[]): number | null {
   if (poi.kind === "monster" || poi.material === null) return null;
-  const kind = poi.kind as GatherableNodeType;
+  const kind = poi.kind; // narrowed to GatherableNodeType by the guard above (1gp: no cast)
   const quality = toolQualityFor(tools, NODE_TOOL[kind]);
   if (quality === null) return null; // missing the required tool
   if (quality < (MATERIAL_TIER[poi.material] ?? 1)) return null; // tool too weak for the tier
