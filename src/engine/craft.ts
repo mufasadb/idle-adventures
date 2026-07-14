@@ -10,7 +10,7 @@ import type { ItemStack } from "./types";
 import type { StationId } from "../data/constants";
 import { RECIPE } from "../data/constants";
 import { subtractStacks, bankStacks } from "./bank";
-import { toolQualityFor } from "./tools";
+import { toolSpeedFor } from "./tools";
 
 // ke3.3: the actual output count for a recipe given the caller's tool pool. For an
 // outputScale recipe the qty is qtyPer × the best matching tool quality (the gate
@@ -22,7 +22,7 @@ export function recipeOutputQty(
   availableTools: string[],
 ): number {
   return recipe.outputScale
-    ? recipe.outputScale.qtyPer * (toolQualityFor(availableTools, recipe.outputScale.capability) ?? 1)
+    ? recipe.outputScale.qtyPer * (toolSpeedFor(availableTools, recipe.outputScale.capability) ?? 1)
     : recipe.output.qty;
 }
 

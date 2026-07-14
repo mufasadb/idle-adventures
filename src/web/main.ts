@@ -19,9 +19,9 @@ import { lineTiles } from "../engine/line";
 import { gatherCost } from "../engine/tools";
 import { heldFoodEnergy } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
-import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, INKS, AFFIX_EFFECTS, NODE_TOOL, TOOL_CAPABILITY, WEAPON_ENHANCEMENT } from "../data/constants";
+import { RECIPE, MATERIAL_GATE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, INKS, AFFIX_EFFECTS, NODE_TOOL, TOOL_CAPABILITY, WEAPON_ENHANCEMENT } from "../data/constants";
 import type { BiomeId, GatherableNodeType } from "../data/constants";
-import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint, logisticsEffect, enhancementHint, affixMaterialHint, describe, recipeGateHint, nodeToolHint, nodeTierNote, name, rejectCopy, combatForecast } from "../render/render";
+import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint, logisticsEffect, enhancementHint, affixMaterialHint, describe, recipeGateHint, nodeToolHint, nodeGateNote, name, rejectCopy, combatForecast } from "../render/render";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, Expedition, LoadoutSlot, MapItem, RejectionReason } from "../engine/types";
 
@@ -589,21 +589,23 @@ function herePanel(grid: Grid, exp: NonNullable<GameState["expedition"]>, legal:
   }
   // gatherable node
   const verb = GATHER_VERB[poi.kind]!;
-  const tier = poi.material ? (MATERIAL_TIER[poi.material] ?? 1) : 1;
+  // D78: the material's ACCESS gate (any-of tool list), or null when ungated.
+  const gate = poi.material ? (MATERIAL_GATE[poi.material]?.tools ?? null) : null;
+  const gateSatisfied = !gate || gate.some((t) => exp.loadout.equipment.tools.includes(t));
   // gate-legibility (playtest 2026-07-09 #1): distinguish the two "can't gather"
   // reasons and name each. NO tool of the required KIND → "needs a knife"; has the
-  // kind but too weak for the tier → "needs a tier-N tool".
+  // kind but the material is access-gated by a tool you lack → "needs iron-pick or …".
   const needCap = NODE_TOOL[poi.kind as GatherableNodeType];
   const hasToolKind = !needCap || exp.loadout.equipment.tools.some((t) => TOOL_CAPABILITY[t] === needCap);
   const toolLocked = !canGather && !hasToolKind;
-  const tierLocked = !canGather && hasToolKind && tier > 1;
-  const locked = toolLocked || tierLocked;
+  const gateLocked = !canGather && hasToolKind && !gateSatisfied;
+  const locked = toolLocked || gateLocked;
   const article = /^[aeiou]/i.test(verb.noun) ? "an" : "a";
   return `<div class="here ${locked ? "locked" : ""}">
-    <b>Here:</b> ${article} ${verb.noun} — <b>${name(poi.material!)}</b>${tier > 1 ? ` <span class="tier">tier ${tier}</span>` : ""}.
+    <b>Here:</b> ${article} ${verb.noun} — <b>${name(poi.material!)}</b>${gate ? ` <span class="tier">gated</span>` : ""}.
     ${canGather ? `<button data-act="gather">${verb.label} it</button>`
       : toolLocked ? `🔒 <span class="warn">${nodeToolHint(poi.kind as GatherableNodeType)} to work ${name(poi.material!)}</span>`
-      : tierLocked ? `🔒 <span class="warn">your tool is too weak — needs a tier-${tier} tool to work ${name(poi.material!)}</span>`
+      : gateLocked ? `🔒 <span class="warn">locked — needs ${gate!.join(" or ")} to work ${name(poi.material!)}</span>`
       : `<span class="warn">can't ${verb.past.replace(/ed$/, "")} — bag full (need a free loot slot)</span>`}
   </div>`;
 }
@@ -713,16 +715,20 @@ function expeditionView(): string {
     }
     if (rt.waypointKeys.has(k)) cls.push("path-waypoint");
     if (route.length && k === goalK) cls.push("path-goal");
-    const locked = poi && !isCleared && poi.material && (MATERIAL_TIER[poi.material] ?? 1) > 1;
+    // D78: loadout-aware lock — a gated material whose any-of tool list is
+    // unsatisfied by the currently-equipped tools (strictly better than the old
+    // tier>1 marker: it clears once you're carrying the key).
+    const gate = poi && !isCleared && poi.material ? (MATERIAL_GATE[poi.material]?.tools ?? null) : null;
+    const locked = gate !== null && !gate.some((t) => exp.loadout.equipment.tools.includes(t));
     if (locked) cls.push("locked");
     const ch = isPlayer ? PLAYER_CHAR : isCleared ? "·" : poi ? POI_CHAR[poi.kind] : TERRAIN_CHAR[grid.terrain[y]![x]!];
     const per = poi ? perceived.get(k) : undefined;
-    // gate-legibility (playtest 2026-07-09 #1, node tier/reach visibility): a
-    // surveyed / in-vision node names its MATERIAL TIER at range (nodeTierNote reads
-    // the PERCEIVED, range-gated tier) so a far vein's worth-the-trek is legible —
-    // an agent trekked 50 tiles only to learn a node was tier-2. This also makes the
-    // tier honest to sight: an out-of-range node (per.detail null) reveals nothing.
-    const tierNote = per ? nodeTierNote(per.detail) : null;
+    // gate-legibility (playtest 2026-07-09 #1, node gate/reach visibility): a
+    // surveyed / in-vision node names its ACCESS GATE at range (nodeGateNote reads
+    // the PERCEIVED, range-gated gate) so a far vein's worth-the-trek and its
+    // unlocking tool are legible — an agent trekked 50 tiles only to learn a node
+    // was locked. Honest to sight: an out-of-range node (per.detail null) reveals nothing.
+    const tierNote = per ? nodeGateNote(per.detail) : null;
     const title = stepBd
       ? stepExplain(stepBd)
       : poi && !isCleared // a cleared tile shows '·' — its title must not keep the stale poi text (1te-d)

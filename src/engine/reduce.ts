@@ -3,7 +3,7 @@ import { expeditionGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
 import { addToCarry, freeCarryStacks, freeLootStacks, usedSlots, carryCap, consumeExpeditionInputs } from "./carry";
-import { toolQualityFor, gatherCost } from "./tools";
+import { toolSpeedFor, gatherCost, gateSatisfied } from "./tools";
 import { strikeExchange, rollLoot, explainMatchup, damageTaken, wieldsRanged, hasAmmo } from "./combat";
 import { eatToRefill, foodEnergyOf } from "./food";
 import { endExpedition, subtractStacks } from "./bank";
@@ -14,7 +14,7 @@ import { packItem, reserveLoadout, EQUIP_SLOTS } from "./pack";
 import type { EquipSlot } from "./pack";
 import { slotOf, isGear } from "./catalog";
 import { candidateMaps, previewHints } from "./town";
-import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, POTION, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, INKS, RECIPE, WEAPON_ENHANCEMENT } from "../data/constants";
+import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MAP_SCROLL_ID, FOOD, POTION, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, INKS, RECIPE, WEAPON_ENHANCEMENT } from "../data/constants";
 import { visionRadius } from "./perceive";
 
 // Pure reducer. M2 fills embark/move; M3 fills gather/drop; M4 fills fight; remaining cases are no-op stubs:
@@ -384,14 +384,15 @@ function gather(state: GameState): { state: GameState; events: GameEvent[] } {
     return rejected(state, "gather", "not-gatherable");
   }
   const kind = poi.kind; // narrowed to GatherableNodeType by the guard above (1gp: no cast)
-  const quality = toolQualityFor(expedition.loadout.equipment.tools, NODE_TOOL[kind]);
-  if (quality === null) return rejected(state, "gather", "missing-tool");
-  // Tier gate (2026-07-04): a tool's quality doubles as its tier. A material
-  // rolled from a higher tier (e.g. coal T2, mithril T3) needs a tool that
-  // strong — you SEE the node but can't work it until you've climbed. This one
-  // check enforces the whole tech tree (no smelting step). legalActions gets it
-  // for free via speculative reduce (D29).
-  if (quality < (MATERIAL_TIER[poi.material] ?? 1)) {
+  const speed = toolSpeedFor(expedition.loadout.equipment.tools, NODE_TOOL[kind]);
+  if (speed === null) return rejected(state, "gather", "missing-tool");
+  // Access gate (D78): a material may require an unlocking tool (MATERIAL_GATE,
+  // an any-of list) — e.g. coal/silver need an iron-or-steel pick, mithril the
+  // steel pick. You SEE the node but can't work it until you hold a key. This
+  // one check is the whole tech tree (no smelting step); legalActions gets it
+  // for free via speculative reduce (D29). Tool SPEED and material ACCESS are
+  // now decoupled levers (the old quality==tier conflation is retired).
+  if (!gateSatisfied(poi.material, expedition.loadout.equipment.tools)) {
     return rejected(state, "gather", "tool-too-weak");
   }
   const cost = gatherCost(poi, expedition.loadout.equipment.tools)!; // single source w/ the route cost-preview (eot); the guards above guarantee non-null
@@ -1025,7 +1026,7 @@ function doff(state: GameState, itemId: string): { state: GameState; events: Gam
 // each ration (dtv). Checks the CAPABILITY, not a defId — any camp-capable tool
 // (future tiered tents) counts, keeping the tool a data-only addition (e96).
 function tentMultOf(expedition: Expedition): number {
-  return toolQualityFor(expedition.loadout.equipment.tools, "camp") !== null ? TENT_FOOD_MULTIPLIER : 1;
+  return toolSpeedFor(expedition.loadout.equipment.tools, "camp") !== null ? TENT_FOOD_MULTIPLIER : 1;
 }
 
 // Sum of ENERGY_CAP_BONUS over equipped tools (si7.2): the flat maxEnergy raise

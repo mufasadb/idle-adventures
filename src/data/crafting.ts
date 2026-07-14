@@ -39,7 +39,7 @@ export const RECIPE: Record<
     requires?: { station?: StationId; tools?: string[]; terrain?: Terrain };
     field?: boolean;
     buildsStation?: StationId; // ke3.2: this recipe BUILDS a home station — its output is routed into state.stations (once), never banked. Inputs consumed normally (e.g. steel×N → anvil). Town-only by nature.
-    outputScale?: { capability: string; qtyPer: number }; // ke3.3: output.qty is REPLACED by qtyPer × best TOOL_QUALITY over availableTools with this capability (the gating tool's quality scales the yield). Absent = fixed output.qty (every existing recipe unchanged).
+    outputScale?: { capability: string; qtyPer: number }; // ke3.3: output.qty is REPLACED by qtyPer × best TOOL_SPEED over availableTools with this capability (the gating tool's speed scales the yield). Absent = fixed output.qty (every existing recipe unchanged).
   }
 > = {
   // Consumables — T1. Rations are FORAGED: any herb → food. Herbs need no tool

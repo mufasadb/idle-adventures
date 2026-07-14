@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { ARMOUR, WEAPONS, MATERIAL_TIER, RECIPE } from "../src/data/constants";
+import { ARMOUR, WEAPONS, MATERIAL_GATE, RECIPE } from "../src/data/constants";
 import { resolveCombat } from "../src/engine/combat";
 import { emptyLoadout } from "../src/engine/loadout";
 import type { Loadout } from "../src/engine/types";
@@ -64,8 +64,10 @@ test("armour TYPE still matters early: plate beats robe vs a ranged attacker", (
   expect(vsPlate.hpLost).toBeLessThan(vsRobe.hpLost); // the matrix choice is real before you're maxed
 });
 
-test("top-tier gear is gated: its recipe inputs are high-tier materials", () => {
-  // mithril plate needs mithril-ore (T3 → steel-pick); steel plate needs coal (T2 → iron-pick)
-  expect(RECIPE["mithril-plate-chest"]!.inputs.some((i) => MATERIAL_TIER[i.defId] === 3)).toBe(true);
-  expect(RECIPE["steel-plate-chest"]!.inputs.some((i) => MATERIAL_TIER[i.defId] === 2)).toBe(true);
+test("top-tier gear is gated: its recipe inputs are access-gated materials", () => {
+  // D78: mithril plate needs mithril-ore (gated on steel-pick); steel plate needs
+  // coal (gated on iron/steel pick) — the gear tree rides the material gates, not a
+  // numeric tier. Assert the specific unlocking tool so the edge stays meaningful.
+  expect(RECIPE["mithril-plate-chest"]!.inputs.some((i) => MATERIAL_GATE[i.defId]?.tools.includes("steel-pick"))).toBe(true);
+  expect(RECIPE["steel-plate-chest"]!.inputs.some((i) => MATERIAL_GATE[i.defId]?.tools.includes("iron-pick"))).toBe(true);
 });

@@ -49,7 +49,7 @@ export const UNARMED_DAMAGE = 1; // damage when wielding no weapon — ALSO a bo
 export const ARROW_STACK_CAP = 20; // arrows per inventory slot; raise = cheaper ammo logistics, lower = tighter ammo-vs-food-vs-loot squeeze
 export const ARROWS_PER_CRAFT = 10; // arrows per craft batch — "three different things to grab, so it should give you quite a lot of them" (user, 2026-07-07)
 // ke3.3: the arrow-shaft recipe's outputScale multiplier — shafts per oak-log =
-// ARROW_SHAFTS_PER_LOG × the fletch tool's TOOL_QUALITY. At q1 (fletchers-knife) one
+// ARROW_SHAFTS_PER_LOG × the fletch tool's TOOL_SPEED. At q1 (fletchers-knife) one
 // log → 3 shafts → exactly one arrows-fletched batch; at q2 (steel-fletchers-knife)
 // one log → 6 shafts → two batches, i.e. the better knife HALVES wood/arrow. The
 // fletched path is deliberately parallel to the direct `arrows` recipe at q1 (no

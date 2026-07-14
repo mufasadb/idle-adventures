@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import {
-  MAP_TIER_MAX, MATERIAL_TIER_WEIGHT, NODE_MAGNITUDE_WEIGHTS,
+  MAP_TIER_MAX, MATERIAL_MAP_TIER_WEIGHT, NODE_MAGNITUDE_WEIGHTS,
   NODE_MAGNITUDE_YIELD, MAP_TIER_CREATURE_ADD,
   BIOMES, BIOME_IDS, GATHER_YIELD,
   MAP_DROP_CHANCE, MAP_SCROLL_ID, PLAYER_BASE_HP,
@@ -16,8 +16,8 @@ import type { GameState, GameEvent } from "../src/engine/types";
 test("map-tier levers: T1 is identity (hygiene)", () => {
   expect(MAP_TIER_MAX).toBe(5);
   // Every material's tier-1 multiplier is 1 (or absent → treated as 1).
-  for (const m of Object.keys(MATERIAL_TIER_WEIGHT)) {
-    expect(MATERIAL_TIER_WEIGHT[m]![1] ?? 1).toBe(1);
+  for (const m of Object.keys(MATERIAL_MAP_TIER_WEIGHT)) {
+    expect(MATERIAL_MAP_TIER_WEIGHT[m]![1] ?? 1).toBe(1);
   }
   // Magnitude at T1 is always the base class.
   expect(NODE_MAGNITUDE_WEIGHTS[1]).toEqual({ 1: 1 });

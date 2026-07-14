@@ -113,19 +113,24 @@ export const BIOMES: Record<BiomeId, Biome> = {
   },
 };
 
-// Gather tier gate (2026-07-04): a material's tier; a POI is workable only when
-// the player's best tool for that node's capability has quality >= this tier
-// (see reduce.gather / tools.toolQualityFor). Absent = tier 1. This one lever
-// gates the entire tech tree — no smelting step. Design:
-// docs/superpowers/specs/2026-07-04-tiered-progression-carry-squeeze-design.md
-export const MATERIAL_TIER: Record<string, number> = {
-  coal: 2,
-  "silver-ore": 2,
-  "ironwood-log": 2,
-  "drake-hide": 2,
-  "mithril-ore": 3,
-  salt: 2, // desert mining (m0a): evaporite deposits — pick required
-  seal: 2, // tundra animal (m0a): large prey — knife required at T2
+// Gather ACCESS gate (D78, 2026-07-11): a material's gate is an explicit ANY-OF
+// tool list — a POI is workable only when at least one of these tool defIds is
+// equipped. Absent = ungated (bare hands / the base kind tool suffice). This
+// mirrors the RECIPE.requires grammar: progression is a path/tree of explicit
+// edges, not a numeric ladder. Tools carry SPEED (TOOL_SPEED, the cost divisor);
+// gates carry ACCESS (this lever) — the two axes are decoupled (see reduce.gather).
+// Every listed tool's capability MUST match the NODE_TOOL capability of every
+// biome node kind that rolls the material (asserted in constants.test) or the
+// gate is unsatisfiable. Supersedes the 2026-07-04 quality==tier conflation.
+// Design: docs/superpowers/specs/2026-07-04-tiered-progression-carry-squeeze-design.md (superseded note)
+export const MATERIAL_GATE: Record<string, { tools: string[] }> = {
+  coal: { tools: ["iron-pick", "steel-pick"] }, // desert/tundra mining fuel — needs a hardened pick
+  "silver-ore": { tools: ["iron-pick", "steel-pick"] },
+  salt: { tools: ["iron-pick", "steel-pick"] }, // desert mining (m0a): evaporite deposits — pick required
+  "ironwood-log": { tools: ["iron-axe", "steel-axe"] }, // wood — needs a hardened axe
+  "drake-hide": { tools: ["steel-knife"] }, // animal — needs the steel knife
+  seal: { tools: ["steel-knife"] }, // tundra animal (m0a): large prey — steel knife required
+  "mithril-ore": { tools: ["steel-pick"] }, // deepest mining tier — only the steel pick
 };
 
 // --- Map epithets (q2k): a map whose generated content crosses a notability
@@ -292,7 +297,7 @@ export const NODE_HARDNESS: Record<GatherableNodeType, number> = {
   wood: 40,
   herb: 20,
   animal: 40,
-}; // energy cost numerator (×10 svz): cost = hardness ÷ tool quality
+}; // energy cost numerator (×10 svz): cost = hardness ÷ tool speed (TOOL_SPEED)
 export const NODE_TOOL: Record<GatherableNodeType, string | null> = {
   mining: "pick",
   wood: "axe",
@@ -332,32 +337,25 @@ export const TOOL_PURPOSE: Record<string, string> = {
   heat: "enables field cooking (with a cooking-pot, cooks stew)",
   simmer: "with a fire-kit, cooks stew in the field",
   alchemy: "enables field brewing (draughts)",
-  vision: "reveals a far node's material tier when you survey it",
+  vision: "reveals a far node's material and gate when you survey it",
   smith: "forges metal plate at an anvil",
 };
-export const TOOL_QUALITY: Record<string, number> = {
-  pick: 1,
-  axe: 1,
-  knife: 1,
+// Tool SPEED (D78): the gather-cost divisor ONLY (cost = NODE_HARDNESS ÷ speed).
+// Absent = speed 1 (a tool contributes no speedup — the base kind tool, or a tool
+// whose speed is irrelevant because its job is a gate/capability, not gathering).
+// ACCESS now lives in MATERIAL_GATE, so the old "quality doubles as tier" filler
+// rows (spyglass/climbing-pick/raft/waders/ice-cleats/tent/canteen/fire-kit/…)
+// are gone — a capability tool that never speeds a gather simply has no entry.
+// Also feeds outputScale (craft yield scales with the fletch tool's speed).
+export const TOOL_SPEED: Record<string, number> = {
   "iron-pick": 2, // halves mining cost vs the basic pick — the "cheaper second run" demonstrator
   "iron-axe": 2,
-  "steel-pick": 3, // tier 3: unlocks mithril; also cheapest mining
+  "steel-pick": 3, // fastest mining
   "steel-axe": 3,
   "steel-knife": 2,
-  spyglass: 1, // quality irrelevant to vision; present to satisfy the catalog invariant
-  "climbing-pick": 1, // quality irrelevant to gating; present to satisfy the catalog invariant
-  raft: 1,
-  waders: 1,
-  "ice-cleats": 1,
-  tent: 1, // quality irrelevant to camping; present to satisfy the catalog invariant
-  canteen: 1, // quality irrelevant to capacity; present to satisfy the catalog invariant
-  "fletchers-knife": 1, // ke3.3: outputScale multiplier for arrow-shaft (qtyPer × quality)
+  "fletchers-knife": 1, // ke3.3: outputScale multiplier for arrow-shaft (qtyPer × speed)
   "steel-fletchers-knife": 2, // tier-2: 2× shafts per log — the visible tool payoff (repays 57l)
-  "fire-kit": 1, // ke3.4: quality irrelevant to the heat gate; present to satisfy the catalog invariant
-  "cooking-pot": 1, // ke3.5: quality irrelevant to the simmer gate; present to satisfy the catalog invariant
-  glassware: 1, // ke3.6: quality irrelevant to the alchemy gate; present to satisfy the catalog invariant
-  "blacksmiths-hammer": 1, // ke3.7: quality irrelevant to the smith gate; present to satisfy the catalog invariant
-}; // gather-cost divisor AND tier gate (quality == max MATERIAL_TIER gatherable)
+}; // pick/axe/knife (the base kind tools) are absent = speed 1 — the ungated baseline
 export const GATHER_YIELD: Record<GatherableNodeType, number> = {
   mining: 3,
   wood: 3,
@@ -415,7 +413,7 @@ export const RETURN_FLAVOR: Record<ReturnFlavorBucket, string[]> = {
 
 // Per-material weight multiplier by map tier. Sparse: absent defId/tier = 1 (identity).
 // MUST be 1 at tier 1 for every listed material (asserted in map-tier.test).
-export const MATERIAL_TIER_WEIGHT: Record<string, Record<number, number>> = {
+export const MATERIAL_MAP_TIER_WEIGHT: Record<string, Record<number, number>> = {
   coal:          { 2: 1, 3: 2, 4: 4, 5: 2 },
   "iron-ore":    { 2: 1.5, 3: 2, 4: 2, 5: 1.5 },
   "mithril-ore": { 3: 1, 4: 2, 5: 3 },

@@ -2,13 +2,18 @@
 // a node's qualitative identity resolves only within the effective detail radius
 // (DETAIL_RADIUS + equipped VISION_RANGE_BONUS). Returns STRUCTURED FACTS ONLY —
 // never a fight outcome, never the hidden affinity (discovered post-fight).
-import { DETAIL_RADIUS, VISION_RANGE_BONUS, MONSTERS, MATERIAL_TIER } from "../data/constants";
+import { DETAIL_RADIUS, VISION_RANGE_BONUS, MONSTERS, MATERIAL_GATE } from "../data/constants";
 import type { NodeType, DmgType, ArmourType } from "../data/constants";
 import type { Grid } from "./grid";
 import type { Coord } from "./move";
 
+// A perceived node's resolved facts. `tier` is the MONSTER tier (size/threat
+// curve) and is only set for monster details. Gatherable nodes instead carry
+// `gatedBy` (D78): the ANY-OF tool list that unlocks the material, or null when
+// ungated — the survey/vision surface names WHICH tool family opens it.
 export type PoiDetail = {
-  tier: number;
+  tier?: number;
+  gatedBy?: string[] | null;
   dmgType?: DmgType;
   armourType?: ArmourType;
   creature?: string;
@@ -37,8 +42,8 @@ export function perceive(grid: Grid, playerPos: Coord, tools: string[], surveyed
       const m = MONSTERS[p.creature]!;
       detail = { tier: m.tier, dmgType: m.dmgType, armourType: m.armourType, creature: p.creature };
     } else {
-      const tier = p.material ? (MATERIAL_TIER[p.material] ?? 1) : 1;
-      detail = { tier, ...(p.material ? { material: p.material } : {}), ...(p.magnitude ? { magnitude: p.magnitude } : {}) };
+      const gatedBy = p.material ? (MATERIAL_GATE[p.material]?.tools ?? null) : null;
+      detail = { gatedBy, ...(p.material ? { material: p.material } : {}), ...(p.magnitude ? { magnitude: p.magnitude } : {}) };
     }
     return { x: p.x, y: p.y, kind: p.kind, detail };
   });

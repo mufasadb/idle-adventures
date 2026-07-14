@@ -1,7 +1,9 @@
 # Tiered Progression + Firm Carry Squeeze — Design
 
+> **⚠ Partially superseded (D78, 2026-07-11, `idle-adventure-3du`).** The **quality == tier** mechanic below — a numeric `MATERIAL_TIER` ladder where a tool's `TOOL_QUALITY` doubled as both the gather-cost divisor and the tier a material demanded — is **retired**. Progression is now a path/tree of **explicit gates**: `MATERIAL_GATE` (an any-of unlocking-tool list per material, mirroring `RECIPE.requires`) carries ACCESS, and `TOOL_SPEED` carries only the cost divisor. The gating BEHAVIOUR (coal needs an iron pick, mithril the steel pick, …) is preserved byte-for-byte — only the numeric-ladder framing is gone. Read the "can't mine coal until you have an iron pick" intent below as a `MATERIAL_GATE` edge, not a tier comparison. The carry-squeeze half of this spec stands.
+
 **Date:** 2026-07-04
-**Status:** Design approved (brainstorm), ready for planning.
+**Status:** Design approved (brainstorm), implemented; progression half superseded by D78 (see note above).
 **Motivation:** M7 feel-assessment (`docs/m7-feel-assessment.md`) findings F1 (best gear trivializes combat with no climb behind it), F2 (carry squeeze too soft), F4 (first upgrade too slow / undifferentiated). This is the M7 → iterate pass.
 
 **User calls that frame this design:**

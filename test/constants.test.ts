@@ -20,8 +20,9 @@ import {
   STACK_CAP,
   NODE_HARDNESS,
   NODE_TOOL,
-  TOOL_QUALITY,
+  TOOL_SPEED,
   TOOL_CAPABILITY,
+  MATERIAL_GATE,
   GATHER_YIELD,
   PLAYER_BASE_HP,
   CHIP_DAMAGE_MIN,
@@ -103,12 +104,38 @@ test("constants: M3 carry + gathering levers are filled", () => {
     expect(NODE_HARDNESS[kind]).toBeGreaterThan(0);
     expect(GATHER_YIELD[kind]).toBeGreaterThan(0);
   }
-  for (const tool of Object.keys(TOOL_QUALITY)) {
-    expect(TOOL_CAPABILITY[tool]).toBeDefined(); // every tool declares its capability
-    expect(TOOL_QUALITY[tool]).toBeGreaterThan(0); // 0 → Infinity cost; negative → energy-GAINING gather
+  // D78: TOOL_SPEED is now the gather-cost divisor ONLY (absent = 1), decoupled
+  // from ACCESS (MATERIAL_GATE). No every-tool-needs-an-entry invariant anymore —
+  // instead every SPEED key must be a real tool and a positive divisor.
+  for (const tool of Object.keys(TOOL_SPEED)) {
+    expect(TOOL_CAPABILITY[tool]).toBeDefined(); // every speed-tuned tool is a real tool
+    expect(TOOL_SPEED[tool]).toBeGreaterThan(0); // 0 → Infinity cost; negative → energy-GAINING gather
   }
-  for (const tool of Object.keys(TOOL_CAPABILITY)) {
-    expect(TOOL_QUALITY[tool]).toBeDefined(); // every capable tool has a quality
+});
+
+// D78 gate parity: every tool named in a MATERIAL_GATE any-of list must be a real
+// tool whose capability matches the NODE_TOOL capability of EVERY biome node kind
+// that rolls that material — otherwise the gate is unsatisfiable (you could never
+// equip a tool of the right kind that unlocks it).
+test("constants: every MATERIAL_GATE tool is capability-matched to the material's node kind", () => {
+  for (const [material, gate] of Object.entries(MATERIAL_GATE)) {
+    // The capabilities of every biome node kind that can roll this material.
+    const nodeCaps = new Set<string | null>();
+    for (const id of BIOME_IDS) {
+      for (const kind of ["mining", "wood", "herb", "animal"] as const) {
+        if (BIOMES[id].materialTable[kind]?.[material]) nodeCaps.add(NODE_TOOL[kind]);
+      }
+    }
+    expect(nodeCaps.size).toBeGreaterThan(0); // the material is actually rolled somewhere
+    // A gated material must never roll from a bare-hands (null-capability) node —
+    // that gate would be unsatisfiable (no tool can provide "no capability").
+    for (const nc of nodeCaps) expect(nc).not.toBeNull();
+    for (const tool of gate.tools) {
+      const cap = TOOL_CAPABILITY[tool];
+      expect(cap).toBeDefined(); // the gate names a real tool
+      // its capability must satisfy every node kind that rolls the material
+      for (const nc of nodeCaps) expect(cap).toBe(nc as string);
+    }
   }
 });
 

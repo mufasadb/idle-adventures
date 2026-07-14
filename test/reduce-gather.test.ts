@@ -6,35 +6,33 @@ import type { Grid, Poi } from "../src/engine/grid";
 import {
   NODE_HARDNESS,
   GATHER_YIELD,
-  TOOL_QUALITY,
   BASE_CARRY_SLOTS,
-  MATERIAL_TIER,
+  MATERIAL_GATE,
 } from "../src/data/constants";
 import type { NodeType } from "../src/data/constants";
 import type { GameState } from "../src/engine/types";
 
 // Deterministically find a map whose rolled biome contains a POI of `kind`.
-// For gatherable kinds, default to a TIER-1 (ungated) material so these
-// scenario tests exercise energy/carry/clear rejections without the tier gate
-// (2026-07-04) preempting them; the tier gate has dedicated tests below.
+// For gatherable kinds, default to an UNGATED material so these scenario tests
+// exercise energy/carry/clear rejections without the access gate (D78) preempting
+// them; the gate has dedicated tests below. Pass `material` to pin a specific
+// gated material (coal/silver via iron-pick, mithril-ore via steel-pick).
 function mapWith(
   kind: NodeType,
-  opts: { minTier?: number; maxTier?: number } = {},
+  opts: { material?: string } = {},
 ): { seed: string; grid: Grid; poi: Poi } {
-  const minTier = opts.minTier ?? 1;
-  const maxTier = opts.maxTier ?? 1;
   for (let i = 0; i < 300; i++) {
     const seed = `m3-scan-${i}`;
     const grid = generateGrid(seed, rollBiome(seed));
     const poi = grid.pois.find((p) => {
       if (p.kind !== kind) return false;
-      if (p.material === null) return true; // monster nodes carry no tier
-      const tier = MATERIAL_TIER[p.material] ?? 1;
-      return tier >= minTier && tier <= maxTier;
+      if (p.material === null) return true; // monster nodes carry no material
+      if (opts.material) return p.material === opts.material;
+      return !(p.material in MATERIAL_GATE); // default: ungated
     });
     if (poi) return { seed, grid, poi };
   }
-  throw new Error(`no map with a ${kind} POI (tier ${minTier}-${maxTier}) in scan range`);
+  throw new Error(`no map with a ${kind} POI (${opts.material ?? "ungated"}) in scan range`);
 }
 
 function standingOn(
@@ -75,7 +73,7 @@ test("gather: with a pick, yield lands in carry and node clears (bead acceptance
   const { seed, poi } = mapWith("mining");
   const before = standingOn(seed, poi, { tools: ["pick"] });
   const { state, events } = reduce(before, { type: "gather" });
-  const cost = NODE_HARDNESS.mining / TOOL_QUALITY.pick!;
+  const cost = NODE_HARDNESS.mining / 1; // base pick = speed 1 (absent from TOOL_SPEED)
   expect(state.expedition!.carry).toEqual([
     { defId: poi.material!, qty: GATHER_YIELD.mining },
   ]);
@@ -145,7 +143,7 @@ test("gather: empty tile has no node", () => {
 test("gather: insufficient energy is rejected before touching carry", () => {
   const { seed, poi } = mapWith("mining");
   const { state, events } = reduce(
-    standingOn(seed, poi, { tools: ["pick"], energy: NODE_HARDNESS.mining / TOOL_QUALITY.pick! - 0.5 }),
+    standingOn(seed, poi, { tools: ["pick"], energy: NODE_HARDNESS.mining / 1 - 0.5 }),
     { type: "gather" },
   );
   expect(events).toEqual([
@@ -194,13 +192,14 @@ test("gather: deterministic and does not mutate input", () => {
   expect(r1).toEqual(reduce(standingOn(seed, poi, { tools: ["axe"] }), { type: "gather" }));
 });
 
-// --- Tier gate (2026-07-04): tool quality doubles as tier; a material rolled
-// above the tool's tier rejects with "tool-too-weak" (distinct from missing the
-// tool entirely). One gate enforces the whole tech tree — see the design spec.
+// --- Access gate (D78): a material may require an unlocking tool (MATERIAL_GATE,
+// an any-of list); lacking it rejects with "tool-too-weak" (distinct from missing
+// the node's kind tool entirely). These edges are the whole tech tree — see the
+// design spec + decisions D78.
 
-test("gather: a basic pick cannot work a T2 mining node (coal/silver) — tool-too-weak", () => {
-  const { seed, poi } = mapWith("mining", { minTier: 2, maxTier: 2 });
-  expect(MATERIAL_TIER[poi.material!]).toBe(2);
+test("gather: a basic pick cannot work a gated coal node — tool-too-weak", () => {
+  const { seed, poi } = mapWith("mining", { material: "coal" });
+  expect(MATERIAL_GATE[poi.material!]!.tools).toContain("iron-pick");
   const { state, events } = reduce(standingOn(seed, poi, { tools: ["pick"] }), { type: "gather" });
   expect(events).toEqual([
     { type: "action-rejected", action: "gather", reason: "tool-too-weak" },
@@ -208,23 +207,23 @@ test("gather: a basic pick cannot work a T2 mining node (coal/silver) — tool-t
   expect(state.expedition!.carry).toEqual([]); // node untouched — you can see it, not work it
 });
 
-test("gather: tool-too-weak is distinct from missing-tool (has a pick, just too weak)", () => {
-  const { seed, poi } = mapWith("mining", { minTier: 2, maxTier: 2 });
+test("gather: tool-too-weak is distinct from missing-tool (has a pick, just lacks the key)", () => {
+  const { seed, poi } = mapWith("mining", { material: "coal" });
   const noPick = reduce(standingOn(seed, poi, { tools: [] }), { type: "gather" }).events;
   const weakPick = reduce(standingOn(seed, poi, { tools: ["pick"] }), { type: "gather" }).events;
   expect(noPick[0]).toMatchObject({ reason: "missing-tool" });
   expect(weakPick[0]).toMatchObject({ reason: "tool-too-weak" });
 });
 
-test("gather: an iron-pick (T2) unlocks the T2 node the basic pick could not", () => {
-  const { seed, poi } = mapWith("mining", { minTier: 2, maxTier: 2 });
+test("gather: an iron-pick unlocks the gated coal node the basic pick could not", () => {
+  const { seed, poi } = mapWith("mining", { material: "coal" });
   const { state, events } = reduce(standingOn(seed, poi, { tools: ["iron-pick"] }), { type: "gather" });
   expect(events.some((e) => e.type === "action-rejected")).toBe(false);
   expect(state.expedition!.carry).toEqual([{ defId: poi.material!, qty: GATHER_YIELD.mining }]);
 });
 
-test("gather: mithril (T3) needs a steel-pick — an iron-pick is still too weak", () => {
-  const { seed, poi } = mapWith("mining", { minTier: 3, maxTier: 3 });
+test("gather: mithril needs a steel-pick — an iron-pick is not on its gate list", () => {
+  const { seed, poi } = mapWith("mining", { material: "mithril-ore" });
   expect(poi.material).toBe("mithril-ore");
   const iron = reduce(standingOn(seed, poi, { tools: ["iron-pick"] }), { type: "gather" }).events;
   expect(iron[0]).toMatchObject({ reason: "tool-too-weak" });

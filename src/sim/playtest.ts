@@ -12,7 +12,7 @@ import { candidateMaps, mapEpithet } from "../engine/town";
 import { expeditionGrid } from "../engine/grid";
 import { recipeOutputQty } from "../engine/craft";
 import { wornPieces } from "../engine/pack";
-import { toolQualityFor } from "../engine/tools";
+import { toolSpeedFor } from "../engine/tools";
 import { perceive } from "../engine/perceive";
 import {
   flavorDetail,
@@ -95,7 +95,7 @@ for (const e of events) console.log(fmtEvent(e));
 const s = summarize(state);
 console.log("\n=== YOU ===");
 console.log(`phase: ${s.phase} · runs completed: ${state.runs ?? 0}`);
-if (s.expedition) console.log(`energy: ${s.expedition.energy}/${s.expedition.maxEnergy} · auto-eat: ${s.expedition.autoEatFood ?? "off"}${state.expedition && toolQualityFor(state.expedition.loadout.equipment.tools, "camp") !== null ? ` · tent (food +${Math.round((TENT_FOOD_MULTIPLIER - 1) * 100)}%)` : ""} · hp: ${s.expedition.hp} · pos (${s.expedition.pos.x},${s.expedition.pos.y}) · nodes cleared: ${s.expedition.cleared} · auto-potion-in-fights: ${(state.expedition?.autoQuaff ?? true) ? "on" : "off"} · auto-finish-fights: ${(state.expedition?.autoFinish ?? false) ? "on" : "off"}`);
+if (s.expedition) console.log(`energy: ${s.expedition.energy}/${s.expedition.maxEnergy} · auto-eat: ${s.expedition.autoEatFood ?? "off"}${state.expedition && toolSpeedFor(state.expedition.loadout.equipment.tools, "camp") !== null ? ` · tent (food +${Math.round((TENT_FOOD_MULTIPLIER - 1) * 100)}%)` : ""} · hp: ${s.expedition.hp} · pos (${s.expedition.pos.x},${s.expedition.pos.y}) · nodes cleared: ${s.expedition.cleared} · auto-potion-in-fights: ${(state.expedition?.autoQuaff ?? true) ? "on" : "off"} · auto-finish-fights: ${(state.expedition?.autoFinish ?? false) ? "on" : "off"}`);
 if (state.expedition) {
   // Carry + carried maps (8ec; si7.4 parity): maps cost a slot each mid-run.
   const cmaps = state.expedition.carriedMaps ?? [];
@@ -259,7 +259,11 @@ function printExpedition(st: GameState): void {
     for (const p of nearby) {
       // si7.4 parity: the web telegraphs walk-in combat; tell the console player
       // too (suffix hint, mirroring tierHint — drivers parse these lines).
-      const tierHint = p.kind !== "monster" && p.detail!.tier > 1 ? ` (needs a tier-${p.detail!.tier} tool)` : "";
+      // D78: name the unlocking tool family (any-of) rather than a tier number.
+      // SHAPE CHANGE from the old " (needs a tier-N tool)" — blind-playtest drivers
+      // that parse this line must match the new "(needs A or B)" text.
+      const gate = p.kind !== "monster" ? p.detail!.gatedBy : null;
+      const tierHint = gate && gate.length ? ` (needs ${gate.join(" or ")})` : "";
       // gate-legibility (playtest 2026-07-09 #1): name the tool KIND a gatherable
       // node needs when the player lacks it — the hunting node's "needs a knife" was
       // never spelled out (web agent burned ~4 runs guessing). Append-only.

@@ -13,7 +13,7 @@ import {
   POI_MIN_SPACING,
   POI_PLACEMENT_ATTEMPTS,
   NODE_TYPES,
-  MATERIAL_TIER_WEIGHT,
+  MATERIAL_MAP_TIER_WEIGHT,
   MAP_TIER_CREATURE_ADD,
   POI_DENSITY_BY_TIER,
   TERRAIN_WEIGHT_TIER_SHIFT,
@@ -160,7 +160,7 @@ export function tierProfile(biome: Biome, biomeId: BiomeId, mapTier: number): Bi
     const base = biome.materialTable[kind]!;
     const scaled: Record<string, number> = {};
     for (const defId of Object.keys(base)) {
-      scaled[defId] = base[defId]! * (MATERIAL_TIER_WEIGHT[defId]?.[mapTier] ?? 1);
+      scaled[defId] = base[defId]! * (MATERIAL_MAP_TIER_WEIGHT[defId]?.[mapTier] ?? 1);
     }
     materialTable[kind] = scaled;
   }

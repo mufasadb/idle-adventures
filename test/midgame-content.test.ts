@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { FOOD, FOOD_ENERGY, FRESH_TO_STALE, MATERIAL_TIER, BIOMES, MONSTERS, LOOT_TABLE } from "../src/data/constants";
+import { FOOD, FOOD_ENERGY, FRESH_TO_STALE, MATERIAL_GATE, BIOMES, MONSTERS, LOOT_TABLE } from "../src/data/constants";
 import { slotOf } from "../src/engine/catalog";
 import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
@@ -17,9 +17,10 @@ test("apple is a fresh food that stales to bruised-apple", () => {
   expect(FRESH_TO_STALE.apple).toBe("bruised-apple");
 });
 
-test("new gather materials sit at their tier and biome", () => {
-  expect(MATERIAL_TIER.salt).toBe(2);
-  expect(MATERIAL_TIER.seal).toBe(2);
+test("new gather materials sit behind their gate and biome", () => {
+  // D78: salt is pick-gated (iron/steel pick); seal needs the steel knife.
+  expect(MATERIAL_GATE.salt!.tools).toEqual(["iron-pick", "steel-pick"]);
+  expect(MATERIAL_GATE.seal!.tools).toEqual(["steel-knife"]);
   expect(BIOMES.desert.materialTable.mining?.salt).toBe(2);
   expect(BIOMES.tundra.materialTable.herb?.thistle).toBe(2);
   expect(BIOMES.woodland.materialTable.herb?.thistle).toBe(1);

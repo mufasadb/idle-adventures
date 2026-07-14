@@ -1,4 +1,4 @@
-import { WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_QUALITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_TIER, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE } from "../data/constants";
+import { WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE } from "../data/constants";
 import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType } from "../data/constants";
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
@@ -183,12 +183,15 @@ export function describe(defId: string): string {
   if (terr) return `gear · ${terr}`;
   if (defId in TOOL_CAPABILITY) {
     const cap = TOOL_CAPABILITY[defId]!;
-    const q = TOOL_QUALITY[defId];
     if (defId === "tent") return `tool · camp — food restores +${Math.round((TENT_FOOD_MULTIPLIER - 1) * 100)}%`;
     // gate-legibility (playtest 2026-07-09 #1): kit-tools are unmarked keys — say
     // what door each opens (field cooking/brewing, the forge, node-tier vision).
     const purpose = TOOL_PURPOSE[cap];
-    return `tool · ${cap}${q ? ` (tier ${q})` : ""}${purpose ? ` — ${purpose}` : ""}`;
+    // D78: a gathering tool names the materials whose gate lists it ("unlocks
+    // silver-ore, coal") — the ACCESS it grants, in place of the old tier number.
+    const unlocks = materialsUnlockedBy(defId);
+    const unlockNote = unlocks.length ? ` — unlocks ${unlocks.join(", ")}` : "";
+    return `tool · ${cap}${purpose ? ` — ${purpose}` : unlockNote}`;
   }
   if (defId in BACKPACK_SLOTS) return `backpack · ${BACKPACK_SLOTS[defId]} carry slots`;
   if (defId in TRANSPORT_CARRY) {
@@ -199,8 +202,16 @@ export function describe(defId: string): string {
   if (defId in INKS) return `a cartographer's ink — apply to a held map to coax out a tendency`;
   const enh = enhancementHint(defId); // 7ao: whetstone/oils state their combat effect
   if (enh) return `weapon coating · ${enh}`;
-  const tier = MATERIAL_TIER[defId];
-  return tier ? `tier-${tier} crafting material` : "a crafting material";
+  // D78: gated materials read qualitatively — no tier number (perception guard).
+  return defId in MATERIAL_GATE ? "a gated crafting material" : "a crafting material";
+}
+
+// D78 reverse lookup: the materials whose MATERIAL_GATE any-of list names this
+// tool — i.e. what ACCESS equipping it grants. Sorted for deterministic copy.
+export function materialsUnlockedBy(toolDefId: string): string[] {
+  return Object.keys(MATERIAL_GATE)
+    .filter((m) => MATERIAL_GATE[m]!.tools.includes(toolDefId))
+    .sort();
 }
 
 // gate-legibility (playtest 2026-07-09 #1): a locked recipe/craft-reject must NAME
@@ -232,15 +243,18 @@ export function nodeToolHint(kind: GatherableNodeType): string | null {
   return cap ? `needs a ${cap}` : null;
 }
 
-// gate-legibility (playtest 2026-07-09 #1, node tier/reach visibility): a surveyed /
-// in-vision node should read its MATERIAL TIER at range so players can plan which
-// veins are worth the trek — an agent mined ~12 nodes fishing for silver, then
-// trekked 50 tiles to learn a node was tier-2. Fed the PERCEIVED tier (range-gated
-// via perceive), so tier stays honest to what you can actually see. tier 1 → null
+// gate-legibility (playtest 2026-07-09 #1, node gate/reach visibility): a surveyed /
+// in-vision node reads its ACCESS GATE at range so players can plan which veins are
+// worth the trek and WHICH tool unlocks them — an agent mined ~12 nodes fishing for
+// silver, then trekked 50 tiles to learn a node was locked. Fed the PERCEIVED gate
+// (range-gated via perceive), honest to what you can actually see. Ungated → null
 // (no signpost needed). NOT for monsters (their size is flavored separately).
-export function nodeTierNote(detail: PoiDetail | null): string | null {
+// D78: names the unlocking tool family instead of a tier number.
+export function nodeGateNote(detail: PoiDetail | null): string | null {
   if (!detail || detail.creature) return null; // null or a monster detail
-  return detail.tier > 1 ? `tier ${detail.tier} — needs a tier-${detail.tier} tool` : null;
+  const gate = detail.gatedBy;
+  if (!gate || gate.length === 0) return null;
+  return `locked — needs ${gate.join(" or ")}`;
 }
 
 const MAGNITUDE_SUFFIX: Record<NodeType, Record<number, string>> = {
@@ -255,7 +269,7 @@ const MAGNITUDE_SUFFIX: Record<NodeType, Record<number, string>> = {
 export function flavorDetail(detail: PoiDetail | null, kind: NodeType): string {
   if (detail === null) return kind === "monster" ? "a monster" : `a ${kind} node`;
   if (kind === "monster") {
-    const size = SIZE_FLAVOR[detail.tier] ?? "a";
+    const size = (detail.tier !== undefined ? SIZE_FLAVOR[detail.tier] : undefined) ?? "a";
     const hide = detail.armourType ? HIDE_FLAVOR[detail.armourType] : "an unclear form";
     const tell = detail.dmgType ? `; ${DMG_FLAVOR[detail.dmgType]}` : "";
     return `${size} creature — ${hide}${tell}`;

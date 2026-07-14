@@ -7,7 +7,7 @@ import { play } from "../src/sim/play";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import type { Poi } from "../src/engine/grid";
 import { emptyLoadout } from "../src/engine/loadout";
-import { MATERIAL_TIER } from "../src/data/constants";
+import { MATERIAL_GATE } from "../src/data/constants";
 import type { Action, GameState } from "../src/engine/types";
 
 const accepts = (state: GameState, action: Action) =>
@@ -87,22 +87,22 @@ test("legalActions: dispatches by phase", () => {
   expect(legalActions(onMap)).toEqual(expeditionActions(onMap));
 });
 
-// Tier gate (2026-07-04): a node whose material out-tiers your tool is "visible
+// Access gate (D78): a node whose material is gated by a tool you lack is "visible
 // but locked" — legalActions must NOT offer gather there. This is the D29 "free"
 // property: no parallel logic, the speculative reduce filters it.
-test("expeditionActions: a tier-locked node is not offered gather (D29 free)", () => {
-  // find a T2+ gatherable node
+test("expeditionActions: an access-locked node is not offered gather (D29 free)", () => {
+  // find a gated gatherable node
   let seed = "";
   let poi: Poi | undefined;
   for (let i = 0; i < 300 && !poi; i++) {
     const s = `lock-${i}`;
     const g = generateGrid(s, rollBiome(s));
-    poi = g.pois.find((p) => p.material !== null && (MATERIAL_TIER[p.material] ?? 1) >= 2);
+    poi = g.pois.find((p) => p.material !== null && p.material in MATERIAL_GATE);
     if (poi) seed = s;
   }
   expect(poi).toBeTruthy();
   const loadout = emptyLoadout();
-  loadout.equipment.tools = ["pick", "axe", "knife"]; // all T1 — too weak for the locked node
+  loadout.equipment.tools = ["pick", "axe", "knife"]; // only base tools — lack every gate key
   const state: GameState = {
     seed: "g", phase: "expedition", bank: [], loadout: emptyLoadout(),
     expedition: { mapSeed: seed, pos: { x: poi!.x, y: poi!.y }, energy: 100, hp: 30, loadout, carry: [], cleared: [] },

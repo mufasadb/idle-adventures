@@ -3,12 +3,13 @@ import {
   recipeGateHint,
   recipeTerrainGate,
   nodeToolHint,
-  nodeTierNote,
+  nodeGateNote,
+  materialsUnlockedBy,
   describe as describeItem,
 } from "../src/render/render";
 import { perceive } from "../src/engine/perceive";
 import { generateGrid, rollBiome } from "../src/engine/grid";
-import { MATERIAL_TIER } from "../src/data/constants";
+import { MATERIAL_GATE } from "../src/data/constants";
 
 // gate-legibility (playtest 2026-07-09 finding #1) — pure signposting helpers.
 
@@ -43,30 +44,39 @@ test("nodeToolHint names the tool KIND a node wants, null for bare-hand herbs", 
   expect(nodeToolHint("herb")).toBeNull();
 });
 
-test("nodeTierNote surfaces a >1 material tier, null for tier 1 or a monster", () => {
-  expect(nodeTierNote({ tier: 2, material: "silver-ore" })).toBe("tier 2 — needs a tier-2 tool");
-  expect(nodeTierNote({ tier: 1, material: "iron-ore" })).toBeNull();
-  expect(nodeTierNote(null)).toBeNull();
-  // a monster detail (has creature) is never given a material-tier note
-  expect(nodeTierNote({ tier: 3, creature: "ice-troll" })).toBeNull();
+test("nodeGateNote names the unlocking tool family for a gated material, null for ungated or a monster", () => {
+  // D78: gate note names WHICH tool(s) unlock the node — no tier number.
+  expect(nodeGateNote({ gatedBy: ["iron-pick", "steel-pick"], material: "silver-ore" })).toBe("locked — needs iron-pick or steel-pick");
+  expect(nodeGateNote({ gatedBy: null, material: "iron-ore" })).toBeNull();
+  expect(nodeGateNote(null)).toBeNull();
+  // a monster detail (has creature) is never given a material-gate note
+  expect(nodeGateNote({ tier: 3, creature: "ice-troll" })).toBeNull();
 });
 
-test("nodeTierNote reads the PERCEIVED (range-gated) tier for a surveyed node", () => {
-  // find a seed with a tier-2+ mining/wood/animal material to prove the wiring
+test("nodeGateNote reads the PERCEIVED (range-gated) gate for a surveyed node", () => {
+  // find a seed with a gated mining/wood/animal material to prove the wiring
   for (let i = 0; i < 200; i++) {
-    const seed = `tier-scan-${i}`;
+    const seed = `gate-scan-${i}`;
     const grid = generateGrid(seed, rollBiome(seed));
-    const tiered = grid.pois.find((p) => p.material && (MATERIAL_TIER[p.material] ?? 1) > 1);
-    if (!tiered) continue;
-    // stand on it → perceive resolves detail → note names its tier
-    const per = perceive(grid, { x: tiered.x, y: tiered.y }, []).find(
-      (p) => p.x === tiered.x && p.y === tiered.y,
+    const gated = grid.pois.find((p) => p.material && p.material in MATERIAL_GATE);
+    if (!gated) continue;
+    // stand on it → perceive resolves detail → note names its unlocking tools
+    const per = perceive(grid, { x: gated.x, y: gated.y }, []).find(
+      (p) => p.x === gated.x && p.y === gated.y,
     )!;
-    const note = nodeTierNote(per.detail);
-    expect(note).toBe(`tier ${MATERIAL_TIER[tiered.material!]} — needs a tier-${MATERIAL_TIER[tiered.material!]} tool`);
+    const note = nodeGateNote(per.detail);
+    expect(note).toBe(`locked — needs ${MATERIAL_GATE[gated.material!]!.tools.join(" or ")}`);
     return;
   }
-  throw new Error("no tiered material POI in scan range");
+  throw new Error("no gated material POI in scan range");
+});
+
+test("materialsUnlockedBy reverse-maps a tool to the materials it gates", () => {
+  // iron-pick opens coal/salt/silver-ore (any-of with steel-pick); steel-pick also mithril
+  expect(materialsUnlockedBy("iron-pick")).toEqual(["coal", "salt", "silver-ore"]);
+  expect(materialsUnlockedBy("steel-pick")).toEqual(["coal", "mithril-ore", "salt", "silver-ore"]);
+  expect(materialsUnlockedBy("steel-knife")).toEqual(["drake-hide", "seal"]);
+  expect(materialsUnlockedBy("pick")).toEqual([]); // base tool gates nothing
 });
 
 test("describe: a kit-tool states what door it opens (fire-kit → field cooking)", () => {
@@ -74,5 +84,5 @@ test("describe: a kit-tool states what door it opens (fire-kit → field cooking
   expect(describeItem("glassware").toLowerCase()).toContain("field brewing");
   expect(describeItem("blacksmiths-hammer").toLowerCase()).toContain("forge");
   // the spyglass tooltip explains the survey payoff (playtest: felt broken)
-  expect(describeItem("spyglass").toLowerCase()).toContain("tier");
+  expect(describeItem("spyglass").toLowerCase()).toContain("gate");
 });

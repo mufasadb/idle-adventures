@@ -4,7 +4,7 @@ import { newGame, candidateMaps } from "../src/engine/town";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import { costToReach } from "../src/engine/reach";
 import { emptyLoadout } from "../src/engine/loadout";
-import { MAX_ENERGY, MAP_WIDTH, MAP_HEIGHT, MATERIAL_TIER } from "../src/data/constants";
+import { MAX_ENERGY, MAP_WIDTH, MAP_HEIGHT, MATERIAL_GATE } from "../src/data/constants";
 import type { Action, GameState } from "../src/engine/types";
 
 // This harness routes around monster POIs by target selection (gatherable
@@ -60,14 +60,14 @@ test("e3j report: starter-kit harvest fraction", () => {
   state = reduce(state, { type: "set-auto-eat-food", defId: "ration" }).state;
   const grid = generateGrid(c.mapSeed, rollBiome(c.mapSeed));
   // Only target nodes this kit can actually work: herb (bare hands), mining
-  // (pick) or animal (knife) — no axe, so skip wood — and only materials at
-  // tier 1 or untiered (MATERIAL_TIER absent defaults to 1); tier-2+ rejects
-  // tool-too-weak with basic tools.
+  // (pick) or animal (knife) — no axe, so skip wood — and only UNGATED materials
+  // (D78: absent from MATERIAL_GATE); an access-gated one rejects tool-too-weak
+  // with basic tools.
   const gatherable = grid.pois.filter(
     (p) =>
       (p.kind === "herb" || p.kind === "mining" || p.kind === "animal") &&
       p.material !== null &&
-      (MATERIAL_TIER[p.material] ?? 1) === 1,
+      !(p.material in MATERIAL_GATE),
   );
   let cleared = 0;
   const skipped = new Set<string>();
@@ -164,13 +164,13 @@ test("e3j report: geared-kit harvest fraction", () => {
   // mco: auto-eat off by default — designate the packed ration to eat-to-refill.
   state = reduce(state, { type: "set-auto-eat-food", defId: "ration" }).state;
   const grid = generateGrid(c.mapSeed, rollBiome(c.mapSeed));
-  // Target ALL gatherable kinds/tiers this kit can work: pick + knife (no axe,
-  // so still skip wood), tier ≤ tool quality 1 — same filter as the starter test.
+  // Target ALL gatherable kinds this kit can work: pick + knife (no axe, so still
+  // skip wood), UNGATED materials only (D78) — same filter as the starter test.
   const gatherable = grid.pois.filter(
     (p) =>
       (p.kind === "herb" || p.kind === "mining" || p.kind === "animal") &&
       p.material !== null &&
-      (MATERIAL_TIER[p.material] ?? 1) === 1,
+      !(p.material in MATERIAL_GATE),
   );
   let cleared = 0;
   const skipped = new Set<string>();
