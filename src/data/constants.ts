@@ -77,7 +77,7 @@ export type Biome = {
 export const BIOMES: Record<BiomeId, Biome> = {
   woodland: {
     terrainWeights: { plains: 0.4, mud: 0.25, river: 0.15, mountain: 0.2 },
-    nodeTypeWeights: { wood: 0.35, herb: 0.25, animal: 0.2, monster: 0.15, mining: 0.05 },
+    nodeTypeWeights: { wood: 0.3, herb: 0.25, animal: 0.2, monster: 0.15, mining: 0.1 }, // p8b: mining 0.05→0.1 (avg ~3→~6 nodes/map) — still the rarest, but reliably present so woodland reads as a mineable biome
     creatureTable: { "forest-boar": 5, "forest-bandit": 4, "shell-beetle": 4, "fae-sprite": 3, werewolf: 2, "giant-elk": 3 }, // m0a: giant-elk mid-tier
     materialTable: {
       mining: { "iron-ore": 7, "copper-ore": 2, "silver-ore": 1 }, // silver present (D27) but T2-gated
