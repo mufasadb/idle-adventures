@@ -21,7 +21,7 @@ import { heldFoodEnergy } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
 import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, INKS, AFFIX_EFFECTS, NODE_TOOL, TOOL_CAPABILITY, WEAPON_ENHANCEMENT } from "../data/constants";
 import type { BiomeId, GatherableNodeType } from "../data/constants";
-import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint, logisticsEffect, enhancementHint, affixMaterialHint, describe, recipeGateHint, recipeTerrainGate, nodeToolHint, nodeTierNote } from "../render/render";
+import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint, logisticsEffect, enhancementHint, affixMaterialHint, describe, recipeGateHint, nodeToolHint, nodeTierNote, name, rejectCopy, combatForecast } from "../render/render";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, Expedition, LoadoutSlot, MapItem, RejectionReason } from "../engine/types";
 
@@ -33,13 +33,6 @@ const GATHER_VERB: Record<string, { label: string; past: string; noun: string }>
   animal: { label: "🔪 Hunt", past: "hunted", noun: "animal" },
 };
 
-// Human-readable item names. Backpacks read as "… Backpack"; everything else is
-// its de-hyphenated, title-cased defId (iron-ore → "Iron Ore").
-const BACKPACK_NAMES: Record<string, string> = { starter: "Starter Backpack", leather: "Leather Backpack", "large-pack": "Large Pack" };
-function name(defId: string): string {
-  if (BACKPACK_NAMES[defId]) return BACKPACK_NAMES[defId]!;
-  return defId.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-}
 
 const params = new URLSearchParams(location.search);
 const seed = params.get("seed") ?? "play";
@@ -286,31 +279,6 @@ function routeAfterClick(exp: Expedition, wps: Pos[], to: Pos): Pos[] {
   return [...wps, to]; // not on the path → new leg
 }
 
-// Map a rejected walk step to a cause-specific message (1te-e): one banner
-// string used to cover ≥3 distinct RejectionReasons, so a bag-full fight read
-// identically to a walled tile. The reason rides the action-rejected event the
-// move driver already receives.
-// gate-legibility (playtest 2026-07-09 #1): NAME the missing thing. When the reject
-// came from a craft, `recipeId` lets us read RECIPE[...].requires and say exactly
-// which station/tool/terrain is missing instead of a generic "needs something."
-function rejectCopy(reason: RejectionReason, recipeId?: string): string {
-  const gate = recipeId ? recipeGateHint(recipeId) : null; // "needs anvil + blacksmiths-hammer"
-  switch (reason) {
-    case "impassable": return "blocked by terrain";
-    case "carry-full": return "bag full — a monster fight needs a free loot slot";
-    case "exhausted": return "out of energy";
-    case "engaged": return "you're engaged — fight or flee below";
-    case "missing-station": return gate ? `can't craft — ${gate} (build the station first)` : "needs a station you haven't built";
-    case "missing-tool": return gate ? `can't craft — ${gate}` : "needs a tool you don't have";
-    case "tool-too-weak": return "your tool is too weak for this material's tier";
-    case "not-field-craftable": return "that recipe is town-only — it can't be made in the field";
-    case "not-near-terrain": {
-      const terr = recipeId ? recipeTerrainGate(recipeId) : null;
-      return terr ? `must stand on (or next to) ${terr} to make this` : "you're not on the terrain this needs";
-    }
-    default: return reason;
-  }
-}
 const foodUnits = (food: ItemStack[]) => food.reduce((n, s) => n + s.qty, 0);
 
 // Walk the planned waypoints in order (eot). Each leg is the straight lineTiles from
@@ -818,12 +786,8 @@ function expeditionView(): string {
   const costClause = `<b class="${overBudget ? "over" : ""}">−${round(rt.walkCost)} walk${rt.actionCost > 0 ? ` + −${round(rt.actionCost)} gather` : ""}${rt.actionCost > 0 ? ` = −${round(total)}` : ""} energy</b>`;
   const forecastClause = fight
     ? (() => {
-        const dmgOut = playerDamage(exp.loadout, fight, exp.weaponBuff); // D60: forecast reflects an active coating
-        const dmgIn = damageTaken(exp.loadout, fight, 0);
-        const toKill = Math.ceil(MONSTER_TIER_HP_CURVE[MONSTERS[fight]!.tier]! / dmgOut);
-        const toDie = Math.ceil(exp.hp / dmgIn);
-        const winning = toKill <= toDie;
-        return ` · <span class="forecast" title="bare-kit forecast — battle items apply when the fight starts">forecast: you hit ${round(dmgOut)}, it hits ${round(dmgIn)} — <b class="${winning ? "good" : "over"}">${winning ? `kill in ${toKill}` : "it wins the race"}</b></span>`;
+        const f = combatForecast(exp.loadout, fight, exp.hp, exp.weaponBuff); // D60: reflects an active coating
+        return ` · <span class="forecast" title="bare-kit forecast — battle items apply when the fight starts">forecast: you hit ${round(f.dmgOut)}, it hits ${round(f.dmgIn)} — <b class="${f.winning ? "good" : "over"}">${f.winning ? `kill in ${f.toKill}` : "it wins the race"}</b></span>`;
       })()
     : "";
   const surveyAtEnd = legal.some((a) => a.type === "survey" && a.at.x === rt.end.x && a.at.y === rt.end.y);

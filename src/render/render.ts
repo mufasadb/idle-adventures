@@ -1,10 +1,62 @@
-import { WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_QUALITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_TIER, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER } from "../data/constants";
+import { WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_QUALITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_TIER, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE } from "../data/constants";
 import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType } from "../data/constants";
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
+import { playerDamage, damageTaken } from "../engine/combat";
+import type { Loadout, RejectionReason } from "../engine/types";
 
 // Dumb view: state → string. The grid is REGENERATED from mapSeed (D14) —
 // render holds no state and makes no decisions.
+
+// --- Shared presentation selectors (eho): pure defId→text + data-shaped derivations
+// any surface (the web today, a real UI later) can format. The web-only HTML builders
+// (recipe-book rows, held-map card) stay in main.ts until a second UI actually exists.
+
+// Display names for defIds whose title-cased id reads wrong ("starter" → not a
+// fire-starter). Everything else title-cases its kebab defId.
+const DISPLAY_NAMES: Record<string, string> = { starter: "Starter Backpack", leather: "Leather Backpack", "large-pack": "Large Pack" };
+export function name(defId: string): string {
+  if (DISPLAY_NAMES[defId]) return DISPLAY_NAMES[defId]!;
+  return defId.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+
+// A rejected action's cause → one human sentence (gate-legibility, playtest 2026-07-09).
+// recipeId lets a craft rejection name the exact missing station/tool/terrain.
+export function rejectCopy(reason: RejectionReason, recipeId?: string): string {
+  const gate = recipeId ? recipeGateHint(recipeId) : null; // "needs anvil + blacksmiths-hammer"
+  switch (reason) {
+    case "impassable": return "blocked by terrain";
+    case "carry-full": return "bag full — a monster fight needs a free loot slot";
+    case "exhausted": return "out of energy";
+    case "engaged": return "you're engaged — fight or flee below";
+    case "missing-station": return gate ? `can't craft — ${gate} (build the station first)` : "needs a station you haven't built";
+    case "missing-tool": return gate ? `can't craft — ${gate}` : "needs a tool you don't have";
+    case "tool-too-weak": return "your tool is too weak for this material's tier";
+    case "not-field-craftable": return "that recipe is town-only — it can't be made in the field";
+    case "not-near-terrain": {
+      const terr = recipeId ? recipeTerrainGate(recipeId) : null;
+      return terr ? `must stand on (or next to) ${terr} to make this` : "you're not on the terrain this needs";
+    }
+    default: return reason;
+  }
+}
+
+// Fight forecast as DATA (eho): the "can I win the race?" numbers behind the web's
+// forecast line. dmgOut/dmgIn are per-strike; toKill/toDie are the round counts; the
+// player wins iff they land the kill no later than they'd fall. Formatting is the
+// surface's job. weaponBuff reflects an active coating (D60).
+export function combatForecast(
+  loadout: Loadout,
+  creature: string,
+  hp: number,
+  weaponBuff?: { id: string },
+): { dmgOut: number; dmgIn: number; toKill: number; toDie: number; winning: boolean } {
+  const dmgOut = playerDamage(loadout, creature, weaponBuff);
+  const dmgIn = damageTaken(loadout, creature, 0);
+  const toKill = Math.ceil(MONSTER_TIER_HP_CURVE[MONSTERS[creature]!.tier]! / dmgOut);
+  const toDie = Math.ceil(hp / dmgIn);
+  return { dmgOut, dmgIn, toKill, toDie, winning: toKill <= toDie };
+}
 
 // --- Perception flavor (9u9.2): turn structured facts into vague, learn-the-
 // vocabulary text. NEVER numbers or the fight outcome. New monsters get flavor

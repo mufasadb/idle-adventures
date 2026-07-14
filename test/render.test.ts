@@ -1,5 +1,8 @@
 import { test, expect } from "bun:test";
-import { flavorDetail, matchupLessons } from "../src/render/render";
+import { flavorDetail, matchupLessons, combatForecast } from "../src/render/render";
+import { emptyLoadout } from "../src/engine/loadout";
+import { playerDamage, damageTaken } from "../src/engine/combat";
+import { MONSTERS, MONSTER_TIER_HP_CURVE } from "../src/data/constants";
 
 // 1z7: the three render.ts grid drawers (render/renderGridText/renderGridHtml) were
 // used by zero shipped surfaces and have been removed — the web and headless console
@@ -21,6 +24,20 @@ test("matchupLessons: surfaces affinity + weapon-vs-hide + armour result", () =>
   expect(l.join(" ")).toMatch(/savaged|something/i); // affinity line present
   const none = matchupLessons({ weaponVsHide: 1, affinityFired: false, armourVsAttack: "neutral" }, "sword");
   expect(none.length).toBe(0); // nothing notable → no noise
+});
+
+// eho: combatForecast is the pure data selector behind the web's fight forecast —
+// it composes the combat primitives into a "win-the-race" verdict any UI can format.
+test("combatForecast composes playerDamage/damageTaken into a win-race forecast", () => {
+  const loadout = emptyLoadout();
+  loadout.equipment.weapon = "sword";
+  const foe = "forest-boar"; // tier-1 woodland beast
+  const f = combatForecast(loadout, foe, 30);
+  expect(f.dmgOut).toBe(playerDamage(loadout, foe));
+  expect(f.dmgIn).toBe(damageTaken(loadout, foe, 0));
+  expect(f.toKill).toBe(Math.ceil(MONSTER_TIER_HP_CURVE[MONSTERS[foe]!.tier]! / f.dmgOut));
+  expect(f.toDie).toBe(Math.ceil(30 / f.dmgIn));
+  expect(f.winning).toBe(f.toKill <= f.toDie);
 });
 
 test("flavorDetail names node magnitude variants", () => {
