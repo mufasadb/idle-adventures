@@ -15,6 +15,7 @@ import { moveCost, moveCostBreakdown } from "../engine/move";
 import { ASSET_TRIAL, TILE_BG, MONSTER_SPRITES, MONSTER_SIZE, NODE_ICON } from "./assets-trial";
 import { costToReach } from "../engine/reach";
 import { carryCap } from "../engine/carry";
+import { wornPieces, ARMOUR_SLOTS } from "../engine/pack";
 import { heldFoodEnergy } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
 import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, TERRAIN_GATE, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, INKS, AFFIX_EFFECTS, NODE_TOOL, TOOL_CAPABILITY, WEAPON_ENHANCEMENT } from "../data/constants";
@@ -372,7 +373,7 @@ function realSlots(loadout: Loadout, carry: ItemStack[], maps: MapItem[] = [], e
   return boxes;
 }
 function wornGhosts(eq: Equipment): string[] {
-  const worn = [eq.weapon, eq.helmet, eq.chest, eq.legs, eq.boots, eq.gloves, eq.transport, eq.backpack, eq.panniers].filter(Boolean) as string[];
+  const worn = wornPieces(eq).filter(Boolean) as string[];
   return worn.map((d) => `<div class="slot ghost" title="${name(d)} — worn, no slot · ${describe(d)}">${name(d)}</div>`);
 }
 // Returns { used, html }. used = real filled slots (ghosts excluded).
@@ -450,7 +451,7 @@ function townView(): string {
     <section>
       <h2>Loadout plan <button class="link" data-reset>reset</button>${loadLastPlan().length && planActions(lo).length === 0 ? ` <button class="link" data-repack title="re-pack the loadout you took last run (skips anything no longer in the bank)">↻ repack last</button>` : ""}</h2>
       ${equipRow("weapon", eq.weapon ? name(eq.weapon) : null)}
-      ${equipRow("armour", [eq.helmet, eq.chest, eq.legs, eq.boots, eq.gloves].filter(Boolean).map((d) => name(d as string)).join(", ") || null)}
+      ${equipRow("armour", ARMOUR_SLOTS.map((s) => eq[s]).filter(Boolean).map((d) => name(d as string)).join(", ") || null)}
       ${equipRow("transport", eq.transport ? `${name(eq.transport)}${TRANSPORT_ROLE[eq.transport] ? ` — ${TRANSPORT_ROLE[eq.transport]}` : ""}` : null)}
       ${eq.panniers ? equipRow("panniers", name(eq.panniers)) : ""}
       ${equipRow("backpack", eq.backpack ? name(eq.backpack) : "none")}

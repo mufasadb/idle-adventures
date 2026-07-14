@@ -2,7 +2,7 @@
 // without touching the bank; the plan is validated against `bank − reservations`
 // so it never exceeds holdings. The bank is only debited at embark. There is no
 // unpack action — reduce a mis-planned consumable by embarking and re-planning.
-import type { ItemStack, Loadout, LoadoutSlot } from "./types";
+import type { ItemStack, Loadout, LoadoutSlot, Equipment } from "./types";
 import { validForSlot, CONSUMABLE_KEYS, consumableKeyForSlot } from "./catalog";
 import { carryCap, consumableSlots } from "./carry";
 
@@ -19,6 +19,19 @@ function addConsumable(list: ItemStack[], defId: string): ItemStack[] {
 export const EQUIP_SLOTS = ["weapon", "helmet", "chest", "legs", "boots", "gloves", "transport", "backpack", "panniers"] as const;
 export type EquipSlot = (typeof EQUIP_SLOTS)[number];
 
+// The armour subset of the durable slots (07u): the single source for "what counts
+// as armour", derived-in-spirit from EQUIP_SLOTS. Used by combat mitigation, the
+// armour reservation loop, and the web armour row instead of hand-copied lists.
+export const ARMOUR_SLOTS = ["helmet", "chest", "legs", "boots", "gloves"] as const satisfies readonly EquipSlot[];
+
+// The worn single-slot durable pieces in canonical EQUIP_SLOTS order (07u). Kills
+// the four hand-copied `[eq.weapon, eq.helmet, …, eq.panniers]` lists that drifted
+// whenever a slot was added. tools (a multi-slot array) are appended by callers that
+// want the FULL kit. nulls are kept — callers filter(Boolean) as they need.
+export function wornPieces(equipment: Equipment): (string | null)[] {
+  return EQUIP_SLOTS.map((slot) => equipment[slot]);
+}
+
 // Every defId the plan reserves from the bank (each equipment piece ×1, each
 // tool ×1, transport, backpack, plus food/potion stack quantities). This is the
 // exact set embark debits (D28) and mirrors what endExpedition banks back (D26,
@@ -26,7 +39,7 @@ export type EquipSlot = (typeof EQUIP_SLOTS)[number];
 export function reserveLoadout(loadout: Loadout): ItemStack[] {
   const { equipment } = loadout;
   const out: ItemStack[] = [];
-  for (const piece of [equipment.weapon, equipment.helmet, equipment.chest, equipment.legs, equipment.boots, equipment.gloves]) {
+  for (const piece of [equipment.weapon, ...ARMOUR_SLOTS.map((s) => equipment[s])]) {
     if (piece !== null) out.push({ defId: piece, qty: 1 });
   }
   for (const tool of equipment.tools) out.push({ defId: tool, qty: 1 });

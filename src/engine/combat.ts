@@ -26,6 +26,7 @@ import {
 import type { DmgType } from "../data/constants";
 import type { Loadout, ItemStack } from "./types";
 import { rand } from "./rng";
+import { ARMOUR_SLOTS } from "./pack";
 
 export type CombatResult = {
   victory: boolean;
@@ -81,8 +82,6 @@ export function rollLoot(
   }
   return loot;
 }
-
-const ARMOUR_SLOTS = ["helmet", "chest", "legs", "boots", "gloves"] as const;
 
 // Ranged style helpers (D45). A "bow" is any weapon whose dmgType is ranged —
 // data-driven, so future ranged weapons join the ammo economy for free.

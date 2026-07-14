@@ -11,6 +11,7 @@ import { summarize } from "./report";
 import { candidateMaps, mapEpithet } from "../engine/town";
 import { expeditionGrid } from "../engine/grid";
 import { recipeOutputQty } from "../engine/craft";
+import { wornPieces } from "../engine/pack";
 import { perceive } from "../engine/perceive";
 import {
   flavorDetail,
@@ -107,7 +108,7 @@ console.log(`bank: ${s.bank.map((i) => `${i.qty}× ${i.defId}`).join(", ") || "(
 // expedition.loadout (state.loadout is the town plan, empty mid-run).
 const active = state.expedition?.loadout ?? s.loadout;
 const eq = active.equipment;
-const worn = [eq.weapon, eq.helmet, eq.chest, eq.legs, eq.boots, eq.gloves, eq.transport, eq.backpack, eq.panniers, ...eq.tools].filter(Boolean);
+const worn = [...wornPieces(eq), ...eq.tools].filter(Boolean);
 console.log(`equipped: ${worn.join(", ") || "(nothing)"} · food: ${active.food.map((f) => `${f.qty}× ${f.defId}`).join(", ") || "none"} · potions: ${active.potions.map((p) => `${p.qty}× ${p.defId}`).join(", ") || "none"}${active.battleItems?.length ? ` · battle: ${active.battleItems.map((b) => `${b.qty}× ${b.defId}`).join(", ")}` : ""}${active.spares?.length ? ` · spare gear (1 slot each, don mid-run to swap): ${active.spares.map((sp) => `${sp.qty}× ${sp.defId}`).join(", ")}` : ""}${active.ammo?.length ? ` · arrows: ${active.ammo.reduce((n, a) => n + a.qty, 0)} (a wielded bow shoots one per combat exchange; empty quiver = the bow swings like a club)` : wieldsRanged(active) ? " · arrows: 0 — ⚠ NO ARROWS: your bow swings like a CLUB (1 dmg). Craft arrows to shoot." : ""}${active.enhancements?.length ? ` · enhancements (1 slot each; enhance id="…" to coat your weapon — engaged or not; mid-fight it costs a turn, 67e): ${active.enhancements.map((en) => `${en.qty}× ${en.defId} (${enhancementHint(en.defId)})`).join(", ")}` : ""}${state.expedition?.weaponBuff ? ` · 🗡️ active coating: ${state.expedition.weaponBuff.id} (${state.expedition.weaponBuff.charges} strikes left)` : ""}`);
 // Make transport/gating gear legible: what it does to a step's cost (mirrors the web).
 {

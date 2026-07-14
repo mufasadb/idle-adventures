@@ -7,6 +7,7 @@ import type { Action, GameState } from "../engine/types";
 import { reduce } from "../engine/reduce";
 import { RECIPE, INKS } from "../data/constants";
 import { slotOf, isGear } from "../engine/catalog";
+import { wornPieces } from "../engine/pack";
 import { candidateMaps } from "../engine/town";
 import { expeditionGrid } from "../engine/grid";
 import { perceive } from "../engine/perceive";
@@ -96,7 +97,7 @@ export function expeditionActions(state: GameState): Action[] {
     if (isGear(stack.defId)) candidates.push({ type: "don", itemId: stack.defId });
   }
   const worn = state.expedition.loadout.equipment;
-  for (const piece of [worn.weapon, worn.helmet, worn.chest, worn.legs, worn.boots, worn.gloves, worn.transport, worn.backpack, worn.panniers]) {
+  for (const piece of wornPieces(worn)) {
     if (piece !== null) candidates.push({ type: "doff", itemId: piece });
   }
   for (const tool of worn.tools) candidates.push({ type: "doff", itemId: tool });
