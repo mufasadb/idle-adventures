@@ -3,7 +3,7 @@ import { expeditionGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
 import { addToCarry, freeCarryStacks, freeLootStacks, usedSlots, carryCap, consumeExpeditionInputs } from "./carry";
-import { toolQualityFor } from "./tools";
+import { toolQualityFor, gatherCost } from "./tools";
 import { strikeExchange, rollLoot, explainMatchup, damageTaken, wieldsRanged, hasAmmo } from "./combat";
 import { eatToRefill, foodEnergyOf } from "./food";
 import { endExpedition, subtractStacks } from "./bank";
@@ -14,7 +14,7 @@ import { packItem, reserveLoadout, EQUIP_SLOTS } from "./pack";
 import type { EquipSlot } from "./pack";
 import { slotOf, isGear } from "./catalog";
 import { candidateMaps, previewHints } from "./town";
-import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_HARDNESS, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, POTION, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, INKS, RECIPE, WEAPON_ENHANCEMENT } from "../data/constants";
+import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MATERIAL_TIER, MAP_SCROLL_ID, FOOD, POTION, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, INKS, RECIPE, WEAPON_ENHANCEMENT } from "../data/constants";
 import { visionRadius } from "./perceive";
 import type { GatherableNodeType } from "../data/constants";
 
@@ -58,6 +58,8 @@ export function reduce(
       return survey(state, action.at);
     case "toggle-auto-quaff":
       return toggleAutoQuaff(state);
+    case "toggle-auto-gather":
+      return toggleAutoGather(state);
     case "toggle-auto-finish":
       return toggleAutoFinish(state);
     case "don":
@@ -393,7 +395,7 @@ function gather(state: GameState): { state: GameState; events: GameEvent[] } {
   if (quality < (MATERIAL_TIER[poi.material] ?? 1)) {
     return rejected(state, "gather", "tool-too-weak");
   }
-  const cost = NODE_HARDNESS[kind] / quality;
+  const cost = gatherCost(poi, expedition.loadout.equipment.tools)!; // single source w/ the route cost-preview (eot); the guards above guarantee non-null
   if (cost > expedition.energy) return rejected(state, "gather", "exhausted");
   // Pay energy first, then waste-free auto-eat (dtv). Eating a food unit frees its
   // slot, which can make room for this gather's loot: the fit-check runs against
@@ -863,6 +865,13 @@ function toggleAutoQuaff(state: GameState): { state: GameState; events: GameEven
   if (state.phase !== "expedition" || !expedition) return rejected(state, "toggle-auto-quaff", "not-on-expedition");
   const on = !(expedition.autoQuaff ?? true);
   return { state: { ...state, expedition: { ...expedition, autoQuaff: on } }, events: [{ type: "auto-quaff-toggled", on }] };
+}
+
+function toggleAutoGather(state: GameState): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) return rejected(state, "toggle-auto-gather", "not-on-expedition");
+  const on = !(expedition.autoGather ?? true); // eot: default ON
+  return { state: { ...state, expedition: { ...expedition, autoGather: on } }, events: [{ type: "auto-gather-toggled", on }] };
 }
 
 function toggleAutoFinish(state: GameState): { state: GameState; events: GameEvent[] } {

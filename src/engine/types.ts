@@ -69,6 +69,7 @@ export type Expedition = {
   combat?: Engagement; // live engagement (si7.1). Optional/absent = not engaged; reads guard with `?? undefined` checks.
   autoQuaff?: boolean; // auto-potion at the threshold inside exchanges (si7.1, mirrors autoEat). Optional/absent = true; reads guard with `?? true`.
   autoFinish?: boolean; // auto-finish fights (67e): when true, a fight/engage resolves the WHOLE fight to victory or defeat in one action. Optional/absent = OFF; reads guard with `?? false`.
+  autoGather?: boolean; // auto-interact with nodes the direct-line walk crosses (eot): ON ⇒ gather each node stepped over, pausing only on a full bag. Optional/absent = ON; reads guard with `?? true`. Flipped by toggle-auto-gather.
   mapTier?: number; // this run's map tier (2yn): set at embark from the chosen map's tier
                     // (offered map = 1, held MapItem = its tier). Optional/absent = 1.
   surveyed?: { x: number; y: number }[]; // POIs resolved at range by the survey action (54f): perceive treats these as always-in-radius. Optional/absent = [] (old saves, terse test states); reads guard with `?? []`.
@@ -124,6 +125,7 @@ export type Action =
   | { type: "doff"; itemId: string } // unequip a worn piece / remove a tool to carry (82r)
   | { type: "toggle-auto-quaff" } // flip auto-potion-at-threshold (si7.1)
   | { type: "toggle-auto-finish" } // flip auto-finish-fights (67e): resolve a whole fight in one action
+  | { type: "toggle-auto-gather" } // flip auto-interact-on-walk (eot)
   | { type: "eat" } // eat one food unit now → refill current energy toward max (dtv)
   | { type: "set-auto-eat-food"; defId: string | null } // designate the food that auto-eats waste-free (mco); null clears it (auto-eat off). Supersedes toggle-auto-eat.
   | { type: "drop"; itemId: string }
@@ -207,6 +209,7 @@ export type GameEvent =
   | { type: "surveyed"; at: { x: number; y: number }; kind: NodeType } // spyglass survey resolved a far POI's detail (54f); qualitative only
   | { type: "auto-quaff-toggled"; on: boolean }
   | { type: "auto-finish-toggled"; on: boolean } // 67e
+  | { type: "auto-gather-toggled"; on: boolean } // eot
   | { type: "provoked"; creature: string; hit: number; hp: number } // 67e: a non-flee in-combat action (coat/potion/gear-swap) cost a turn — the monster landed one hit
   | { type: "donned"; defId: string; slot: LoadoutSlot; displaced: string | null; energy: number } // equipped from carry (82r)
   | { type: "doffed"; defId: string; slot: LoadoutSlot; energy: number } // unequipped to carry (82r)

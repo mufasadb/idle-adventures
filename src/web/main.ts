@@ -181,6 +181,7 @@ function fmt(e: GameEvent): string {
     case "inked": { const mat = affixMaterialHint(e.affix); return `🖋 inked — this map now favours ${mat ? name(mat) : "its domain"} (of ${AFFIX_EFFECTS[e.affix]?.label ?? e.affix})`; }
     case "auto-quaff-toggled": return `auto-quaff ${e.on ? "on" : "off"}`;
     case "auto-finish-toggled": return `auto-finish fights ${e.on ? "on" : "off"}`;
+    case "auto-gather-toggled": return `auto-gather ${e.on ? "on" : "off"}`;
     case "provoked": return `⚔ the ${name(e.creature)} strikes while you act · −${round(e.hit)}hp → ${round(e.hp)}hp`;
     case "donned": return `🧤 donned ${name(e.defId)}${e.displaced ? ` (stowed ${name(e.displaced)})` : ""} · −${DON_DOFF_ENERGY}e → ${round(e.energy)}e`;
     case "doffed": return `🎒 doffed ${name(e.defId)} to the bag · −${DON_DOFF_ENERGY}e → ${round(e.energy)}e`;
