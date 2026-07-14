@@ -1,23 +1,15 @@
 import { test, expect } from "bun:test";
+import { scanForPoi, isTier1Monster } from "./helpers";
 import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
-import { generateGrid, rollBiome } from "../src/engine/grid";
 import type { Poi } from "../src/engine/grid";
 import { newGame } from "../src/engine/town";
-import { PLAYER_BASE_HP, MONSTERS, COMBAT_BUFF } from "../src/data/constants";
+import { PLAYER_BASE_HP, COMBAT_BUFF } from "../src/data/constants";
 import type { GameState, GameEvent } from "../src/engine/types";
 
 const types = (evs: GameEvent[]) => evs.map((e) => e.type);
 
-function monsterMap(): { seed: string; poi: Poi } {
-  for (let i = 0; i < 400; i++) {
-    const seed = `use-scan-${i}`;
-    const grid = generateGrid(seed, rollBiome(seed));
-    const poi = grid.pois.find((p) => p.kind === "monster" && p.creature !== null && MONSTERS[p.creature!]?.tier === 1);
-    if (poi) return { seed, poi };
-  }
-  throw new Error("no monster POI in scan range");
-}
+const monsterMap = (): { seed: string; poi: Poi } => scanForPoi("use-scan", isTier1Monster);
 
 // An expedition standing on a live monster with battle items packed, NOT yet engaged.
 function withBattleItems(items: { defId: string; qty: number }[]): { state: GameState; poi: Poi } {

@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test";
+import { scanForPoi } from "./helpers";
 import { reduce } from "../src/engine/reduce";
 import { newGame, candidateMaps } from "../src/engine/town";
-import { generateGrid, rollBiome } from "../src/engine/grid";
 import type { Grid, Poi } from "../src/engine/grid";
 import { NODE_HARDNESS, TOOL_QUALITY, MATERIAL_TIER } from "../src/data/constants";
 import type { GameState } from "../src/engine/types";
@@ -10,17 +10,7 @@ import type { GameState } from "../src/engine/types";
 // actually work — run 1 gathers with the plain `pick`, so a T2+ material (e.g.
 // coal, rolled more often now that POI_DENSITY is higher, e3j) would reject
 // tool-too-weak before the cost-drop assertion ever runs.
-function miningMap(): { seed: string; grid: Grid; poi: Poi } {
-  for (let i = 0; i < 400; i++) {
-    const seed = `loop-scan-${i}`;
-    const grid = generateGrid(seed, rollBiome(seed));
-    const poi = grid.pois.find(
-      (p) => p.kind === "mining" && (MATERIAL_TIER[p.material ?? ""] ?? 1) === 1,
-    );
-    if (poi) return { seed, grid, poi };
-  }
-  throw new Error("no mining map in scan range");
-}
+const miningMap = (): { seed: string; grid: Grid; poi: Poi } => scanForPoi("loop-scan", (p) => p.kind === "mining" && (MATERIAL_TIER[p.material ?? ""] ?? 1) === 1);
 
 // Drop the player onto `poi` in the active (just-embarked) expedition, with the
 // embarked loadout, full energy. Movement is exercised in M6's scripted loop.

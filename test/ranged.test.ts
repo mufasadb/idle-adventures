@@ -1,4 +1,5 @@
 // Ranged combat — bow + ammo (D45). Covers the spec's Testing section:
+import { scanForPoi, isTier1Monster, isInterior } from "./helpers";
 // docs/superpowers/specs/2026-07-07-ranged-combat-bow-ammo-design.md
 import { test, expect } from "bun:test";
 import { reduce } from "../src/engine/reduce";
@@ -29,19 +30,7 @@ import type { GameState, GameEvent, ItemStack } from "../src/engine/types";
 
 // Seed-scan for a tier-1 monster with all 8 neighbours IN BOUNDS (we stand on
 // each of them in the adjacency sweep) — mirrors monsterMap in engagement.test.ts.
-function monsterMap(): { seed: string; poi: Poi } {
-  for (let i = 0; i < 400; i++) {
-    const seed = `ranged-scan-${i}`;
-    const grid = generateGrid(seed, rollBiome(seed));
-    const poi = grid.pois.find(
-      (p) =>
-        p.kind === "monster" && p.creature !== null && MONSTERS[p.creature!]?.tier === 1 &&
-        p.x > 0 && p.x < MAP_WIDTH - 1 && p.y > 0 && p.y < MAP_HEIGHT - 1,
-    );
-    if (poi) return { seed, poi };
-  }
-  throw new Error("no interior tier-1 monster POI in scan range");
-}
+const monsterMap = (): { seed: string; poi: Poi } => scanForPoi("ranged-scan", (p) => isTier1Monster(p) && isInterior(p));
 
 // Hand-built state standing ADJACENT to the monster (default: below it) with a
 // bow wielded and arrows held — the ranged-engage fixture.

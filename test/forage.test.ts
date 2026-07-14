@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test";
+import { scanForPoi } from "./helpers";
 import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
-import { generateGrid, rollBiome } from "../src/engine/grid";
 import type { Poi } from "../src/engine/grid";
 import { slotOf } from "../src/engine/catalog";
 import { GATHER_YIELD, FOOD_ENERGY, MAX_ENERGY } from "../src/data/constants";
@@ -9,15 +9,7 @@ import type { GameState } from "../src/engine/types";
 
 // Find a map holding a berry-bush (an herb POI whose rolled material is
 // "berries") — mirrors reduce-gather.test.ts's mapWith scan.
-function berryMap(): { seed: string; poi: Poi } {
-  for (let i = 0; i < 600; i++) {
-    const seed = `forage-scan-${i}`;
-    const grid = generateGrid(seed, rollBiome(seed));
-    const poi = grid.pois.find((p) => p.kind === "herb" && p.material === "berries");
-    if (poi) return { seed, poi };
-  }
-  throw new Error("no berries herb node in scan range");
-}
+const berryMap = (): { seed: string; poi: Poi } => scanForPoi("forage-scan", (p) => p.kind === "herb" && p.material === "berries", 600);
 
 function standingOn(
   seed: string,

@@ -1,25 +1,17 @@
 import { test, expect } from "bun:test";
+import { scanForPoi, isTier1Monster } from "./helpers";
 import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
-import { generateGrid, rollBiome } from "../src/engine/grid";
 import type { Poi } from "../src/engine/grid";
 import { damageTaken } from "../src/engine/combat";
-import { PLAYER_BASE_HP, MAP_HEIGHT, MONSTERS, QUAFF_ENERGY } from "../src/data/constants";
+import { PLAYER_BASE_HP, MAP_HEIGHT, QUAFF_ENERGY } from "../src/data/constants";
 import type { GameState, GameEvent } from "../src/engine/types";
 
 // Tier-1 only (landing-fix robustness): the bare-sword victory-loop test below
 // assumes a winnable matchup. Filtering to tier 1 keeps that assumption true
 // even if future seed/data shifts move which monster a scan lands on first —
 // a tier-3+ find could otherwise flip the loop to a defeat.
-function monsterMap(): { seed: string; poi: Poi } {
-  for (let i = 0; i < 400; i++) {
-    const seed = `eng-scan-${i}`;
-    const grid = generateGrid(seed, rollBiome(seed));
-    const poi = grid.pois.find((p) => p.kind === "monster" && p.creature !== null && MONSTERS[p.creature!]?.tier === 1);
-    if (poi) return { seed, poi };
-  }
-  throw new Error("no monster POI in scan range");
-}
+const monsterMap = (): { seed: string; poi: Poi } => scanForPoi("eng-scan", isTier1Monster);
 
 function onMonster(seed: string, poi: Poi, opts: { hp?: number; potions?: { defId: string; qty: number }[] } = {}): GameState {
   const loadout = emptyLoadout();
