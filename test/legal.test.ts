@@ -19,8 +19,10 @@ test("townActions: offers pack + embark on a fresh game, never move/gather", () 
   expect(actions.length).toBeGreaterThan(0);
   // every offered action is genuinely accepted by reduce (D29: no drift)
   for (const a of actions) expect(accepts(state, a)).toBe(true);
-  // packing a starter item is offered
-  expect(actions).toContainEqual({ type: "pack", slot: "tool", itemId: "pick" });
+  // packing a starter item is offered — a fresh bank is FOOD only now (xls/9az
+  // bootstrap: no pre-made tools; you knap those your first run), so the packable
+  // starter is the ration, not a tool.
+  expect(actions).toContainEqual({ type: "pack", slot: "food", itemId: "ration" });
   // embark on each candidate map is offered
   for (const m of candidateMaps("s")) {
     expect(actions).toContainEqual({ type: "embark", mapSeed: m.mapSeed });

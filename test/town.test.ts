@@ -9,8 +9,9 @@ test("newGame: a town state with a functional starter bank", () => {
   expect(g.expedition).toBeNull();
   const has = (d: string) => g.bank.some((s) => s.defId === d && s.qty > 0);
   expect(has("small-backpack")).toBe(false); // you start WITHOUT a backpack — it's the first craft
-  expect(has("pick")).toBe(true);
-  expect(has("ration")).toBe(true); // enough to embark with energy
+  expect(has("pick")).toBe(false); // xls/9az bootstrap: you start with NO tools/weapon — you knap them your first run (flint + deadwood)
+  expect(has("sword")).toBe(false);
+  expect(has("ration")).toBe(true); // food only — enough to embark with energy and forage the first kit
 });
 
 test("newGame: deterministic", () => {

@@ -77,6 +77,13 @@ function oneRun(s: GameState, mapSeed: string): GameState {
   }
   s = reduce(s, { type: "return" }).state;
 
+  // Stone-age bootstrap (xls/9az): a fresh game has NO tools — you knap them from
+  // foraged flint. Knap a knife the moment we've foraged the flint for it, so the
+  // NEXT run can hunt animals (deer-hide → the backpack + ration-venison); bare
+  // hands can only forage herbs.
+  if (qtyOf(s, "knife") === 0 && accepts(s, { type: "craft", recipeId: "knife" })) {
+    s = reduce(s, { type: "craft", recipeId: "knife" }).state;
+  }
   // bootstrap a backpack once (reserves one deer-hide), then convert every other
   // food material — foraged herbs AND hunted hides — into rations.
   if (qtyOf(s, "small-backpack") === 0 && qtyOf(s, "leather") === 0 && qtyOf(s, "deer-hide") >= 1) {

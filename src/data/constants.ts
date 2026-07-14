@@ -40,11 +40,11 @@ export const PREVIEW_FIDELITY = 0; // how much a preview reveals (placeholder �
 // not a literal buried in town.ts. Modest + functional: enough to run a real first
 // expedition. You start with NO backpack (bare BASE_CARRY_SLOTS); the ration stack
 // is exactly one STACK_CAP while you bootstrap the food loop.
+// xls/9az stone-age bootstrap: you no longer START with tools/weapon — you knap
+// them your first run (club/knife/axe/pick from flint + deadwood, no tool). Food
+// only, so run 1 isn't a starvation trap; return is free (D62), so the bootstrap
+// costs one deliberate forage trip. See docs/superpowers/specs/2026-07-14-stone-age-bootstrap-design.md
 export const STARTER_BANK: { defId: string; qty: number }[] = [
-  { defId: "pick", qty: 1 },
-  { defId: "axe", qty: 1 },
-  { defId: "knife", qty: 1 },
-  { defId: "sword", qty: 1 },
   { defId: "ration", qty: 5 },
   { defId: "potion", qty: 2 },
 ];
@@ -82,7 +82,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
     materialTable: {
       mining: { "iron-ore": 7, "copper-ore": 2, "silver-ore": 1 }, // silver present (D27) but T2-gated
       wood: { "oak-log": 5, "pine-log": 2, "ironwood-log": 1, stringybark: 3, apple: 2 }, // ironwood T2 (iron-axe); stringybark (D45) = bowstring source, woodland is bow country (oak rebalanced 7→5); apple (m0a) fresh fruit from orchard — material defId = food defId so gather routes to food
-      herb: { "forest-herb": 7, berries: 4, "desert-sage": 2, "ice-moss": 1, flint: 2, thistle: 1 }, // flint (D45): foraged from creek beds, bare hands — arrowheads without a pick; thistle (m0a) T1 herb
+      herb: { "forest-herb": 7, berries: 4, "desert-sage": 2, "ice-moss": 1, flint: 2, thistle: 1, deadwood: 3 }, // flint (D45): foraged from creek beds, bare hands — arrowheads without a pick; thistle (m0a) T1 herb; deadwood (xls): bare-hands foraged wood — the stone-age bootstrap material (club + tool handles)
       animal: { "deer-hide": 7, "wolf-pelt": 2, "lizard-hide": 1, feather: 2 }, // feather (D45): fletching from birds (knife)
     },
     barrierTerrain: "mountain",
@@ -94,7 +94,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
     materialTable: {
       mining: { "copper-ore": 7, "iron-ore": 2, "coal": 1, salt: 2 }, // coal T2 (iron-pick) — desert is a fuel source; salt (m0a) T2 evaporite
       wood: { "cactus-wood": 7, "oak-log": 2, "pine-log": 1 },
-      herb: { "desert-sage": 7, "forest-herb": 2, berries: 1, "ice-moss": 1, flint: 3 }, // flint country (D45): scree + dry creek beds
+      herb: { "desert-sage": 7, "forest-herb": 2, berries: 1, "ice-moss": 1, flint: 3, deadwood: 2 }, // flint country (D45): scree + dry creek beds; deadwood (xls): scarcer bare-hands wood in the desert
       animal: { "lizard-hide": 7, "deer-hide": 2, "drake-hide": 1, feather: 2 }, // drake T2 (steel-knife); feather (D45)
     },
     barrierTerrain: "mountain",
@@ -106,7 +106,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
     materialTable: {
       mining: { "silver-ore": 5, "coal": 2, "iron-ore": 2, "mithril-ore": 1 }, // silver T2 + coal T2 + mithril T3: tundra is the deep-tier mine
       wood: { "pine-log": 7, "oak-log": 2, "ironwood-log": 1, stringybark: 1 }, // stringybark rare here (D45) — bow country is woodland
-      herb: { "ice-moss": 7, "desert-sage": 2, berries: 1, "forest-herb": 1, flint: 1, thistle: 2 }, // thistle (m0a) T2 herb; flint scarce under the ice (D45)
+      herb: { "ice-moss": 7, "desert-sage": 2, berries: 1, "forest-herb": 1, flint: 1, thistle: 2, deadwood: 2 }, // thistle (m0a) T2 herb; flint scarce under the ice (D45); deadwood (xls): bare-hands wood under the tundra
       animal: { "wolf-pelt": 7, "deer-hide": 2, "drake-hide": 1, feather: 2, seal: 2 }, // seal (m0a) T2 large prey; feather (D45)
     },
     barrierTerrain: "mountain",

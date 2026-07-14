@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { reduce } from "../src/engine/reduce";
-import { newGame, candidateMaps } from "../src/engine/town";
+import { candidateMaps } from "../src/engine/town";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import { costToReach } from "../src/engine/reach";
 import { emptyLoadout } from "../src/engine/loadout";
@@ -37,13 +37,23 @@ test("e3j structural: the strip out-ranges one energy capacity (5 offered maps)"
 
 test("e3j report: starter-kit harvest fraction", () => {
   const c = candidateMaps("rf", 0)[0]!;
-  let state: GameState = newGame("rf");
+  // A post-bootstrap starter kit: xls/9az means a FRESH bank is food-only, so the
+  // realistic early kit is what you've KNAPPED after run 1 — pick + knife (from
+  // flint + deadwood) + a little food. Hand-build that bank (no backpack yet) so
+  // this measures the modest-kit reach, not a bare-handed forage-only run.
+  let state: GameState = {
+    seed: "rf", phase: "town",
+    bank: [
+      { defId: "pick", qty: 1 },
+      { defId: "knife", qty: 1 },
+      { defId: "ration", qty: 2 },
+    ],
+    loadout: emptyLoadout(), expedition: null, runs: 0,
+  };
   const act = (a: Action) => reduce(state, a);
-  // Affordable kit: a fresh bank has no small-backpack yet (that's a
-  // craft output — see town.ts), so pack only what the bare BASE_CARRY_SLOTS
-  // bag fits: pick + knife tools, 2 ration food (4/6 slots). Assert each pack
-  // actually lands so an unaffordable/oversized kit can't silently regress
-  // this test back to a meaningless 0% (as starter+axe+4 rations did).
+  // Pack only what the bare BASE_CARRY_SLOTS bag fits: pick + knife tools, 2
+  // ration food (4/6 slots). Assert each pack actually lands so an unaffordable/
+  // oversized kit can't silently regress this test back to a meaningless 0%.
   for (const a of [
     { type: "pack", slot: "tool", itemId: "pick" } as const,
     { type: "pack", slot: "tool", itemId: "knife" } as const,

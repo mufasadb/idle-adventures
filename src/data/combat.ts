@@ -159,6 +159,10 @@ export const MONSTERS: Record<string, Monster> = {
 export type Weapon = { dmgType: DmgType; damage: number; tags: string[] };
 // ⚠ balance surface: changing this requires `bun run sim:tables` (test/balance-tables.test.ts enforces)
 export const WEAPONS: Record<string, Weapon> = {
+  // T0 (damage 2) — the stone-age entry weapon (9az/xls): a deadwood club,
+  // knapped/bound by hand with NO tool. Below sword (3), above unarmed (1) —
+  // a real weapon that the very first run crafts before any metal exists.
+  club: { dmgType: "melee", damage: 2, tags: [] },
   // T1 (damage 3) — starter/basic, matrix + affinity choices live here early
   sword: { dmgType: "melee", damage: 3, tags: [] },
   "iron-sword": { dmgType: "melee", damage: 3, tags: ["iron"] }, // fae affinity

@@ -29,6 +29,9 @@ test("loop: crafting iron-pick makes the second run's mining measurably cheaper 
   const { seed, poi } = miningMap();
   // --- Run 1: basic pick ---
   let state = newGame("loop");
+  // xls/9az bootstrap: a fresh bank is food-only, so seed the knapped basic pick
+  // (flint + deadwood) this test's run-1 baseline assumes.
+  state = { ...state, bank: [...state.bank, { defId: "pick", qty: 1 }] };
   state = reduce(state, { type: "pack", slot: "tool", itemId: "pick" }).state;
   state = reduce(state, { type: "pack", slot: "backpack", itemId: "small-backpack" }).state;
   state = reduce(state, { type: "pack", slot: "food", itemId: "ration" }).state;

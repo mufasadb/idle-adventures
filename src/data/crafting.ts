@@ -65,6 +65,15 @@ export const RECIPE: Record<
   // Consumables — T2 (gated by a T2 material → sit behind the iron-pick)
   "trail-ration": { inputs: [{ defId: "ration", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "trail-ration", qty: 1 } }, // cooked over coal — denser energy/slot
   "greater-potion": { inputs: [{ defId: "potion", qty: 1 }, { defId: "silver-ore", qty: 1 }], output: { defId: "greater-potion", qty: 1 } },
+  // Tools + weapon — tier-0 STONE-AGE STARTERS (9az/xls): the kit you no longer
+  // START with — you knap it by hand your first run. NO `requires` → craftable
+  // bare-handed in town. Inputs are the two bare-hands forageables (flint via the
+  // herb node everywhere; deadwood, the crude foraged wood added for exactly this),
+  // so the whole kit bootstraps from one forage trip without the axe→wood paradox.
+  club: { inputs: [{ defId: "deadwood", qty: 2 }], output: { defId: "club", qty: 1 } }, // the entry weapon (WEAPONS.club, dmg 2)
+  knife: { inputs: [{ defId: "flint", qty: 1 }], output: { defId: "knife", qty: 1 } }, // a knapped flint blade — the archetypal stone tool
+  axe: { inputs: [{ defId: "flint", qty: 1 }, { defId: "deadwood", qty: 1 }], output: { defId: "axe", qty: 1 } }, // stone head + wood handle
+  pick: { inputs: [{ defId: "flint", qty: 1 }, { defId: "deadwood", qty: 1 }], output: { defId: "pick", qty: 1 } },
   // Tools — tiered upgrades (iron-pick is the "cheaper second run" demonstrator)
   "iron-pick": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "iron-pick", qty: 1 } },
   "iron-axe": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "iron-axe", qty: 1 } },
@@ -133,7 +142,11 @@ export const RECIPE: Record<
   // alternates stay ungated — the deliberate "plate without a forge" path.
   anvil: { inputs: [{ defId: "iron-ore", qty: 3 }, { defId: "oak-log", qty: 2 }], output: { defId: "anvil", qty: 1 }, buildsStation: "anvil" },
   "blacksmiths-hammer": { inputs: [{ defId: "iron-ore", qty: 2 }], output: { defId: "blacksmiths-hammer", qty: 1 } },
-  // Weapons — T1
+  // Weapons — T1. sword vs iron-sword (9az): both dmg 3, differentiated by COST —
+  // plain sword is the cheap generic (iron-ore ×2, no affinity); iron-sword pays
+  // +1 ore for the "iron" tag's ×2 fae affinity. (sword left STARTER_BANK in the
+  // xls/9az bootstrap, so it needs a recipe or it'd be an orphan — the 7pi lesson.)
+  sword: { inputs: [{ defId: "iron-ore", qty: 2 }], output: { defId: "sword", qty: 1 } },
   "iron-sword": { inputs: [{ defId: "iron-ore", qty: 3 }], output: { defId: "iron-sword", qty: 1 } },
   bow: { inputs: [{ defId: "oak-log", qty: 2 }, { defId: "bowstring", qty: 1 }], output: { defId: "bow", qty: 1 } }, // D45 rework: bowstring replaces deer-hide — the whole bow line stays pick-free (starter axe)
   "fire-staff": { inputs: [{ defId: "pine-log", qty: 2 }, { defId: "fae-dust", qty: 1 }], output: { defId: "fire-staff", qty: 1 } },
