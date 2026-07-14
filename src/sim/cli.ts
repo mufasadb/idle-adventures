@@ -11,13 +11,14 @@ import { summarize } from "./report";
 const [seed, actionsArg] = process.argv.slice(2);
 if (!seed) {
   console.error("usage: bun run play <seed> '[actions json]'");
-  // h61: besides the engine actions listed under legalActions, the driver accepts a
-  // TRAVEL directive that auto-routes around walls to a tile in one step:
-  //   {"type":"travel","to":{"x":10,"y":42}}
-  // It walks the Dijkstra path (spending energy per step) and stops on arrival, on
-  // exhaustion, or when it walks into a monster (engaging it). Use it instead of
-  // hand-appending many single "move" actions.
-  console.error('travel directive: {"type":"travel","to":{"x":N,"y":N}} — auto-routes to a tile (reach a far node / combat in one step)');
+  // eot: besides the engine actions listed under legalActions, the driver accepts a
+  // ROUTE directive — YOU plan the path (routing efficiently is the game, not the
+  // solver's job). Each waypoint draws a STRAIGHT line from the previous point; it
+  // does NOT route around walls. It walks each tile (spending energy), auto-gathering
+  // nodes it crosses, and STOPS at the first wall on the line, a walked-into monster,
+  // or a full bag — then you re-plan from where it stopped:
+  //   {"type":"route","waypoints":[{"x":10,"y":42},{"x":10,"y":30}]}
+  console.error('route directive: {"type":"route","waypoints":[{"x":N,"y":N},...]} — walk STRAIGHT legs you plan (no auto-routing around walls); stops at a wall/monster/full bag');
   process.exit(1);
 }
 const actions: DriverAction[] = actionsArg ? (JSON.parse(actionsArg) as DriverAction[]) : [];

@@ -1,8 +1,10 @@
 // Shared sim-layer pathfinding (h61): a monster-aware Dijkstra + path reconstruction
 // over the expedition grid. Pure — honours transport/tools/diagonal cost via moveCost,
-// exactly like the reducer's per-step charge. Used by the harvest reference player
-// (simHarvest) and the `travel` console directive (play.ts). NOT engine code: the
-// engine stays single-step; this batches steps for the headless driver + harness.
+// exactly like the reducer's per-step charge. PARKED (eot): no longer backs an
+// agent-facing directive — the `route` directive routes by hand (straight legs). This
+// auto-router now serves only the harvest reference player (harvest.ts), and stays
+// for a future large-scale auto-routing balance calculator (idle-adventure-s2e). NOT
+// engine code: the engine stays single-step; this batches steps for the harness.
 import { moveCost } from "../engine/move";
 import type { Coord } from "../engine/move";
 import { MAP_WIDTH, MAP_HEIGHT } from "../data/constants";
