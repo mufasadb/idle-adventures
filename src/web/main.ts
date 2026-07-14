@@ -13,16 +13,17 @@ import { slotOf } from "../engine/catalog";
 import { recipeOutputQty } from "../engine/craft";
 import { moveCost, moveCostBreakdown } from "../engine/move";
 import { ASSET_TRIAL, TILE_BG, MONSTER_SPRITES, MONSTER_SIZE, NODE_ICON } from "./assets-trial";
-import { costToReach } from "../engine/reach";
 import { carryCap } from "../engine/carry";
 import { wornPieces, ARMOUR_SLOTS } from "../engine/pack";
+import { lineTiles } from "../engine/line";
+import { gatherCost } from "../engine/tools";
 import { heldFoodEnergy } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
-import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, TERRAIN_GATE, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, INKS, AFFIX_EFFECTS, NODE_TOOL, TOOL_CAPABILITY, WEAPON_ENHANCEMENT } from "../data/constants";
+import { RECIPE, MATERIAL_TIER, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, INKS, AFFIX_EFFECTS, NODE_TOOL, TOOL_CAPABILITY, WEAPON_ENHANCEMENT } from "../data/constants";
 import type { BiomeId, GatherableNodeType } from "../data/constants";
 import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint, logisticsEffect, enhancementHint, affixMaterialHint, describe, recipeGateHint, recipeTerrainGate, nodeToolHint, nodeTierNote } from "../render/render";
 import { perceive } from "../engine/perceive";
-import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, LoadoutSlot, MapItem, RejectionReason } from "../engine/types";
+import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, Expedition, LoadoutSlot, MapItem, RejectionReason } from "../engine/types";
 
 // Per-node verb so the UI reads right: you don't "mine" an animal.
 const GATHER_VERB: Record<string, { label: string; past: string; noun: string }> = {
@@ -45,12 +46,14 @@ const seed = params.get("seed") ?? "play";
 const SAVE_KEY = `idle-adv:${seed}`;
 
 type Pos = { x: number; y: number };
-type Pending = { goal: Pos; path: Pos[]; cost: number; fight?: string; shoot?: boolean } | null; // shoot (D45): the goal is adjacent + a ranged engage is legal
 
 let state: GameState = load() ?? newGame(seed);
 let log: string[] = loadLog();
-let pending: Pending = null; // a proposed walk awaiting a confirm click
-let hint: string | null = null; // transient path banner when a click can't be routed (si7.5)
+// eot: routing is the PLAYER's job. `route` is the planned list of waypoints (the
+// player's tile is the implicit head); each leg between consecutive points is drawn
+// as a naive STRAIGHT line (lineTiles), never an energy-optimal path. Clicks build,
+// extend, and truncate it; Walk executes it. Empty = nothing planned.
+let route: Pos[] = [];
 // 67e: the engagement forecast from the LAST render, so the panel can show a delta
 // ("kill in 5 → 3") after a coat/swap/potion. Keyed on the engagement so a new fight
 // resets it. Purely presentational.
@@ -70,7 +73,7 @@ function load(): GameState | null {
 function loadLog(): string[] {
   try { const raw = localStorage.getItem(`${SAVE_KEY}:log`); return raw ? (JSON.parse(raw) as string[]) : []; } catch { return []; }
 }
-function newRun(): void { state = newGame(seed); log = ["· new game"]; pending = null; draw(); }
+function newRun(): void { state = newGame(seed); log = ["· new game"]; route = []; draw(); }
 
 // --- repack-last-loadout (nuy) -----------------------------------------------
 // The plan is consumed at embark by design (D22/D28) — correct, but it read as a
@@ -121,7 +124,6 @@ function repackLast(): void {
 
 // --- action plumbing: one funnel so every interaction goes through reduce ----
 function apply(action: Action): void {
-  hint = null; // any committed action clears a stale walled-off notice
   const prevLoadout = state.loadout; // embark consumes this plan — stash it for repack
   const { state: next, events } = reduce(state, action);
   if (action.type === "embark" && !events.some((e) => e.type === "action-rejected")) saveLastPlan(prevLoadout);
@@ -209,45 +211,79 @@ const TRANSPORT_ROLE: Record<string, string> = {
   mule: "slow but hauls",
 };
 
-// --- A* pathfinding (UI convenience) -----------------------------------------
-// `blocked` = live-monster tiles routed AROUND (monsters block a tile until
-// beaten). The goal itself is allowed even if blocked, so you can click a monster
-// to walk in and fight it — the route just won't pass through OTHER monsters.
-function findPath(grid: Grid, start: Pos, goal: Pos, transport: string | null, tools: string[], blocked: Set<string>): { path: Pos[]; cost: number } | null {
-  if (kk(start) === kk(goal)) return { path: [], cost: 0 };
-  const goalK = kk(goal);
-  const startK = kk(start);
-  const g = new Map<string, number>([[startK, 0]]);
-  const came = new Map<string, Pos>();
-  const open = new Set<string>([startK]);
-  const coord = new Map<string, Pos>([[startK, start]]);
-  const h = (p: Pos) => Math.max(Math.abs(p.x - goal.x), Math.abs(p.y - goal.y));
-  while (open.size) {
-    let cur: string | null = null, best = Infinity;
-    for (const k of open) { const f = (g.get(k) ?? Infinity) + h(coord.get(k)!); if (f < best) { best = f; cur = k; } }
-    if (cur === null) break;
-    if (cur === kk(goal)) {
-      const path: Pos[] = []; let step = goal;
-      while (kk(step) !== startK) { path.unshift(step); step = came.get(kk(step))!; }
-      return { path, cost: g.get(kk(goal))! };
-    }
-    open.delete(cur);
-    const p = coord.get(cur)!;
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-      if (!dx && !dy) continue;
-      const nx = p.x + dx, ny = p.y + dy;
-      if (nx < 0 || ny < 0 || nx >= MAP_WIDTH || ny >= MAP_HEIGHT) continue;
-      const nk = `${nx},${ny}`;
-      if (blocked.has(nk) && nk !== goalK) continue; // route around other monsters
-      const step = moveCost(grid.terrain[ny]![nx]!, transport, tools, dx !== 0 && dy !== 0); // l2w: diagonal steps cost √2×
-      if (!Number.isFinite(step)) continue;
-      const tentative = (g.get(cur) ?? Infinity) + step;
-      if (tentative < (g.get(nk) ?? Infinity)) {
-        came.set(nk, p); g.set(nk, tentative); coord.set(nk, { x: nx, y: ny }); open.add(nk);
+// --- Direct-line routing (eot) -----------------------------------------------
+// The player plans the route by hand: each waypoint draws a NAIVE straight line
+// (lineTiles) from the previous point — never an energy-optimal path (finding the
+// efficient route is the game). deriveRoute turns the waypoint list into the drawn
+// tiles, per-leg block markers, and the split walk/action energy preview. Pure over
+// its inputs; recomputed each render, never stored.
+type Leg = { tiles: Pos[]; blockedAt: Pos | null };
+type DerivedRoute = {
+  legs: Leg[];
+  drawn: Pos[]; // every leg tile in walk order (the whole plan, drawn even past a block)
+  walkable: Pos[]; // the prefix the walk will actually traverse (stops at the first block)
+  waypointKeys: Set<string>;
+  blockKeys: Set<string>; // each leg's first impassable tile — the red "won't work" markers
+  walkCost: number; // movement energy over the walkable prefix
+  actionCost: number; // auto-gather energy for resolved workable nodes on the walkable prefix
+  blocked: boolean; // any leg hits a wall → Walk disabled
+  end: Pos; // last waypoint (or the player, if the route is empty)
+};
+
+function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: Set<string>, cleared: Set<string>): DerivedRoute {
+  const eq = exp.loadout.equipment;
+  const legs: Leg[] = [];
+  const drawn: Pos[] = [];
+  const walkable: Pos[] = [];
+  const waypointKeys = new Set<string>();
+  const blockKeys = new Set<string>();
+  let walkCost = 0;
+  let actionCost = 0;
+  let globallyBlocked = false; // once the walk hits any wall, later tiles aren't traversed
+  let prevWalk: Pos = exp.pos; // previous WALKED tile — sets the next step's diagonal cost
+  let legStart: Pos = exp.pos;
+  for (const wp of wps) {
+    waypointKeys.add(kk(wp));
+    const tiles = lineTiles(legStart, wp);
+    let blockedAt: Pos | null = null;
+    for (const t of tiles) {
+      drawn.push(t);
+      const passable = Number.isFinite(moveCost(grid.terrain[t.y]![t.x]!, eq.transport, eq.tools)); // impassability is flag-independent
+      if (!passable) {
+        if (blockedAt === null) { blockedAt = t; blockKeys.add(kk(t)); } // this leg's first block
+        globallyBlocked = true;
+      } else if (!globallyBlocked) {
+        walkable.push(t);
+        const diagonal = prevWalk.x !== t.x && prevWalk.y !== t.y;
+        walkCost += moveCost(grid.terrain[t.y]![t.x]!, eq.transport, eq.tools, diagonal);
+        prevWalk = t;
+        if ((exp.autoGather ?? true) && !cleared.has(kk(t)) && resolved.has(kk(t))) {
+          const poi = grid.pois.find((p) => p.x === t.x && p.y === t.y);
+          if (poi) { const gc = gatherCost(poi, eq.tools); if (gc !== null) actionCost += gc; }
+        }
       }
     }
+    legs.push({ tiles, blockedAt });
+    legStart = wp;
   }
-  return null;
+  return { legs, drawn, walkable, waypointKeys, blockKeys, walkCost, actionCost, blocked: legs.some((l) => l.blockedAt !== null), end: wps.length ? wps[wps.length - 1]! : exp.pos };
+}
+
+// A click either clears, TRUNCATES (snaps to the earliest walk-order occurrence of a
+// tile already on the drawn path — this is the "un-click to unwind" gesture, and it
+// resolves self-crossing routes deterministically), or APPENDS a new waypoint. The
+// truncation target becomes the new final waypoint.
+function routeAfterClick(exp: Expedition, wps: Pos[], to: Pos): Pos[] {
+  if (to.x === exp.pos.x && to.y === exp.pos.y) return []; // click self = clear
+  // earliest walk-order occurrence of `to` across the legs → truncate there
+  let legStart: Pos = exp.pos;
+  for (let i = 0; i < wps.length; i++) {
+    for (const t of lineTiles(legStart, wps[i]!)) {
+      if (t.x === to.x && t.y === to.y) return [...wps.slice(0, i), to];
+    }
+    legStart = wps[i]!;
+  }
+  return [...wps, to]; // not on the path → new leg
 }
 
 // Map a rejected walk step to a cause-specific message (1te-e): one banner
@@ -277,18 +313,17 @@ function rejectCopy(reason: RejectionReason, recipeId?: string): string {
 }
 const foodUnits = (food: ItemStack[]) => food.reduce((n, s) => n + s.qty, 0);
 
-// Replay a proposed path one move at a time (each still validated by reduce).
-// Stops early on the first rejection (surfacing its true cause, 1te-e) or when
-// a step engages a monster (1te-a: walking INTO a monster is a fight, not a
-// walk — the deadlock was that the generic "blocked" message hid a bag-full
-// engage rejection and swallowed the successful engagement's state change).
-function confirmWalk(path: Pos[]): void {
+// Walk the planned route's walkable tiles in order, each a real `move` validated by
+// reduce (D29). Stops on the first rejection (surfacing its true cause, 1te-e) or a
+// walked-into fight (1te-a: walking INTO a monster is a fight, not a walk). eot.3
+// layers auto-gather + full-bag pause on top of this.
+function walkRoute(tiles: Pos[]): void {
   const startEnergy = state.expedition!.energy;
   const startFood = state.expedition!.loadout.food;
   let steps = 0;
   let stopReason: RejectionReason | null = null;
   let engaged = false;
-  for (const t of path) {
+  for (const t of tiles) {
     const { state: next, events } = reduce(state, { type: "move", to: t });
     const rej = events.find((e): e is Extract<GameEvent, { type: "action-rejected" }> => e.type === "action-rejected");
     if (rej) { stopReason = rej.reason; break; }
@@ -306,7 +341,7 @@ function confirmWalk(path: Pos[]): void {
   if (steps > 0) log.unshift(`🚶 walked ${steps} tile${steps !== 1 ? "s" : ""} → (${exp.pos.x},${exp.pos.y}) · ${delta}${ateClause}`);
   if (engaged) log.unshift(`⚔ engaged the ${name(exp.combat!.creature)} — resolve the fight in the panel below`);
   if (stopReason) log.unshift(`✋ stopped — ${rejectCopy(stopReason)}`);
-  pending = null; trimAndDraw();
+  route = []; trimAndDraw();
 }
 
 // --- rendering ---------------------------------------------------------------
@@ -663,8 +698,10 @@ function expeditionView(): string {
     perceive(grid, exp.pos, exp.loadout.equipment.tools, exp.surveyed ?? []).map((p) => [`${p.x},${p.y}`, p]),
   );
   const cleared = new Set(exp.cleared.map(kk));
-  const pathSet = new Set(pending ? pending.path.map(kk) : []);
-  const goalK = pending ? kk(pending.goal) : "";
+  const resolved = new Set([...perceived].filter(([, p]) => p.detail != null).map(([key]) => key));
+  const rt = deriveRoute(grid, exp, route, resolved, cleared);
+  const drawnSet = new Set(rt.drawn.map(kk));
+  const goalK = kk(rt.end);
 
   let cells = "";
   for (let y = 0; y < MAP_HEIGHT; y++) for (let x = 0; x < MAP_WIDTH; x++) {
@@ -675,16 +712,20 @@ function expeditionView(): string {
     const cls = ["tile", `terrain-${grid.terrain[y]![x]}`];
     if (poi && !isCleared) cls.push("poi", `poi-${poi.kind}`);
     if (isPlayer) cls.push("player");
-    const onPath = pathSet.has(k);
+    const onPath = drawnSet.has(k);
+    const isBlock = rt.blockKeys.has(k);
     let stepBd: ReturnType<typeof moveCostBreakdown> | null = null;
-    if (onPath) {
+    if (isBlock) {
+      cls.push("path", "path-blocked"); // the red "this won't work" marker
+    } else if (onPath) {
       cls.push("path");
       stepBd = moveCostBreakdown(grid.terrain[y]![x]!, exp.loadout.equipment.transport, exp.loadout.equipment.tools);
       if (stepBd.enabled) cls.push("path-enabled");
       else if (stepBd.discounts.length) cls.push("path-tool");
       else if (stepBd.transport) cls.push("path-transport");
     }
-    if (k === goalK) cls.push("path-goal");
+    if (rt.waypointKeys.has(k)) cls.push("path-waypoint");
+    if (route.length && k === goalK) cls.push("path-goal");
     const locked = poi && !isCleared && poi.material && (MATERIAL_TIER[poi.material] ?? 1) > 1;
     if (locked) cls.push("locked");
     const ch = isPlayer ? PLAYER_CHAR : isCleared ? "·" : poi ? POI_CHAR[poi.kind] : TERRAIN_CHAR[grid.terrain[y]![x]!];
@@ -727,51 +768,51 @@ function expeditionView(): string {
   }
 
   const maxEnergy = exp.maxEnergy ?? MAX_ENERGY;
-  // When a walk is pending, split the energy bar: the part you'll KEEP after the
-  // walk (green) + the part it'll SPEND (orange, red if it would strand you).
-  const pendCost = pending ? pending.cost : 0;
-  const overBudget = pending ? pending.cost > exp.energy : false;
-  const spend = Math.min(pendCost, exp.energy);
+  // With a route planned, split the energy bar: the part you'll KEEP (green) + the
+  // part it'll SPEND (orange, red if it would strand you). Planned = walk + auto-gather.
+  const hasRoute = route.length > 0;
+  const total = rt.walkCost + rt.actionCost;
+  const overBudget = hasRoute && total > exp.energy;
+  const spend = Math.min(total, exp.energy); // clamp — a huge route must never blow out the bar
   const keep = exp.energy - spend;
   const pct = (v: number) => Math.min(100, (v / maxEnergy) * 100);
   // energy may exceed maxEnergy after a manual over-eat (m0a) — cap the bar fill at
   // 100% and surface the surplus rather than overflowing the track.
-  const overFull = !pending && exp.energy > maxEnergy;
+  const overFull = !hasRoute && exp.energy > maxEnergy;
   const overSpan = overFull ? ` <span class="overfull">+${round(exp.energy - maxEnergy)}</span>` : "";
-  const energyFill = pending
+  const energyFill = hasRoute
     ? `<div class="fill energy" style="width:${pct(keep)}%"></div><div class="fill spend${overBudget ? " over" : ""}" style="width:${pct(spend)}%"></div>`
     : `<div class="fill energy" style="width:${pct(exp.energy)}%"></div>`;
-  const energyLabel = pending
-    ? `${round(exp.energy)}/${maxEnergy} → <b class="${overBudget ? "over" : ""}">${round(Math.max(0, exp.energy - pendCost))}</b>${overBudget ? " ⚠ strands you" : ""}`
+  const energyLabel = hasRoute
+    ? `${round(exp.energy)}/${maxEnergy} → <b class="${overBudget ? "over" : ""}">${round(Math.max(0, exp.energy - total))}</b>${overBudget ? " ⚠ strands you" : ""}`
     : `${round(exp.energy)}/${maxEnergy}${overSpan}`;
+  const autoGatherOn = exp.autoGather ?? true;
   const bars = `
     <div class="bar"><span>Energy</span><div class="track">${energyFill}</div><b>${energyLabel}</b></div>
-    <div class="bar"><span>HP</span><div class="track"><div class="fill hp" style="width:${Math.min(100, (exp.hp / 30) * 100)}%"></div></div><b>${round(exp.hp)}</b></div>`;
+    <div class="bar"><span>HP</span><div class="track"><div class="fill hp" style="width:${Math.min(100, (exp.hp / 30) * 100)}%"></div></div><b>${round(exp.hp)}</b></div>
+    <div class="muted small">🌿 auto-gather <b>${autoGatherOn ? "on" : "off"}</b> — <button class="link" data-toggle-autogather>${autoGatherOn ? "walk over nodes without harvesting" : "harvest nodes you cross"}</button></div>`;
 
-  const saving = pending
-    ? pending.path.reduce((s, p, i) => {
-        const prev = i === 0 ? exp.pos : pending!.path[i - 1]!; // l2w: diagonal cost depends on the incoming step
-        return s + moveCostBreakdown(grid.terrain[p.y]![p.x]!, null, [], prev.x !== p.x && prev.y !== p.y).final;
-      }, 0) - pending.cost
-    : 0;
-  const savingClause = pending && Number.isFinite(saving) && saving > 0 ? ` · gear/transport saved ${round(saving)}e` : "";
-  const forecastClause = pending?.fight
+  // End-of-route affordances (eot): the LAST waypoint drives Fight/Shoot/Survey.
+  const endPoi = route.length ? poiAt.get(goalK) : undefined;
+  const fight = endPoi && endPoi.kind === "monster" && endPoi.creature && !cleared.has(goalK) ? endPoi.creature : undefined;
+  const shoot = fight !== undefined && legal.some((a) => a.type === "fight" && a.at !== undefined && a.at.x === rt.end.x && a.at.y === rt.end.y);
+  const costClause = `<b class="${overBudget ? "over" : ""}">−${round(rt.walkCost)} walk${rt.actionCost > 0 ? ` + −${round(rt.actionCost)} gather` : ""}${rt.actionCost > 0 ? ` = −${round(total)}` : ""} energy</b>`;
+  const forecastClause = fight
     ? (() => {
-        const dmgOut = playerDamage(exp.loadout, pending.fight!, exp.weaponBuff); // D60: forecast reflects an active coating
-        const dmgIn = damageTaken(exp.loadout, pending.fight!, 0);
-        const toKill = Math.ceil(MONSTER_TIER_HP_CURVE[MONSTERS[pending.fight!]!.tier]! / dmgOut);
+        const dmgOut = playerDamage(exp.loadout, fight, exp.weaponBuff); // D60: forecast reflects an active coating
+        const dmgIn = damageTaken(exp.loadout, fight, 0);
+        const toKill = Math.ceil(MONSTER_TIER_HP_CURVE[MONSTERS[fight]!.tier]! / dmgOut);
         const toDie = Math.ceil(exp.hp / dmgIn);
         const winning = toKill <= toDie;
         return ` · <span class="forecast" title="bare-kit forecast — battle items apply when the fight starts">forecast: you hit ${round(dmgOut)}, it hits ${round(dmgIn)} — <b class="${winning ? "good" : "over"}">${winning ? `kill in ${toKill}` : "it wins the race"}</b></span>`;
       })()
     : "";
+  const surveyAtEnd = legal.some((a) => a.type === "survey" && a.at.x === rt.end.x && a.at.y === rt.end.y);
   const pathBanner = exp.combat
     ? `<div class="pathbanner engaged">⚔ <b>ENGAGED — the ${name(exp.combat.creature)}</b> · fight or flee in the panel below ↓</div>`
-    : pending
-    ? `<div class="pathbanner">${pending.fight ? `⚔ walk in &amp; <b>fight the ${name(pending.fight)}</b> · ` : ""}→ (${pending.goal.x},${pending.goal.y}): ${pending.path.length} tile${pending.path.length !== 1 ? "s" : ""}, <b class="${pending.cost > exp.energy ? "over" : ""}">−${round(pending.cost)} energy</b>${savingClause}${forecastClause} · <button data-walk>${pending.fight ? "Fight ▶" : "Walk ▶"}</button> ${pending.shoot ? `<button data-shoot title="engage from here with your bow — your opener lands before it can answer, and you don't step in">🏹 Shoot</button> ` : ""}${legal.some((a) => a.type === "survey" && a.at.x === pending!.goal.x && a.at.y === pending!.goal.y) ? `<button data-survey-x="${pending.goal.x}" data-survey-y="${pending.goal.y}" title="study it through the glass without walking over — resolves its detail for −${SURVEY_ENERGY}e">🔭 Survey (−${SURVEY_ENERGY}e)</button> ` : ""}<button class="link" data-cancelpath>cancel</button></div>`
-    : hint
-    ? `<div class="pathbanner"><b class="over">✗ ${hint}</b></div>`
-    : `<div class="pathbanner muted">Click a tile → previews the route + energy. Click <b>Walk</b> (or the tile again / right-click) to go. Monsters (<b>X</b>) block their tile — click one to fight, or route around.</div>`;
+    : hasRoute
+    ? `<div class="pathbanner${rt.blocked ? " blocked" : ""}">${rt.blocked ? `<b class="over">✗ blocked — a leg crosses impassable terrain (red).</b> Click a tile on the line to unwind past it, or reroute. · ` : ""}${fight ? `⚔ walk in &amp; <b>fight the ${name(fight)}</b> · ` : ""}→ (${rt.end.x},${rt.end.y}): ${rt.walkable.length} tile${rt.walkable.length !== 1 ? "s" : ""}, ${costClause}${forecastClause} · <button data-walk${rt.blocked ? " disabled title=\"clear the blocked leg first\"" : ""}>${fight ? "Fight ▶" : "Walk ▶"}</button> ${shoot ? `<button data-shoot title="engage from here with your bow — your opener lands before it can answer, and you don't step in">🏹 Shoot</button> ` : ""}${surveyAtEnd ? `<button data-survey-x="${rt.end.x}" data-survey-y="${rt.end.y}" title="study it through the glass without walking over — resolves its detail for −${SURVEY_ENERGY}e">🔭 Survey (−${SURVEY_ENERGY}e)</button> ` : ""}<button class="link" data-cancelpath>cancel</button></div>`
+    : `<div class="pathbanner muted">Click a tile → draws a straight line + previews energy. Click more tiles to add waypoints; click a tile already on the line to unwind to it. Then <b>Walk</b>. Monsters (<b>X</b>) are fought when your line reaches them.</div>`;
 
   const cap = carryCap(exp.loadout.equipment);
   const inv = inventoryGrid(exp.loadout, exp.carry, cap, exp.carriedMaps ?? [], exp.autoEatFood ?? null);
@@ -853,7 +894,8 @@ function wire(): void {
   app.querySelectorAll<HTMLElement>("[data-drop-map]").forEach((el) => el.onclick = () => apply({ type: "drop-map", mapSeed: el.dataset.dropMap! }));
   app.querySelectorAll<HTMLElement>("[data-use-item]").forEach((el) => el.onclick = () => apply({ type: "use-item", itemId: el.dataset.useItem! }));
   app.querySelectorAll<HTMLElement>("[data-enhance]").forEach((el) => el.onclick = () => apply({ type: "enhance", id: el.dataset.enhance! }));
-  app.querySelectorAll<HTMLElement>("[data-act]").forEach((el) => el.onclick = () => { pending = null; apply({ type: el.dataset.act! } as Action); });
+  app.querySelectorAll<HTMLElement>("[data-act]").forEach((el) => el.onclick = () => { route = []; apply({ type: el.dataset.act! } as Action); });
+  const gatherToggle = app.querySelector<HTMLElement>("[data-toggle-autogather]"); if (gatherToggle) gatherToggle.onclick = () => apply({ type: "toggle-auto-gather" });
   // Auto-eat designation (mco): right-click a food box to set it as the auto-eat
   // food; right-clicking the already-designated one clears it (null = off).
   app.querySelectorAll<HTMLElement>("[data-eatfood]").forEach((el) => el.oncontextmenu = (ev) => {
@@ -863,12 +905,12 @@ function wire(): void {
   });
   const reset = app.querySelector<HTMLElement>("[data-reset]"); if (reset) reset.onclick = () => planReset();
   const repack = app.querySelector<HTMLElement>("[data-repack]"); if (repack) repack.onclick = () => repackLast();
-  const cancel = app.querySelector<HTMLElement>("[data-cancelpath]"); if (cancel) cancel.onclick = () => { pending = null; draw(); };
-  const walk = app.querySelector<HTMLElement>("[data-walk]"); if (walk) walk.onclick = () => { if (pending) confirmWalk(pending.path); };
-  // Shoot (D45): ranged engage on the pending goal — stays put, spends no energy
-  const shoot = app.querySelector<HTMLElement>("[data-shoot]"); if (shoot) shoot.onclick = () => { if (pending) { const at = pending.goal; pending = null; apply({ type: "fight", at }); } };
-  // Survey (54f): resolve the pending goal's detail at range, stay put
-  const surveyBtn = app.querySelector<HTMLElement>("[data-survey-x]"); if (surveyBtn) surveyBtn.onclick = () => { const at = { x: Number(surveyBtn.dataset.surveyX), y: Number(surveyBtn.dataset.surveyY) }; pending = null; apply({ type: "survey", at }); };
+  const cancel = app.querySelector<HTMLElement>("[data-cancelpath]"); if (cancel) cancel.onclick = () => { route = []; draw(); };
+  const walk = app.querySelector<HTMLElement>("[data-walk]"); if (walk) walk.onclick = () => { const d = currentDerived(); if (d && !d.blocked) walkRoute(d.walkable); };
+  // Shoot (D45): ranged engage on the LAST waypoint — stays put, spends no energy
+  const shoot = app.querySelector<HTMLElement>("[data-shoot]"); if (shoot) shoot.onclick = () => { const at = route[route.length - 1]; if (at) { route = []; apply({ type: "fight", at }); } };
+  // Survey (54f): resolve the last waypoint's detail at range, stay put
+  const surveyBtn = app.querySelector<HTMLElement>("[data-survey-x]"); if (surveyBtn) surveyBtn.onclick = () => { const at = { x: Number(surveyBtn.dataset.surveyX), y: Number(surveyBtn.dataset.surveyY) }; route = []; apply({ type: "survey", at }); };
   app.querySelectorAll<HTMLElement>("[data-ink-map]").forEach((el) => el.onclick = () => apply({ type: "ink", mapSeed: el.dataset.inkMap!, inkId: el.dataset.inkId! }));
   app.querySelectorAll<HTMLElement>("[data-newgame]").forEach((el) => el.onclick = () => { if (confirm("Start a new game? This wipes the current run.")) newRun(); });
   app.querySelectorAll<HTMLElement>(".tile[data-x]").forEach((el) => {
@@ -878,43 +920,26 @@ function wire(): void {
   });
 }
 
-// Why did A* find no route to a clicked tile? (si7.5) — replaces the old generic
-// "walled off / blocked by a monster" with a reasoned cause. Data-driven from
-// TERRAIN_GATE via reach.ts (pure): (1) if the tile IS terrain-reachable with the
-// current kit, only a monster on the sole route can have blocked A*; (2) else, try
-// each gate tool the player lacks — if adding it makes reach finite, name it (only
-// climbing-pick enables mountains today; raft merely discounts a river, so it never
-// surfaces here); (3) otherwise the tile is sealed behind impassable terrain.
-function unreachableReason(grid: Grid, from: Pos, goal: Pos): string {
-  const eq = state.expedition!.loadout.equipment;
-  const reach = (tools: string[]) => costToReach(grid.terrain, from, eq.transport, tools)[goal.y]![goal.x]!;
-  if (Number.isFinite(reach(eq.tools))) {
-    return "a monster sits on the only route — fight through it, or find a way around";
-  }
-  const gateTools = [...new Set(Object.values(TERRAIN_GATE).flatMap((g) => Object.keys(g ?? {})))];
-  const enablers = gateTools.filter((tool) => !eq.tools.includes(tool) && Number.isFinite(reach([...eq.tools, tool])));
-  if (enablers.length) return `walled off — a ${enablers.map(name).join(" or ")} would open a route`;
-  return "no route exists — that tile is sealed behind impassable terrain";
+// Recompute the derived route from the live state + `route` waypoints, for wire
+// handlers that run outside the render (Walk needs the walkable tiles + blocked flag).
+function currentDerived(): DerivedRoute | null {
+  const exp = state.expedition;
+  if (!exp) return null;
+  const grid = expeditionGrid(exp);
+  const perceived = new Map(perceive(grid, exp.pos, exp.loadout.equipment.tools, exp.surveyed ?? []).map((p) => [`${p.x},${p.y}`, p]));
+  const resolved = new Set([...perceived].filter(([, p]) => p.detail != null).map(([k]) => k));
+  const cleared = new Set(exp.cleared.map(kk));
+  return deriveRoute(grid, exp, route, resolved, cleared);
 }
 
+// A tile click builds the plan (eot): clear on self, TRUNCATE if the tile is already
+// on the drawn line (earliest walk-order occurrence — handles self-crossing), else
+// APPEND a new waypoint. No pathfinding — the line geometry is whatever routeAfterClick
+// draws; a leg crossing a wall just shows a red marker and disables Walk.
 function onTileClick(to: Pos): void {
-  hint = null;
   const exp = state.expedition;
   if (!exp) return;
-  if (to.x === exp.pos.x && to.y === exp.pos.y) { pending = null; draw(); return; } // click self = cancel
-  if (pending && kk(pending.goal) === kk(to)) { confirmWalk(pending.path); return; } // confirm
-  const grid = expeditionGrid(exp);
-  const cleared = new Set(exp.cleared.map(kk));
-  // live monsters block the route (you fight what you walk into) — routed around
-  const blocked = new Set(grid.pois.filter((p) => p.kind === "monster" && p.creature && !cleared.has(kk(p))).map(kk));
-  const found = findPath(grid, exp.pos, to, exp.loadout.equipment.transport, exp.loadout.equipment.tools, blocked);
-  if (!found || found.path.length === 0) { pending = null; hint = unreachableReason(grid, exp.pos, to); draw(); return; }
-  const goalPoi = grid.pois.find((p) => kk(p) === kk(to));
-  const fight = goalPoi?.kind === "monster" && goalPoi.creature && !cleared.has(kk(to)) ? goalPoi.creature : undefined;
-  // Shoot affordance (D45): an adjacent live monster with a bow + arrows offers
-  // a ranged engage alongside the walk-in — legality straight from reduce (D29).
-  const shoot = fight !== undefined && legalActions(state).some((a) => a.type === "fight" && a.at !== undefined && a.at.x === to.x && a.at.y === to.y);
-  pending = { goal: to, path: found.path, cost: found.cost, fight, shoot };
+  route = routeAfterClick(exp, route, to);
   draw();
 }
 
