@@ -4,7 +4,7 @@ This file provides instructions and context for AI coding agents working on this
 
 ## This project — Idle Adventure (POC)
 
-A turn-based exploration RPG built as a "logistics puzzle on a grid": pack a loadout, drop onto a procedural 20×20 map, make routing/gather/fight calls to **extract as much value as you can before fatigue forces you home** (return is free — the tension is depth-vs-haul under an **energy + HP budget**, not turn-back timing; see D62), craft upgrades, go again. The POC validates exactly one thing — **is that loop fun?**
+A turn-based exploration RPG built as a "logistics puzzle on a grid": pack a loadout, drop onto a procedural 20×60 map, make routing/gather/fight calls to **extract as much value as you can before fatigue forces you home** (return is free — the tension is depth-vs-haul under an **energy + HP budget**, not turn-back timing; see D62), craft upgrades, go again. The POC validates exactly one thing — **is that loop fun?**
 
 **Read first (in `docs/`):**
 - `superpowers/specs/2026-06-30-idle-adventure-poc-core-loop-design.md` — the design (what + why), including the engine contract.
@@ -105,9 +105,10 @@ One pure engine, three thin surfaces. The reducer is the single source of truth 
 **`src/engine/`** (pure — lint-enforced boundary):
 - `types.ts` — the contract: `GameState`/`Expedition`/`Engagement`, `Action`, `GameEvent`, `RejectionReason` (closed unions; adding an Action without a reducer case is a compile error).
 - `reduce.ts` — the reducer. All rules live here. A rejected action returns the ORIGINAL state plus an `action-rejected` event.
-- `grid.ts` — deterministic map generation: base Perlin terrain + low-frequency barrier layer, connectivity carve (all walkable tiles = one component), south-edge entry (must be walkable), POI rejection-sampling on walkable tiles with value-vs-reach pairing. Memoized per `(mapSeed, biomeId)`.
+- `grid.ts` — deterministic map generation: base Perlin terrain + low-frequency barrier layer, connectivity carve (all walkable tiles = one component), south-edge entry (must be walkable), value-agnostic POI rejection-sampling on walkable tiles (D57r retired the value-vs-reach pairing). Memoized per `(mapSeed, biomeId, mapTier, affixes)`.
 - `noise.ts` / `rng.ts` — seeded primitives: `perlin2`, `rand` (stateless hash — namespace seeds like `` `${seed}:barrier` ``), `weightedPick` (always over sorted keys for determinism).
 - `reach.ts` — `costToReach` (Dijkstra) + `reachableTiles` (flood); honours gear/transport via `moveCost`.
+- `line.ts` — `lineTiles(a,b)`: pure Bresenham direct-line stepper for player-planned routing (eot); one 8-neighbour grid step per tile.
 - `move.ts` — `moveCost` = absolute terrain cost − gear discounts (floor `MIN_STEP`) ÷ per-terrain transport multiplier; mountain is ∞ unless enabled.
 - `combat.ts` — pure fight math: `playerDamage` (weapon × matrix × affinity), `damageTaken` (% mitigation `K/(K+D)`), `strikeExchange` (one round), `resolveCombat` (atomic loop over exchanges), `rollLoot` (seeded), `explainMatchup`.
 - `carry.ts` — all slot accounting: `carryCap`, `consumableSlots`, `freeLootStacks`, `usedSlots`, `addToCarry`. Consumables/tools = 1 slot per unit; only loot stacks (`STACK_CAP`).
@@ -131,7 +132,7 @@ In THIS repo, `src/web/assets-trial.ts` (behind the `ASSET_TRIAL` flag in `main.
 ## Conventions & Patterns
 
 - Grids are `[y][x]`; `x ∈ [0, MAP_WIDTH)`, `y ∈ [0, MAP_HEIGHT)` (20×60 portrait strip).
-- Optional `Expedition`/`GameState` fields exist for old saves + terse test states — always read with the documented `??` default (`autoEat ?? true`, `maps ?? []`, …). New optional fields follow this pattern and document their default in `types.ts`.
+- Optional `Expedition`/`GameState` fields exist for old saves + terse test states — always read with the documented `??` default (`autoQuaff ?? true`, `autoGather ?? true`, `maps ?? []`, …; note `autoEat` the boolean is gone — D48 replaced it with the `autoEatFood` defId). New optional fields follow this pattern and document their default in `types.ts`.
 - `GameEvent` is a closed union and the web `fmt()` switch is exhaustive — adding an event without a log line breaks typecheck (by design).
 - Every lever change lands with its docs: a `decisions.md` D-row (dense single-row style, cite the spec) and a `balance-levers.md` update. Check the highest D-number before writing.
 - Deeper working rules (gates, test idioms, harness invariants, browser verification): **`docs/working-on-this-codebase.md`** — hand this to any subagent touching code.
