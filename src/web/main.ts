@@ -313,23 +313,37 @@ function rejectCopy(reason: RejectionReason, recipeId?: string): string {
 }
 const foodUnits = (food: ItemStack[]) => food.reduce((n, s) => n + s.qty, 0);
 
-// Walk the planned route's walkable tiles in order, each a real `move` validated by
-// reduce (D29). Stops on the first rejection (surfacing its true cause, 1te-e) or a
-// walked-into fight (1te-a: walking INTO a monster is a fight, not a walk). eot.3
-// layers auto-gather + full-bag pause on top of this.
-function walkRoute(tiles: Pos[]): void {
+// Walk the planned waypoints in order (eot). Each leg is the straight lineTiles from
+// the current position to the waypoint, applied as single `move`s validated by reduce
+// (D29). After each step, auto-gather the tile the walk landed on (gated by
+// autoGather): a node harvests, a FULL BAG pauses the walk with the remaining route
+// intact so you can make room and Walk again. The whole walk also halts on the first
+// rejection (its true cause, 1te-e) or a walked-into fight (1te-a).
+function walkRoute(wps: Pos[]): void {
   const startEnergy = state.expedition!.energy;
   const startFood = state.expedition!.loadout.food;
   let steps = 0;
+  let gathered = 0;
   let stopReason: RejectionReason | null = null;
   let engaged = false;
-  for (const t of tiles) {
-    const { state: next, events } = reduce(state, { type: "move", to: t });
-    const rej = events.find((e): e is Extract<GameEvent, { type: "action-rejected" }> => e.type === "action-rejected");
-    if (rej) { stopReason = rej.reason; break; }
-    state = next;
-    if (next.expedition!.combat) { engaged = true; break; } // final step was the fight
-    steps += 1;
+  let bagFull = false;
+  const remaining = [...wps];
+  walk: while (remaining.length) {
+    for (const t of lineTiles(state.expedition!.pos, remaining[0]!)) {
+      const moved = reduce(state, { type: "move", to: t });
+      const rej = moved.events.find((e): e is Extract<GameEvent, { type: "action-rejected" }> => e.type === "action-rejected");
+      if (rej) { stopReason = rej.reason; break walk; }
+      state = moved.state;
+      if (state.expedition!.combat) { engaged = true; break walk; } // walked into a fight
+      steps += 1;
+      if (state.expedition!.autoGather ?? true) {
+        const g = reduce(state, { type: "gather" });
+        if (g.events.some((e) => e.type === "gathered")) { state = g.state; gathered += 1; }
+        else if (g.events.some((e) => e.type === "action-rejected" && e.reason === "carry-full")) { bagFull = true; break walk; }
+        // other gather rejections (no node / too weak / exhausted) — skip, keep walking
+      }
+    }
+    remaining.shift(); // reached this waypoint
   }
   const exp = state.expedition!;
   // spend/food computed once from start→end state — no per-step sign juggling,
@@ -338,10 +352,15 @@ function walkRoute(tiles: Pos[]): void {
   const delta = net >= 0 ? `−${round(net)}e` : `+${round(-net)}e`;
   const ate = foodUnits(startFood) - foodUnits(exp.loadout.food);
   const ateClause = ate > 0 ? ` · auto-ate ${ate}× ration` : "";
-  if (steps > 0) log.unshift(`🚶 walked ${steps} tile${steps !== 1 ? "s" : ""} → (${exp.pos.x},${exp.pos.y}) · ${delta}${ateClause}`);
+  const gatheredClause = gathered > 0 ? ` · auto-gathered ${gathered}× node${gathered !== 1 ? "s" : ""}` : "";
+  if (steps > 0) log.unshift(`🚶 walked ${steps} tile${steps !== 1 ? "s" : ""} → (${exp.pos.x},${exp.pos.y}) · ${delta}${ateClause}${gatheredClause}`);
   if (engaged) log.unshift(`⚔ engaged the ${name(exp.combat!.creature)} — resolve the fight in the panel below`);
+  if (bagFull) log.unshift(`🎒 bag full — dropped anchor at (${exp.pos.x},${exp.pos.y}); make room and Walk to resume`);
   if (stopReason) log.unshift(`✋ stopped — ${rejectCopy(stopReason)}`);
-  route = []; trimAndDraw();
+  // Preserve the remaining route only on a bag-full pause (resume after making room);
+  // a fight or an obstacle clears it so you re-plan from where you are.
+  route = bagFull ? remaining : [];
+  trimAndDraw();
 }
 
 // --- rendering ---------------------------------------------------------------
@@ -906,7 +925,7 @@ function wire(): void {
   const reset = app.querySelector<HTMLElement>("[data-reset]"); if (reset) reset.onclick = () => planReset();
   const repack = app.querySelector<HTMLElement>("[data-repack]"); if (repack) repack.onclick = () => repackLast();
   const cancel = app.querySelector<HTMLElement>("[data-cancelpath]"); if (cancel) cancel.onclick = () => { route = []; draw(); };
-  const walk = app.querySelector<HTMLElement>("[data-walk]"); if (walk) walk.onclick = () => { const d = currentDerived(); if (d && !d.blocked) walkRoute(d.walkable); };
+  const walk = app.querySelector<HTMLElement>("[data-walk]"); if (walk) walk.onclick = () => { const d = currentDerived(); if (d && !d.blocked) walkRoute(route); };
   // Shoot (D45): ranged engage on the LAST waypoint — stays put, spends no energy
   const shoot = app.querySelector<HTMLElement>("[data-shoot]"); if (shoot) shoot.onclick = () => { const at = route[route.length - 1]; if (at) { route = []; apply({ type: "fight", at }); } };
   // Survey (54f): resolve the last waypoint's detail at range, stay put
