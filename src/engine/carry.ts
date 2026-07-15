@@ -1,6 +1,6 @@
 // Carry-slot accounting. Loot stacks hold STACK_CAP each; consumables and tools
 // each occupy ONE slot per unit (Phase 2, pqp — no stacking for consumables).
-import { BASE_CARRY_SLOTS, BACKPACK_SLOTS, STACK_CAP, TRANSPORT_CARRY, BEAST_TRANSPORTS, PANNIERS_SLOTS, AMMO, ARROW_STACK_CAP } from "../data/constants";
+import { BASE_CARRY_SLOTS, BACKPACK_SLOTS, STACK_CAP, TRANSPORT_CARRY, BEAST_TRANSPORTS, PANNIERS_SLOTS, AMMO, ARROW_STACK_CAP, MAP_CARRY_BASE, MAP_HOLDER_CAP } from "../data/constants";
 import { isGear, CONSUMABLE_KINDS, CONSUMABLE_KEYS } from "./catalog";
 import type { ItemStack, Loadout, Equipment } from "./types";
 
@@ -34,21 +34,32 @@ export function freeCarryStacks(loadout: Loadout): number {
   return carryCap(loadout.equipment) - consumableSlots(loadout);
 }
 
-// Loot capacity after carried maps take their slots (8ec): each carried map
-// costs one slot for the run. Gather + fightAt size their stack budget here.
-export function freeLootStacks(loadout: Loadout, carriedMaps: { mapSeed: string }[] | undefined): number {
-  return freeCarryStacks(loadout) - (carriedMaps ?? []).length;
+// Loot capacity available (zpm.2): carried maps NO LONGER take loot slots — they
+// have their own dedicated pool (mapCarryCap). So loot stacks are just whatever
+// carry room is left after consumables + tools. Gather + fightAt size their budget here.
+export function freeLootStacks(loadout: Loadout): number {
+  return freeCarryStacks(loadout);
 }
 
-// Whole-bag occupancy (e3j): consumable units + loot stacks + carried maps.
+// Whole-bag occupancy (e3j): consumable units + loot stacks. Carried maps are NOT
+// counted here (zpm.2 — they live in the separate map-carry pool, mapCarryCap).
 // Fresh forage lands in loadout.food (not carry), so gather's fit check for
 // food yields must count every slot source, not just loot stacks.
-export function usedSlots(
-  loadout: Loadout,
-  carry: ItemStack[],
-  carriedMaps: { mapSeed: string }[] | undefined,
-): number {
-  return consumableSlots(loadout) + carry.length + (carriedMaps ?? []).length;
+export function usedSlots(loadout: Loadout, carry: ItemStack[]): number {
+  return consumableSlots(loadout) + carry.length;
+}
+
+// Dedicated map-carry capacity (zpm.2): how many map-drops you can carry, a pool
+// SEPARATE from loot/carry slots. Base is the starter-bag "map pocket"; owning a
+// crafted map-holder raises it (best owned WINS, mirroring the backpack cap). Reads
+// the OWNED bank (holders are permanent), so it's always active regardless of loadout.
+export function mapCarryCap(bank: ItemStack[]): number {
+  let cap = MAP_CARRY_BASE;
+  for (const s of bank) {
+    const holderCap = MAP_HOLDER_CAP[s.defId];
+    if (holderCap !== undefined) cap = Math.max(cap, holderCap);
+  }
+  return cap;
 }
 
 // Backpack tier total. The backpack REPLACES the base (it IS your storage), it

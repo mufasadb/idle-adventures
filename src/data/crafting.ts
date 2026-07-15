@@ -94,6 +94,12 @@ export const RECIPE: Record<
   "small-backpack": { inputs: [{ defId: "deer-hide", qty: 1 }], output: { defId: "small-backpack", qty: 1 } },
   leather: { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "leather", qty: 1 } },
   "large-pack": { inputs: [{ defId: "drake-hide", qty: 2 }, { defId: "ironwood-log", qty: 1 }], output: { defId: "large-pack", qty: 1 } },
+  // Map holders (zpm.2) — OWNED, not equipped: a crafted-once, permanent map-carry
+  // upgrade (MAP_HOLDER_CAP; best owned wins). They aren't a loadout slot (slotOf →
+  // null, isGear → false), so they can't be packed — they just sit in the bank and
+  // raise mapCarryCap. Tiered hide→T2-material, mirroring the backpack line.
+  "map-satchel": { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "map-satchel", qty: 1 } }, // T1: a hide roll for the maps
+  "map-case": { inputs: [{ defId: "drake-hide", qty: 1 }, { defId: "silver-ore", qty: 1 }], output: { defId: "map-case", qty: 1 } }, // T2: a hardened case (silver → iron-pick-gated)
   // Transport
   horse: { inputs: [{ defId: "deer-hide", qty: 3 }, { defId: "oak-log", qty: 2 }], output: { defId: "horse", qty: 1 } },
   wagon: { inputs: [{ defId: "ironwood-log", qty: 2 }, { defId: "iron-ore", qty: 2 }], output: { defId: "wagon", qty: 1 } }, // T2: ironwood → iron-axe

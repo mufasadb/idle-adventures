@@ -1,5 +1,6 @@
-// Humanoid map drops (8ec): fightAt mints a carried MapItem; carried maps cost
-// a slot each and bank as held maps at run end.
+// Humanoid map drops (8ec): fightAt mints a carried MapItem; carried maps live in
+// a DEDICATED map-carry pool (zpm.2, mapCarryCap) — separate from loot/carry slots —
+// and bank as held maps at run end.
 import { test, expect } from "bun:test";
 import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
@@ -14,7 +15,7 @@ import {
   STACK_CAP,
   MAP_TIER_MAX,
 } from "../src/data/constants";
-import type { GameState, GameEvent, MapItem } from "../src/engine/types";
+import type { GameState, GameEvent } from "../src/engine/types";
 
 // Combat is no longer atomic (si7.1): the first `fight` engages, subsequent
 // `fight`s each run one exchange. Loop to the terminal outcome so these tests
@@ -108,38 +109,39 @@ test("no roll, no map", () => {
   expect(events.some((e) => e.type === "map-dropped")).toBe(false);
 });
 
-test("full pack: map left behind (carried:false), fight unaffected", () => {
+test("map-cap full: map left behind (carried:false), fight unaffected (zpm.2)", () => {
   const { seed, poi } = humanoidFight(true);
+  // Fill the DEDICATED map-carry pool to its base cap (1, since bank is empty) — a
+  // full LOOT bag no longer blocks a map (zpm.2); only a full map-pocket does.
   const before = atMonster(seed, poi, (s) => {
-    // fill all but one free slot with distinct full stacks: the fight's material
-    // loot takes the last stack, leaving no free slot for the map
+    s.expedition!.carriedMaps = [{ mapSeed: "already-held", biomeId: "desert", vintage: 0 }];
+  });
+  const { state, events } = fightToEnd(before);
+  const dropped = events.find((e) => e.type === "map-dropped") as { carried: boolean } | undefined;
+  expect(dropped?.carried).toBe(false);
+  // the pool stays at exactly the one already-held map — the new drop was left behind
+  expect(state.expedition!.carriedMaps ?? []).toEqual([{ mapSeed: "already-held", biomeId: "desert", vintage: 0 }]);
+  expect(events.some((e) => e.type === "fought")).toBe(true);
+});
+
+test("carried maps do NOT reduce loot/carry capacity — a full loot bag AND a carried map coexist (zpm.2)", () => {
+  const { seed, poi } = humanoidFight(true);
+  // Already carrying a map (its own pool) AND a loot bag one stack shy of full.
+  // The fight's material loot must still fit in that last loot slot — the map costs
+  // ZERO loot slots now, so the fight is NOT rejected for carry-full.
+  const before = atMonster(seed, poi, (s) => {
+    s.expedition!.carriedMaps = [{ mapSeed: "held-map", biomeId: "desert", vintage: 0 }];
     s.expedition!.carry = Array.from({ length: BASE_CARRY_SLOTS - 1 }, (_, i) => ({
       defId: `filler-${i}`,
       qty: STACK_CAP,
     }));
   });
   const { state, events } = fightToEnd(before);
-  const dropped = events.find((e) => e.type === "map-dropped") as { carried: boolean } | undefined;
-  expect(dropped?.carried).toBe(false);
-  expect(state.expedition!.carriedMaps ?? []).toEqual([]);
+  // no carry-full rejection: the loot found its slot despite the carried map
+  expect(events.some((e) => e.type === "action-rejected" && (e as { reason: string }).reason === "carry-full")).toBe(false);
   expect(events.some((e) => e.type === "fought")).toBe(true);
-});
-
-test("carried maps debit gather/loot capacity by one stack each", () => {
-  const { seed, poi } = humanoidFight(true);
-  const held: MapItem[] = Array.from({ length: BASE_CARRY_SLOTS }, (_, i) => ({
-    mapSeed: `m${i}`,
-    biomeId: "desert",
-    vintage: 0,
-  }));
-  const before = atMonster(seed, poi, (s) => {
-    s.expedition!.carriedMaps = held;
-  });
-  // all slots eaten by maps → the fight's material loot can't fit → carry-full
-  const { events } = reduce(before, { type: "fight" });
-  expect(events).toContainEqual(
-    expect.objectContaining({ type: "action-rejected", reason: "carry-full" }),
-  );
+  // the map is still carried — untouched by loot pressure
+  expect(state.expedition!.carriedMaps).toEqual([{ mapSeed: "held-map", biomeId: "desert", vintage: 0 }]);
 });
 
 test("drop-map discards a carried map, freeing its slot; unknown seed rejects", () => {
@@ -154,6 +156,24 @@ test("drop-map discards a carried map, freeing its slot; unknown seed rejects", 
   expect(rej.events).toContainEqual(
     expect.objectContaining({ type: "action-rejected", action: "drop-map", reason: "map-not-carried" }),
   );
+});
+
+test("drop-map frees a map-pocket so the next drop fits (zpm.2)", () => {
+  const { seed, poi } = humanoidFight(true);
+  // Map-pocket at its base cap (1) with a held map → the fresh drop is left behind.
+  const full = atMonster(seed, poi, (s) => {
+    s.expedition!.carriedMaps = [{ mapSeed: "occupant", biomeId: "desert", vintage: 0 }];
+  });
+  const left = fightToEnd(full);
+  expect((left.events.find((e) => e.type === "map-dropped") as { carried: boolean }).carried).toBe(false);
+
+  // Drop the occupant to free the pocket, then a fresh fight's drop now fits.
+  const freed = reduce(atMonster(seed, poi, (s) => {
+    s.expedition!.carriedMaps = [{ mapSeed: "occupant", biomeId: "desert", vintage: 0 }];
+  }), { type: "drop-map", mapSeed: "occupant" }).state;
+  const after = fightToEnd(freed);
+  expect((after.events.find((e) => e.type === "map-dropped") as { carried: boolean }).carried).toBe(true);
+  expect((after.state.expedition!.carriedMaps ?? []).length).toBe(1);
 });
 
 test("drop-map in town rejects", () => {

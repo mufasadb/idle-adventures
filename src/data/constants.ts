@@ -366,6 +366,17 @@ export const GATHER_YIELD: Record<GatherableNodeType, number> = {
 // === Map tiers (2yn) — value-scaling generation axis. See spec 2026-07-08-map-tiers. ===
 export const MAP_TIER_MAX = 5; // deepest map tier; drop-mint caps here
 
+// === Map-carry capacity (zpm.2) — a DEDICATED pool for carried map-drops, separate
+// from loot/carry slots. Carried maps no longer steal a loot stack (spec §3). ===
+export const MAP_CARRY_BASE = 1; // starter-bag "map pocket": how many map-drops you can carry with NO holder owned.
+// Total map-carry cap a map-holder grants (best OWNED wins, mirroring BACKPACK_SLOTS —
+// holders are OWNED, not equipped: a passive bag upgrade, no slot cost). Recipes in
+// crafting.ts. NEAR-THING values (tune in zpm.4).
+export const MAP_HOLDER_CAP: Record<string, number> = {
+  "map-satchel": 2, // T1 hide holder: +1 over base
+  "map-case": 3, // T2 holder: +2 over base
+};
+
 // === Return flavor (xwp) — cosmetic beat on VOLUNTARY return only (never defeat). ===
 // Reframes the loop as "how much value can you extract before fatigue forces you
 // home": a low-energy return reads as an exhausted trek, a high-energy one as

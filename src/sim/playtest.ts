@@ -30,7 +30,7 @@ import {
 import { RECIPE, MAP_WIDTH, MAP_HEIGHT, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, AFFIX_EFFECTS, NODE_TOOL, TOOL_CAPABILITY, TOOL_PURPOSE, TENT_FOOD_MULTIPLIER } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 import { moveCostBreakdown } from "../engine/move";
-import { usedSlots, carryCap } from "../engine/carry";
+import { usedSlots, carryCap, mapCarryCap } from "../engine/carry";
 import { costToReach } from "../engine/reach";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
 import type { Action, GameEvent, GameState } from "../engine/types";
@@ -96,12 +96,13 @@ console.log("\n=== YOU ===");
 console.log(`phase: ${s.phase} · runs completed: ${state.runs ?? 0}`);
 if (s.expedition) console.log(`energy: ${s.expedition.energy}/${s.expedition.maxEnergy} · auto-eat: ${s.expedition.autoEatFood ?? "off"}${state.expedition && toolSpeedFor(state.expedition.loadout.equipment.tools, "camp") !== null ? ` · tent (food +${Math.round((TENT_FOOD_MULTIPLIER - 1) * 100)}%)` : ""} · hp: ${s.expedition.hp} · pos (${s.expedition.pos.x},${s.expedition.pos.y}) · nodes cleared: ${s.expedition.cleared} · auto-potion-in-fights: ${(state.expedition?.autoQuaff ?? true) ? "on" : "off"} · auto-finish-fights: ${(state.expedition?.autoFinish ?? false) ? "on" : "off"}`);
 if (state.expedition) {
-  // Carry + carried maps (8ec; si7.4 parity): maps cost a slot each mid-run.
+  // Carry + carried maps (8ec; zpm.2: maps live in a DEDICATED map-carry pool now,
+  // not a loot slot — mapCarryCap over the owned bank).
   const cmaps = state.expedition.carriedMaps ?? [];
-  console.log(`carry: ${state.expedition.carry.map((c) => `${c.qty}× ${c.defId}`).join(", ") || "(empty)"}${cmaps.length ? ` · carried maps (1 slot each, bank as held maps at run end): ${cmaps.map((m) => `T${m.tier ?? 1} ${m.biomeId} map — drop-map mapSeed="${m.mapSeed}" to free the slot`).join("; ")}` : ""}`);
+  console.log(`carry: ${state.expedition.carry.map((c) => `${c.qty}× ${c.defId}`).join(", ") || "(empty)"}${cmaps.length ? ` · carried maps (${cmaps.length}/${mapCarryCap(s.bank)} map-pocket, bank as held maps at run end): ${cmaps.map((m) => `T${m.tier ?? 1} ${m.biomeId} map — drop-map mapSeed="${m.mapSeed}" to free a map-pocket`).join("; ")}` : ""}`);
   // Bag occupancy (si7.4 parity): the web shows used/cap; the console must too —
   // new line, never reshape the carry line above (drivers parse it).
-  console.log(`bag: ${usedSlots(state.expedition.loadout, state.expedition.carry, cmaps)}/${carryCap(state.expedition.loadout.equipment)} slots used (each food/potion/battle-item/tool/spare-gear unit + each loot stack + each carried map = 1 slot)`);
+  console.log(`bag: ${usedSlots(state.expedition.loadout, state.expedition.carry)}/${carryCap(state.expedition.loadout.equipment)} slots used (each food/potion/battle-item/tool/spare-gear unit + each loot stack = 1 slot; carried maps use a separate map-pocket)`);
 }
 console.log(`bank: ${s.bank.map((i) => `${i.qty}× ${i.defId}`).join(", ") || "(empty)"}`);
 // Show the ACTIVE loadout: on an expedition the equipped gear lives on

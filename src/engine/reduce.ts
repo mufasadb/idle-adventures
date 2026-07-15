@@ -2,7 +2,7 @@ import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot, RejectionRea
 import { expeditionGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
-import { addToCarry, freeCarryStacks, freeLootStacks, usedSlots, carryCap, consumeExpeditionInputs } from "./carry";
+import { addToCarry, freeLootStacks, usedSlots, carryCap, consumeExpeditionInputs, mapCarryCap } from "./carry";
 import { toolSpeedFor, gatherCost, gateSatisfied } from "./tools";
 import { strikeExchange, rollLoot, explainMatchup, damageTaken, wieldsRanged, hasAmmo } from "./combat";
 import { eatToRefill, foodEnergyOf } from "./food";
@@ -252,7 +252,7 @@ function fieldCraftAction(state: GameState, recipeId: string): { state: GameStat
     const candidate = target === "food"
       ? { ...loadout, food: nextList }
       : { ...loadout, food: fed.food, potions: nextList };
-    if (usedSlots(candidate, consumed.carry, expedition.carriedMaps) > carryCap(candidate.equipment)) {
+    if (usedSlots(candidate, consumed.carry) > carryCap(candidate.equipment)) {
       return rejected(state, "craft", "carry-full");
     }
     return {
@@ -262,7 +262,7 @@ function fieldCraftAction(state: GameState, recipeId: string): { state: GameStat
   }
   // Material/gear output → carry, slot-fit-checked against the post-consume inventory.
   const loadoutFed = { ...loadout, food: fed.food };
-  const carry = addToCarry(consumed.carry, outDef, qty, freeLootStacks(loadoutFed, expedition.carriedMaps));
+  const carry = addToCarry(consumed.carry, outDef, qty, freeLootStacks(loadoutFed));
   if (carry === null) return rejected(state, "craft", "carry-full");
   return {
     state: { ...state, expedition: { ...expedition, energy: fed.energy, carry, loadout: loadoutFed } },
@@ -392,7 +392,7 @@ function gather(state: GameState): { state: GameState; events: GameEvent[] } {
         ? [{ defId: front.defId, qty: front.qty + qty }, ...loadout.food.slice(1)]
         : [{ defId: poi.material, qty }, ...loadout.food];
     const candidate = { ...loadout, food };
-    if (usedSlots(candidate, expedition.carry, expedition.carriedMaps) > carryCap(candidate.equipment)) {
+    if (usedSlots(candidate, expedition.carry) > carryCap(candidate.equipment)) {
       return rejected(state, "gather", "carry-full");
     }
     return {
@@ -410,7 +410,7 @@ function gather(state: GameState): { state: GameState; events: GameEvent[] } {
       ],
     };
   }
-  const maxStacks = freeLootStacks(loadout, expedition.carriedMaps);
+  const maxStacks = freeLootStacks(loadout);
   const carry = addToCarry(expedition.carry, poi.material, qty, maxStacks);
   if (carry === null) return rejected(state, "gather", "carry-full");
   return {
@@ -492,7 +492,7 @@ function engage(
 ): { state: GameState; events: GameEvent[] } {
   const rolled = rollLoot(state.seed, creature, at);
   const loot = rolled.filter((s) => s.defId !== MAP_SCROLL_ID);
-  const maxStacks = freeLootStacks(expedition.loadout, expedition.carriedMaps);
+  const maxStacks = freeLootStacks(expedition.loadout);
   let carryWithLoot: typeof expedition.carry | null = expedition.carry;
   for (const stack of loot) {
     carryWithLoot = addToCarry(carryWithLoot, stack.defId, stack.qty, maxStacks);
@@ -616,7 +616,7 @@ function fightRound(state: GameState): { state: GameState; events: GameEvent[] }
   // fit was checked at engage AND re-checked by any mid-fight don/doff (xe4,
   // pendingLootFits) — so this can't overflow; fail loudly if that invariant ever
   // breaks again rather than writing carry:null into state.
-  const maxStacks = freeLootStacks(loadout, expedition.carriedMaps);
+  const maxStacks = freeLootStacks(loadout);
   let carryWithLoot: typeof expedition.carry = expedition.carry;
   for (const stack of loot) {
     const next = addToCarry(carryWithLoot, stack.defId, stack.qty, maxStacks);
@@ -631,7 +631,7 @@ function fightRound(state: GameState): { state: GameState; events: GameEvent[] }
     const biomeId = rollBiome(mapSeed);
     const sourceTier = expedition.mapTier ?? 1;
     const tier = Math.min(sourceTier + 1, MAP_TIER_MAX);
-    const carried = carryWithLoot.length + carriedMaps.length < freeCarryStacks(loadout);
+    const carried = carriedMaps.length < mapCarryCap(state.bank); // zpm.2: maps have their own dedicated pool, not a loot slot
     if (carried) mapsAfter = [...carriedMaps, { mapSeed, biomeId, vintage: state.runs ?? 0, tier }];
     mapEvents.push({ type: "map-dropped", at: { x: combat.at.x, y: combat.at.y }, mapSeed, biomeId, hints: previewHints(mapSeed, biomeId), carried, tier });
   }
@@ -917,10 +917,9 @@ function pendingLootFits(
   combat: NonNullable<Expedition["combat"]>,
   loadout: Loadout,
   carry: ItemStack[],
-  carriedMaps: Expedition["carriedMaps"],
 ): boolean {
   const loot = rollLoot(state.seed, combat.creature, combat.at).filter((s) => s.defId !== MAP_SCROLL_ID);
-  const maxStacks = freeLootStacks(loadout, carriedMaps);
+  const maxStacks = freeLootStacks(loadout);
   let c: ItemStack[] | null = carry;
   for (const stack of loot) {
     c = addToCarry(c, stack.defId, stack.qty, maxStacks);
@@ -950,11 +949,11 @@ function don(state: GameState, itemId: string): { state: GameState; events: Game
     if (displaced !== null) carryNext = [...carryNext, { defId: displaced, qty: 1 }];
   }
   const loadout = { ...expedition.loadout, equipment };
-  if (usedSlots(loadout, carryNext, expedition.carriedMaps) > carryCap(equipment)) {
+  if (usedSlots(loadout, carryNext) > carryCap(equipment)) {
     return rejected(state, "don", "carry-full");
   }
   // xe4: while engaged, the swap must also leave room for the pending victory loot.
-  if (expedition.combat && !pendingLootFits(state, expedition.combat, loadout, carryNext, expedition.carriedMaps)) {
+  if (expedition.combat && !pendingLootFits(state, expedition.combat, loadout, carryNext)) {
     return rejected(state, "don", "carry-full");
   }
   // 67e: in-combat swap costs the monster's turn, NOT energy; out-of-combat keeps DON_DOFF_ENERGY.
@@ -984,11 +983,11 @@ function doff(state: GameState, itemId: string): { state: GameState; events: Gam
   }
   const carryNext = [...expedition.carry, { defId: itemId, qty: 1 }];
   const loadout = { ...expedition.loadout, equipment };
-  if (usedSlots(loadout, carryNext, expedition.carriedMaps) > carryCap(equipment)) {
+  if (usedSlots(loadout, carryNext) > carryCap(equipment)) {
     return rejected(state, "doff", "carry-full");
   }
   // xe4: while engaged, the swap must also leave room for the pending victory loot.
-  if (expedition.combat && !pendingLootFits(state, expedition.combat, loadout, carryNext, expedition.carriedMaps)) {
+  if (expedition.combat && !pendingLootFits(state, expedition.combat, loadout, carryNext)) {
     return rejected(state, "doff", "carry-full");
   }
   // 67e: in-combat swap costs the monster's turn, NOT energy (mirrors don).

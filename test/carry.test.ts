@@ -1,6 +1,7 @@
 import { test, expect } from "bun:test";
-import { slotCap, carryCap, addToCarry, freeCarryStacks } from "../src/engine/carry";
-import { BASE_CARRY_SLOTS, BACKPACK_SLOTS, STACK_CAP, TRANSPORT_CARRY, PANNIERS_SLOTS } from "../src/data/constants";
+import { slotCap, carryCap, addToCarry, freeCarryStacks, mapCarryCap } from "../src/engine/carry";
+import { BASE_CARRY_SLOTS, BACKPACK_SLOTS, STACK_CAP, TRANSPORT_CARRY, PANNIERS_SLOTS, MAP_CARRY_BASE, MAP_HOLDER_CAP } from "../src/data/constants";
+import type { ItemStack } from "../src/engine/types";
 import { emptyLoadout } from "../src/engine/loadout";
 
 test("slotCap: no backpack gives base slots; backpack defines the cap", () => {
@@ -75,4 +76,26 @@ test("freeCarryStacks: consumable units + tools each take a slot (pqp)", () => {
   loadout.potions = [{ defId: "healing-potion", qty: 2 }]; // 2 units → 2 slots
   loadout.equipment.tools = ["pick"]; // tools cost a slot too
   expect(freeCarryStacks(loadout)).toBe(BACKPACK_SLOTS["small-backpack"]! - 3 - 2 - 1);
+});
+
+// --- Map-carry capacity (zpm.2): a dedicated pool, separate from loot slots ---
+const holderNames = Object.keys(MAP_HOLDER_CAP);
+const [satchel, mapCase] = holderNames; // map-satchel (T1), map-case (T2)
+
+test("mapCarryCap: base with no holder in the bank", () => {
+  expect(mapCarryCap([])).toBe(MAP_CARRY_BASE);
+  // ordinary materials don't count as holders
+  expect(mapCarryCap([{ defId: "iron-ore", qty: 4 }])).toBe(MAP_CARRY_BASE);
+});
+
+test("mapCarryCap: an owned holder raises the cap to its tier", () => {
+  const bank: ItemStack[] = [{ defId: satchel!, qty: 1 }];
+  expect(mapCarryCap(bank)).toBe(MAP_HOLDER_CAP[satchel!]!);
+  expect(MAP_HOLDER_CAP[satchel!]!).toBeGreaterThan(MAP_CARRY_BASE);
+});
+
+test("mapCarryCap: best holder WINS with two owned (order-independent)", () => {
+  const best = Math.max(MAP_HOLDER_CAP[satchel!]!, MAP_HOLDER_CAP[mapCase!]!);
+  expect(mapCarryCap([{ defId: satchel!, qty: 1 }, { defId: mapCase!, qty: 1 }])).toBe(best);
+  expect(mapCarryCap([{ defId: mapCase!, qty: 1 }, { defId: satchel!, qty: 1 }])).toBe(best);
 });

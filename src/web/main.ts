@@ -13,7 +13,7 @@ import { slotOf } from "../engine/catalog";
 import { recipeOutputQty } from "../engine/craft";
 import { moveCost, moveCostBreakdown } from "../engine/move";
 import { ASSET_TRIAL, TILE_BG, MONSTER_SPRITES, MONSTER_SIZE, NODE_ICON } from "./assets-trial";
-import { carryCap } from "../engine/carry";
+import { carryCap, mapCarryCap } from "../engine/carry";
 import { wornPieces, ARMOUR_SLOTS } from "../engine/pack";
 import { lineTiles } from "../engine/line";
 import { gatherCost } from "../engine/tools";
@@ -390,7 +390,9 @@ function realSlots(loadout: Loadout, carry: ItemStack[], maps: MapItem[] = [], e
   }
   for (const t of loadout.equipment.tools) boxes.push(slotBox("tool", name(t), "", describe(t)));
   for (const s of carry) boxes.push(slotBox("loot", name(s.defId), `×${s.qty}`, describe(s.defId)));
-  for (const m of maps) boxes.push(slotBox("loot", `🗺️ T${m.tier ?? 1} ${name(m.biomeId)} map`, "")); // carried maps (8ec): 1 slot each
+  // zpm.2: carried maps NO LONGER use a loot/carry slot — they live in a dedicated
+  // map-carry pool (mapCarryCap) and render in their own section below the grid.
+  void maps;
   return boxes;
 }
 function wornGhosts(eq: Equipment): string[] {
@@ -857,7 +859,7 @@ function expeditionView(): string {
       <div class="muted small">food (green) is eaten to refill energy as you travel — freeing slots for loot (gold). Potions purple · battle items red · tools grey · worn gear ghosted (free).</div>
       ${exp.carry.length ? `<div class="bank" style="margin-top:.5rem">${exp.carry.map((s) => `<div class="bankitem"><span class="chip" title="${describe(s.defId)}">${name(s.defId)} ×${s.qty}</span>${legal.some((a) => a.type === "don" && a.itemId === s.defId) ? `<button data-don="${s.defId}" title="equip it (−${DON_DOFF_ENERGY}e; swaps the worn piece into the bag)">don</button>` : ""}<button data-drop="${s.defId}">drop</button></div>`).join("")}</div>` : ""}
       ${(() => { const doffable = legal.filter((a) => a.type === "doff").map((a) => (a as { itemId: string }).itemId); return doffable.length ? `<div class="bank" style="margin-top:.5rem">${doffable.map((id) => `<div class="bankitem"><span class="chip" title="worn · ${describe(id)}">${name(id)} (worn)</span><button data-doff="${id}" title="stow it in the bag (−${DON_DOFF_ENERGY}e; takes a slot)">doff</button></div>`).join("")}</div>` : ""; })()}
-      ${(exp.carriedMaps ?? []).length ? `<div class="bank" style="margin-top:.5rem">${(exp.carriedMaps ?? []).map((m) => `<div class="bankitem"><span class="chip" title="1 slot — banks as a held map when the run ends">🗺️ T${m.tier ?? 1} ${name(m.biomeId)} map</span><button data-drop-map="${m.mapSeed}">drop</button></div>`).join("")}</div>` : ""}
+      ${(exp.carriedMaps ?? []).length ? `<div class="muted" style="margin-top:.5rem;font-size:.85em">carried maps ${(exp.carriedMaps ?? []).length}/${mapCarryCap(state.bank)} map-pocket</div><div class="bank">${(exp.carriedMaps ?? []).map((m) => `<div class="bankitem"><span class="chip" title="map-pocket (separate from loot slots) — banks as a held map when the run ends">🗺️ T${m.tier ?? 1} ${name(m.biomeId)} map</span><button data-drop-map="${m.mapSeed}">drop</button></div>`).join("")}</div>` : ""}
     </section>
   </div>
   ${logView()}`;
