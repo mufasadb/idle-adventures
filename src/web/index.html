@@ -91,9 +91,23 @@
       .bank, .craftlist, .actions { display: flex; flex-direction: column; gap: 0.3rem; }
       .actions { flex-direction: row; flex-wrap: wrap; }
       .bankitem, .craftitem, .mapcard { display: flex; align-items: center; gap: 0.5rem; }
-      .mapcard { background: #20202a; border: 1px solid #333; border-radius: 5px; padding: 0.5rem 0.7rem; margin-bottom: 0.4rem; }
+      .mapcard { background: #20202a; border: 1px solid #333; border-radius: 5px; padding: 0.5rem 0.7rem; margin-bottom: 0.4rem; flex-wrap: wrap; }
       .mapcard b { text-transform: capitalize; min-width: 5rem; }
       .mapoffer { display: flex; flex-direction: column; gap: 0.2rem; }
+      /* zpm.3: free local map (renewable, green) vs earned map (valued, tarnished gold) */
+      .mapcard.local { border-left: 3px solid #4f9c78; }
+      .mapcard.earned { border-left: 3px solid #b8933f; background: #262019; }
+      .mapcard .muted.small { flex-basis: 100%; }
+      .maptag { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.05rem 0.4rem; border-radius: 999px; font-weight: 600; white-space: nowrap; }
+      .maptag.free { background: #1a2c23; color: #7fd6a8; border: 1px solid #2f5a45; }
+      .maptag.tier { background: #2e2612; color: #e0b45e; border: 1px solid #6b551f; }
+      .mapgroup { font-size: 0.95rem; margin: 0.85rem 0 0.3rem; }
+      /* zpm.3: two-step prep banner */
+      .prepbar { display: flex; align-items: center; gap: 1rem; justify-content: space-between; flex-wrap: wrap; background: #20202a; border: 1px solid #3a3a46; border-radius: 6px; padding: 0.6rem 0.9rem; margin-top: 0.75rem; }
+      .prephead { flex: 1; min-width: 12rem; text-transform: capitalize; }
+      .prephead .maptag { margin-left: 0.35rem; }
+      button.embark-final { background: #2f6b45; color: #eafff2; border: 1px solid #3f8a5a; font-weight: 600; padding: 0.45rem 1.1rem; border-radius: 5px; font-size: 0.95rem; }
+      button.embark-final:hover { background: #3a8256; }
       .craftitem.locked { opacity: 0.5; }
       .craftitem .craftname { font-weight: 600; }
       .craftgroup { display: flex; flex-direction: column; gap: 0.15rem; }

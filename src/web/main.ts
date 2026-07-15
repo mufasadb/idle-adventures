@@ -47,6 +47,12 @@ let log: string[] = loadLog();
 // as a naive STRAIGHT line (lineTiles), never an energy-optimal path. Clicks build,
 // extend, and truncate it; Walk executes it. Empty = nothing planned.
 let route: Pos[] = [];
+// zpm.3: two-step town flow. `prep` = the mapSeed the player is preparing to embark
+// on (null = the town OVERVIEW where you pick a map). Selecting a map (Prepare)
+// sets it and shows the loadout screen; Embark commits, ← back clears it. Purely a
+// VIEW mode — the loadout plan itself lives in state.loadout (D28). Cleared whenever
+// we leave town (draw() guards it) so a consumed/rotated map can never linger.
+let prep: string | null = null;
 // 67e: the engagement forecast from the LAST render, so the panel can show a delta
 // ("kill in 5 → 3") after a coat/swap/potion. Keyed on the engagement so a new fight
 // resets it. Purely presentational.
@@ -337,6 +343,7 @@ function draw(): void {
   // across the re-render (save before, restore after) so the view stays put. Only
   // restores when a .gridscroll existed both before and after — phase transitions
   // (town has none) correctly fall through to the fresh element's default 0,0.
+  if (state.phase !== "town") prep = null; // leaving town drops the prep selection (zpm.3)
   const prev = app.querySelector<HTMLElement>(".gridscroll");
   const keepScroll = prev ? { top: prev.scrollTop, left: prev.scrollLeft } : null;
   app.innerHTML = state.phase === "town" ? townView() : expeditionView();
@@ -430,44 +437,91 @@ function heldMapSuffix(m: MapItem): string {
 }
 
 function townView(): string {
+  const local = localMap(state.seed, state.runs ?? 0);
+  const heldMaps = state.maps ?? [];
+  // prep may point at a map that no longer exists (consumed/rotated) — fall back to overview.
+  const inPrep = prep !== null && (prep === local.mapSeed || heldMaps.some((m) => m.mapSeed === prep));
+  const header = `<header><h1>Town</h1><span class="muted">seed "${state.seed}"</span><button class="link" data-newgame>new game</button></header>`;
+  if (inPrep) {
+    return `${header}
+    ${prepBar(prep!, local, heldMaps)}
+    <div class="cols">
+      ${loadoutSection()}
+      ${bankSection()}
+      ${recipeSection()}
+    </div>
+    ${logView()}`;
+  }
+  return `${header}
+  <div class="cols">
+    ${mapSelectSection(local, heldMaps)}
+    ${bankSection()}
+    ${recipeSection()}
+  </div>
+  ${logView()}`;
+}
+
+// STEP 1 (zpm.3): the town overview — pick where to go. The FREE local map reads
+// as mundane/renewable; EARNED maps carry a tier badge and "spent on embark" so a
+// player never burns a T3 thinking it's the freebie. Each card leads to Prepare.
+function mapSelectSection(local: ReturnType<typeof localMap>, heldMaps: MapItem[]): string {
   const legal = legalActions(state);
-  const craftable = legal.filter((a): a is Extract<Action, { type: "craft" }> => a.type === "craft");
+  return `
+    <section>
+      <h2>Where to? <span class="muted small">pick a map — then prepare &amp; embark</span></h2>
+      <div class="mapoffer">
+        <div class="mapcard local">
+          <span class="maptag free">FREE · always here</span>
+          <b>${local.preview.headline}${epithetSuffix(local.mapSeed, local.biomeId)}</b>
+          <div class="muted small">over the hill — a fresh T1 map every visit, never used up. Where food &amp; your first maps come from.</div>
+          <button data-prepare="${local.mapSeed}">Prepare ▶</button>
+        </div>
+      </div>
+      <h3 class="mapgroup">Your maps <span class="muted small">earned from humanoid drops · each spent on embark</span></h3>
+      ${heldMaps.length ? `<div class="mapoffer">
+        ${heldMaps.map((m) => `
+          <div class="mapcard earned">
+            <span class="maptag tier">T${m.tier ?? 1}</span>
+            <b>${name(m.biomeId)} map${heldMapSuffix(m)}</b>
+            <span class="muted small">${(state.runs ?? 0) - m.vintage} runs old</span>
+            <button data-prepare="${m.mapSeed}">Prepare ▶</button>
+            ${Object.keys(INKS).filter((inkId) => legal.some((a) => a.type === "ink" && a.mapSeed === m.mapSeed && a.inkId === inkId)).map((inkId) => `<button data-ink-map="${m.mapSeed}" data-ink-id="${inkId}" title="apply ${name(inkId)} — rolls an affix from its domain onto this map">${name(inkId)}</button>`).join("")}
+          </div>`).join("")}
+      </div>` : `<div class="muted small">(none yet — kill a humanoid to loot a map)</div>`}
+    </section>`;
+}
+
+// STEP 2 (zpm.3): the prep banner — the chosen map pinned, the spend-vs-free call
+// spelled out, the loadout warnings, and the FINAL commit button. The only place
+// embark fires; its copy states the cost so the resource-spend is deliberate.
+function prepBar(mapSeed: string, local: ReturnType<typeof localMap>, heldMaps: MapItem[]): string {
+  const isLocal = mapSeed === local.mapSeed;
+  const held = heldMaps.find((m) => m.mapSeed === mapSeed);
+  const label = isLocal
+    ? `${local.preview.headline}${epithetSuffix(local.mapSeed, local.biomeId)} <span class="maptag free">FREE · T1</span>`
+    : `${name(held!.biomeId)} map${heldMapSuffix(held!)} <span class="maptag tier">T${held?.tier ?? 1}</span>`;
+  const spendNote = isLocal
+    ? `<span class="muted small">free local run — the map is not used up</span>`
+    : `<span class="warn small">⚠ embarking SPENDS this map</span>`;
+  const lo = state.loadout;
+  const warns = `${lo.food.length === 0 ? `<div class="warn">⚠ no food packed → you embark at full ${MAX_ENERGY} energy but nothing to eat mid-run — no way to refill stamina</div>` : ""}${wieldsRanged(lo) && !(lo.ammo ?? []).length ? `<div class="warn">⚠ bow packed with NO ARROWS → it will swing like a club (1 dmg). Pack arrows to shoot.</div>` : ""}`;
+  return `
+  <div class="prepbar">
+    <button class="link" data-back>← back to maps</button>
+    <div class="prephead"><span class="muted small">Preparing</span> ${label} · ${spendNote}</div>
+    <button class="embark-final" data-embark="${mapSeed}">Embark ▶${isLocal ? "" : " — spends this map"}</button>
+  </div>
+  ${warns}`;
+}
+
+function loadoutSection(): string {
   const lo = state.loadout;
   const eq = lo.equipment;
   const cap = carryCap(eq);
   const inv = inventoryGrid(lo, [], cap);
-  const local = localMap(state.seed, state.runs ?? 0);
-  const heldMaps = state.maps ?? [];
   const equipRow = (label: string, val: string | null) =>
     `<div class="row"><span class="k">${label}</span><span class="v">${val ?? "<span class='muted'>—</span>"}</span></div>`;
-
   return `
-  <header><h1>Town</h1><span class="muted">seed "${state.seed}"</span><button class="link" data-newgame>new game</button></header>
-  <div class="cols">
-    <section>
-      <h2>Local expedition <span class="muted small">over the hill — free, always available</span></h2>
-      <div class="mapoffer">
-        <div class="mapcard">
-          <b>${local.preview.headline}${epithetSuffix(local.mapSeed, local.biomeId)}</b>
-          <button data-embark="${local.mapSeed}">Embark ▶</button>
-        </div>
-      </div>
-      ${lo.food.length === 0 ? `<div class="warn">⚠ no food packed → you embark at full ${MAX_ENERGY} energy but have nothing to eat mid-run — no way to refill your stamina</div>` : ""}
-      ${wieldsRanged(lo) && !(lo.ammo ?? []).length ? `<div class="warn">⚠ bow packed with NO ARROWS → it will swing like a club (1 dmg). Pack arrows to shoot.</div>` : ""}
-      <div class="muted small">The local map is the free "go nearby" run — a fresh T1 map every visit, never consumed. Better maps come from humanoid drops and are spent on embark.</div>
-
-      <h2 style="margin-top:1rem">Your maps <span class="muted small">earned from drops — spent on embark</span></h2>
-      ${heldMaps.length ? `<div class="mapoffer">
-        ${heldMaps.map((m) => `
-          <div class="mapcard">
-            <b>T${m.tier ?? 1} ${name(m.biomeId)} map${heldMapSuffix(m)}</b>
-            <span class="muted small">${(state.runs ?? 0) - m.vintage} runs old</span>
-            <button data-embark="${m.mapSeed}">Embark ▶ (spend)</button>
-            ${Object.keys(INKS).filter((inkId) => legal.some((a) => a.type === "ink" && a.mapSeed === m.mapSeed && a.inkId === inkId)).map((inkId) => `<button data-ink-map="${m.mapSeed}" data-ink-id="${inkId}" title="apply ${name(inkId)} — rolls an affix from its domain onto this map">${name(inkId)}</button>`).join("")}
-          </div>`).join("")}
-      </div>` : `<div class="muted small">(none yet — kill a humanoid to loot a map)</div>`}
-    </section>
-
     <section>
       <h2>Loadout plan <button class="link" data-reset>reset</button>${loadLastPlan().length && planActions(lo).length === 0 ? ` <button class="link" data-repack title="re-pack the loadout you took last run (skips anything no longer in the bank)">↻ repack last</button>` : ""}</h2>
       ${equipRow("weapon", eq.weapon ? name(eq.weapon) : null)}
@@ -479,8 +533,12 @@ function townView(): string {
       <div class="row"><span class="k">bag</span><span class="v">${inv.used}/${cap} slots</span></div>
       ${inv.html}
       <div class="muted small">worn gear (ghosted) is free · each food / potion / battle-item / tool takes one slot — bring several tools to work different node types · you embark at ${MAX_ENERGY} energy; packed food holds ≈ ${heldFoodEnergy(lo.food)} energy of refills to eat back as you travel${eq.tools.includes("tent") ? ` · tent — food restores +${Math.round((TENT_FOOD_MULTIPLIER - 1) * 100)}%` : ""}</div>
-    </section>
+    </section>`;
+}
 
+function bankSection(): string {
+  const legal = legalActions(state);
+  return `
     <section>
       <h2>Bank</h2>
       <div class="bank">
@@ -495,8 +553,13 @@ function townView(): string {
           </div>`;
         }).join("")}
       </div>
-    </section>
+    </section>`;
+}
 
+function recipeSection(): string {
+  const legal = legalActions(state);
+  const craftable = legal.filter((a): a is Extract<Action, { type: "craft" }> => a.type === "craft");
+  return `
     <section>
       <h2>Recipe book <span class="muted small">one line per output · each ingredient path listed below it</span></h2>
       <div class="craftlist">
@@ -550,9 +613,7 @@ function townView(): string {
           }).join("");
         })()}
       </div>
-    </section>
-  </div>
-  ${logView()}`;
+    </section>`;
 }
 
 // What the player is standing on — always shown, so gather/fight has context.
@@ -872,6 +933,8 @@ function logView(): string {
 // --- wiring: attach handlers after each render -------------------------------
 function wire(): void {
   app.querySelectorAll<HTMLElement>("[data-embark]").forEach((el) => el.onclick = () => apply({ type: "embark", mapSeed: el.dataset.embark! }));
+  app.querySelectorAll<HTMLElement>("[data-prepare]").forEach((el) => el.onclick = () => { prep = el.dataset.prepare!; route = []; draw(); }); // zpm.3: enter the prep screen for this map
+  app.querySelectorAll<HTMLElement>("[data-back]").forEach((el) => el.onclick = () => { prep = null; draw(); }); // zpm.3: back to the map overview
   app.querySelectorAll<HTMLElement>("[data-craft]").forEach((el) => el.onclick = () => apply({ type: "craft", recipeId: el.dataset.craft! }));
   app.querySelectorAll<HTMLElement>("[data-pack]").forEach((el) => el.onclick = () => apply({ type: "pack", slot: el.dataset.slot as LoadoutSlot, itemId: el.dataset.pack! }));
   app.querySelectorAll<HTMLElement>("[data-drop]").forEach((el) => el.onclick = () => apply({ type: "drop", itemId: el.dataset.drop! }));
