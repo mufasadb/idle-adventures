@@ -1,8 +1,8 @@
 import { test, expect } from "bun:test";
 import { townActions, expeditionActions, legalActions } from "../src/sim/legal";
 import { reduce } from "../src/engine/reduce";
-import { newGame, candidateMaps } from "../src/engine/town";
-const OFFER_S = candidateMaps("s", 0)[0]!.mapSeed; // offered map for seed "s" (9u9.3)
+import { newGame, localMap } from "../src/engine/town";
+const OFFER_S = localMap("s", 0).mapSeed; // the free local map for seed "s" (9u9.3)
 import { play } from "../src/sim/play";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import type { Poi } from "../src/engine/grid";
@@ -23,26 +23,26 @@ test("townActions: offers pack + embark on a fresh game, never move/gather", () 
   // bootstrap: no pre-made tools; you knap those your first run), so the packable
   // starter is the ration, not a tool.
   expect(actions).toContainEqual({ type: "pack", slot: "food", itemId: "ration" });
-  // embark on each candidate map is offered
-  for (const m of candidateMaps("s")) {
-    expect(actions).toContainEqual({ type: "embark", mapSeed: m.mapSeed });
-  }
+  // embark on the free local map is offered
+  expect(actions).toContainEqual({ type: "embark", mapSeed: localMap("s", 0).mapSeed });
   // no expedition-only actions leak in
   expect(actions.some((a) => a.type === "move" || a.type === "gather" || a.type === "return")).toBe(false);
 });
 
-test("townActions: offers pocket-map for each offered map; a held map is embarkable (xzx)", () => {
+// pocket-map is retired (zpm.1): it's removed from the Action union, so the
+// compiler itself guarantees townActions can never emit it — no runtime assert
+// needed (checking `a.type === "pocket-map"` is now a type error). This test pins
+// that town offers embark on the free local map AND each held (drop-earned) map.
+test("townActions: offers embark on the free local map + each held map (zpm.1)", () => {
   const state = newGame("s");
-  const offer = candidateMaps("s", 0);
   const town = townActions(state);
-  // every offered map can be pocketed (none held yet)
-  for (const m of offer) expect(town).toContainEqual({ type: "pocket-map", mapSeed: m.mapSeed });
-  // after pocketing one, its seed is embarkable AND no longer offered to pocket
-  const held = reduce(state, { type: "pocket-map", mapSeed: offer[0]!.mapSeed }).state;
-  const after = townActions(held);
-  expect(after).toContainEqual({ type: "embark", mapSeed: offer[0]!.mapSeed });
-  expect(after).not.toContainEqual({ type: "pocket-map", mapSeed: offer[0]!.mapSeed });
-  for (const a of after) expect(accepts(held, a)).toBe(true); // D29: no drift
+  // the free local map is embarkable
+  expect(town).toContainEqual({ type: "embark", mapSeed: localMap("s", 0).mapSeed });
+  // a held (drop-earned) map is also embarkable
+  const withHeld: GameState = { ...state, maps: [{ mapSeed: "s:drop:1", biomeId: "woodland", vintage: 0, tier: 2 }] };
+  const after = townActions(withHeld);
+  expect(after).toContainEqual({ type: "embark", mapSeed: "s:drop:1" });
+  for (const a of after) expect(accepts(withHeld, a)).toBe(true); // D29: no drift
 });
 
 test("townActions: empty when not in town", () => {

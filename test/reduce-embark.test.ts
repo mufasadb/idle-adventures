@@ -3,11 +3,11 @@ import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import { MAX_ENERGY } from "../src/data/constants";
-import { candidateMaps, newGame } from "../src/engine/town";
+import { localMap, newGame } from "../src/engine/town";
 import type { GameState, MapItem } from "../src/engine/types";
 
-const OFFER_G = candidateMaps("g", 0)[0]!.mapSeed; // townState()'s first offered map
-const OFFER_E = candidateMaps("e", 0)[0]!.mapSeed; // seed-"e" states' first offered map
+const OFFER_G = localMap("g", 0).mapSeed; // townState()'s local map
+const OFFER_E = localMap("e", 0).mapSeed; // seed-"e" states' local map
 
 function townState(): GameState {
   const loadout = emptyLoadout();
@@ -127,7 +127,7 @@ test("embark: an off-offer seed is rejected (no seed re-farming, 9u9.3)", () => 
 });
 
 test("embark: held map tier flows into expedition.mapTier", () => {
-  // Pocket-free path: inject a held T3 map, then embark it.
+  // Held map arrives as a drop (zpm.2): inject a held T3 map, then embark it.
   const base = newGame("emk");
   const held: MapItem = { mapSeed: "held-t3", biomeId: "tundra", vintage: 0, tier: 3 };
   const st = { ...base, maps: [held] };
@@ -135,21 +135,20 @@ test("embark: held map tier flows into expedition.mapTier", () => {
   expect(state.expedition?.mapTier).toBe(3);
 });
 
-test("embark: an offered map is tier 1", () => {
+test("embark: the local map is tier 1", () => {
   const base = newGame("emk2");
-  const offer = candidateMaps("emk2", 0)[0]!;
-  const { state } = reduce(base, { type: "embark", mapSeed: offer.mapSeed });
+  const local = localMap("emk2", 0);
+  const { state } = reduce(base, { type: "embark", mapSeed: local.mapSeed });
   expect(state.expedition?.mapTier).toBe(1);
 });
 
-test("embark: the offer rotates with runs — last visit's seed is no longer valid", () => {
-  const prevSeed = candidateMaps("g", 0)[0]!.mapSeed;
+test("embark: the local map rotates with runs — last visit's seed is no longer valid", () => {
+  const prevSeed = localMap("g", 0).mapSeed;
   const s1: GameState = { ...townState(), runs: 1 };
-  const offeredNow = candidateMaps("g", 1).map((m) => m.mapSeed);
-  if (!offeredNow.includes(prevSeed)) {
-    expect(reduce(s1, { type: "embark", mapSeed: prevSeed }).events).toEqual([
-      { type: "action-rejected", action: "embark", reason: "not-offered" },
-    ]);
-  }
-  expect(reduce(s1, { type: "embark", mapSeed: offeredNow[0]! }).events[0]!.type).toBe("embarked");
+  const offeredNow = localMap("g", 1).mapSeed;
+  expect(offeredNow).not.toBe(prevSeed); // rotated
+  expect(reduce(s1, { type: "embark", mapSeed: prevSeed }).events).toEqual([
+    { type: "action-rejected", action: "embark", reason: "not-offered" },
+  ]);
+  expect(reduce(s1, { type: "embark", mapSeed: offeredNow }).events[0]!.type).toBe("embarked");
 });

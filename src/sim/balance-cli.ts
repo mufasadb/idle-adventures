@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { KIT_PRESETS, resolveKit, simFight, simReach, simTables, mapTierReport } from "./balance";
 import type { FightReport, ReachReport, TableData, MapTierReport, KitSpec } from "./balance";
 import { harvestFractionReport } from "./harvest";
-import { candidateMaps } from "../engine/town";
+import { localMap } from "../engine/town";
 import type { ItemStack } from "../engine/types";
 
 type Flags = { kit: string; overrides: KitSpec; vs?: string; seed?: string; json: boolean; write: boolean };
@@ -144,7 +144,7 @@ export function run(argv: string[]): { code: number; output: string } {
     }
     if (cmd === "harvest") {
       const tier = Number(flags.seed ?? 3); // --seed reused as tier selector for this view
-      const maps = Array.from({ length: 5 }, (_, i) => candidateMaps("hf", i)[0]!.mapSeed);
+      const maps = Array.from({ length: 5 }, (_, i) => localMap("hf", i).mapSeed);
       const rep = harvestFractionReport(
         { tools: ["pick", "knife", "canteen", "tent", "ice-cleats", "climbing-pick"], backpack: "large-pack", transport: "horse", food: [{ defId: "pemmican", qty: 6 }] },
         tier,

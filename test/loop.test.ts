@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test";
 import { scanForPoi } from "./helpers";
 import { reduce } from "../src/engine/reduce";
-import { newGame, candidateMaps } from "../src/engine/town";
+import { newGame, localMap } from "../src/engine/town";
 import type { Grid, Poi } from "../src/engine/grid";
 import { NODE_HARDNESS, TOOL_SPEED, MATERIAL_GATE } from "../src/data/constants";
 import type { GameState } from "../src/engine/types";
@@ -36,7 +36,7 @@ test("loop: crafting iron-pick makes the second run's mining measurably cheaper 
   state = reduce(state, { type: "pack", slot: "backpack", itemId: "small-backpack" }).state;
   state = reduce(state, { type: "pack", slot: "food", itemId: "ration" }).state;
   state = reduce(state, { type: "pack", slot: "food", itemId: "ration" }).state;
-  state = reduce(state, { type: "embark", mapSeed: candidateMaps("loop", state.runs ?? 0)[0]!.mapSeed }).state;
+  state = reduce(state, { type: "embark", mapSeed: localMap("loop", state.runs ?? 0).mapSeed }).state;
   // stand on the mining node with plenty of energy, gather with the basic pick
   state = standingOn(state, seed, poi, 100);
   const gather1 = reduce(state, { type: "gather" });
@@ -60,7 +60,7 @@ test("loop: crafting iron-pick makes the second run's mining measurably cheaper 
   state = reduce(state, { type: "pack", slot: "backpack", itemId: "small-backpack" }).state;
   state = reduce(state, { type: "pack", slot: "food", itemId: "ration" }).state;
   state = reduce(state, { type: "pack", slot: "food", itemId: "ration" }).state;
-  state = reduce(state, { type: "embark", mapSeed: candidateMaps("loop", state.runs ?? 0)[0]!.mapSeed }).state;
+  state = reduce(state, { type: "embark", mapSeed: localMap("loop", state.runs ?? 0).mapSeed }).state;
   state = standingOn(state, seed, poi, 100);
   const gather2 = reduce(state, { type: "gather" });
   const cost2 = NODE_HARDNESS.mining / TOOL_SPEED["iron-pick"]!; // 6 / 2

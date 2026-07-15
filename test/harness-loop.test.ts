@@ -2,7 +2,7 @@ import { test, expect } from "bun:test";
 import { reduce } from "../src/engine/reduce";
 import { legalActions } from "../src/sim/legal";
 import { play } from "../src/sim/play";
-import { newGame, candidateMaps } from "../src/engine/town";
+import { newGame, localMap } from "../src/engine/town";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import { MAP_WIDTH, MAP_HEIGHT } from "../src/data/constants";
 import type { Action, GameState } from "../src/engine/types";
@@ -86,18 +86,18 @@ function runLoop(seed: string, mapSeed: string, runs: number): { state: GameStat
 }
 
 test("harness: a JSON action stream drives a full loop on two different biomes", () => {
-  // Scan the town's rotating offer (candidateMaps, by town-visit `runs`) for two
-  // DISTINCT biomes on which the greedy driver actually completes a gather. The
-  // driver is naive (no pathfinding — mountains can wedge a straight-line route),
-  // so we don't bet on a specific map; we prove the loop works on ≥2 biomes and
-  // every embark is a validly-offered candidate (9u9.3).
+  // Scan the town's rotating local map (localMap, by town-visit `runs` — one map
+  // per visit now, zpm.1) for two DISTINCT biomes on which the greedy driver
+  // actually completes a gather. The driver is naive (no pathfinding — mountains
+  // can wedge a straight-line route), so we don't bet on a specific map; we prove
+  // the loop works on ≥2 biomes and every embark is the validly-offered local map
+  // at runs=r (9u9.3).
   const done = new Map<BiomeId, { state: GameState; gathered: boolean }>();
-  for (let r = 0; r < 80 && done.size < 2; r++) {
-    for (const c of candidateMaps("hl", r)) {
-      if (done.has(c.biomeId)) continue;
-      const res = runLoop("hl", c.mapSeed, r); // embark validates: mapSeed ∈ offer at runs=r
-      if (res.gathered) done.set(c.biomeId, res);
-    }
+  for (let r = 0; r < 240 && done.size < 2; r++) {
+    const c = localMap("hl", r);
+    if (done.has(c.biomeId)) continue;
+    const res = runLoop("hl", c.mapSeed, r); // embark validates: mapSeed is the local map at runs=r
+    if (res.gathered) done.set(c.biomeId, res);
   }
   expect(done.size).toBe(2); // two biomes drove a full gather loop
   const starter = new Set(["small-backpack", "pick", "axe", "knife", "sword", "ration", "potion"]);
@@ -113,7 +113,7 @@ test("harness: play() reproduces a hand-authored full loop headlessly", () => {
   const actions: Action[] = [
     { type: "pack", slot: "food", itemId: "ration" },
     { type: "pack", slot: "food", itemId: "ration" },
-    { type: "embark", mapSeed: candidateMaps("hl", 0)[0]!.mapSeed },
+    { type: "embark", mapSeed: localMap("hl", 0).mapSeed },
     { type: "return" },
   ];
   const { state, events } = play("hl", actions);

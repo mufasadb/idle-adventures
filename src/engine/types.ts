@@ -111,7 +111,6 @@ export type Action =
   | { type: "craft"; recipeId: string }
   | { type: "pack"; slot: LoadoutSlot; itemId: string }
   | { type: "embark"; mapSeed: string }
-  | { type: "pocket-map"; mapSeed: string }
   | { type: "ink"; mapSeed: string; inkId: string } // apply a crafted ink to a held map (cxq): rolls + writes an affix from the ink's domain
   | { type: "move"; to: { x: number; y: number } } // steps ONE tile toward target
   | { type: "gather" }
@@ -162,7 +161,6 @@ export type RejectionReason =
   | "insufficient"
   | "already-packed"
   | "no-slot"
-  | "already-pocketed"
   | "engaged"
   | "not-engaged"
   | "not-worn" // doff of a defId that isn't currently equipped (82r)
@@ -226,7 +224,6 @@ export type GameEvent =
       rounds?: number; // 67e: set when auto-finish resolved the fight in one action (the N rounds it collapsed); absent for a single manual round
     }
   | { type: "crafted"; recipeId: string; output: ItemStack; where?: "field" | "town" } // where (ke3.4): field crafts read distinctly in the log. Optional/absent = town.
-  | { type: "pocketed-map"; mapSeed: string; biomeId: BiomeId; tier: number }
   | { type: "inked"; mapSeed: string; affix: string } // an ink rolled + wrote this affix onto a held map (cxq)
   | { type: "map-dropped"; at: { x: number; y: number }; mapSeed: string; biomeId: BiomeId; hints: string[]; carried: boolean; tier: number } // humanoid kill minted a map (8ec); carried=false → pack full, left behind
   | { type: "map-discarded"; mapSeed: string } // drop-map (8ec): carried map thrown away mid-run

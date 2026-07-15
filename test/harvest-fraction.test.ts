@@ -1,9 +1,9 @@
 import { test, expect } from "bun:test";
 import { simHarvest, harvestFractionReport } from "../src/sim/harvest";
-import { candidateMaps } from "../src/engine/town";
+import { localMap } from "../src/engine/town";
 import { HARVEST_FRACTION_TIER_TARGET, HARVEST_FRACTION_BASE_TARGET } from "../src/data/constants";
 
-const seeds = (n: number) => Array.from({ length: n }, (_, i) => candidateMaps("hf", i)[0]!.mapSeed);
+const seeds = (n: number) => Array.from({ length: n }, (_, i) => localMap("hf", i).mapSeed);
 
 test("simHarvest returns a fraction in [0,1] with a positive POI total", () => {
   const r = simHarvest({ tools: ["pick", "knife"], food: [{ defId: "ration", qty: 2 }] }, seeds(1)[0]!, 1);

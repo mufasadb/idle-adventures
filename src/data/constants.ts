@@ -33,7 +33,6 @@ export const FOOD_REACH_MIN = 2; // min forageable (herb/animal) nodes on finite
 // (data-driven like TERRAIN_GATE; future glasses/cartography/scent items slot in).
 export const DETAIL_RADIUS = 2;
 export const VISION_RANGE_BONUS: Record<string, number> = { spyglass: 3 }; // spyglass → radius 5
-export const CANDIDATE_MAP_COUNT = 3; // town map choices (spec §11)
 export const PREVIEW_FIDELITY = 0; // how much a preview reveals (placeholder — M5)
 
 // Fresh-game starter bank (e96): the kit a new game begins with — a tunable lever,

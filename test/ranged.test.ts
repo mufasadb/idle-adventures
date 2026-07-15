@@ -11,7 +11,7 @@ import { consumableSlots, stackCapOf } from "../src/engine/carry";
 import { packItem, reserveLoadout } from "../src/engine/pack";
 import { endExpedition } from "../src/engine/bank";
 import { legalActions } from "../src/sim/legal";
-import { candidateMaps } from "../src/engine/town";
+import { localMap } from "../src/engine/town";
 import {
   PLAYER_BASE_HP,
   MAP_WIDTH,
@@ -213,7 +213,7 @@ test("pack/bank round-trip: packed arrows debit at embark; unspent arrows bank b
   let s: GameState = { seed: "rt", phase: "town", bank: [{ defId: "arrows", qty: 5 }], loadout: emptyLoadout(), expedition: null };
   for (let i = 0; i < 3; i++) s = reduce(s, { type: "pack", slot: "ammo", itemId: "arrows" }).state;
   expect(s.loadout.ammo).toEqual([{ defId: "arrows", qty: 3 }]);
-  const offer = candidateMaps(s.seed, 0)[0]!;
+  const offer = localMap(s.seed, 0);
   s = reduce(s, { type: "embark", mapSeed: offer.mapSeed }).state;
   expect(s.bank).toContainEqual({ defId: "arrows", qty: 2 }); // 5 packed-3 = 2 left home
   expect(s.expedition!.loadout.ammo).toEqual([{ defId: "arrows", qty: 3 }]);

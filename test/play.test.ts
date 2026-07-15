@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test";
 import { play } from "../src/sim/play";
-import { newGame, candidateMaps } from "../src/engine/town";
-const OFFER_S = candidateMaps("s", 0)[0]!.mapSeed; // offered map for seed "s" (9u9.3)
+import { newGame, localMap } from "../src/engine/town";
+const OFFER_S = localMap("s", 0).mapSeed; // offered map for seed "s" (9u9.3)
 
 test("play: no actions returns the fresh game unchanged", () => {
   const { state, events } = play("s", []);

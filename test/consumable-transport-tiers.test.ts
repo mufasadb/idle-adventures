@@ -4,10 +4,10 @@ import { resolveCombat } from "../src/engine/combat";
 import { moveCost } from "../src/engine/move";
 import { slotCap } from "../src/engine/carry";
 import { emptyLoadout } from "../src/engine/loadout";
-import { candidateMaps } from "../src/engine/town";
+import { localMap } from "../src/engine/town";
 import type { GameState } from "../src/engine/types";
 
-const OFFER_T = candidateMaps("t", 0)[0]!.mapSeed; // an offered map for seed "t" (9u9.3)
+const OFFER_T = localMap("t", 0).mapSeed; // an offered map for seed "t" (9u9.3)
 
 // Consumable/transport/backpack tiers (2026-07-04). Better consumables give more
 // per item — progression EARNS efficiency against the firm carry squeeze.

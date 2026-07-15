@@ -5,7 +5,7 @@ import { test, expect } from "bun:test";
 import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
 import { legalActions } from "../src/sim/legal";
-import { candidateMaps } from "../src/engine/town";
+import { localMap } from "../src/engine/town";
 import { stackCapOf } from "../src/engine/carry";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import { rollLoot } from "../src/engine/combat";
@@ -58,7 +58,7 @@ test("embark expands spares into carry as one piece per stack and clears loadout
   let s = reduce(seedState, { type: "pack", slot: "spare", itemId: "silver-sword" }).state;
   s = reduce(s, { type: "pack", slot: "spare", itemId: "silver-sword" }).state;
   expect(s.loadout.spares).toEqual([{ defId: "silver-sword", qty: 2 }]); // merged plan (slots counted per-unit)
-  const offer = candidateMaps(s.seed, 0)[0]!;
+  const offer = localMap(s.seed, 0);
   const embarked = reduce(s, { type: "embark", mapSeed: offer.mapSeed }).state;
   expect(embarked.expedition!.carry).toEqual([{ defId: "silver-sword", qty: 1 }, { defId: "silver-sword", qty: 1 }]); // per-piece stacks
   expect(embarked.expedition!.loadout.spares).toEqual([]); // no double slot-count

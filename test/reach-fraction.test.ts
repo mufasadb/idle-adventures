@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { reduce } from "../src/engine/reduce";
-import { candidateMaps } from "../src/engine/town";
+import { localMap } from "../src/engine/town";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import { costToReach } from "../src/engine/reach";
 import { emptyLoadout } from "../src/engine/loadout";
@@ -26,7 +26,7 @@ test("e3j structural: the strip out-ranges one energy capacity (5 offered maps)"
   // The farthest POI must cost more than MAX_ENERGY to even REACH on foot —
   // food (and forage routing) is the only way to work the deep half.
   for (let r = 0; r < 5; r++) {
-    const c = candidateMaps("rf", r)[0]!;
+    const c = localMap("rf", r);
     const grid = generateGrid(c.mapSeed, rollBiome(c.mapSeed));
     const reach = costToReach(grid.terrain, grid.entry);
     const finite = grid.pois.map((p) => reach[p.y]![p.x]!).filter(Number.isFinite);
@@ -36,7 +36,7 @@ test("e3j structural: the strip out-ranges one energy capacity (5 offered maps)"
 });
 
 test("e3j report: starter-kit harvest fraction", () => {
-  const c = candidateMaps("rf", 0)[0]!;
+  const c = localMap("rf", 0);
   // A post-bootstrap starter kit: xls/9az means a FRESH bank is food-only, so the
   // realistic early kit is what you've KNAPPED after run 1 — pick + knife (from
   // flint + deadwood) + a little food. Hand-build that bank (no backpack yet) so
@@ -129,7 +129,7 @@ test("e3j report: starter-kit harvest fraction", () => {
 });
 
 test("e3j report: geared-kit harvest fraction", () => {
-  const c = candidateMaps("rf", 0)[0]!;
+  const c = localMap("rf", 0);
   // Hand-build a stocked bank (spec §6 parity) instead of relying on newGame's
   // starter bank — a geared+provisioned run should harvest much more of the map.
   let state: GameState = {

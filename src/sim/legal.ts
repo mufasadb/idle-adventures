@@ -8,7 +8,7 @@ import { reduce } from "../engine/reduce";
 import { RECIPE, INKS } from "../data/constants";
 import { slotOf, isGear } from "../engine/catalog";
 import { wornPieces } from "../engine/pack";
-import { candidateMaps } from "../engine/town";
+import { localMap } from "../engine/town";
 import { expeditionGrid } from "../engine/grid";
 import { perceive } from "../engine/perceive";
 
@@ -31,15 +31,9 @@ export function townActions(state: GameState): Action[] {
     if (slot !== null) candidates.push({ type: "pack", slot, itemId: stack.defId });
     if (isGear(stack.defId)) candidates.push({ type: "pack", slot: "spare", itemId: stack.defId });
   }
-  // embark: each candidate map the town is offering (rotates with state.runs)
-  for (const map of candidateMaps(state.seed, state.runs ?? 0)) {
-    candidates.push({ type: "embark", mapSeed: map.mapSeed });
-  }
-  // pocket each offered map you don't already hold; embark each held map (xzx)
-  const held = new Set((state.maps ?? []).map((m) => m.mapSeed));
-  for (const map of candidateMaps(state.seed, state.runs ?? 0)) {
-    if (!held.has(map.mapSeed)) candidates.push({ type: "pocket-map", mapSeed: map.mapSeed });
-  }
+  // embark: the free local map (rotates with state.runs, D80) + each held map
+  // (drop-minted, spent on embark). No pocket action — pocketing is retired (zpm.1).
+  candidates.push({ type: "embark", mapSeed: localMap(state.seed, state.runs ?? 0).mapSeed });
   for (const m of state.maps ?? []) candidates.push({ type: "embark", mapSeed: m.mapSeed });
   // ink (cxq): each held map × each ink defId you hold; reduce filters the rest (D29)
   const inkIds = state.bank.filter((s) => s.defId in INKS).map((s) => s.defId);

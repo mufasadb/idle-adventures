@@ -13,7 +13,7 @@ import { craft as applyRecipe, recipeOutputQty } from "./craft";
 import { packItem, reserveLoadout, EQUIP_SLOTS } from "./pack";
 import type { EquipSlot } from "./pack";
 import { slotOf, isGear } from "./catalog";
-import { candidateMaps, previewHints } from "./town";
+import { localMap, previewHints } from "./town";
 import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MAP_SCROLL_ID, FOOD, POTION, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, INKS, RECIPE, WEAPON_ENHANCEMENT } from "../data/constants";
 import { visionRadius } from "./perceive";
 
@@ -27,8 +27,6 @@ export function reduce(
   switch (action.type) {
     case "embark":
       return embark(state, action.mapSeed);
-    case "pocket-map":
-      return pocketMap(state, action.mapSeed);
     case "ink":
       return inkMap(state, action.mapSeed, action.inkId);
     case "move":
@@ -89,17 +87,17 @@ function embark(
   mapSeed: string,
 ): { state: GameState; events: GameEvent[] } {
   if (state.phase !== "town") return rejected(state, "embark", "not-in-town");
-  // No seed re-farming (9u9.3): you can only embark on a map the town is CURRENTLY
-  // offering (candidateMaps rotates with runs). legalActions already restricts to
-  // these; validating here makes reduce the source of truth (D29) so no driver can
-  // farm a favourable seed by hand-building the action.
-  // A map is embarkable if the town is CURRENTLY offering it ("go nearby" — a
-  // fresh map, not consumed) OR you're holding it (a pocketed map, xzx — spent on
-  // embark). A seed that's neither is not-offered, so the farm loop stays closed.
-  const offered = candidateMaps(state.seed, state.runs ?? 0).map((m) => m.mapSeed);
+  // No seed re-farming (9u9.3): you can only embark on the town's CURRENT local
+  // map (localMap rotates with runs — D80) OR a held map you earned as a drop.
+  // Validating here makes reduce the source of truth (D29) so no driver can farm a
+  // favourable seed by hand-building the action.
+  // The local map is the free "go nearby" run — a fresh T1 map, NOT held, so it's
+  // never consumed. Held maps (state.maps, drop-minted, zpm.2) ARE consumed on
+  // embark (wasHeld below). A seed that's neither stays not-offered — farm closed.
+  const offered = localMap(state.seed, state.runs ?? 0).mapSeed;
   const held = state.maps ?? [];
   const wasHeld = held.some((m) => m.mapSeed === mapSeed);
-  if (!offered.includes(mapSeed) && !wasHeld) return rejected(state, "embark", "not-offered");
+  if (offered !== mapSeed && !wasHeld) return rejected(state, "embark", "not-offered");
   // D28: settle the plan against the bank — debit everything the loadout pulls.
   const reserved = reserveLoadout(state.loadout);
   const bank = subtractStacks(state.bank, reserved);
@@ -146,26 +144,6 @@ function embark(
     events: [
       { type: "embarked", mapSeed, biomeId: grid.biomeId, pos: grid.entry, energy },
     ],
-  };
-}
-
-// Pocket an offered map (xzx): keep a single-use snapshot to run later, even after
-// the offer rotates. No cost, no cap — "go nearby" means you're never stuck, so
-// hoarding buys nothing. Dedupe by mapSeed; must be in the current offer.
-function pocketMap(
-  state: GameState,
-  mapSeed: string,
-): { state: GameState; events: GameEvent[] } {
-  if (state.phase !== "town") return rejected(state, "pocket-map", "not-in-town");
-  const offer = candidateMaps(state.seed, state.runs ?? 0);
-  const found = offer.find((m) => m.mapSeed === mapSeed);
-  if (!found) return rejected(state, "pocket-map", "not-offered");
-  const maps = state.maps ?? [];
-  if (maps.some((m) => m.mapSeed === mapSeed)) return rejected(state, "pocket-map", "already-pocketed");
-  const item = { mapSeed: found.mapSeed, biomeId: found.biomeId, vintage: state.runs ?? 0, tier: 1 };
-  return {
-    state: { ...state, maps: [...maps, item] },
-    events: [{ type: "pocketed-map", mapSeed, biomeId: found.biomeId, tier: 1 }],
   };
 }
 

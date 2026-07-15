@@ -8,7 +8,7 @@
 import { play } from "./play";
 import { legalActions } from "./legal";
 import { summarize } from "./report";
-import { candidateMaps, mapEpithet } from "../engine/town";
+import { localMap, mapEpithet } from "../engine/town";
 import { expeditionGrid } from "../engine/grid";
 import { recipeOutputQty } from "../engine/craft";
 import { wornPieces } from "../engine/pack";
@@ -66,7 +66,6 @@ function fmtEvent(e: GameEvent): string {
         : `☠ you were downed${ff} · run ends, haul kept`) + tail;
     }
     case "crafted": return `✦ ${e.where === "field" ? "field-crafted 🔥 " : "crafted "}${e.output.qty}× ${e.output.defId}`;
-    case "pocketed-map": return `📜 pocketed a T${e.tier} ${e.biomeId} map`;
     case "map-dropped": return e.carried
       ? `🗺️ looted a T${e.tier} ${e.biomeId} map (takes 1 carry slot — banks home with you)`
       : `🗺️ a T${e.tier} ${e.biomeId} map dropped — pack full, left behind`;
@@ -137,14 +136,14 @@ for (const a of legalActions(state)) console.log(JSON.stringify(a));
 
 function printTown(st: GameState): void {
   console.log("\n=== TOWN ===");
-  const offer = candidateMaps(st.seed, st.runs ?? 0);
-  console.log("Maps on offer (embark = 'go nearby', free; or pocket to keep for later):");
-  for (const m of offer) { const e = mapEpithet(m.mapSeed, m.biomeId); console.log(`  • ${m.preview.headline}${e ? ` of ${e}` : ""}  →  embark mapSeed="${m.mapSeed}"  ·  pocket mapSeed="${m.mapSeed}"`); }
-  // Held maps (xzx): pocketed snapshots that survive the offer rotating — embark
-  // spends one. "go nearby" runs a fresh offered map instead (nothing to spend).
+  const local = localMap(st.seed, st.runs ?? 0);
+  console.log("Local map (embark = free 'go nearby', never consumed; rotates each visit):");
+  { const e = mapEpithet(local.mapSeed, local.biomeId); console.log(`  • ${local.preview.headline}${e ? ` of ${e}` : ""}  →  embark mapSeed="${local.mapSeed}"`); }
+  // Held maps (zpm.1): earned from humanoid drops (zpm.2), survive across visits —
+  // embark spends one. The local map is the free run instead (nothing to spend).
   const held = st.maps ?? [];
-  console.log("\nYour maps (held — embarking one SPENDS it; they outlast the offer rotating):");
-  if (held.length === 0) console.log("  (none — pocket a map above to keep it)");
+  console.log("\nYour maps (earned from drops — embarking one SPENDS it):");
+  if (held.length === 0) console.log("  (none — kill a humanoid to loot a map)");
   for (const m of held) {
     // cxq affix labels (player-inked) take precedence over the q2k emergent epithet.
     const affixes = m.affixes ?? [];

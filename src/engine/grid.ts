@@ -212,7 +212,7 @@ export function affixProfile(biome: Biome, affixes: string[]): Biome {
 // Single derivation of an in-run map grid from expedition identity (kuv): every
 // in-run VIEW and ENGINE site MUST derive the grid through this helper, so a new
 // generation discriminator (mapTier, affixes) can never desync view↔engine
-// again. Town-side / offer-preview (candidateMaps) stays separate.
+// again. Town-side / offer-preview (localMap) stays separate.
 export function expeditionGrid(exp: { mapSeed: string; mapTier?: number; affixes?: string[] }): Grid {
   return generateGrid(exp.mapSeed, rollBiome(exp.mapSeed), exp.mapTier ?? 1, exp.affixes ?? []);
 }

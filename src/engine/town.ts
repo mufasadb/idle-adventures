@@ -1,13 +1,13 @@
-// Town entry (M5): a fresh game's starter state, and the town's candidate-map
-// offer. candidateMaps is a pure helper (like the future legalActions, M6) that
-// feeds both the web view and the AI harness — it is NOT a reducer action;
-// embark carries only the chosen mapSeed.
+// Town entry (M5): a fresh game's starter state, and the town's local-map offer.
+// localMap is a pure helper (like legalActions) that feeds both the web view and
+// the AI harness — it is NOT a reducer action; embark carries only the chosen
+// mapSeed.
 import type { GameState } from "./types";
 import type { BiomeId } from "../data/constants";
 import type { Grid } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { rollBiome, generateGrid } from "./grid";
-import { CANDIDATE_MAP_COUNT, PREVIEW_FIDELITY, EPITHETS, MONSTERS, STARTER_BANK } from "../data/constants";
+import { PREVIEW_FIDELITY, EPITHETS, MONSTERS, STARTER_BANK } from "../data/constants";
 
 // Modest, functional starter kit: enough to run a real first expedition. You
 // start with NO backpack (bare BASE_CARRY_SLOTS) — the small-backpack is your
@@ -63,19 +63,19 @@ export function mapEpithet(mapSeed: string, biomeId: BiomeId, mapTier = 1): stri
   return epithetForGrid(generateGrid(mapSeed, biomeId, mapTier));
 }
 
-// The town's offer for the CURRENT visit. `runs` (GameState.runs) advances the
-// seed namespace so every return to town rolls a fresh batch of Perlin maps —
-// the world is effectively infinite, not the same 3 maps forever. Still pure and
-// deterministic: (seed, runs) fully determines the offer.
-export function candidateMaps(
+// The town's single free "over the hill" local map (zpm.1, map-economy spec §①).
+// Replaces the old 3-map offer: one deterministic T1 map, always available,
+// never pocketable, never consumed on embark. `runs` (GameState.runs) advances
+// the seed namespace so the local map ROTATES each town visit — a fresh Perlin
+// map every time, not the same map forever (keeps it from going stale). Still
+// pure and deterministic: (seed, runs) fully determines the map. The real map
+// economy is now the drop-minted held maps (state.maps); this is the cheap-food
+// + humanoid-map-drop seed of that climb.
+export function localMap(
   seed: string,
   runs = 0,
-): { mapSeed: string; biomeId: BiomeId; preview: { headline: string; hints: string[] } }[] {
-  const maps: { mapSeed: string; biomeId: BiomeId; preview: { headline: string; hints: string[] } }[] = [];
-  for (let i = 0; i < CANDIDATE_MAP_COUNT; i++) {
-    const mapSeed = `${seed}:map:${runs}:${i}`;
-    const biomeId = rollBiome(mapSeed);
-    maps.push({ mapSeed, biomeId, preview: { headline: biomeId, hints: previewHints(mapSeed, biomeId) } });
-  }
-  return maps;
+): { mapSeed: string; biomeId: BiomeId; preview: { headline: string; hints: string[] } } {
+  const mapSeed = `${seed}:local:${runs}`;
+  const biomeId = rollBiome(mapSeed);
+  return { mapSeed, biomeId, preview: { headline: biomeId, hints: previewHints(mapSeed, biomeId) } };
 }

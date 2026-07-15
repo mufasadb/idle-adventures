@@ -1,13 +1,13 @@
 import { test, expect } from "bun:test";
 import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
-import { candidateMaps } from "../src/engine/town";
+import { localMap } from "../src/engine/town";
 
 import type { GameState, Action } from "../src/engine/types";
 
 // Embark a run with a given food loadout + tools, then drain energy to `energy`.
 function onMap(food: { defId: string; qty: number }[], tools: string[], energy: number): GameState {
-  const seed = candidateMaps("oe", 0)[0]!.mapSeed;
+  const seed = localMap("oe", 0).mapSeed;
   const bank = [...tools.map((d) => ({ defId: d, qty: 1 })), ...food];
   let s: GameState = { seed: "oe", phase: "town", bank, loadout: emptyLoadout(), expedition: null, runs: 0 };
   for (const t of tools) s = reduce(s, { type: "pack", slot: "tool", itemId: t } as Action).state;

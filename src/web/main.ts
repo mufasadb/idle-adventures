@@ -4,7 +4,7 @@
 // what's offered, so the UI can never diverge from what the engine accepts.
 // Pathing (A*) is a UI convenience — it only proposes a sequence of `move`
 // actions; each step is still validated by `reduce`.
-import { newGame, candidateMaps, mapEpithet } from "../engine/town";
+import { newGame, localMap, mapEpithet } from "../engine/town";
 import { reduce } from "../engine/reduce";
 import { legalActions } from "../sim/legal";
 import { expeditionGrid, rollBiome } from "../engine/grid";
@@ -157,7 +157,6 @@ function fmt(e: GameEvent): string {
         : `☠ the ${name(e.creature)} downed you${ff} · run ends, haul kept`) + tail;
     }
     case "crafted": return `✦ ${e.where === "field" ? "field-crafted 🔥 " : "crafted "}${e.output.qty}× ${name(e.output.defId)}`;
-    case "pocketed-map": return `📜 pocketed a T${e.tier} ${name(e.biomeId)} map`;
     case "map-dropped": return e.carried
       ? `🗺️ looted a T${e.tier} ${name(e.biomeId)} map (takes 1 slot — banks home with you)`
       : `🗺️ a T${e.tier} ${name(e.biomeId)} map dropped — pack full, left behind`;
@@ -435,9 +434,8 @@ function townView(): string {
   const eq = lo.equipment;
   const cap = carryCap(eq);
   const inv = inventoryGrid(lo, [], cap);
-  const offer = candidateMaps(state.seed, state.runs ?? 0);
+  const local = localMap(state.seed, state.runs ?? 0);
   const heldMaps = state.maps ?? [];
-  const heldSeeds = new Set(heldMaps.map((m) => m.mapSeed));
   const equipRow = (label: string, val: string | null) =>
     `<div class="row"><span class="k">${label}</span><span class="v">${val ?? "<span class='muted'>—</span>"}</span></div>`;
 
@@ -445,20 +443,18 @@ function townView(): string {
   <header><h1>Town</h1><span class="muted">seed "${state.seed}"</span><button class="link" data-newgame>new game</button></header>
   <div class="cols">
     <section>
-      <h2>Choose a map <span class="muted small">3 fresh each visit — no going back</span></h2>
+      <h2>Local expedition <span class="muted small">over the hill — free, always available</span></h2>
       <div class="mapoffer">
-        ${offer.map((m) => `
-          <div class="mapcard">
-            <b>${m.preview.headline}${epithetSuffix(m.mapSeed, m.biomeId)}</b>
-            <button data-embark="${m.mapSeed}">Embark ▶</button>
-            ${heldSeeds.has(m.mapSeed) ? `<span class="muted small">pocketed</span>` : `<button data-pocket="${m.mapSeed}">Pocket</button>`}
-          </div>`).join("")}
+        <div class="mapcard">
+          <b>${local.preview.headline}${epithetSuffix(local.mapSeed, local.biomeId)}</b>
+          <button data-embark="${local.mapSeed}">Embark ▶</button>
+        </div>
       </div>
       ${lo.food.length === 0 ? `<div class="warn">⚠ no food packed → you embark at full ${MAX_ENERGY} energy but have nothing to eat mid-run — no way to refill your stamina</div>` : ""}
       ${wieldsRanged(lo) && !(lo.ammo ?? []).length ? `<div class="warn">⚠ bow packed with NO ARROWS → it will swing like a club (1 dmg). Pack arrows to shoot.</div>` : ""}
-      <div class="muted small">Embark = "go nearby" (free). Pocket keeps a map to run later — it rotates out of the offer but stays yours.</div>
+      <div class="muted small">The local map is the free "go nearby" run — a fresh T1 map every visit, never consumed. Better maps come from humanoid drops and are spent on embark.</div>
 
-      <h2 style="margin-top:1rem">Your maps <span class="muted small">held — spent on embark</span></h2>
+      <h2 style="margin-top:1rem">Your maps <span class="muted small">earned from drops — spent on embark</span></h2>
       ${heldMaps.length ? `<div class="mapoffer">
         ${heldMaps.map((m) => `
           <div class="mapcard">
@@ -467,7 +463,7 @@ function townView(): string {
             <button data-embark="${m.mapSeed}">Embark ▶ (spend)</button>
             ${Object.keys(INKS).filter((inkId) => legal.some((a) => a.type === "ink" && a.mapSeed === m.mapSeed && a.inkId === inkId)).map((inkId) => `<button data-ink-map="${m.mapSeed}" data-ink-id="${inkId}" title="apply ${name(inkId)} — rolls an affix from its domain onto this map">${name(inkId)}</button>`).join("")}
           </div>`).join("")}
-      </div>` : `<div class="muted small">(none — pocket a map to keep it for later)</div>`}
+      </div>` : `<div class="muted small">(none yet — kill a humanoid to loot a map)</div>`}
     </section>
 
     <section>
@@ -874,7 +870,6 @@ function logView(): string {
 // --- wiring: attach handlers after each render -------------------------------
 function wire(): void {
   app.querySelectorAll<HTMLElement>("[data-embark]").forEach((el) => el.onclick = () => apply({ type: "embark", mapSeed: el.dataset.embark! }));
-  app.querySelectorAll<HTMLElement>("[data-pocket]").forEach((el) => el.onclick = () => apply({ type: "pocket-map", mapSeed: el.dataset.pocket! }));
   app.querySelectorAll<HTMLElement>("[data-craft]").forEach((el) => el.onclick = () => apply({ type: "craft", recipeId: el.dataset.craft! }));
   app.querySelectorAll<HTMLElement>("[data-pack]").forEach((el) => el.onclick = () => apply({ type: "pack", slot: el.dataset.slot as LoadoutSlot, itemId: el.dataset.pack! }));
   app.querySelectorAll<HTMLElement>("[data-drop]").forEach((el) => el.onclick = () => apply({ type: "drop", itemId: el.dataset.drop! }));

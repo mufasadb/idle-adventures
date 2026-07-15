@@ -1,7 +1,6 @@
 import { test, expect } from "bun:test";
-import { newGame, candidateMaps } from "../src/engine/town";
+import { newGame, localMap } from "../src/engine/town";
 import { rollBiome } from "../src/engine/grid";
-import { CANDIDATE_MAP_COUNT } from "../src/data/constants";
 
 test("newGame: a town state with a functional starter bank", () => {
   const g = newGame("s1");
@@ -18,18 +17,15 @@ test("newGame: deterministic", () => {
   expect(newGame("s1")).toEqual(newGame("s1"));
 });
 
-test("candidateMaps: CANDIDATE_MAP_COUNT deterministic maps, biome-name headline, no hints at fidelity 0", () => {
-  const maps = candidateMaps("town-seed");
-  expect(maps.length).toBe(CANDIDATE_MAP_COUNT);
-  expect(candidateMaps("town-seed")).toEqual(maps); // deterministic
-  for (const m of maps) {
-    expect(m.biomeId).toBe(rollBiome(m.mapSeed)); // anyone with the seed re-derives the biome (D21)
-    expect(m.preview.headline).toBe(m.biomeId); // headline IS the biome name
-    expect(m.preview.hints).toEqual([]); // PREVIEW_FIDELITY === 0
-  }
+test("localMap: a single deterministic map, biome-name headline, no hints at fidelity 0 (zpm.1)", () => {
+  const m = localMap("town-seed");
+  expect(localMap("town-seed")).toEqual(m); // deterministic per (seed, runs)
+  expect(m.biomeId).toBe(rollBiome(m.mapSeed)); // anyone with the seed re-derives the biome (D21)
+  expect(m.preview.headline).toBe(m.biomeId); // headline IS the biome name
+  expect(m.preview.hints).toEqual([]); // PREVIEW_FIDELITY === 0
 });
 
-test("candidateMaps: distinct map seeds", () => {
-  const seeds = candidateMaps("town-seed").map((m) => m.mapSeed);
+test("localMap: rotates per run-count — distinct seeds across visits (D80)", () => {
+  const seeds = [0, 1, 2, 3, 4].map((r) => localMap("town-seed", r).mapSeed);
   expect(new Set(seeds).size).toBe(seeds.length);
 });

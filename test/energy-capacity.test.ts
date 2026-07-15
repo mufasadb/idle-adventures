@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { reduce } from "../src/engine/reduce";
-import { candidateMaps } from "../src/engine/town";
+import { localMap } from "../src/engine/town";
 import { emptyLoadout } from "../src/engine/loadout";
 import { MAX_ENERGY, ENERGY_CAP_BONUS } from "../src/data/constants";
 import { energyCapOf } from "../src/engine/reduce";
@@ -17,7 +17,7 @@ test("energyCapOf sums ENERGY_CAP_BONUS over equipped tools", () => {
 });
 
 test("embark with a canteen raises maxEnergy and starts full", () => {
-  const seed = candidateMaps("cap", 0)[0]!.mapSeed;
+  const seed = localMap("cap", 0).mapSeed;
   let s = town([{ defId: "canteen", qty: 1 }]);
   s = reduce(s, { type: "pack", slot: "tool", itemId: "canteen" } as Action).state;
   s = reduce(s, { type: "embark", mapSeed: seed } as Action).state;
@@ -26,7 +26,7 @@ test("embark with a canteen raises maxEnergy and starts full", () => {
 });
 
 test("embark with no capacity gear is unchanged at MAX_ENERGY", () => {
-  const seed = candidateMaps("cap", 0)[0]!.mapSeed;
+  const seed = localMap("cap", 0).mapSeed;
   let s = town([]);
   s = reduce(s, { type: "embark", mapSeed: seed } as Action).state;
   expect(s.expedition!.maxEnergy).toBe(MAX_ENERGY);

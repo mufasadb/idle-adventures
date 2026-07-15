@@ -1,7 +1,11 @@
 import { test, expect } from "bun:test";
 import { mapEpithet, epithetForGrid } from "../src/engine/town";
 import type { Grid, Poi } from "../src/engine/grid";
-import { EPITHETS, BIOME_IDS, CANDIDATE_MAP_COUNT } from "../src/data/constants";
+import { EPITHETS, BIOME_IDS } from "../src/data/constants";
+
+// A per-visit sample width for the epithet sweep below (was CANDIDATE_MAP_COUNT,
+// retired with the 3-map offer in zpm.1 — this test only needs a batch of seeds).
+const SAMPLE_WIDTH = 3;
 
 // Minimal synthetic grid — epithetForGrid only reads pois, so terrain/entry are dummy.
 function mkGrid(pois: Partial<Poi>[]): Grid {
@@ -89,9 +93,9 @@ test("mapEpithet: high-tier tundra maps surface a boss epithet", () => {
 test("mapEpithet: typical T1 offers stay plain — under 40% named across a sweep", () => {
   let total = 0, named = 0;
   for (let run = 0; run < 24; run++) {
-    for (let i = 0; i < CANDIDATE_MAP_COUNT; i++) {
+    for (let i = 0; i < SAMPLE_WIDTH; i++) {
       const seed = `game:map:${run}:${i}`;
-      const b = BIOME_IDS[(run * CANDIDATE_MAP_COUNT + i) % BIOME_IDS.length]!;
+      const b = BIOME_IDS[(run * SAMPLE_WIDTH + i) % BIOME_IDS.length]!;
       total++;
       if (mapEpithet(seed, b, 1) !== null) named++;
     }

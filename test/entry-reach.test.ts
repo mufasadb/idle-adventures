@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { candidateMaps } from "../src/engine/town";
+import { localMap } from "../src/engine/town";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import { costToReach, reachableTiles } from "../src/engine/reach";
 import { MAX_ENERGY, MAP_WIDTH, MAP_HEIGHT } from "../src/data/constants";
@@ -31,7 +31,7 @@ import { MAX_ENERGY, MAP_WIDTH, MAP_HEIGHT } from "../src/data/constants";
 const FLOOD_FLOOR = 300;
 const WITHIN_CAPACITY_FLOOR = 3;
 const SEEDS = ["a", "b", "c", "d", "e", "f", "g", "h", "rf", "play", "alpha", "bravo", "x", "y", "z"];
-const RUNS = 6;
+const RUNS = 18; // town now offers ONE local map per visit (zpm.1) — sweep more visits to keep the old 3-maps-per-visit sample count
 
 test("si7.5 structural: entry opens onto a basin with a real first-run choice (seed sweep)", () => {
   let minFlood = Infinity;
@@ -39,18 +39,17 @@ test("si7.5 structural: entry opens onto a basin with a real first-run choice (s
   let worst = "";
   for (const seed of SEEDS) {
     for (let r = 0; r < RUNS; r++) {
-      for (const c of candidateMaps(seed, r)) {
-        const grid = generateGrid(c.mapSeed, rollBiome(c.mapSeed));
-        const flood = reachableTiles(grid.terrain, grid.entry);
-        const reach = costToReach(grid.terrain, grid.entry);
-        const within = grid.pois.filter((p) => (reach[p.y]![p.x] ?? Infinity) <= MAX_ENERGY).length;
-        if (within < minWithin) { minWithin = within; worst = `${seed}#${r} ${rollBiome(c.mapSeed)} flood=${flood} within=${within}`; }
-        minFlood = Math.min(minFlood, flood);
-        // Entry is never a boxed corner…
-        expect(flood).toBeGreaterThanOrEqual(FLOOD_FLOOR);
-        // …and always offers more than a single forced node on the first run.
-        expect(within).toBeGreaterThanOrEqual(WITHIN_CAPACITY_FLOOR);
-      }
+      const c = localMap(seed, r);
+      const grid = generateGrid(c.mapSeed, rollBiome(c.mapSeed));
+      const flood = reachableTiles(grid.terrain, grid.entry);
+      const reach = costToReach(grid.terrain, grid.entry);
+      const within = grid.pois.filter((p) => (reach[p.y]![p.x] ?? Infinity) <= MAX_ENERGY).length;
+      if (within < minWithin) { minWithin = within; worst = `${seed}#${r} ${rollBiome(c.mapSeed)} flood=${flood} within=${within}`; }
+      minFlood = Math.min(minFlood, flood);
+      // Entry is never a boxed corner…
+      expect(flood).toBeGreaterThanOrEqual(FLOOD_FLOOR);
+      // …and always offers more than a single forced node on the first run.
+      expect(within).toBeGreaterThanOrEqual(WITHIN_CAPACITY_FLOOR);
     }
   }
   console.log(
