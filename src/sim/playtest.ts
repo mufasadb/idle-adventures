@@ -24,7 +24,7 @@ import {
   nodeToolHint,
   affixMaterialHint,
   TERRAIN_CHAR,
-  POI_CHAR,
+  poiGlyph,
   PLAYER_CHAR,
 } from "../render/render";
 import { RECIPE, MAP_WIDTH, MAP_HEIGHT, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, AFFIX_EFFECTS, TOOL_CAPABILITY, TOOL_PURPOSE, TENT_FOOD_MULTIPLIER } from "../data/constants";
@@ -217,7 +217,7 @@ function printExpedition(st: GameState): void {
       : "";
     console.log(`\n=== ENGAGED: ${c.creature} — ${c.monsterHp} HP · you hit ${dmgOut}, it hits ${dmgIn}${quiver}${coating}${poisonHdr}${battle}${enh} · actions: fight | flee | quaff${battle ? " | use-item" : ""}${enh ? " | enhance" : ""} | toggle-auto-quaff | toggle-auto-finish | don/doff (costs a turn) ===`);
   }
-  console.log("\n=== MAP (▲ you · letters = node kinds · detail only resolves near you) ===");
+  console.log("\n=== MAP (▲ you · letters = node kinds · detail only resolves near you · near a forage 'H' its material shows: f=flint d=deadwood b=berries) ===");
   const rows: string[] = [];
   for (let y = 0; y < MAP_HEIGHT; y++) {
     let row = "";
@@ -225,7 +225,7 @@ function printExpedition(st: GameState): void {
       const k = `${x},${y}`;
       if (exp.pos.x === x && exp.pos.y === y) row += PLAYER_CHAR;
       else if (cleared.has(k)) row += "·";
-      else if (seen.has(k)) row += POI_CHAR[seen.get(k)!.kind];
+      else if (seen.has(k)) { const p = seen.get(k)!; row += poiGlyph(p.kind, p.detail); } // cww: resolved forage shows its material (f/d/b)
       else row += TERRAIN_CHAR[grid.terrain[y]![x]!];
     }
     rows.push(row);

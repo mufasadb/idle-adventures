@@ -280,14 +280,14 @@ const MAGNITUDE_SUFFIX: Record<NodeType, Record<number, string>> = {
 
 // Vague human text from perception facts. `detail === null` → kind only.
 export function flavorDetail(detail: PoiDetail | null, kind: NodeType): string {
-  if (detail === null) return kind === "monster" ? "a monster" : `a ${kind} node`;
+  if (detail === null) return kind === "monster" ? "a monster" : `a ${kindLabel(kind)} node`;
   if (kind === "monster") {
     const size = (detail.tier !== undefined ? SIZE_FLAVOR[detail.tier] : undefined) ?? "a";
     const hide = detail.armourType ? HIDE_FLAVOR[detail.armourType] : "an unclear form";
     const tell = detail.dmgType ? `; ${DMG_FLAVOR[detail.dmgType]}` : "";
     return `${size} creature — ${hide}${tell}`;
   }
-  const mat = detail.material ?? `a ${kind} node`;
+  const mat = detail.material ?? `a ${kindLabel(kind)} node`;
   const suffix = detail.magnitude ? MAGNITUDE_SUFFIX[kind]?.[detail.magnitude] : undefined;
   return suffix ? `${mat} ${suffix}` : mat;
 }
@@ -319,6 +319,34 @@ export const POI_CHAR: Record<NodeType, string> = {
   animal: "A",
   monster: "X",
 };
+
+// cww (playtest 2026-07-17 F1): a forage ("herb") node is a LOTTERY — the same "H"
+// marker hides flint / deadwood / berries / herbs, so 3/3 blind players found one and
+// assumed the rest were the same, missing the bootstrap tool-materials. Once a forage
+// node RESOLVES (you're within perception range), show its MATERIAL glyph instead of
+// the generic kind glyph, so the map visibly teaches that forage varies. Vague far,
+// specific near (the existing perception model) — this just makes the "near" state
+// legible. Materials absent here (the actual herbs) keep the generic "H".
+export const FORAGE_MATERIAL_CHAR: Record<string, string> = {
+  flint: "f",
+  deadwood: "d",
+  berries: "b",
+};
+
+// The map glyph for a perceived POI: a RESOLVED forage node shows its material glyph
+// (f/d/b); everything else — and any unresolved node — shows its kind glyph. Shared by
+// the console map and the web grid so both surfaces teach forage variety identically.
+export function poiGlyph(kind: NodeType, detail: PoiDetail | null): string {
+  if (kind === "herb" && detail?.material) return FORAGE_MATERIAL_CHAR[detail.material] ?? POI_CHAR.herb;
+  return POI_CHAR[kind];
+}
+
+// cww: player-facing label for a node KIND. The internal type stays "herb", but a
+// forage node yields herbs OR flint OR deadwood OR berries — calling it "herb" implies
+// herbs-only and hid the tool-material path. Display it as "forage".
+export function kindLabel(kind: NodeType): string {
+  return kind === "herb" ? "forage" : kind;
+}
 
 // TERRAIN_CHAR / POI_CHAR / PLAYER_CHAR are the shared tile glyphs; the web
 // (main.ts) and headless console (playtest.ts) each draw their own grid from them.

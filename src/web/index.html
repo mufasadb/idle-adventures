@@ -30,6 +30,10 @@
       .terrain-mountain { background: #5c5c63; }
       .poi { font-weight: bold; color: #ffd75e; }
       .poi.locked { color: #8a7a3a; } /* visible but tier-locked */
+      /* cww: a resolved forage node tinted by its material — flint/deadwood pop against the herb yellow so the bootstrap tool-materials are legible at a glance. `.grid` prefix outranks the asset-trial .poi gold in both render modes. */
+      .grid .tile.poi.mat-flint { color: #cfe0ea; }    /* pale stone */
+      .grid .tile.poi.mat-deadwood { color: #d9a662; } /* dry wood */
+      .grid .tile.poi.mat-berries { color: #e07a97; }  /* berry red */
       .player { color: #fff; background: #c03838 !important; border-radius: 3px; }
       .tile { cursor: pointer; }
       .tile:hover { outline: 2px solid #8ab4ff; outline-offset: -2px; }
@@ -51,6 +55,13 @@
       .grid.asset-trial .tile .nodeicon { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 24px; height: 24px; image-rendering: pixelated; pointer-events: none; z-index: 2; filter: drop-shadow(0 1px 1px #000a); }
       .grid.asset-trial .tile.player { font-size: 20px; color: #ffd75e; text-shadow: 0 0 3px #000, 0 0 3px #000; z-index: 3; }
       .grid.asset-trial .tile.poi { color: #ffd75e; text-shadow: 0 0 3px #000; }
+      /* cww: in sprite mode a resolved forage material shows its LETTER (no material icon exists yet) — the generic herb icon is suppressed, so make the f/d/b visible + material-coloured (beats the .poi gold above by source order at equal specificity). */
+      .grid.asset-trial .tile.poi.mat-flint,
+      .grid.asset-trial .tile.poi.mat-deadwood,
+      .grid.asset-trial .tile.poi.mat-berries { font-size: 18px; font-weight: bold; }
+      .grid.asset-trial .tile.poi.mat-flint { color: #cfe0ea; }
+      .grid.asset-trial .tile.poi.mat-deadwood { color: #d9a662; }
+      .grid.asset-trial .tile.poi.mat-berries { color: #e07a97; }
       .pathbanner .over { color: #ff6b6b; } /* route costs more energy than you have */
       .pathbanner.engaged { color: #ffb454; font-weight: 600; } /* a fight is live — point at the panel */
 

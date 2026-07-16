@@ -21,7 +21,7 @@ import { heldFoodEnergy } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
 import { RECIPE, MATERIAL_GATE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, INKS, AFFIX_EFFECTS, WEAPON_ENHANCEMENT } from "../data/constants";
 import type { BiomeId, GatherableNodeType } from "../data/constants";
-import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint, logisticsEffect, enhancementHint, affixMaterialHint, describe, recipeGateHint, nodeToolHint, nodeGateNote, name, rejectCopy, combatForecast } from "../render/render";
+import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint, logisticsEffect, enhancementHint, affixMaterialHint, describe, recipeGateHint, nodeToolHint, nodeGateNote, name, rejectCopy, combatForecast } from "../render/render";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, Expedition, LoadoutSlot, MapItem, RejectionReason } from "../engine/types";
 
@@ -29,7 +29,7 @@ import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, Exped
 const GATHER_VERB: Record<string, { label: string; past: string; noun: string }> = {
   mining: { label: "⛏ Mine", past: "mined", noun: "ore vein" },
   wood: { label: "🪓 Chop", past: "chopped", noun: "stand of trees" },
-  herb: { label: "🌿 Forage", past: "foraged", noun: "herb patch" },
+  herb: { label: "🌿 Forage", past: "foraged", noun: "forage patch" },
   animal: { label: "🔪 Hunt", past: "hunted", noun: "animal" },
 };
 
@@ -802,8 +802,11 @@ function expeditionView(): string {
     const gate = poi && !isCleared && poi.material ? (MATERIAL_GATE[poi.material]?.tools ?? null) : null;
     const locked = gate !== null && !gate.some((t) => exp.loadout.equipment.tools.includes(t));
     if (locked) cls.push("locked");
-    const ch = isPlayer ? PLAYER_CHAR : isCleared ? "·" : poi ? POI_CHAR[poi.kind] : TERRAIN_CHAR[grid.terrain[y]![x]!];
     const per = poi ? perceived.get(k) : undefined;
+    // cww: a RESOLVED forage node shows its material glyph (f/d/b) + a material colour
+    // class, so the map teaches that forage varies (flint/deadwood look different once near).
+    if (poi && !isCleared && poi.kind === "herb" && per?.detail?.material) cls.push(`mat-${per.detail.material}`);
+    const ch = isPlayer ? PLAYER_CHAR : isCleared ? "·" : poi ? poiGlyph(poi.kind, per?.detail ?? null) : TERRAIN_CHAR[grid.terrain[y]![x]!];
     // gate-legibility (playtest 2026-07-09 #1, node gate/reach visibility): a
     // surveyed / in-vision node names its ACCESS GATE at range (nodeGateNote reads
     // the PERCEIVED, range-gated gate) so a far vein's worth-the-trek and its
@@ -814,8 +817,8 @@ function expeditionView(): string {
       ? stepExplain(stepBd)
       : poi && !isCleared // a cleared tile shows '·' — its title must not keep the stale poi text (1te-d)
       ? (per && per.detail
-          ? `${poi.kind} · ${flavorDetail(per.detail, poi.kind)}${tierNote ? ` · ${tierNote}` : ""}`
-          : poi.kind === "monster" ? "a monster" : `a ${poi.kind} node`)
+          ? `${kindLabel(poi.kind)} · ${flavorDetail(per.detail, poi.kind)}${tierNote ? ` · ${tierNote}` : ""}`
+          : poi.kind === "monster" ? "a monster" : `a ${kindLabel(poi.kind)} node`)
       : grid.terrain[y]![x]!;
     // 48l.6 trial: paint the terrain tile texture + overlay a ¾ billboard sprite
     // on monster POIs / a node icon where we have one. Flag-gated; the real
@@ -832,7 +835,10 @@ function expeditionView(): string {
           const sp = MONSTER_SPRITES[cr];
           const msz = MONSTER_SIZE[cr] ?? 48;
           if (sp) overlay = `<img class="sprite" src="${sp}" style="width:${msz}px;height:${msz}px" alt="">`;
-        } else if (NODE_ICON[poi.kind]) {
+        } else if (NODE_ICON[poi.kind] && !(poi.kind === "herb" && per?.detail?.material && FORAGE_MATERIAL_CHAR[per.detail.material])) {
+          // cww: a resolved forage TOOL-material (flint/deadwood/berries) suppresses the
+          // generic herb icon so its colored glyph (f/d/b) shows through — the map teaches
+          // forage variety even in sprite mode. Unresolved / actual-herb nodes keep the icon.
           overlay = `<img class="nodeicon" src="${NODE_ICON[poi.kind]}" alt="">`;
         }
       }

@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { flavorDetail, matchupLessons, combatForecast } from "../src/render/render";
+import { flavorDetail, matchupLessons, combatForecast, poiGlyph, kindLabel, POI_CHAR } from "../src/render/render";
 import { emptyLoadout } from "../src/engine/loadout";
 import { playerDamage, damageTaken } from "../src/engine/combat";
 import { MONSTERS, MONSTER_TIER_HP_CURVE } from "../src/data/constants";
@@ -10,6 +10,30 @@ import { MONSTERS, MONSTER_TIER_HP_CURVE } from "../src/data/constants";
 // live selectors render.ts still exports.
 
 // --- perception flavor (9u9.2): facts → vague human text, no numbers/outcome ---
+
+// cww (playtest 2026-07-17 F1): a RESOLVED forage node must show its MATERIAL, not the
+// generic "H"/"herb" — the black box that made 3/3 blind players miss flint/deadwood.
+test("poiGlyph: a resolved forage node shows its material glyph; unresolved/other kinds show the kind glyph", () => {
+  // unresolved (no detail) → generic kind glyph
+  expect(poiGlyph("herb", null)).toBe(POI_CHAR.herb); // "H"
+  expect(poiGlyph("mining", null)).toBe(POI_CHAR.mining);
+  // resolved forage → material glyph
+  expect(poiGlyph("herb", { gatedBy: null, material: "flint" })).toBe("f");
+  expect(poiGlyph("herb", { gatedBy: null, material: "deadwood" })).toBe("d");
+  expect(poiGlyph("herb", { gatedBy: null, material: "berries" })).toBe("b");
+  // resolved forage that's an actual herb keeps the generic glyph (no material char)
+  expect(poiGlyph("herb", { gatedBy: null, material: "forest-herb" })).toBe(POI_CHAR.herb);
+  // non-forage kinds are unaffected even when resolved
+  expect(poiGlyph("mining", { gatedBy: null, material: "iron-ore" })).toBe(POI_CHAR.mining);
+});
+
+test("kindLabel: the 'herb' kind reads as 'forage' (it yields flint/deadwood too), others unchanged", () => {
+  expect(kindLabel("herb")).toBe("forage");
+  expect(kindLabel("mining")).toBe("mining");
+  expect(kindLabel("monster")).toBe("monster");
+  // flavorDetail uses it: an unresolved forage node reads "a forage node", not "a herb node"
+  expect(flavorDetail(null, "herb")).toBe("a forage node");
+});
 
 test("flavorDetail: null detail gives kind-only text; monster detail is vague, no numbers", () => {
   expect(flavorDetail(null, "monster")).toBe("a monster");
