@@ -37,11 +37,18 @@ test("recipeTerrainGate surfaces a field terrain gate (water-vial → river)", (
   expect(recipeTerrainGate("plate-helmet")).toBeNull();
 });
 
-test("nodeToolHint names the tool KIND a node wants, null for bare-hand herbs", () => {
-  expect(nodeToolHint("mining")).toBe("needs a pick");
-  expect(nodeToolHint("animal")).toBe("needs a knife");
-  expect(nodeToolHint("wood")).toBe("needs a axe");
-  expect(nodeToolHint("herb")).toBeNull();
+test("nodeToolHint names the MISSING tool(s) for a node, null when the player holds them (D83 tool-aware)", () => {
+  // Bare-handed: names whatever the node requires.
+  expect(nodeToolHint("mining", [])).toBe("needs a pick");
+  expect(nodeToolHint("wood", [])).toBe("needs a axe");
+  expect(nodeToolHint("herb", [])).toBeNull(); // bare-hand forage
+  // Animal = trap AND knife (D83). Flavored combined copy; then only the missing one.
+  expect(nodeToolHint("animal", [])).toBe("you'll need both a trap to trap the animal and a knife to alleviate it of its parts");
+  expect(nodeToolHint("animal", ["knife"])).toBe("needs a trap to trap the animal");
+  expect(nodeToolHint("animal", ["trap"])).toBe("needs a knife to alleviate it of its parts");
+  expect(nodeToolHint("animal", ["trap", "knife"])).toBeNull();
+  // Holding the tool clears the generic hint too.
+  expect(nodeToolHint("mining", ["pick"])).toBeNull();
 });
 
 test("nodeGateNote names the unlocking tool family for a gated material, null for ungated or a monster", () => {

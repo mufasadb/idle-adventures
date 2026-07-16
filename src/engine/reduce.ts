@@ -3,7 +3,7 @@ import { expeditionGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
 import { addToCarry, freeLootStacks, usedSlots, carryCap, consumeExpeditionInputs, mapCarryCap } from "./carry";
-import { toolSpeedFor, gatherCost, gateSatisfied } from "./tools";
+import { toolSpeedFor, gatherCost, gateSatisfied, secondaryToolSatisfied } from "./tools";
 import { strikeExchange, rollLoot, explainMatchup, damageTaken, wieldsRanged, hasAmmo } from "./combat";
 import { eatToRefill, foodEnergyOf } from "./food";
 import { endExpedition, subtractStacks } from "./bank";
@@ -364,6 +364,12 @@ function gather(state: GameState): { state: GameState; events: GameEvent[] } {
   const kind = poi.kind; // narrowed to GatherableNodeType by the guard above (1gp: no cast)
   const speed = toolSpeedFor(expedition.loadout.equipment.tools, NODE_TOOL[kind]);
   if (speed === null) return rejected(state, "gather", "missing-tool");
+  // D83: secondary AND-gate — animal "hunting" needs a TRAP (catch) as well as the
+  // knife (skin). Missing it is a "missing-tool" reject; the render layer names both
+  // tools in the near-node hint. Checked before gatherCost so its `!` stays valid.
+  if (!secondaryToolSatisfied(kind, expedition.loadout.equipment.tools)) {
+    return rejected(state, "gather", "missing-tool");
+  }
   // Access gate (D78): a material may require an unlocking tool (MATERIAL_GATE,
   // an any-of list) — e.g. coal/silver need an iron-or-steel pick, mithril the
   // steel pick. You SEE the node but can't work it until you hold a key. This

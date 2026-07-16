@@ -19,7 +19,7 @@ import { lineTiles } from "../engine/line";
 import { gatherCost } from "../engine/tools";
 import { heldFoodEnergy } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
-import { RECIPE, MATERIAL_GATE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, INKS, AFFIX_EFFECTS, NODE_TOOL, TOOL_CAPABILITY, WEAPON_ENHANCEMENT } from "../data/constants";
+import { RECIPE, MATERIAL_GATE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, INKS, AFFIX_EFFECTS, WEAPON_ENHANCEMENT } from "../data/constants";
 import type { BiomeId, GatherableNodeType } from "../data/constants";
 import { TERRAIN_CHAR, POI_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint, logisticsEffect, enhancementHint, affixMaterialHint, describe, recipeGateHint, nodeToolHint, nodeGateNote, name, rejectCopy, combatForecast } from "../render/render";
 import { perceive } from "../engine/perceive";
@@ -654,16 +654,17 @@ function herePanel(grid: Grid, exp: NonNullable<GameState["expedition"]>, legal:
   // gate-legibility (playtest 2026-07-09 #1): distinguish the two "can't gather"
   // reasons and name each. NO tool of the required KIND → "needs a knife"; has the
   // kind but the material is access-gated by a tool you lack → "needs iron-pick or …".
-  const needCap = NODE_TOOL[poi.kind as GatherableNodeType];
-  const hasToolKind = !needCap || exp.loadout.equipment.tools.some((t) => TOOL_CAPABILITY[t] === needCap);
-  const toolLocked = !canGather && !hasToolKind;
-  const gateLocked = !canGather && hasToolKind && !gateSatisfied;
+  // D83: tool-aware — names whatever tool(s) are missing (animal → trap AND knife),
+  // null when the player holds them all. Drives the tool-locked vs gate-locked split.
+  const toolNeed = nodeToolHint(poi.kind as GatherableNodeType, exp.loadout.equipment.tools);
+  const toolLocked = !canGather && toolNeed !== null;
+  const gateLocked = !canGather && toolNeed === null && !gateSatisfied;
   const locked = toolLocked || gateLocked;
   const article = /^[aeiou]/i.test(verb.noun) ? "an" : "a";
   return `<div class="here ${locked ? "locked" : ""}">
     <b>Here:</b> ${article} ${verb.noun} — <b>${name(poi.material!)}</b>${gate ? ` <span class="tier">gated</span>` : ""}.
     ${canGather ? `<button data-act="gather">${verb.label} it</button>`
-      : toolLocked ? `🔒 <span class="warn">${nodeToolHint(poi.kind as GatherableNodeType)} to work ${name(poi.material!)}</span>`
+      : toolLocked ? `🔒 <span class="warn">${toolNeed} to work ${name(poi.material!)}</span>`
       : gateLocked ? `🔒 <span class="warn">locked — needs ${gate!.join(" or ")} to work ${name(poi.material!)}</span>`
       : `<span class="warn">can't ${verb.past.replace(/ed$/, "")} — bag full (need a free loot slot)</span>`}
   </div>`;

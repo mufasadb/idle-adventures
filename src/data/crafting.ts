@@ -74,6 +74,7 @@ export const RECIPE: Record<
   knife: { inputs: [{ defId: "flint", qty: 1 }], output: { defId: "knife", qty: 1 } }, // a knapped flint blade — the archetypal stone tool
   axe: { inputs: [{ defId: "flint", qty: 1 }, { defId: "deadwood", qty: 1 }], output: { defId: "axe", qty: 1 } }, // stone head + wood handle
   pick: { inputs: [{ defId: "flint", qty: 1 }, { defId: "deadwood", qty: 1 }], output: { defId: "pick", qty: 1 } },
+  trap: { inputs: [{ defId: "deadwood", qty: 1 }, { defId: "flint", qty: 1 }], output: { defId: "trap", qty: 1 } }, // D83: wooden jaws + a flint trigger — the CATCH tool for hunting (animal nodes need trap + knife). Stone-age-craftable alongside the knife.
   // Tools — tiered upgrades (iron-pick is the "cheaper second run" demonstrator)
   "iron-pick": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "iron-pick", qty: 1 } },
   "iron-axe": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "iron-axe", qty: 1 } },

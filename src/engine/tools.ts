@@ -1,7 +1,8 @@
 // Tool gating for gathering (M3). NODE_TOOL names a CAPABILITY; equipped
 // tool defIds map to capabilities via TOOL_CAPABILITY, so tiered tools
 // (M5: "iron-pick") are pure data additions.
-import { TOOL_CAPABILITY, TOOL_SPEED, NODE_TOOL, NODE_HARDNESS, MATERIAL_GATE } from "../data/constants";
+import { TOOL_CAPABILITY, TOOL_SPEED, NODE_TOOL, NODE_SECONDARY_TOOL, NODE_HARDNESS, MATERIAL_GATE } from "../data/constants";
+import type { GatherableNodeType } from "../data/constants";
 import type { Poi } from "./grid";
 
 // Best equipped SPEED (cost divisor) for a capability. null capability = bare
@@ -19,6 +20,16 @@ export function toolSpeedFor(
     if (best === null || speed > best) best = speed;
   }
   return best;
+}
+
+// D83: a node kind's SECONDARY required capability (AND-gate on top of NODE_TOOL),
+// or null when it has none. True when satisfied by the equipped tools — nodes with
+// no secondary are always satisfied; one with a secondary needs a tool of that
+// capability equipped (a pure binary gate, no speed contribution). Animal = "trap".
+export function secondaryToolSatisfied(kind: GatherableNodeType, tools: string[]): boolean {
+  const cap = NODE_SECONDARY_TOOL[kind];
+  if (!cap) return true;
+  return tools.some((t) => TOOL_CAPABILITY[t] === cap);
 }
 
 // The ANY-OF tool list gating a material, or null when it's ungated (D78).
@@ -46,7 +57,8 @@ export function gatherCost(poi: Poi, tools: string[]): number | null {
   if (poi.kind === "monster" || poi.material === null) return null;
   const kind = poi.kind; // narrowed to GatherableNodeType by the guard above (1gp: no cast)
   const speed = toolSpeedFor(tools, NODE_TOOL[kind]);
-  if (speed === null) return null; // missing the required tool
+  if (speed === null) return null; // missing the required (primary) tool
+  if (!secondaryToolSatisfied(kind, tools)) return null; // D83: missing the AND-gate tool (animal → trap)
   if (!gateSatisfied(poi.material, tools)) return null; // access-gated: lack an unlocking tool
   return NODE_HARDNESS[kind] / speed;
 }

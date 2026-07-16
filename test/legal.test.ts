@@ -114,6 +114,33 @@ test("expeditionActions: an access-locked node is not offered gather (D29 free)"
   expect(actions.some((a) => a.type === "gather")).toBe(false); // the locked node is not workable
 });
 
+// D83: hunting's trap+knife AND-gate must flow through legalActions for free (D29)
+// — an animal node with only a knife is NOT offered gather; add the trap and it is.
+test("expeditionActions: an animal node needs trap AND knife to be offered gather (D83)", () => {
+  let seed = "";
+  let poi: Poi | undefined;
+  for (let i = 0; i < 300 && !poi; i++) {
+    const s = `hunt-${i}`;
+    const g = generateGrid(s, rollBiome(s));
+    poi = g.pois.find((p) => p.kind === "animal" && p.material !== null && !(p.material in MATERIAL_GATE));
+    if (poi) seed = s;
+  }
+  expect(poi).toBeTruthy();
+  const mk = (tools: string[]): GameState => {
+    const loadout = emptyLoadout();
+    loadout.equipment.tools = tools;
+    return {
+      seed: "g", phase: "expedition", bank: [], loadout: emptyLoadout(),
+      expedition: { mapSeed: seed, pos: { x: poi!.x, y: poi!.y }, energy: 100, hp: 30, loadout, carry: [], cleared: [] },
+    };
+  };
+  const knifeOnly = mk(["knife"]);
+  for (const a of expeditionActions(knifeOnly)) expect(accepts(knifeOnly, a)).toBe(true);
+  expect(expeditionActions(knifeOnly).some((a) => a.type === "gather")).toBe(false); // no trap → not workable
+  const both = mk(["knife", "trap"]);
+  expect(expeditionActions(both).some((a) => a.type === "gather")).toBe(true); // trap + knife → offered
+});
+
 test("expeditionActions: drop-map offered per carried map (8ec)", () => {
   const onMap = play("s", [{ type: "embark", mapSeed: OFFER_S }]).state;
   const withMap: GameState = {

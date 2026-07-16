@@ -231,3 +231,20 @@ test("gather: mithril needs a steel-pick — an iron-pick is not on its gate lis
   expect(steel.events.some((e) => e.type === "action-rejected")).toBe(false);
   expect(steel.state.expedition!.carry).toEqual([{ defId: "mithril-ore", qty: GATHER_YIELD.mining }]);
 });
+
+// D83: hunting an animal node needs BOTH a trap (catch) AND a knife (skin) — an
+// AND-gate (NODE_SECONDARY_TOOL). Missing either is a "missing-tool" reject.
+test("gather: an animal node needs a trap AND a knife (D83 AND-gate)", () => {
+  const { seed, poi } = mapWith("animal");
+  const knifeOnly = reduce(standingOn(seed, poi, { tools: ["knife"] }), { type: "gather" });
+  expect(knifeOnly.events[0]).toMatchObject({ type: "action-rejected", action: "gather", reason: "missing-tool" });
+  expect(knifeOnly.state.expedition!.carry).toEqual([]);
+
+  const trapOnly = reduce(standingOn(seed, poi, { tools: ["trap"] }), { type: "gather" });
+  expect(trapOnly.events[0]).toMatchObject({ type: "action-rejected", action: "gather", reason: "missing-tool" });
+  expect(trapOnly.state.expedition!.carry).toEqual([]);
+
+  const both = reduce(standingOn(seed, poi, { tools: ["trap", "knife"] }), { type: "gather" });
+  expect(both.events.some((e) => e.type === "action-rejected")).toBe(false);
+  expect(both.state.expedition!.carry).toEqual([{ defId: poi.material!, qty: GATHER_YIELD.animal }]);
+});

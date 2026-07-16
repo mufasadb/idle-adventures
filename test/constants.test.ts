@@ -20,6 +20,7 @@ import {
   STACK_CAP,
   NODE_HARDNESS,
   NODE_TOOL,
+  NODE_SECONDARY_TOOL,
   TOOL_SPEED,
   TOOL_CAPABILITY,
   MATERIAL_GATE,
@@ -137,6 +138,18 @@ test("constants: every MATERIAL_GATE tool is capability-matched to the material'
       for (const nc of nodeCaps) expect(cap).toBe(nc as string);
     }
   }
+});
+
+// D83: an animal node's AND-gate (NODE_SECONDARY_TOOL) must be SATISFIABLE — the
+// named capability has to be provided by at least one real tool, or hunting would
+// be impossible. (Distinct from NODE_TOOL, the primary/speed capability.)
+test("constants: every NODE_SECONDARY_TOOL capability is provided by a real tool (AND-gate is satisfiable)", () => {
+  for (const [kind, cap] of Object.entries(NODE_SECONDARY_TOOL)) {
+    expect(NODE_TOOL[kind as keyof typeof NODE_TOOL]).not.toBeNull(); // a bare-hand node with a secondary would be contradictory
+    const providers = Object.entries(TOOL_CAPABILITY).filter(([, c]) => c === cap);
+    expect(providers.length).toBeGreaterThan(0); // some tool grants this capability
+  }
+  expect(NODE_SECONDARY_TOOL.animal).toBe("trap"); // hunting needs a trap alongside the knife
 });
 
 test("constants: every biome yields a non-empty weighted material table per gatherable node type", () => {

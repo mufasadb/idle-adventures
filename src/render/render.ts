@@ -1,4 +1,4 @@
-import { WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE } from "../data/constants";
+import { WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE } from "../data/constants";
 import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType } from "../data/constants";
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
@@ -238,9 +238,22 @@ export function recipeTerrainGate(recipeId: string): Terrain | null {
 // the tool KIND (capability) the node wants — "needs a knife", not "no tool". Reads
 // NODE_TOOL[kind] (a capability string that reads as a noun: pick/axe/knife). Herb
 // nodes need no tool → null.
-export function nodeToolHint(kind: GatherableNodeType): string | null {
-  const cap = NODE_TOOL[kind];
-  return cap ? `needs a ${cap}` : null;
+// D83: tool-AWARE — names the required tool(s) the player is MISSING for this node,
+// or null when they hold everything. Animal "hunting" needs a TRAP (catch) AND a
+// knife (skin); the flavored copy names both, or just the missing one.
+export function nodeToolHint(kind: GatherableNodeType, tools: string[]): string | null {
+  const has = (cap: string) => tools.some((t) => TOOL_CAPABILITY[t] === cap);
+  const prim = NODE_TOOL[kind];
+  const sec = NODE_SECONDARY_TOOL[kind] ?? null;
+  const missPrim = prim !== null && !has(prim);
+  const missSec = sec !== null && !has(sec);
+  if (!missPrim && !missSec) return null;
+  if (kind === "animal") {
+    if (missPrim && missSec) return "you'll need both a trap to trap the animal and a knife to alleviate it of its parts";
+    if (missSec) return "needs a trap to trap the animal";
+    return "needs a knife to alleviate it of its parts";
+  }
+  return `needs a ${prim}`; // generic single-tool nodes (mining/wood)
 }
 
 // gate-legibility (playtest 2026-07-09 #1, node gate/reach visibility): a surveyed /

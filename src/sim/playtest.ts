@@ -27,7 +27,7 @@ import {
   POI_CHAR,
   PLAYER_CHAR,
 } from "../render/render";
-import { RECIPE, MAP_WIDTH, MAP_HEIGHT, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, AFFIX_EFFECTS, NODE_TOOL, TOOL_CAPABILITY, TOOL_PURPOSE, TENT_FOOD_MULTIPLIER } from "../data/constants";
+import { RECIPE, MAP_WIDTH, MAP_HEIGHT, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, AFFIX_EFFECTS, TOOL_CAPABILITY, TOOL_PURPOSE, TENT_FOOD_MULTIPLIER } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 import { moveCostBreakdown } from "../engine/move";
 import { usedSlots, carryCap, mapCarryCap } from "../engine/carry";
@@ -264,12 +264,12 @@ function printExpedition(st: GameState): void {
       // that parse this line must match the new "(needs A or B)" text.
       const gate = p.kind !== "monster" ? p.detail!.gatedBy : null;
       const tierHint = gate && gate.length ? ` (needs ${gate.join(" or ")})` : "";
-      // gate-legibility (playtest 2026-07-09 #1): name the tool KIND a gatherable
-      // node needs when the player lacks it — the hunting node's "needs a knife" was
-      // never spelled out (web agent burned ~4 runs guessing). Append-only.
-      const needCap = p.kind !== "monster" ? NODE_TOOL[p.kind as GatherableNodeType] : null;
-      const hasKind = !needCap || exp.loadout.equipment.tools.some((t) => TOOL_CAPABILITY[t] === needCap);
-      const toolHint = needCap && !hasKind ? ` (${nodeToolHint(p.kind as GatherableNodeType)})` : "";
+      // gate-legibility (playtest 2026-07-09 #1): name the tool(s) a gatherable node
+      // needs when the player lacks them — the hunting node's requirement was never
+      // spelled out (web agent burned ~4 runs guessing). D83: nodeToolHint is now
+      // tool-aware and names whatever is MISSING (animal → trap AND knife). Append-only.
+      const toolHintText = p.kind !== "monster" ? nodeToolHint(p.kind as GatherableNodeType, exp.loadout.equipment.tools) : null;
+      const toolHint = toolHintText ? ` (${toolHintText})` : "";
       const fightHint = p.kind === "monster" ? ` (step onto it to fight — needs a free loot slot)` : "";
       // Shoot hint (D45, append-only): an adjacent monster you can ranged-engage
       // right now (bow wielded + arrows) — the legal-action JSON carries `fight at`.

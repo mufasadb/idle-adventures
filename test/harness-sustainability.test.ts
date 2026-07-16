@@ -32,6 +32,7 @@ function oneRun(s: GameState, mapSeed: string): GameState {
   if (qtyOf(s, "leather") > 0) s = reduce(s, { type: "pack", slot: "backpack", itemId: "leather" }).state;
   else if (qtyOf(s, "small-backpack") > 0) s = reduce(s, { type: "pack", slot: "backpack", itemId: "small-backpack" }).state;
   if (qtyOf(s, "knife") > 0) s = reduce(s, { type: "pack", slot: "tool", itemId: "knife" }).state;
+  if (qtyOf(s, "trap") > 0) s = reduce(s, { type: "pack", slot: "tool", itemId: "trap" }).state; // D83: hunting needs a trap too
   const packN = Math.min(qtyOf(s, "ration"), STACK_CAP); // one stack → one slot, keep room to gather
   for (let i = 0; i < packN; i++) s = reduce(s, { type: "pack", slot: "food", itemId: "ration" }).state;
 
@@ -83,6 +84,11 @@ function oneRun(s: GameState, mapSeed: string): GameState {
   // hands can only forage herbs.
   if (qtyOf(s, "knife") === 0 && accepts(s, { type: "craft", recipeId: "knife" })) {
     s = reduce(s, { type: "craft", recipeId: "knife" }).state;
+  }
+  // D83: hunting now also needs a TRAP (catch) alongside the knife (skin) — knap one
+  // from foraged deadwood + flint the moment we can, so the next run can hunt animals.
+  if (qtyOf(s, "trap") === 0 && accepts(s, { type: "craft", recipeId: "trap" })) {
+    s = reduce(s, { type: "craft", recipeId: "trap" }).state;
   }
   // bootstrap a backpack once (reserves one deer-hide), then convert every other
   // food material — foraged herbs AND hunted hides — into rations.

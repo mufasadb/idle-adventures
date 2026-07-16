@@ -302,11 +302,19 @@ export const NODE_TOOL: Record<GatherableNodeType, string | null> = {
   wood: "axe",
   herb: null, // bare hands
   animal: "knife",
-}; // required tool CAPABILITY per node type
+}; // required tool CAPABILITY per node type (the PRIMARY — drives gather SPEED)
+// D83: a node kind may require a SECOND capability IN ADDITION to NODE_TOOL[kind]
+// (an AND-gate). Absent = no extra requirement. The primary still drives gather
+// SPEED; the secondary is a pure binary gate. Animal "hunting" now needs a TRAP to
+// catch the beast AND a knife to take its parts — reject copy names both.
+export const NODE_SECONDARY_TOOL: Partial<Record<GatherableNodeType, string>> = {
+  animal: "trap",
+};
 export const TOOL_CAPABILITY: Record<string, string> = {
   pick: "pick",
   axe: "axe",
   knife: "knife",
+  trap: "trap", // D83: the CATCH tool for hunting — animal nodes need a trap (this) AND a knife (skinning). Binary gate, no TOOL_SPEED (not a speed tool).
   "iron-pick": "pick",
   "iron-axe": "axe",
   "steel-pick": "pick",
