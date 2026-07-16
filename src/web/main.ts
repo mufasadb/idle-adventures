@@ -352,6 +352,27 @@ function draw(): void {
     if (next) { next.scrollTop = keepScroll.top; next.scrollLeft = keepScroll.left; }
   }
   wire(); save();
+  // c67 (playtest F4): camera-follow. The map is taller than its scroll window, so a
+  // Walk that moves you north walks you off-screen and you must chase yourself. When
+  // the player's POSITION changes, re-centre the window on them. On a pos-UNCHANGED
+  // redraw (route planning, toggles) we leave the boc-preserved scroll alone, so
+  // scrolling ahead to inspect a far node is never yanked back.
+  if (state.phase !== "town" && state.expedition) {
+    const p = `${state.expedition.pos.x},${state.expedition.pos.y}`;
+    if (p !== camPos) { centerOnPlayer(); camPos = p; }
+  } else camPos = null;
+}
+
+// c67: scroll the play window so the player tile sits at its centre (the browser
+// clamps at the edges, so an entry-edge player naturally shows the ground ahead).
+let camPos: string | null = null;
+function centerOnPlayer(): void {
+  const gs = app.querySelector<HTMLElement>(".gridscroll");
+  const pl = gs?.querySelector<HTMLElement>(".tile.player");
+  if (!gs || !pl) return;
+  const gsR = gs.getBoundingClientRect(), plR = pl.getBoundingClientRect();
+  gs.scrollTop += (plR.top - gsR.top) - gs.clientHeight / 2 + plR.height / 2;
+  gs.scrollLeft += (plR.left - gsR.left) - gs.clientWidth / 2 + plR.width / 2;
 }
 
 // The inventory grid (pqp/ju3). Each food/potion/battle-item UNIT and each tool
@@ -860,7 +881,7 @@ function expeditionView(): string {
   const pathBanner = exp.combat
     ? `<div class="pathbanner engaged">⚔ <b>ENGAGED — the ${name(exp.combat.creature)}</b> · fight or flee in the panel below ↓</div>`
     : hasRoute
-    ? `<div class="pathbanner${rt.blocked ? " blocked" : ""}">${rt.blocked ? `<b class="over">✗ blocked — a leg crosses impassable terrain (red).</b> Click a tile on the line to unwind past it, or reroute. · ` : ""}${fight ? `⚔ walk in &amp; <b>fight the ${name(fight)}</b> · ` : ""}→ (${rt.end.x},${rt.end.y}): ${rt.walkable.length} tile${rt.walkable.length !== 1 ? "s" : ""}, ${costClause}${forecastClause} · <button data-walk${rt.blocked ? " disabled title=\"clear the blocked leg first\"" : ""}>${fight ? "Fight ▶" : "Walk ▶"}</button> ${shoot ? `<button data-shoot title="engage from here with your bow — your opener lands before it can answer, and you don't step in">🏹 Shoot</button> ` : ""}${surveyAtEnd ? `<button data-survey-x="${rt.end.x}" data-survey-y="${rt.end.y}" title="study it through the glass without walking over — resolves its detail for −${SURVEY_ENERGY}e">🔭 Survey (−${SURVEY_ENERGY}e)</button> ` : ""}<button class="link" data-cancelpath>cancel</button></div>`
+    ? `<div class="pathbanner${rt.blocked ? " blocked" : ""}">${rt.blocked ? `<b class="over">✗ blocked — a leg crosses impassable terrain (red).</b> Click a tile on the line to unwind past it, or reroute. · ` : ""}${fight ? `⚔ walk in &amp; <b>fight the ${name(fight)}</b> · ` : ""}→ (${rt.end.x},${rt.end.y}): ${rt.walkable.length} tile${rt.walkable.length !== 1 ? "s" : ""}, ${costClause}${forecastClause} · <button data-walk${rt.blocked ? " disabled title=\"clear the blocked leg first\"" : ""}>${fight ? "Fight ▶" : "Walk ▶"}</button> ${shoot ? `<button data-shoot title="engage from here with your bow — your opener lands before it can answer, and you don't step in">🏹 Shoot</button> ` : ""}${surveyAtEnd ? `<button data-survey-x="${rt.end.x}" data-survey-y="${rt.end.y}" title="study it through the glass without walking over — resolves its detail for −${SURVEY_ENERGY}e">🔭 Survey (−${SURVEY_ENERGY}e)</button> ` : ""}<button class="link" data-cancelpath title="remove the whole planned route">✕ clear route</button></div>`
     : `<div class="pathbanner muted">Click a tile → draws a straight line + previews energy. Click more tiles to add waypoints; click a tile already on the line to unwind to it. Then <b>Walk</b>. Monsters (<b>X</b>) are fought when your line reaches them.</div>`;
 
   const cap = carryCap(exp.loadout.equipment);
