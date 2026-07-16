@@ -22,16 +22,25 @@ function resolveWalkIn(state: GameState): GameState {
   return s;
 }
 
-test("e3j structural: the strip out-ranges one energy capacity (5 offered maps)", () => {
-  // The farthest POI must cost more than MAX_ENERGY to even REACH on foot —
-  // food (and forage routing) is the only way to work the deep half.
+test("D84 structural: a centre-entry square out-scales one energy tank (5 offered maps)", () => {
+  // D84 premise-break: the old strip proxy was "the farthest POI costs > MAX_ENERGY"
+  // (you can't reach the deep north). From the CENTRE of a square any single point is
+  // cheaply reachable, so that proxy no longer fits. The REAL invariant it stood for —
+  // "food buys reach; you can't harvest it all on one tank" — becomes: every POI is
+  // reachable (no direction is a dead pocket), but the cumulative cost to reach the
+  // whole field vastly out-scales one 300-energy tank, so a run harvests a SECTOR, not
+  // the map. "Reach any point; not all points."
   for (let r = 0; r < 5; r++) {
     const c = localMap("rf", r);
     const grid = generateGrid(c.mapSeed, rollBiome(c.mapSeed));
     const reach = costToReach(grid.terrain, grid.entry);
-    const finite = grid.pois.map((p) => reach[p.y]![p.x]!).filter(Number.isFinite);
-    expect(finite.length).toBeGreaterThan(0);
-    expect(Math.max(...finite)).toBeGreaterThan(MAX_ENERGY);
+    const poiCosts = grid.pois.map((p) => reach[p.y]![p.x]!);
+    expect(poiCosts.length).toBeGreaterThan(0);
+    // (1) no stranded content — every POI is reachable from the central entry
+    expect(poiCosts.every(Number.isFinite)).toBe(true);
+    // (2) but the field dwarfs one tank — even a food-boosted run can't sweep it all
+    const total = poiCosts.reduce((a, b) => a + b, 0);
+    expect(total).toBeGreaterThan(5 * MAX_ENERGY);
   }
 });
 

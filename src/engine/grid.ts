@@ -23,7 +23,6 @@ import {
 import type { Terrain, NodeType, BiomeId, Biome } from "../data/constants";
 import { rand, weightedPick } from "./rng";
 import { perlin2 } from "./noise";
-import { reachableTiles } from "./reach";
 import { moveCost } from "./move";
 
 export type Poi = {
@@ -248,34 +247,26 @@ function buildGrid(mapSeed: string, biomeId: BiomeId, mapTier: number, affixes: 
     terrain.push(row);
   }
   carveConnectivity(terrain, biome);
-  // Entry (b91): embark lands on the bottom row. Pick the x that opens onto the
-  // LARGEST on-foot reachable region, so a bare loadout is never boxed into a
-  // dead corner pocket — every POI (food included) stays reachable at all. (D73:
-  // placement no longer pulls forage NEAR entry; only this connectivity keeps it
-  // reachable.) Ties break toward a seeded preferred x for determinism + variety.
-  // Constraint (e3j final review): the entry tile itself MUST be walkable — you
-  // must be able to return to it. Skip impassable bottom-row candidates; without
-  // this, a bottom-row wall tile adjacent to the one walkable component can tie
-  // (or beat) every real candidate and strand the player on a tile they can leave
-  // but never re-enter.
-  const preferred = Math.floor(rand(mapSeed, "entry") * MAP_WIDTH);
-  let entry = { x: preferred, y: MAP_HEIGHT - 1 };
-  let bestReach = -1;
-  for (let x = 0; x < MAP_WIDTH; x++) {
-    if (!walkableTerrain(terrain[MAP_HEIGHT - 1]![x]!)) continue;
-    const cand = { x, y: MAP_HEIGHT - 1 };
-    const n = reachableTiles(terrain, cand);
-    if (n > bestReach || (n === bestReach && Math.abs(x - preferred) < Math.abs(entry.x - preferred))) {
-      bestReach = n;
-      entry = cand;
-    }
+  // Entry (D84): embark lands at the CENTRE of the square (was the b91 south-edge
+  // search). carveConnectivity guarantees ONE walkable component, so every walkable
+  // tile reaches all others — pick the walkable tile NEAREST the geometric centre
+  // (Chebyshev), preferring the exact centre. From here the run's opening move is a
+  // 360° "which direction do I spend my energy?" choice instead of "how far north".
+  // Deterministic: ties break to the lowest (y, x) in scan order. Removing the old
+  // rand("entry") call can't shift other RNG — rand is a stateless namespaced hash.
+  const cx = Math.floor(MAP_WIDTH / 2), cy = Math.floor(MAP_HEIGHT / 2);
+  let entry: { x: number; y: number } | null = null;
+  let bestD = Infinity;
+  for (let y = 0; y < MAP_HEIGHT; y++) for (let x = 0; x < MAP_WIDTH; x++) {
+    if (!walkableTerrain(terrain[y]![x]!)) continue;
+    const d = Math.max(Math.abs(x - cx), Math.abs(y - cy));
+    if (d < bestD) { bestD = d; entry = { x, y }; }
   }
-  // Fallback: the ENTIRE bottom row was unwalkable. Carve the preferred-x tile to
-  // native walkable terrain and re-run connectivity so it joins the main
-  // component, then use it as entry.
-  if (bestReach === -1) {
-    entry = { x: preferred, y: MAP_HEIGHT - 1 };
-    terrain[entry.y]![entry.x] = carveTerrainOf(biome);
+  // Fallback (astronomically unlikely — carve guarantees a walkable component):
+  // no walkable tile at all → carve the centre to native terrain and re-unify.
+  if (!entry) {
+    entry = { x: cx, y: cy };
+    terrain[cy]![cx] = carveTerrainOf(biome);
     carveConnectivity(terrain, biome);
   }
   // Phase 3 (b91): place POIs in two steps so we can bias value against terrain.

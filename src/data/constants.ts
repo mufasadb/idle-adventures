@@ -10,11 +10,16 @@ export * from "./combat";
 export * from "./crafting";
 
 // --- Map & perception (filled in M1) ---
-// 20×60 strip (e3j): the map outgrows one 300-energy capacity so food buys reach
-// again. WIDTH is thumb-sized for phone portrait; HEIGHT is the long axis you
-// scroll — the whole reach economy hangs off this pair.
-export const MAP_WIDTH = 20; // tiles across
-export const MAP_HEIGHT = 60; // tiles along the strip
+// D84: a 35×35 SQUARE you drill into the CENTER (was a 20×60 portrait strip with a
+// south entry). The strip's shape falsely signalled "a deep north end worth reaching"
+// — but within-map placement is value-agnostic (D57r), so depth-within-a-map does NOT
+// pay; the reward axis is MAP TIER. A centre-entry square removes that false signal and
+// makes the run's opening move a 360° "which direction do I spend my energy?" choice.
+// c67 camera-follow decouples map shape from screen shape (the viewport pans to the
+// player). Area 1225 ≈ the old 1200, so the map still out-ranges one 300-energy tank —
+// you reach any single point but never clear the whole field in one run.
+export const MAP_WIDTH = 35; // tiles across (square)
+export const MAP_HEIGHT = 35; // tiles down (square)
 export const NOISE_FREQUENCY = 0.15; // Perlin sample step per tile; lower = larger terrain regions
 // Barrier layer (e3j): a SECOND, lower-frequency noise field lays long walls of
 // each biome's barrierTerrain across the strip — the navigation puzzle. Tiles
@@ -23,7 +28,7 @@ export const NOISE_FREQUENCY = 0.15; // Perlin sample step per tile; lower = lar
 // literally unreachable barefoot — mountains are cost-walls, not prisons).
 export const BARRIER_NOISE_FREQUENCY = 0.06; // ≪ NOISE_FREQUENCY → chunky ridges, not speckle
 export const BARRIER_THRESHOLD = 0.68; // the "how walled is the world" dial: lower = more maze
-export const POI_DENSITY = 60; // POIs per 20×60 map (e3j): ~3× area × slightly denser — a geared+provisioned run should harvest ~half and CHOOSE which half. Was 18 on 20×20.
+export const POI_DENSITY = 60; // POIs per 35×35 map (D84): a geared+provisioned run should harvest ~half and CHOOSE which half (now: which DIRECTION). Area 1225 ≈ the old 20×60 = 1200, so the count/value budget carries over.
 export const POI_MIN_SPACING = 3; // min Chebyshev distance between POIs (spec: 3–4 tiles apart)
 export const POI_PLACEMENT_ATTEMPTS = 2000; // seeded rejection-sampling budget per map (scaled with density, e3j)
 export const FOOD_REACH_MIN = 2; // min forageable (herb/animal) nodes on finite on-foot cost-to-reach tiles (grid.test reachability guard). D73 (57r): placement is value-agnostic — forage is NO LONGER pulled near entry, so this only promises forage sits on REACHABLE tiles (guaranteed by the walkable-connectivity carve, since all POIs land on walkable tiles), NOT that it's cheap to reach. Food SUFFICIENCY at scale is a density concern (biome nodeTypeWeights), validated by the pinned harness-sustainability test, not by placement

@@ -50,9 +50,10 @@ test("constants: lever groups exist with the documented shape", () => {
 });
 
 test("constants: M1 map levers are filled", () => {
-  // 20×60 strip (e3j): phone-portrait — thumb-wide, scroll-long
-  expect(MAP_WIDTH).toBe(20);
-  expect(MAP_HEIGHT).toBe(60);
+  // D84: a 35×35 square you drill into the centre (was a 20×60 portrait strip).
+  expect(MAP_WIDTH).toBe(35);
+  expect(MAP_HEIGHT).toBe(35);
+  expect(MAP_WIDTH).toBe(MAP_HEIGHT); // square — no false "deep" axis
   expect(POI_DENSITY).toBeGreaterThan(0);
   expect(POI_MIN_SPACING).toBeGreaterThanOrEqual(3);
   expect(NOISE_FREQUENCY).toBeGreaterThan(0);
