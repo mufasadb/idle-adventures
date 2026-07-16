@@ -154,6 +154,10 @@ export const MONSTERS: Record<string, Monster> = {
   "giant-elk": { tier: 2, dmgType: "melee", armourType: "light", category: "beast", tags: ["beast"] }, // m0a: woodland mid-tier — rich-venison source
   "dust-djinn": { tier: 2, dmgType: "magic", armourType: "robe", category: "fae", tags: ["fae"] }, // m0a: desert bow-bait (robe hide)
   "frost-hatchling": { tier: 2, dmgType: "magic", armourType: "robe", category: "beast", tags: ["dragon"] }, // m0a: tundra wyrm herald, bow-bait; dragon tag = wyrmbane affinity
+  // D83: drake-hide moved off the hunted animal table onto a FIGHT — a T2 desert+tundra
+  // drake. Light hide + melee (an ordinary mid-tier fight); dragon tag keeps drake-oil's
+  // "affinity vs dragon" theme coherent (and makes it wyrmbane-vulnerable at T2).
+  drake: { tier: 2, dmgType: "melee", armourType: "light", category: "beast", tags: ["dragon"] },
 }; // monster combat stats and loot triggers
 
 export type Weapon = { dmgType: DmgType; damage: number; tags: string[] };
@@ -244,6 +248,7 @@ export const LOOT_TABLE: Record<string, ItemStackSpec[]> = {
   "ancient-wyrm": [{ defId: "wyrm-scale", qty: 3 }, { defId: "dragonheart", qty: 1, chance: 0.2 }],
   // Mid-game tier 2 (m0a): giant-elk drops only rich-venison (elk-antler omitted — drop-only path keeps roster clean)
   "giant-elk": [{ defId: "rich-venison", qty: 2 }],
+  drake: [{ defId: "drake-hide", qty: 2 }], // D83: drake-hide is now a combat drop (was a steel-knife-gated hunt)
   "dust-djinn": [{ defId: "djinn-ember", qty: 1 }],
   // frost-hatchling: hatchling-scale (armour shortcut) + map-scroll @15% (the wyrm herald's map drop)
   // map-scroll is intercepted by rollLoot/fightAt and minted as a MapItem — it never enters carry as a material.

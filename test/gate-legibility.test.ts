@@ -82,8 +82,8 @@ test("materialsUnlockedBy reverse-maps a tool to the materials it gates", () => 
   // iron-pick opens coal/salt/silver-ore (any-of with steel-pick); steel-pick also mithril
   expect(materialsUnlockedBy("iron-pick")).toEqual(["coal", "salt", "silver-ore"]);
   expect(materialsUnlockedBy("steel-pick")).toEqual(["coal", "mithril-ore", "salt", "silver-ore"]);
-  expect(materialsUnlockedBy("steel-knife")).toEqual(["drake-hide", "seal"]);
   expect(materialsUnlockedBy("pick")).toEqual([]); // base tool gates nothing
+  // D83: steel-knife retired — drake-hide is a combat drop now, seal huntable with the base knife.
 });
 
 test("describe: a kit-tool states what door it opens (fire-kit → field cooking)", () => {

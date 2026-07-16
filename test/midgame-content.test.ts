@@ -18,9 +18,10 @@ test("apple is a fresh food that stales to bruised-apple", () => {
 });
 
 test("new gather materials sit behind their gate and biome", () => {
-  // D78: salt is pick-gated (iron/steel pick); seal needs the steel knife.
+  // D78: salt is pick-gated (iron/steel pick). D83: seal is no longer steel-knife-gated
+  // (steel-knife retired) — it's huntable with the base trap+knife like every other hide.
   expect(MATERIAL_GATE.salt!.tools).toEqual(["iron-pick", "steel-pick"]);
-  expect(MATERIAL_GATE.seal!.tools).toEqual(["steel-knife"]);
+  expect(MATERIAL_GATE.seal).toBeUndefined();
   expect(BIOMES.desert.materialTable.mining?.salt).toBe(2);
   expect(BIOMES.tundra.materialTable.herb?.thistle).toBe(2);
   expect(BIOMES.woodland.materialTable.herb?.thistle).toBe(1);

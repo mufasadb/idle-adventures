@@ -218,6 +218,15 @@
       "tags": [
         "dragon"
       ]
+    },
+    "drake": {
+      "tier": 2,
+      "dmgType": "melee",
+      "armourType": "light",
+      "category": "beast",
+      "tags": [
+        "dragon"
+      ]
     }
   },
   "tolls": {
@@ -427,6 +436,32 @@
         "hpLost": 1.1,
         "hpLostPct": 3.8,
         "rounds": 2
+      }
+    },
+    "drake": {
+      "bare": {
+        "victory": false,
+        "hpLost": 30,
+        "hpLostPct": 100,
+        "rounds": 4
+      },
+      "iron": {
+        "victory": true,
+        "hpLost": 16,
+        "hpLostPct": 53.3,
+        "rounds": 5
+      },
+      "steel": {
+        "victory": true,
+        "hpLost": 9,
+        "hpLostPct": 30,
+        "rounds": 4
+      },
+      "mithril": {
+        "victory": true,
+        "hpLost": 4.6,
+        "hpLostPct": 15.2,
+        "rounds": 3
       }
     },
     "dust-djinn": {

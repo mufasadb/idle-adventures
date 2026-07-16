@@ -89,24 +89,24 @@ export const BIOMES: Record<BiomeId, Biome> = {
   desert: {
     terrainWeights: { plains: 0.55, mountain: 0.3, river: 0.15 },
     nodeTypeWeights: { mining: 0.4, monster: 0.25, herb: 0.15, wood: 0.1, animal: 0.1 },
-    creatureTable: { "sand-raider": 5, "mirage-wisp": 4, "giant-scorpion": 3, "dust-djinn": 3 }, // m0a: dust-djinn mid-tier bow-bait
+    creatureTable: { "sand-raider": 5, "mirage-wisp": 4, "giant-scorpion": 3, "dust-djinn": 3, drake: 3 }, // m0a: dust-djinn mid-tier bow-bait; D83: drake (T2) drops drake-hide — the hide is now a fight, not a hunt
     materialTable: {
       mining: { "copper-ore": 7, "iron-ore": 2, "coal": 1, salt: 2 }, // coal T2 (iron-pick) — desert is a fuel source; salt (m0a) T2 evaporite
       wood: { "cactus-wood": 7, "oak-log": 2, "pine-log": 1 },
       herb: { "desert-sage": 7, flint: 5, deadwood: 5, "forest-herb": 2, berries: 1, "ice-moss": 1 }, // D83: flint 3→5, deadwood 2→5 — bootstrap abundance on T1 (~48% of desert forage), tapered higher. flint country (D45): scree + dry creek beds; deadwood (xls): scarcer bare-hands wood in the desert
-      animal: { "lizard-hide": 7, "deer-hide": 2, "drake-hide": 1, feather: 2 }, // drake T2 (steel-knife); feather (D45)
+      animal: { "lizard-hide": 7, "deer-hide": 2, feather: 2 }, // D83: drake-hide removed — now a combat drop from the `drake` monster (was 'too high up' for a hunted node); feather (D45)
     },
     barrierTerrain: "mountain",
   },
   tundra: {
     terrainWeights: { ice: 0.5, mountain: 0.25, plains: 0.15, river: 0.1 },
     nodeTypeWeights: { animal: 0.35, monster: 0.25, mining: 0.2, wood: 0.1, herb: 0.1 },
-    creatureTable: { "snow-wolf": 5, "ice-crab": 4, "snow-marauder": 3, "frost-fae": 2, "frost-hatchling": 3 }, // m0a: frost-hatchling wyrm herald bow-bait
+    creatureTable: { "snow-wolf": 5, "ice-crab": 4, "snow-marauder": 3, "frost-fae": 2, "frost-hatchling": 3, drake: 3 }, // m0a: frost-hatchling wyrm herald bow-bait; D83: drake (T2) drops drake-hide (now a fight, not a hunt)
     materialTable: {
       mining: { "silver-ore": 5, "coal": 2, "iron-ore": 2, "mithril-ore": 1 }, // silver T2 + coal T2 + mithril T3: tundra is the deep-tier mine
       wood: { "pine-log": 7, "oak-log": 2, "ironwood-log": 1, stringybark: 1 }, // stringybark rare here (D45) — bow country is woodland
       herb: { "ice-moss": 7, deadwood: 5, flint: 4, "desert-sage": 2, thistle: 2, berries: 1, "forest-herb": 1 }, // D83: flint 1→4, deadwood 2→5 — bootstrap abundance on T1 (~41% of tundra forage; was the worst biome), tapered higher. thistle (m0a) T2 herb; deadwood (xls): bare-hands wood under the tundra
-      animal: { "wolf-pelt": 7, "deer-hide": 2, "drake-hide": 1, feather: 2, seal: 2 }, // seal (m0a) T2 large prey; feather (D45)
+      animal: { "wolf-pelt": 7, "deer-hide": 2, feather: 2, seal: 2 }, // D83: drake-hide removed (now the `drake` combat drop); seal (m0a) large prey — now huntable with the base trap+knife (steel-knife retired); feather (D45)
     },
     barrierTerrain: "mountain",
   },
@@ -127,8 +127,8 @@ export const MATERIAL_GATE: Record<string, { tools: string[] }> = {
   "silver-ore": { tools: ["iron-pick", "steel-pick"] },
   salt: { tools: ["iron-pick", "steel-pick"] }, // desert mining (m0a): evaporite deposits — pick required
   "ironwood-log": { tools: ["iron-axe", "steel-axe"] }, // wood — needs a hardened axe
-  "drake-hide": { tools: ["steel-knife"] }, // animal — needs the steel knife
-  seal: { tools: ["steel-knife"] }, // tundra animal (m0a): large prey — steel knife required
+  // D83: drake-hide + seal steel-knife gates retired — drake-hide is now a combat
+  // drop (the `drake` monster) and seal is huntable with the base trap+knife.
   "mithril-ore": { tools: ["steel-pick"] }, // deepest mining tier — only the steel pick
 };
 
@@ -319,7 +319,6 @@ export const TOOL_CAPABILITY: Record<string, string> = {
   "iron-axe": "axe",
   "steel-pick": "pick",
   "steel-axe": "axe",
-  "steel-knife": "knife",
   spyglass: "vision", // perception-range capability (9u9.2); NODE_TOOL never asks for it, so no gather impact
   "climbing-pick": "climb", // gating capability (boo); NODE_TOOL never asks for "climb", so no gather impact
   raft: "ford", // gating capability for rivers (boo)
@@ -359,7 +358,6 @@ export const TOOL_SPEED: Record<string, number> = {
   "iron-axe": 2,
   "steel-pick": 3, // fastest mining
   "steel-axe": 3,
-  "steel-knife": 2,
   "fletchers-knife": 1, // ke3.3: outputScale multiplier for arrow-shaft (qtyPer × speed)
   "steel-fletchers-knife": 2, // tier-2: 2× shafts per log — the visible tool payoff (repays 57l)
 }; // pick/axe/knife (the base kind tools) are absent = speed 1 — the ungated baseline

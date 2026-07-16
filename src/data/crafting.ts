@@ -81,7 +81,6 @@ export const RECIPE: Record<
   // T3 tools need coal (T2, iron-pick-gated) → you must climb pick→iron-pick→mine coal before steel exists
   "steel-pick": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "coal", qty: 2 }], output: { defId: "steel-pick", qty: 1 } },
   "steel-axe": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "steel-axe", qty: 1 } },
-  "steel-knife": { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "silver-ore", qty: 1 }], output: { defId: "steel-knife", qty: 1 } }, // silver T2 → iron-pick-gated
   spyglass: { inputs: [{ defId: "copper-ore", qty: 2 }, { defId: "ice-moss", qty: 1 }], output: { defId: "spyglass", qty: 1 } }, // cross-biome: desert copper + tundra moss
   // Terrain-gating tools (boo): each a tool slot, so bringing one is a real loadout tradeoff
   "climbing-pick": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "climbing-pick", qty: 1 } }, // enables mountains (∞ → 40)
@@ -157,7 +156,7 @@ export const RECIPE: Record<
   "iron-sword": { inputs: [{ defId: "iron-ore", qty: 3 }], output: { defId: "iron-sword", qty: 1 } },
   bow: { inputs: [{ defId: "oak-log", qty: 2 }, { defId: "bowstring", qty: 1 }], output: { defId: "bow", qty: 1 } }, // D45 rework: bowstring replaces deer-hide — the whole bow line stays pick-free (starter axe)
   "fire-staff": { inputs: [{ defId: "pine-log", qty: 2 }, { defId: "fae-dust", qty: 1 }], output: { defId: "fire-staff", qty: 1 } },
-  // Weapons — T2 (each needs a T2 material → all sit behind the iron-pick/iron-axe/steel-knife tier)
+  // Weapons — T2 (each needs a T2 material → all sit behind the iron-pick/iron-axe tier)
   "silver-sword": { inputs: [{ defId: "silver-ore", qty: 3 }], output: { defId: "silver-sword", qty: 1 } }, // werewolf affinity; silver T2, best-farmed in tundra
   "steel-sword": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "steel-sword", qty: 1 } },
   "composite-bow": { inputs: [{ defId: "ironwood-log", qty: 2 }, { defId: "bowstring", qty: 1 }], output: { defId: "composite-bow", qty: 1 } }, // D45 rework: bowstring replaces deer-hide; ironwood T2 (iron-axe) — the TOP bow crosses into mining, the style never requires it
@@ -190,7 +189,7 @@ export const RECIPE: Record<
   "mithril-plate-boots": { inputs: [{ defId: "mithril-ore", qty: 1 }], output: { defId: "mithril-plate-boots", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
   "mithril-plate-gloves": { inputs: [{ defId: "mithril-ore", qty: 1 }], output: { defId: "mithril-plate-gloves", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
   // Armour — light/robe T2 samples (gated by a T2 material so they sit mid-climb)
-  "studded-chest": { inputs: [{ defId: "drake-hide", qty: 1 }, { defId: "deer-hide", qty: 1 }], output: { defId: "studded-chest", qty: 1 } }, // drake T2 → steel-knife
+  "studded-chest": { inputs: [{ defId: "drake-hide", qty: 1 }, { defId: "deer-hide", qty: 1 }], output: { defId: "studded-chest", qty: 1 } }, // drake-hide now a combat drop (D83)
   "studded-legs": { inputs: [{ defId: "drake-hide", qty: 1 }], output: { defId: "studded-legs", qty: 1 } },
   "enchanted-chest": { inputs: [{ defId: "ice-moss", qty: 2 }, { defId: "silver-ore", qty: 1 }], output: { defId: "enchanted-chest", qty: 1 } }, // silver T2 → iron-pick
   "enchanted-hood": { inputs: [{ defId: "ice-moss", qty: 1 }, { defId: "silver-ore", qty: 1 }], output: { defId: "enchanted-hood", qty: 1 } },
