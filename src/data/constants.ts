@@ -445,6 +445,37 @@ export const MATERIAL_MAP_TIER_WEIGHT: Record<string, Record<number, number>> = 
   deadwood:      { 2: 0.5, 3: 0.3, 4: 0.2, 5: 0.2 },
 };
 
+// D84: per-creature weight multiplier by MAP tier — the sibling of
+// MATERIAL_MAP_TIER_WEIGHT for the roster. Sparse, IDENTITY at T1 (absent = ×1, so
+// T1 maps are byte-identical). This is what makes a higher-tier map PLAY different:
+// the T1 trash scales OUT and the T2 monsters scale IN as tier rises, so the fights
+// read tougher on the combat forecast and the drops craft into GEAR, not just food —
+// the real "deeper = better", carried by the roster (bosses fade in separately via
+// MAP_TIER_CREATURE_ADD). Rosters OVERLAP (a T2 map is mostly familiar with tougher
+// things creeping in; a T3 is mostly tough with the odd straggler) — not a hard switch.
+// Woodland gains a real tier climb here (its MAP_TIER_CREATURE_ADD is empty — D82
+// near-thing) by scaling giant-elk/werewolf up. Multipliers are the tuning dial.
+export const CREATURE_MAP_TIER_WEIGHT: Record<string, Record<number, number>> = {
+  // Tier-1 trash scales OUT (untouched at T1/T2; thinning begins at T3)
+  "sand-raider":     { 3: 0.6, 4: 0.4, 5: 0.3 },
+  "mirage-wisp":     { 3: 0.6, 4: 0.4, 5: 0.3 },
+  "forest-boar":     { 3: 0.6, 4: 0.4, 5: 0.3 },
+  "snow-wolf":       { 3: 0.6, 4: 0.4, 5: 0.3 },
+  "shell-beetle":    { 3: 0.6, 4: 0.4, 5: 0.3 },
+  "ice-crab":        { 3: 0.6, 4: 0.4, 5: 0.3 },
+  "fae-sprite":      { 3: 0.6, 4: 0.4, 5: 0.3 },
+  "forest-bandit":   { 3: 0.6, 4: 0.4, 5: 0.3 },
+  // Tier-2 mid scales IN (giant-elk/werewolf give WOODLAND its tier climb)
+  "giant-scorpion":  { 2: 1.5, 3: 2, 4: 2.5, 5: 3 },
+  "dust-djinn":      { 2: 1.5, 3: 2, 4: 2.5, 5: 3 },
+  drake:             { 2: 1.5, 3: 2, 4: 2.5, 5: 3 },
+  "giant-elk":       { 2: 1.5, 3: 2, 4: 2.5, 5: 3 },
+  werewolf:          { 2: 1.5, 3: 2, 4: 2.5, 5: 3 },
+  "snow-marauder":   { 2: 1.5, 3: 2, 4: 2.5, 5: 3 },
+  "frost-fae":       { 2: 1.5, 3: 2, 4: 2.5, 5: 3 },
+  "frost-hatchling": { 2: 1.5, 3: 2, 4: 2.5, 5: 3 },
+};
+
 // Node-variant magnitude distribution by map tier. Weighted over class {1,2,3}.
 // T1 = {1:1} (always base — identity). Higher tiers shift toward rich.
 export const NODE_MAGNITUDE_WEIGHTS: Record<number, Record<number, number>> = {

@@ -14,6 +14,7 @@ import {
   POI_PLACEMENT_ATTEMPTS,
   NODE_TYPES,
   MATERIAL_MAP_TIER_WEIGHT,
+  CREATURE_MAP_TIER_WEIGHT,
   MAP_TIER_CREATURE_ADD,
   POI_DENSITY_BY_TIER,
   TERRAIN_WEIGHT_TIER_SHIFT,
@@ -163,8 +164,13 @@ export function tierProfile(biome: Biome, biomeId: BiomeId, mapTier: number): Bi
     }
     materialTable[kind] = scaled;
   }
-  // (b) creatureTable = boss-free base + additive boss layer (biome-scoped, weights sum on collision)
-  const creatureTable: Record<string, number> = { ...biome.creatureTable };
+  // (b) creatureTable: base weights × per-creature tier multiplier (D84 — T1 trash
+  // scales OUT, T2/T3 scale IN, rosters overlap), THEN the additive biome-scoped boss
+  // layer (weights sum on collision). Identity at T1 (multiplier absent = ×1).
+  const creatureTable: Record<string, number> = {};
+  for (const defId of Object.keys(biome.creatureTable)) {
+    creatureTable[defId] = biome.creatureTable[defId]! * (CREATURE_MAP_TIER_WEIGHT[defId]?.[mapTier] ?? 1);
+  }
   for (const [defId, w] of Object.entries(MAP_TIER_CREATURE_ADD[biomeId]?.[mapTier] ?? {})) {
     creatureTable[defId] = (creatureTable[defId] ?? 0) + w;
   }
