@@ -81,7 +81,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
     materialTable: {
       mining: { "iron-ore": 7, "copper-ore": 2, "silver-ore": 1 }, // silver present (D27) but T2-gated
       wood: { "oak-log": 5, "pine-log": 2, "ironwood-log": 1, stringybark: 3, apple: 2 }, // ironwood T2 (iron-axe); stringybark (D45) = bowstring source, woodland is bow country (oak rebalanced 7→5); apple (m0a) fresh fruit from orchard — material defId = food defId so gather routes to food
-      herb: { "forest-herb": 7, berries: 4, "desert-sage": 2, "ice-moss": 1, flint: 2, thistle: 1, deadwood: 3 }, // flint (D45): foraged from creek beds, bare hands — arrowheads without a pick; thistle (m0a) T1 herb; deadwood (xls): bare-hands foraged wood — the stone-age bootstrap material (club + tool handles)
+      herb: { "forest-herb": 7, deadwood: 6, flint: 5, berries: 4, "desert-sage": 2, "ice-moss": 1, thistle: 1 }, // D83: flint 2→5, deadwood 3→6 — bootstrap materials abundant on T1 (~42% of woodland forage), tapered at higher tiers via MATERIAL_MAP_TIER_WEIGHT. flint (D45): creek-bed arrowheads, bare hands; deadwood (xls): bare-hands foraged wood — the stone-age bootstrap; thistle (m0a) T1 herb
       animal: { "deer-hide": 7, "wolf-pelt": 2, "lizard-hide": 1, feather: 2 }, // feather (D45): fletching from birds (knife)
     },
     barrierTerrain: "mountain",
@@ -93,7 +93,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
     materialTable: {
       mining: { "copper-ore": 7, "iron-ore": 2, "coal": 1, salt: 2 }, // coal T2 (iron-pick) — desert is a fuel source; salt (m0a) T2 evaporite
       wood: { "cactus-wood": 7, "oak-log": 2, "pine-log": 1 },
-      herb: { "desert-sage": 7, "forest-herb": 2, berries: 1, "ice-moss": 1, flint: 3, deadwood: 2 }, // flint country (D45): scree + dry creek beds; deadwood (xls): scarcer bare-hands wood in the desert
+      herb: { "desert-sage": 7, flint: 5, deadwood: 5, "forest-herb": 2, berries: 1, "ice-moss": 1 }, // D83: flint 3→5, deadwood 2→5 — bootstrap abundance on T1 (~48% of desert forage), tapered higher. flint country (D45): scree + dry creek beds; deadwood (xls): scarcer bare-hands wood in the desert
       animal: { "lizard-hide": 7, "deer-hide": 2, "drake-hide": 1, feather: 2 }, // drake T2 (steel-knife); feather (D45)
     },
     barrierTerrain: "mountain",
@@ -105,7 +105,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
     materialTable: {
       mining: { "silver-ore": 5, "coal": 2, "iron-ore": 2, "mithril-ore": 1 }, // silver T2 + coal T2 + mithril T3: tundra is the deep-tier mine
       wood: { "pine-log": 7, "oak-log": 2, "ironwood-log": 1, stringybark: 1 }, // stringybark rare here (D45) — bow country is woodland
-      herb: { "ice-moss": 7, "desert-sage": 2, berries: 1, "forest-herb": 1, flint: 1, thistle: 2, deadwood: 2 }, // thistle (m0a) T2 herb; flint scarce under the ice (D45); deadwood (xls): bare-hands wood under the tundra
+      herb: { "ice-moss": 7, deadwood: 5, flint: 4, "desert-sage": 2, thistle: 2, berries: 1, "forest-herb": 1 }, // D83: flint 1→4, deadwood 2→5 — bootstrap abundance on T1 (~41% of tundra forage; was the worst biome), tapered higher. thistle (m0a) T2 herb; deadwood (xls): bare-hands wood under the tundra
       animal: { "wolf-pelt": 7, "deer-hide": 2, "drake-hide": 1, feather: 2, seal: 2 }, // seal (m0a) T2 large prey; feather (D45)
     },
     barrierTerrain: "mountain",
@@ -427,6 +427,11 @@ export const MATERIAL_MAP_TIER_WEIGHT: Record<string, Record<number, number>> = 
   coal:          { 2: 1, 3: 2, 4: 4, 5: 2 },
   "iron-ore":    { 2: 1.5, 3: 2, 4: 2, 5: 1.5 },
   "mithril-ore": { 3: 1, 4: 2, 5: 3 },
+  // D83: bootstrap materials are ABUNDANT at T1 (base herb weights raised) but
+  // taper on higher tiers so they don't crowd out higher-value forage deep in —
+  // a fresh player finds them fast; a deep run drifts back toward scarcity.
+  flint:         { 2: 0.5, 3: 0.3, 4: 0.2, 5: 0.2 },
+  deadwood:      { 2: 0.5, 3: 0.3, 4: 0.2, 5: 0.2 },
 };
 
 // Node-variant magnitude distribution by map tier. Weighted over class {1,2,3}.
