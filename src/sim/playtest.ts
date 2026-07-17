@@ -217,7 +217,7 @@ function printExpedition(st: GameState): void {
       : "";
     console.log(`\n=== ENGAGED: ${c.creature} — ${c.monsterHp} HP · you hit ${dmgOut}, it hits ${dmgIn}${quiver}${coating}${poisonHdr}${battle}${enh} · actions: fight | flee | quaff${battle ? " | use-item" : ""}${enh ? " | enhance" : ""} | toggle-auto-quaff | toggle-auto-finish | don/doff (costs a turn) ===`);
   }
-  console.log("\n=== MAP (▲ you · letters = node kinds · detail only resolves near you · near a forage 'H' its material shows: f=flint d=deadwood b=berries) ===");
+  console.log("\n=== MAP (▲ you · letters = node kinds · detail only resolves near you · near a forage 'H' its material shows: f=flint d=deadwood b=berries · C=humanoid camp, kill it for a MAP — visible from afar) ===");
   const rows: string[] = [];
   for (let y = 0; y < MAP_HEIGHT; y++) {
     let row = "";
@@ -225,7 +225,7 @@ function printExpedition(st: GameState): void {
       const k = `${x},${y}`;
       if (exp.pos.x === x && exp.pos.y === y) row += PLAYER_CHAR;
       else if (cleared.has(k)) row += "·";
-      else if (seen.has(k)) { const p = seen.get(k)!; row += poiGlyph(p.kind, p.detail); } // cww: resolved forage shows its material (f/d/b)
+      else if (seen.has(k)) { const p = seen.get(k)!; row += poiGlyph(p.kind, p.detail, p.landmark); } // cww/wzx: resolved forage shows its material (f/d/b); a humanoid camp shows C at any range
       else row += TERRAIN_CHAR[grid.terrain[y]![x]!];
     }
     rows.push(row);
@@ -252,6 +252,13 @@ function printExpedition(st: GameState): void {
       const bits = carriedKitTools.map((t) => `${t} (${TOOL_PURPOSE[TOOL_CAPABILITY[t]!]})`);
       console.log(`\nField craft: your kit — ${bits.join(", ")} — but nothing craftable here yet (need the ingredients, a partner kit-tool, or the right terrain).`);
     }
+  }
+  // wzx: camps (humanoid map-droppers) are landmarks visible at ANY range — list them
+  // so a console player can pick a heading toward the map-economy on-ramp, mirroring
+  // the 'C' glyphs on the map. Cleared ones drop off.
+  const camps = [...seen.values()].filter((p) => p.landmark === "camp" && !cleared.has(`${p.x},${p.y}`));
+  if (camps.length) {
+    console.log(`\nCamps (kill a humanoid here to loot a MAP — visible from afar): ${camps.map((c) => `(${c.x},${c.y})`).join(", ")}`);
   }
   const nearby = [...seen.values()].filter((p) => p.detail && !cleared.has(`${p.x},${p.y}`));
   if (nearby.length) {

@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test";
 import { perceive } from "../src/engine/perceive";
 import { generateGrid, rollBiome } from "../src/engine/grid";
-import { DETAIL_RADIUS } from "../src/data/constants";
+import { DETAIL_RADIUS, MONSTERS } from "../src/data/constants";
 
 const cheby = (a: { x: number; y: number }, b: { x: number; y: number }) =>
   Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
@@ -50,4 +50,28 @@ test("perceive: spyglass extends the detail radius", () => {
   const glass = perceive(grid, origin, ["spyglass"]).find((p) => p.x === far.x && p.y === far.y)!;
   expect(bare.detail).toBeNull();
   expect(glass.detail).not.toBeNull();
+});
+
+// wzx: a humanoid monster (the map-dropper) is a CAMP landmark — its `landmark: "camp"`
+// is visible at ANY range (out of detail radius too), while its stats still gate to
+// `detail`, so the map-economy on-ramp is discoverable without leaking the fight.
+test("perceive: a humanoid reads as a camp landmark at any range; stats still gate", () => {
+  const humanoids = new Set(
+    Object.entries(MONSTERS).filter(([, m]) => m.category === "humanoid").map(([k]) => k),
+  );
+  let grid, far, origin;
+  for (let i = 0; i < 60 && !far; i++) {
+    const seed = `wzx-camp-${i}`;
+    grid = generateGrid(seed, rollBiome(seed));
+    origin = grid.entry;
+    far = grid.pois.find((p) => p.creature && humanoids.has(p.creature) && cheby(origin!, p) > DETAIL_RADIUS + 2);
+  }
+  expect(far).toBeTruthy();
+  const seen = perceive(grid!, origin!, []).find((p) => p.x === far!.x && p.y === far!.y)!;
+  expect(seen.landmark).toBe("camp"); // visible from afar
+  expect(seen.detail).toBeNull();     // but its tier/hide/damage still gated (out of range)
+  // adjacent: the camp resolves its stats too, still flagged a camp
+  const near = perceive(grid!, { x: far!.x, y: far!.y }, []).find((p) => p.x === far!.x && p.y === far!.y)!;
+  expect(near.landmark).toBe("camp");
+  expect(near.detail).not.toBeNull();
 });

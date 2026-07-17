@@ -333,10 +333,12 @@ export const FORAGE_MATERIAL_CHAR: Record<string, string> = {
   berries: "b",
 };
 
-// The map glyph for a perceived POI: a RESOLVED forage node shows its material glyph
-// (f/d/b); everything else — and any unresolved node — shows its kind glyph. Shared by
-// the console map and the web grid so both surfaces teach forage variety identically.
-export function poiGlyph(kind: NodeType, detail: PoiDetail | null): string {
+// The map glyph for a perceived POI. Precedence: a humanoid CAMP landmark (wzx — the
+// map-dropper, "C", visible at any range) > a RESOLVED forage material (f/d/b) > the
+// kind glyph. Shared by the console map and the web grid so both teach identically.
+export const CAMP_CHAR = "C";
+export function poiGlyph(kind: NodeType, detail: PoiDetail | null, landmark?: "camp"): string {
+  if (landmark === "camp") return CAMP_CHAR;
   if (kind === "herb" && detail?.material) return FORAGE_MATERIAL_CHAR[detail.material] ?? POI_CHAR.herb;
   return POI_CHAR[kind];
 }

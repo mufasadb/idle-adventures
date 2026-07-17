@@ -30,6 +30,9 @@
       .terrain-mountain { background: #5c5c63; }
       .poi { font-weight: bold; color: #ffd75e; }
       .poi.locked { color: #8a7a3a; } /* visible but tier-locked */
+      /* wzx: a humanoid camp (the map-dropper) — a landmark visible at any range so you can pick a heading toward the map economy. Teal ring + the 'C' glyph (non-trial). */
+      .tile.landmark-camp { box-shadow: inset 0 0 0 2px #35c2b0; border-radius: 3px; }
+      .tile.landmark-camp.poi { color: #6fe0d0; }
       /* cww: a resolved forage node tinted by its material — flint/deadwood pop against the herb yellow so the bootstrap tool-materials are legible at a glance. `.grid` prefix outranks the asset-trial .poi gold in both render modes. */
       .grid .tile.poi.mat-flint { color: #cfe0ea; }    /* pale stone */
       .grid .tile.poi.mat-deadwood { color: #d9a662; } /* dry wood */

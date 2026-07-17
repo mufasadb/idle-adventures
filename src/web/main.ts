@@ -806,7 +806,10 @@ function expeditionView(): string {
     // cww: a RESOLVED forage node shows its material glyph (f/d/b) + a material colour
     // class, so the map teaches that forage varies (flint/deadwood look different once near).
     if (poi && !isCleared && poi.kind === "herb" && per?.detail?.material) cls.push(`mat-${per.detail.material}`);
-    const ch = isPlayer ? PLAYER_CHAR : isCleared ? "·" : poi ? poiGlyph(poi.kind, per?.detail ?? null) : TERRAIN_CHAR[grid.terrain[y]![x]!];
+    // wzx: a humanoid CAMP (the map-dropper) reads as a landmark at any range.
+    const isCamp = !!poi && !isCleared && per?.landmark === "camp";
+    if (isCamp) cls.push("landmark-camp");
+    const ch = isPlayer ? PLAYER_CHAR : isCleared ? "·" : poi ? poiGlyph(poi.kind, per?.detail ?? null, per?.landmark) : TERRAIN_CHAR[grid.terrain[y]![x]!];
     // gate-legibility (playtest 2026-07-09 #1, node gate/reach visibility): a
     // surveyed / in-vision node names its ACCESS GATE at range (nodeGateNote reads
     // the PERCEIVED, range-gated gate) so a far vein's worth-the-trek and its
@@ -815,6 +818,8 @@ function expeditionView(): string {
     const tierNote = per ? nodeGateNote(per.detail) : null;
     const title = stepBd
       ? stepExplain(stepBd)
+      : isCamp // wzx: a camp reads as "map here" at any range, resolved or not
+      ? `a camp — kill the humanoid here to loot a MAP${per && per.detail ? ` · ${flavorDetail(per.detail, poi!.kind)}` : ""}`
       : poi && !isCleared // a cleared tile shows '·' — its title must not keep the stale poi text (1te-d)
       ? (per && per.detail
           ? `${kindLabel(poi.kind)} · ${flavorDetail(per.detail, poi.kind)}${tierNote ? ` · ${tierNote}` : ""}`
