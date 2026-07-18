@@ -32,6 +32,7 @@ import type { GatherableNodeType } from "../data/constants";
 import { moveCostBreakdown } from "../engine/move";
 import { usedSlots, carryCap, mapCarryCap } from "../engine/carry";
 import { costToReach } from "../engine/reach";
+import { foodEnergyOf } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
 import type { Action, GameEvent, GameState } from "../engine/types";
 
@@ -292,14 +293,24 @@ function printExpedition(st: GameState): void {
     // routing benefit of your transport/tools is legible. One Dijkstra each.
     const withGear = costToReach(grid.terrain, exp.pos, exp.loadout.equipment.transport, exp.loadout.equipment.tools);
     const onFoot = costToReach(grid.terrain, exp.pos, null, []);
-    console.log(`\n=== REACH (energy to walk to each node from ${exp.pos.x},${exp.pos.y}; you have ${exp.energy} energy) ===`);
+    // df3 (web parity): the affordability verdict accounts for DESIGNATED auto-eat.
+    // If autoEatFood is set, the walk refills waste-free en route, so a node can be
+    // reached on energy + the designated food's total restore (× tent bonus), not
+    // just current energy. Auto-eat off ⇒ pool 0 ⇒ unchanged raw-energy verdict.
+    const tentMult = toolSpeedFor(exp.loadout.equipment.tools, "camp") !== null ? TENT_FOOD_MULTIPLIER : 1;
+    const refillPool = exp.autoEatFood
+      ? exp.loadout.food.filter((f) => f.defId === exp.autoEatFood).reduce((sum, f) => sum + f.qty * foodEnergyOf(f.defId) * tentMult, 0)
+      : 0;
+    const budget = exp.energy + refillPool;
+    const poolNote = refillPool > 0 ? ` (+${Math.round(refillPool)}e auto-eat reserve)` : "";
+    console.log(`\n=== REACH (energy to walk to each node from ${exp.pos.x},${exp.pos.y}; you have ${exp.energy} energy${poolNote}) ===`);
     for (const poi of grid.pois) {
       if (cleared.has(`${poi.x},${poi.y}`)) continue;
       const c = withGear[poi.y]![poi.x]!;
       if (!Number.isFinite(c)) { console.log(`  (${poi.x},${poi.y}) ${poi.kind} — unreachable on foot (needs gear to cross)`); continue; }
       const foot = onFoot[poi.y]![poi.x]!;
       const delta = Number.isFinite(foot) && foot !== c ? ` (${c < foot ? "−" : "+"}${Math.abs(Math.round(foot - c))}e vs on foot)` : "";
-      const afford = c > exp.energy ? " ⚠ more than you have" : "";
+      const afford = c > budget ? " ⚠ more than you have" : c > exp.energy ? " (covered by auto-eat en route)" : "";
       const surveyHint = legalActions(st).some((a) => a.type === "survey" && a.at.x === poi.x && a.at.y === poi.y)
         ? ` · survey it from here (−${SURVEY_ENERGY}e, no walk): {"type":"survey","at":{"x":${poi.x},"y":${poi.y}}}`
         : "";

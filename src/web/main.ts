@@ -11,12 +11,13 @@ import { expeditionGrid, rollBiome } from "../engine/grid";
 import type { Grid } from "../engine/grid";
 import { slotOf } from "../engine/catalog";
 import { recipeOutputQty } from "../engine/craft";
-import { moveCost, moveCostBreakdown } from "../engine/move";
+import { moveCostBreakdown } from "../engine/move";
 import { ASSET_TRIAL, TILE_BG, MONSTER_SPRITES, MONSTER_SIZE, NODE_ICON } from "./assets-trial";
 import { carryCap, mapCarryCap } from "../engine/carry";
 import { wornPieces, ARMOUR_SLOTS } from "../engine/pack";
 import { lineTiles } from "../engine/line";
-import { gatherCost } from "../engine/tools";
+import { deriveRoute } from "./route";
+import type { DerivedRoute } from "./route";
 import { heldFoodEnergy } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
 import { RECIPE, MATERIAL_GATE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, INKS, AFFIX_EFFECTS, WEAPON_ENHANCEMENT } from "../data/constants";
@@ -210,62 +211,7 @@ const TRANSPORT_ROLE: Record<string, string> = {
 };
 
 // --- Direct-line routing (eot) -----------------------------------------------
-// The player plans the route by hand: each waypoint draws a NAIVE straight line
-// (lineTiles) from the previous point — never an energy-optimal path (finding the
-// efficient route is the game). deriveRoute turns the waypoint list into the drawn
-// tiles, per-leg block markers, and the split walk/action energy preview. Pure over
-// its inputs; recomputed each render, never stored.
-type Leg = { tiles: Pos[]; blockedAt: Pos | null };
-type DerivedRoute = {
-  legs: Leg[];
-  drawn: Pos[]; // every leg tile in walk order (the whole plan, drawn even past a block)
-  walkable: Pos[]; // the prefix the walk will actually traverse (stops at the first block)
-  waypointKeys: Set<string>;
-  blockKeys: Set<string>; // each leg's first impassable tile — the red "won't work" markers
-  walkCost: number; // movement energy over the walkable prefix
-  actionCost: number; // auto-gather energy for resolved workable nodes on the walkable prefix
-  blocked: boolean; // any leg hits a wall → Walk disabled
-  end: Pos; // last waypoint (or the player, if the route is empty)
-};
-
-function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: Set<string>, cleared: Set<string>): DerivedRoute {
-  const eq = exp.loadout.equipment;
-  const legs: Leg[] = [];
-  const drawn: Pos[] = [];
-  const walkable: Pos[] = [];
-  const waypointKeys = new Set<string>();
-  const blockKeys = new Set<string>();
-  let walkCost = 0;
-  let actionCost = 0;
-  let globallyBlocked = false; // once the walk hits any wall, later tiles aren't traversed
-  let prevWalk: Pos = exp.pos; // previous WALKED tile — sets the next step's diagonal cost
-  let legStart: Pos = exp.pos;
-  for (const wp of wps) {
-    waypointKeys.add(kk(wp));
-    const tiles = lineTiles(legStart, wp);
-    let blockedAt: Pos | null = null;
-    for (const t of tiles) {
-      drawn.push(t);
-      const passable = Number.isFinite(moveCost(grid.terrain[t.y]![t.x]!, eq.transport, eq.tools)); // impassability is flag-independent
-      if (!passable) {
-        if (blockedAt === null) { blockedAt = t; blockKeys.add(kk(t)); } // this leg's first block
-        globallyBlocked = true;
-      } else if (!globallyBlocked) {
-        walkable.push(t);
-        const diagonal = prevWalk.x !== t.x && prevWalk.y !== t.y;
-        walkCost += moveCost(grid.terrain[t.y]![t.x]!, eq.transport, eq.tools, diagonal);
-        prevWalk = t;
-        if ((exp.autoGather ?? true) && !cleared.has(kk(t)) && resolved.has(kk(t))) {
-          const poi = grid.pois.find((p) => p.x === t.x && p.y === t.y);
-          if (poi) { const gc = gatherCost(poi, eq.tools); if (gc !== null) actionCost += gc; }
-        }
-      }
-    }
-    legs.push({ tiles, blockedAt });
-    legStart = wp;
-  }
-  return { legs, drawn, walkable, waypointKeys, blockKeys, walkCost, actionCost, blocked: legs.some((l) => l.blockedAt !== null), end: wps.length ? wps[wps.length - 1]! : exp.pos };
-}
+// deriveRoute + its types live in ./route (DOM-free so they're unit-testable — df3).
 
 // A click either clears, TRUNCATES (snaps to the earliest walk-order occurrence of a
 // tile already on the drawn path — this is the "un-click to unwind" gesture, and it
@@ -857,7 +803,10 @@ function expeditionView(): string {
   // part it'll SPEND (orange, red if it would strand you). Planned = walk + auto-gather.
   const hasRoute = route.length > 0;
   const total = rt.walkCost + rt.actionCost;
-  const overBudget = hasRoute && total > exp.energy;
+  // df3: the STRAND verdict is auto-eat-aware — the walk over-budgets only when the
+  // simulated energy (mid-walk refills applied) can't finish, not merely when the raw
+  // walk+gather spend exceeds current energy. endEnergy is the honest projected end.
+  const overBudget = hasRoute && rt.strands;
   const spend = Math.min(total, exp.energy); // clamp — a huge route must never blow out the bar
   const keep = exp.energy - spend;
   const pct = (v: number) => Math.min(100, (v / maxEnergy) * 100);
@@ -869,7 +818,7 @@ function expeditionView(): string {
     ? `<div class="fill energy" style="width:${pct(keep)}%"></div><div class="fill spend${overBudget ? " over" : ""}" style="width:${pct(spend)}%"></div>`
     : `<div class="fill energy" style="width:${pct(exp.energy)}%"></div>`;
   const energyLabel = hasRoute
-    ? `${round(exp.energy)}/${maxEnergy} → <b class="${overBudget ? "over" : ""}">${round(Math.max(0, exp.energy - total))}</b>${overBudget ? " ⚠ strands you" : ""}`
+    ? `${round(exp.energy)}/${maxEnergy} → <b class="${overBudget ? "over" : ""}">${round(Math.max(0, rt.endEnergy))}</b>${overBudget ? " ⚠ strands you" : ""}`
     : `${round(exp.energy)}/${maxEnergy}${overSpan}`;
   const autoGatherOn = exp.autoGather ?? true;
   const bars = `
