@@ -27,7 +27,7 @@ import {
   poiGlyph,
   PLAYER_CHAR,
 } from "../render/render";
-import { RECIPE, MAP_WIDTH, MAP_HEIGHT, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, AFFIX_EFFECTS, TOOL_CAPABILITY, TOOL_PURPOSE, TENT_FOOD_MULTIPLIER } from "../data/constants";
+import { RECIPE, MAP_WIDTH, MAP_HEIGHT, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, AFFIX_EFFECTS, TOOL_CAPABILITY, TOOL_PURPOSE, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 import { moveCostBreakdown } from "../engine/move";
 import { usedSlots, carryCap, mapCarryCap } from "../engine/carry";
@@ -56,7 +56,7 @@ function fmtEvent(e: GameEvent): string {
     case "moved": return `walked to (${e.to.x},${e.to.y}) on ${e.terrain} · −${e.cost}e → ${e.energy}e`;
     case "gathered": return `gathered ${e.qty}× ${e.material} · −${e.cost}e → ${e.energy}e`;
     case "dropped": return `dropped ${e.qty}× ${e.defId}`;
-    case "ate": return `🍖 ate ${e.defId} · +${e.restored}e → ${e.energy}e`;
+    case "ate": return `${e.campMeal ? "🏕 camp meal — ate" : "🍖 ate"} ${e.defId} · +${e.restored}e → ${e.energy}e${e.campMeal ? " (over max — banked reach)" : ""}`;
     case "auto-eat-set": return e.defId ? `🍴 auto-eat food set to ${e.defId}` : `🍴 auto-eat off`;
     case "fought": {
       const lessons = matchupLessons(e.matchup, null);
@@ -95,7 +95,7 @@ for (const e of events) console.log(fmtEvent(e));
 const s = summarize(state);
 console.log("\n=== YOU ===");
 console.log(`phase: ${s.phase} · runs completed: ${state.runs ?? 0}`);
-if (s.expedition) console.log(`energy: ${s.expedition.energy}/${s.expedition.maxEnergy} · auto-eat: ${s.expedition.autoEatFood ?? "off"}${state.expedition && toolSpeedFor(state.expedition.loadout.equipment.tools, "camp") !== null ? ` · tent (food +${Math.round((TENT_FOOD_MULTIPLIER - 1) * 100)}%)` : ""} · hp: ${s.expedition.hp} · pos (${s.expedition.pos.x},${s.expedition.pos.y}) · nodes cleared: ${s.expedition.cleared} · auto-potion-in-fights: ${(state.expedition?.autoQuaff ?? true) ? "on" : "off"} · auto-finish-fights: ${(state.expedition?.autoFinish ?? false) ? "on" : "off"}`);
+if (s.expedition) console.log(`energy: ${s.expedition.energy}/${s.expedition.maxEnergy} · auto-eat: ${s.expedition.autoEatFood ?? "off"}${state.expedition && toolSpeedFor(state.expedition.loadout.equipment.tools, "camp") !== null ? ` · 🏕 camp meal ${(state.expedition.campMealsUsed ?? 0) < TENT_CAMP_MEALS ? `READY (eat a food to over-eat past max at +${Math.round((TENT_FOOD_MULTIPLIER - 1) * 100)}%)` : "spent this run"}` : ""} · hp: ${s.expedition.hp} · pos (${s.expedition.pos.x},${s.expedition.pos.y}) · nodes cleared: ${s.expedition.cleared} · auto-potion-in-fights: ${(state.expedition?.autoQuaff ?? true) ? "on" : "off"} · auto-finish-fights: ${(state.expedition?.autoFinish ?? false) ? "on" : "off"}`);
 if (state.expedition) {
   // Carry + carried maps (8ec; zpm.2: maps live in a DEDICATED map-carry pool now,
   // not a loot slot — mapCarryCap over the owned bank).

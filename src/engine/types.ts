@@ -69,6 +69,7 @@ export type Expedition = {
   combat?: Engagement; // live engagement (si7.1). Optional/absent = not engaged; reads guard with `?? undefined` checks.
   autoQuaff?: boolean; // auto-potion at the threshold inside exchanges (si7.1, mirrors autoEat). Optional/absent = true; reads guard with `?? true`.
   autoFinish?: boolean; // auto-finish fights (67e): when true, a fight/engage resolves the WHOLE fight to victory or defeat in one action. Optional/absent = OFF; reads guard with `?? false`.
+  campMealsUsed?: number; // tent "camp meals" spent this expedition (7lr): a tent lets you over-eat past max (+TENT_FOOD_MULTIPLIER) TENT_CAMP_MEALS times per run. Fresh per embark; reads guard with `?? 0`.
   autoGather?: boolean; // auto-interact with nodes the direct-line walk crosses (eot): ON ⇒ gather each node stepped over, pausing only on a full bag. Optional/absent = ON; reads guard with `?? true`. Flipped by toggle-auto-gather.
   mapTier?: number; // this run's map tier (2yn): set at embark from the chosen map's tier
                     // (offered map = 1, held MapItem = its tier). Optional/absent = 1.
@@ -125,7 +126,7 @@ export type Action =
   | { type: "toggle-auto-quaff" } // flip auto-potion-at-threshold (si7.1)
   | { type: "toggle-auto-finish" } // flip auto-finish-fights (67e): resolve a whole fight in one action
   | { type: "toggle-auto-gather" } // flip auto-interact-on-walk (eot)
-  | { type: "eat" } // eat one food unit now → refill current energy toward max (dtv)
+  | { type: "eat"; defId: string } // eat one unit of a CHOSEN food now (7lr): additive, capped at max — UNLESS a tent turns it into the once-per-run camp meal (over-max + TENT_FOOD_MULTIPLIER)
   | { type: "set-auto-eat-food"; defId: string | null } // designate the food that auto-eats waste-free (mco); null clears it (auto-eat off). Supersedes toggle-auto-eat.
   | { type: "drop"; itemId: string }
   | { type: "drop-map"; mapSeed: string } // discard a carried map mid-run (8ec) — frees its slot; no re-pickup
@@ -196,7 +197,7 @@ export type GameEvent =
       energy: number; // remaining after the gather
     }
   | { type: "dropped"; defId: string; qty: number }
-  | { type: "ate"; defId: string; restored: number; energy: number } // ate one food unit (dtv): restored energy, new current
+  | { type: "ate"; defId: string; restored: number; energy: number; campMeal?: boolean } // ate one food unit (dtv): restored energy, new current. campMeal (7lr) = a tent camp meal (over-max, +50%).
   | { type: "auto-eat-set"; defId: string | null } // designated (or cleared, null) the auto-eat food (mco)
   | { type: "engaged"; at: { x: number; y: number }; creature: string; monsterHp: number; ranged?: boolean } // ranged (D45): engaged from an adjacent tile with a bow — the first exchange skips its retaliation
   | { type: "exchanged"; creature: string; dmgDealt: number; dmgTaken: number; monsterHp: number; hp: number; potionsUsed: number; arrowSpent?: boolean; poisonDmg?: number } // arrowSpent (D45): present when this exchange shot an arrow. poisonDmg (D60): poison DoT dealt to the monster this round, present when >0

@@ -20,7 +20,7 @@ import { deriveRoute } from "./route";
 import type { DerivedRoute } from "./route";
 import { heldFoodEnergy } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
-import { RECIPE, MATERIAL_GATE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, INKS, AFFIX_EFFECTS, WEAPON_ENHANCEMENT } from "../data/constants";
+import { RECIPE, MATERIAL_GATE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, INKS, AFFIX_EFFECTS, WEAPON_ENHANCEMENT } from "../data/constants";
 import type { BiomeId, GatherableNodeType } from "../data/constants";
 import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint, logisticsEffect, enhancementHint, affixMaterialHint, describe, recipeGateHint, nodeToolHint, nodeGateNote, name, rejectCopy, combatForecast } from "../render/render";
 import { perceive } from "../engine/perceive";
@@ -153,7 +153,7 @@ function fmt(e: GameEvent): string {
     case "moved": return `walked to (${e.to.x},${e.to.y}) on ${e.terrain} · −${round(e.cost)}e → ${round(e.energy)}e`;
     case "gathered": return `${GATHER_VERB[e.kind]?.past ?? "gathered"} ${e.qty}× ${name(e.material)} · −${round(e.cost)}e → ${round(e.energy)}e`;
     case "dropped": return `dropped ${e.qty}× ${name(e.defId)}`;
-    case "ate": return `🍖 ate ${name(e.defId)} · +${round(e.restored)}e → ${round(e.energy)}e`;
+    case "ate": return `${e.campMeal ? "🏕 camp meal — ate" : "🍖 ate"} ${name(e.defId)} · +${round(e.restored)}e → ${round(e.energy)}e${e.campMeal ? " (over max — banked reach)" : ""}`;
     case "auto-eat-set": return e.defId ? `🍴 auto-eat: ${name(e.defId)}` : `🍴 auto-eat off`;
     case "fought": {
       const lessons = matchupLessons(e.matchup, null);
@@ -336,7 +336,7 @@ function slotBox(cls: string, label: string, q: string, tip = ""): string {
 // (or null = none designated but still designatable). Food boxes then carry
 // data-eatfood for right-click designation, and the active one gets a border + 🍴
 // badge. In town it's undefined → plain food boxes, no designation affordance.
-function realSlots(loadout: Loadout, carry: ItemStack[], maps: MapItem[] = [], eatFood?: string | null): string[] {
+function realSlots(loadout: Loadout, carry: ItemStack[], maps: MapItem[] = [], eatFood?: string | null, eatable?: Set<string>, campMealReady = false): string[] {
   const boxes: string[] = [];
   const units = (items: ItemStack[], cls: string) => {
     for (const it of items) for (let i = 0; i < it.qty; i++) boxes.push(slotBox(cls, name(it.defId), "", describe(it.defId)));
@@ -348,8 +348,15 @@ function realSlots(loadout: Loadout, carry: ItemStack[], maps: MapItem[] = [], e
   } else {
     for (const it of loadout.food) for (let i = 0; i < it.qty; i++) {
       const on = it.defId === eatFood;
-      const tip = `${on ? "auto-eating — right-click to stop" : "right-click to auto-eat this"} · ${describe(it.defId)}`;
-      boxes.push(`<div class="slot food${on ? " designated" : ""}" data-eatfood="${it.defId}" title="${name(it.defId)} — ${tip}">${name(it.defId)}${on ? `<span class="autoeat">🍴</span>` : ""}</div>`);
+      const canEat = eatable?.has(it.defId) ?? false; // 7lr: this food would actually gain energy
+      // 7lr: left-click eats one unit of THIS food (a tent + unspent charge makes it the
+      // over-max camp meal); right-click designates it as the auto-eat food.
+      const eatTip = canEat
+        ? (campMealReady ? "left-click: 🏕 CAMP MEAL (over-max, +50%)" : "left-click: eat one")
+        : "already full — can't eat";
+      const tip = `${eatTip} · ${on ? "auto-eating — right-click to stop" : "right-click: auto-eat this"} · ${describe(it.defId)}`;
+      const cls = `slot food${on ? " designated" : ""}${canEat ? " eatable" : ""}${canEat && campMealReady ? " campmeal" : ""}`;
+      boxes.push(`<div class="${cls}" ${canEat ? `data-eat="${it.defId}"` : ""} data-eatfood="${it.defId}" title="${name(it.defId)} — ${tip}">${name(it.defId)}${on ? `<span class="autoeat">🍴</span>` : ""}</div>`);
     }
   }
   units(loadout.potions, "potion");
@@ -374,8 +381,8 @@ function wornGhosts(eq: Equipment): string[] {
   return worn.map((d) => `<div class="slot ghost" title="${name(d)} — worn, no slot · ${describe(d)}">${name(d)}</div>`);
 }
 // Returns { used, html }. used = real filled slots (ghosts excluded).
-function inventoryGrid(loadout: Loadout, carry: ItemStack[], cap: number, maps: MapItem[] = [], eatFood?: string | null): { used: number; html: string } {
-  const real = realSlots(loadout, carry, maps, eatFood);
+function inventoryGrid(loadout: Loadout, carry: ItemStack[], cap: number, maps: MapItem[] = [], eatFood?: string | null, eatable?: Set<string>, campMealReady = false): { used: number; html: string } {
+  const real = realSlots(loadout, carry, maps, eatFood, eatable, campMealReady);
   const boxes = [...real];
   while (boxes.length < cap) boxes.push(`<div class="slot empty">·</div>`);
   const ghosts = wornGhosts(loadout.equipment);
@@ -845,7 +852,11 @@ function expeditionView(): string {
     : `<div class="pathbanner muted">Click a tile → draws a straight line + previews energy. Click more tiles to add waypoints; click a tile already on the line to unwind to it. Then <b>Walk</b>. Monsters (<b>X</b>) are fought when your line reaches them.</div>`;
 
   const cap = carryCap(exp.loadout.equipment);
-  const inv = inventoryGrid(exp.loadout, exp.carry, cap, exp.carriedMaps ?? [], exp.autoEatFood ?? null);
+  // 7lr: which foods can actually be eaten right now (speculative-reduce filtered), and
+  // whether an eat would be the tent camp meal (tent equipped + an unspent charge).
+  const eatable = new Set(legal.filter((a): a is Extract<Action, { type: "eat" }> => a.type === "eat").map((a) => a.defId));
+  const campMealReady = exp.loadout.equipment.tools.includes("tent") && (exp.campMealsUsed ?? 0) < TENT_CAMP_MEALS;
+  const inv = inventoryGrid(exp.loadout, exp.carry, cap, exp.carriedMaps ?? [], exp.autoEatFood ?? null, eatable, campMealReady);
   return `
   <header><h1>${rollBiome(exp.mapSeed)} expedition</h1><span class="muted">pos (${exp.pos.x},${exp.pos.y})</span><button class="link" data-newgame>new game</button></header>
   <div class="cols">
@@ -858,7 +869,7 @@ function expeditionView(): string {
       ${exp.combat ? engagementPanel(exp, legal) : herePanel(grid, exp, legal)}
       <h2>Actions</h2>
       <div class="actions">
-        ${legal.some((a) => a.type === "eat") ? `<button data-act="eat">🍖 Eat${exp.loadout.equipment.tools.includes("tent") ? " (+50%)" : ""}</button>` : `<button disabled title="no food, or already full">🍖 Eat</button>`}
+        ${exp.loadout.equipment.tools.includes("tent") ? `<span class="campmeal-badge${campMealReady ? " ready" : " spent"}" title="${campMealReady ? "left-click a food in your bag to eat it as a CAMP MEAL — over-eat past max at +50%, once per run" : "camp meal spent this run — eating is now a normal capped meal"}">🏕 camp meal ${campMealReady ? "ready" : "spent"}</span>` : ""}
         ${legal.some((a) => a.type === "quaff") ? `<button data-act="quaff" title="drink a potion here (−${QUAFF_ENERGY}e)">🧪 Potion (−${QUAFF_ENERGY}e)</button>` : `<button disabled title="no potions, full HP, or too tired">🧪 Potion</button>`}
         <button data-act="toggle-auto-quaff" title="auto-drink a potion when HP drops below the threshold mid-fight">Auto-potion: <b>${(exp.autoQuaff ?? true) ? "on" : "off"}</b></button>
         <button data-act="toggle-auto-finish" title="67e: fast-forward whole fights to victory or defeat in one click — flip off to make in-fight decisions">Auto-finish fights: <b>${(exp.autoFinish ?? false) ? "on" : "off"}</b></button>
@@ -898,7 +909,7 @@ function expeditionView(): string {
       })()}
       <h2>Bag <span class="muted small">${inv.used}/${cap} slots</span></h2>
       ${inv.html}
-      <div class="muted small">🍴 auto-eat: ${exp.autoEatFood ? `<b>${name(exp.autoEatFood)}</b> refills your energy as you travel — right-click it to stop` : "off — right-click a food unit in the bag to auto-eat it (waste-free refills)"}</div>
+      <div class="muted small">🍖 <b>left-click</b> a food in your bag to eat one${campMealReady ? " (with a tent, your first eat is a 🏕 camp meal — over-max, +50%)" : ""} · 🍴 auto-eat: ${exp.autoEatFood ? `<b>${name(exp.autoEatFood)}</b> refills as you travel — right-click it to stop` : "off — right-click a food to auto-eat it (waste-free refills, no tent bonus)"}</div>
       <div class="muted small">food (green) is eaten to refill energy as you travel — freeing slots for loot (gold). Potions purple · battle items red · tools grey · worn gear ghosted (free).</div>
       ${exp.carry.length ? `<div class="bank" style="margin-top:.5rem">${exp.carry.map((s) => `<div class="bankitem"><span class="chip" title="${describe(s.defId)}">${name(s.defId)} ×${s.qty}</span>${legal.some((a) => a.type === "don" && a.itemId === s.defId) ? `<button data-don="${s.defId}" title="equip it (−${DON_DOFF_ENERGY}e; swaps the worn piece into the bag)">don</button>` : ""}<button data-drop="${s.defId}">drop</button></div>`).join("")}</div>` : ""}
       ${(() => { const doffable = legal.filter((a) => a.type === "doff").map((a) => (a as { itemId: string }).itemId); return doffable.length ? `<div class="bank" style="margin-top:.5rem">${doffable.map((id) => `<div class="bankitem"><span class="chip" title="worn · ${describe(id)}">${name(id)} (worn)</span><button data-doff="${id}" title="stow it in the bag (−${DON_DOFF_ENERGY}e; takes a slot)">doff</button></div>`).join("")}</div>` : ""; })()}
@@ -929,6 +940,8 @@ function wire(): void {
   const gatherToggle = app.querySelector<HTMLElement>("[data-toggle-autogather]"); if (gatherToggle) gatherToggle.onclick = () => apply({ type: "toggle-auto-gather" });
   // Auto-eat designation (mco): right-click a food box to set it as the auto-eat
   // food; right-clicking the already-designated one clears it (null = off).
+  // 7lr: left-click a food box to eat one unit (tent + charge = camp meal).
+  app.querySelectorAll<HTMLElement>("[data-eat]").forEach((el) => el.onclick = () => apply({ type: "eat", defId: el.dataset.eat! }));
   app.querySelectorAll<HTMLElement>("[data-eatfood]").forEach((el) => el.oncontextmenu = (ev) => {
     ev.preventDefault();
     const defId = el.dataset.eatfood!;

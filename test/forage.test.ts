@@ -68,7 +68,7 @@ test("berries eat like food (30 restore)", () => {
   // boosted(30) > current(0) and the eat is accepted.
   const { seed, poi } = berryMap();
   const before = standingOn(seed, poi, { energy: 0, food: [{ defId: "berries", qty: 1 }] });
-  const { state, events } = reduce(before, { type: "eat" });
+  const { state, events } = reduce(before, { type: "eat", defId: "berries" });
   expect(events[0]).toEqual({ type: "ate", defId: "berries", restored: FOOD_ENERGY.berries!, energy: FOOD_ENERGY.berries! });
   expect(state.expedition!.loadout.food).toEqual([]);
 });

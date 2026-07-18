@@ -14,7 +14,7 @@ import { packItem, reserveLoadout, EQUIP_SLOTS } from "./pack";
 import type { EquipSlot } from "./pack";
 import { slotOf, isGear } from "./catalog";
 import { localMap, previewHints } from "./town";
-import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MAP_SCROLL_ID, FOOD, POTION, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, INKS, RECIPE, WEAPON_ENHANCEMENT } from "../data/constants";
+import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MAP_SCROLL_ID, FOOD, POTION, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, INKS, RECIPE, WEAPON_ENHANCEMENT } from "../data/constants";
 import { visionRadius } from "./perceive";
 
 // Pure reducer. M2 fills embark/move; M3 fills gather/drop; M4 fills fight; remaining cases are no-op stubs:
@@ -34,7 +34,7 @@ export function reduce(
     case "gather":
       return gather(state);
     case "eat":
-      return eat(state);
+      return eat(state, action);
     case "set-auto-eat-food":
       return setAutoEatFood(state, action.defId);
     case "drop":
@@ -1033,43 +1033,45 @@ function autoRefill(
     energy,
     expedition.maxEnergy ?? MAX_ENERGY,
     target,
-    tentMultOf(expedition),
+    1, // 7lr: auto-eat gets NO tent bonus — the tent's +50% now lives only in the manual camp meal
   );
 }
 
-// Eat one food unit NOW (m0a): deliberate over-eat. Targets the MOST-dense unit
-// (the reserve auto-eat leaves alone) and jumps energy TO its boosted value
-// (foodEnergy × tentMult), which may exceed maxEnergy. Ties break by lowest index.
-// Rejects when there's no food or the boosted value wouldn't raise energy.
-function eat(state: GameState): { state: GameState; events: GameEvent[] } {
+// Eat one unit of a CHOSEN food NOW (7lr). Additive (+its energy), capped at max —
+// UNLESS a tent turns it into the once-per-run CAMP MEAL: with a tent equipped and an
+// unspent camp charge, restore is ×TENT_FOOD_MULTIPLIER and over-eats PAST max (banked
+// reach), spending a charge. All the tent's food power lives here — auto-eat and a
+// normal (no-tent / charge-spent) manual eat are plain ×1 capped. Rejects when the
+// named food isn't packed or the eat can't raise energy (already at/over max).
+function eat(state: GameState, action: Extract<Action, { type: "eat" }>): { state: GameState; events: GameEvent[] } {
   const expedition = state.expedition;
   if (state.phase !== "expedition" || !expedition) {
     return rejected(state, "eat", "not-on-expedition");
   }
   if (expedition.combat) return rejected(state, "eat", "engaged");
-  const tentMult = tentMultOf(expedition);
   const food = expedition.loadout.food;
-  if (food.length === 0) return rejected(state, "eat", "insufficient");
-  // Deliberate over-eat (m0a): target the MOST-dense unit (the reserve auto-eat
-  // leaves alone) and jump energy TO its boosted value (foodEnergy × tentMult),
-  // which may exceed maxEnergy. Ties break by lowest index. Reject if eating it
-  // wouldn't raise energy (boosted ≤ current) — nothing to gain.
-  let idx = 0;
-  for (let i = 1; i < food.length; i++) {
-    if (foodEnergyOf(food[i]!.defId) > foodEnergyOf(food[idx]!.defId)) idx = i;
-  }
-  const boosted = foodEnergyOf(food[idx]!.defId) * tentMult;
-  if (boosted <= expedition.energy) return rejected(state, "eat", "insufficient");
-  const energy = boosted;
+  const idx = food.findIndex((s) => s.defId === action.defId && s.qty > 0);
+  if (idx < 0) return rejected(state, "eat", "insufficient"); // not a packed food
+  const campMeal = tentMultOf(expedition) > 1 && (expedition.campMealsUsed ?? 0) < TENT_CAMP_MEALS;
+  const restore = foodEnergyOf(action.defId) * (campMeal ? TENT_FOOD_MULTIPLIER : 1);
+  const maxEnergy = expedition.maxEnergy ?? MAX_ENERGY;
+  // Camp meal over-eats past max; a plain meal caps at max (no waste-into-nothing).
+  const energy = campMeal ? expedition.energy + restore : Math.min(expedition.energy + restore, maxEnergy);
+  if (energy <= expedition.energy) return rejected(state, "eat", "insufficient"); // no gain (at/over max, no camp meal)
   const nextFood = food.map((s) => ({ ...s }));
   nextFood[idx]!.qty -= 1;
   const filtered = nextFood.filter((s) => s.qty > 0);
   return {
     state: {
       ...state,
-      expedition: { ...expedition, energy, loadout: { ...expedition.loadout, food: filtered } },
+      expedition: {
+        ...expedition,
+        energy,
+        campMealsUsed: (expedition.campMealsUsed ?? 0) + (campMeal ? 1 : 0),
+        loadout: { ...expedition.loadout, food: filtered },
+      },
     },
-    events: [{ type: "ate", defId: food[idx]!.defId, restored: energy - expedition.energy, energy }],
+    events: [{ type: "ate", defId: action.defId, restored: energy - expedition.energy, energy, ...(campMeal ? { campMeal: true } : {}) }],
   };
 }
 

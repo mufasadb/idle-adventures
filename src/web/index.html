@@ -89,6 +89,13 @@
       .slot[data-eatfood] { cursor: context-menu; } /* mco: right-click to designate auto-eat food */
       .slot.food.designated { border: 2px solid #cfe08a; box-shadow: 0 0 0 1px #cfe08a55; position: relative; } /* designated auto-eat food */
       .slot .autoeat { position: absolute; top: -0.5rem; right: -0.4rem; font-size: 0.72rem; } /* 🍴 badge */
+      /* 7lr: a food you can eat now is clickable; a camp-meal-ready eat glows teal (over-max + 50%) */
+      .slot.food.eatable { cursor: pointer; }
+      .slot.food.eatable:hover { border-color: #cfe08a; }
+      .slot.food.campmeal:hover { border-color: #35c2b0; box-shadow: 0 0 0 1px #35c2b088; }
+      .campmeal-badge { padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85rem; }
+      .campmeal-badge.ready { background: #14332e; color: #6fe0d0; border: 1px solid #35c2b0; }
+      .campmeal-badge.spent { background: #24242c; color: #7a7a86; border: 1px solid #3a3a44; }
       .slot.potion { background: #2a2233; border-color: #5a3e6a; color: #d0a8e0; }
       .slot.battle { background: #331e1e; border-color: #6a2e2e; color: #e69a9a; }
       .slot.ammo { background: #2e281c; border-color: #6a582e; color: #e0c488; } /* arrows (D45): amber quiver */

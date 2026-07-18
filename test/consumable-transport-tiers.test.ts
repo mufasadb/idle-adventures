@@ -35,8 +35,8 @@ test("eat: trail-ration RESTORES 2× a ration (per-food lever now = restore, ff7
   // foodEnergy (no tent → ×1), so the tier edge shows as the landing value.
   const drainedR = { ...withRation, expedition: { ...withRation.expedition!, energy: 0 } };
   const drainedT = { ...withTrail, expedition: { ...withTrail.expedition!, energy: 0 } };
-  const ateR = reduce(drainedR, { type: "eat" }).state;
-  const ateT = reduce(drainedT, { type: "eat" }).state;
+  const ateR = reduce(drainedR, { type: "eat", defId: "ration" }).state;
+  const ateT = reduce(drainedT, { type: "eat", defId: "trail-ration" }).state;
   expect(ateR.expedition!.energy).toBe(80);  // jumped TO 80 (ration density)
   expect(ateT.expedition!.energy).toBe(130); // jumped TO 130 — same slot, denser (si7.2 compression)
 });

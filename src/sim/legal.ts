@@ -79,8 +79,8 @@ export function expeditionActions(state: GameState): Action[] {
   if (!engaged) for (const recipeId of Object.keys(RECIPE)) candidates.push({ type: "craft", recipeId });
   // stamina (dtv/mco): eat when there's food + room; designate the auto-eat food.
   // One set-auto-eat-food per held food defId (designate it), plus null (clear/off).
-  candidates.push({ type: "eat" });
   const foodDefs = new Set(state.expedition.loadout.food.map((s) => s.defId));
+  for (const defId of foodDefs) candidates.push({ type: "eat", defId }); // 7lr: eat a CHOSEN food (speculative reduce drops any that can't gain)
   for (const defId of foodDefs) candidates.push({ type: "set-auto-eat-food", defId });
   candidates.push({ type: "set-auto-eat-food", defId: null });
   // drop each carried stack

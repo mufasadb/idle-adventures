@@ -202,9 +202,13 @@ export const ENERGY_PER_FOOD = 80; // default energy RESTORED per food unit eate
 // max (FOOD_ENERGY × tentMult). MAX_ENERGY is the base ceiling (gear-raisable
 // later — a future progression axis). See reduce.embark / food.eatToRefill.
 export const MAX_ENERGY = 300;
-// A tent (durable "camp" tool) multiplies energy restored per food unit — each
-// ration goes further, so food is a stronger reach investment. Tunable.
+// A tent (durable "camp" tool) powers the once-per-run "CAMP MEAL" (7lr): a manual
+// eat with a tent + an unspent charge multiplies restore by this AND over-eats past
+// max (banking reach beyond the bar). ONLY the camp meal reads this — auto-eat and
+// normal manual eat are plain ×1. So the tent is a deliberate, rationed power move
+// (a bag slot for one killer meal), not a passive buff. Tunable.
 export const TENT_FOOD_MULTIPLIER = 1.5;
+export const TENT_CAMP_MEALS = 1; // camp meals per expedition a tent grants (7lr)
 // Energy-capacity gear (si7.2): a durable tool that RAISES the stamina ceiling
 // (maxEnergy) additively at embark, so denser tier food stays whole-unit
 // auto-eatable (eatToRefill only eats a unit that fits under max). One proof
@@ -526,8 +530,14 @@ export const POI_DENSITY_BY_TIER: Record<number, number> = {
 // design ASPIRATION — the no-optimal-router reference player is a conservative floor
 // (a real player harvests more); the TIER≈2×BASE ratio is the invariant, and the hard
 // gate. Which ~half the player takes stays a live routing choice.
-export const HARVEST_FRACTION_TIER_TARGET = 0.5;
-export const HARVEST_FRACTION_BASE_TARGET = 0.25;
+// 7lr: removing the tent's PASSIVE auto-eat bonus (its +50% now lives only in the
+// once-per-run camp meal) lowered auto-harvest reach on tent packs ~1 band (the
+// reference forager auto-routes and never uses a camp meal, so it's a conservative
+// floor a real player beats by timing the meal). Targets re-derived to the new
+// equilibrium (0.50→0.45 / 0.25→0.20); the TIER≈2× BASE invariant (the hard gate) is
+// UNTOUCHED — measured 2.38× after the change.
+export const HARVEST_FRACTION_TIER_TARGET = 0.45;
+export const HARVEST_FRACTION_BASE_TARGET = 0.2;
 
 // Per-terrain weight multiplier by map tier. Absent tier/terrain = 1 (identity at T1).
 // Harsher mix upward — the energy cost that makes si7.2's tier-food matter.

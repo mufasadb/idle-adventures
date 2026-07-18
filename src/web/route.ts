@@ -10,7 +10,7 @@ import { moveCost } from "../engine/move";
 import { lineTiles } from "../engine/line";
 import { gatherCost } from "../engine/tools";
 import { eatToRefill } from "../engine/food";
-import { MAX_ENERGY, TENT_FOOD_MULTIPLIER } from "../data/constants";
+import { MAX_ENERGY } from "../data/constants";
 
 export type Pos = { x: number; y: number };
 const kk = (p: Pos) => `${p.x},${p.y}`;
@@ -45,15 +45,15 @@ export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: S
   // raw walkCost+actionCost, which ignores mid-walk refills. autoEatFood unset = no
   // refills, so this reduces to the old exp.energy − total behaviour.
   const maxEnergy = exp.maxEnergy ?? MAX_ENERGY;
-  const tentMult = eq.tools.includes("tent") ? TENT_FOOD_MULTIPLIER : 1;
   const autoEatFood = exp.autoEatFood;
   let simEnergy = exp.energy;
   let simFood = exp.loadout.food.map((s) => ({ ...s }));
   // Mirror autoRefill: pay `cost` off simEnergy, then auto-eat the designated food.
+  // 7lr: auto-eat gets NO tent bonus (×1) — the tent's +50% is manual-camp-meal-only.
   const payThenEat = (cost: number): void => {
     simEnergy -= cost;
     if (autoEatFood) {
-      const fed = eatToRefill(simFood, simEnergy, maxEnergy, autoEatFood, tentMult);
+      const fed = eatToRefill(simFood, simEnergy, maxEnergy, autoEatFood, 1);
       simFood = fed.food;
       simEnergy = fed.energy;
     }
