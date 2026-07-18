@@ -3,6 +3,7 @@
 // and bank as held maps at run end.
 import { test, expect } from "bun:test";
 import { reduce } from "../src/engine/reduce";
+import { rollLoot } from "../src/engine/combat";
 import { emptyLoadout } from "../src/engine/loadout";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import type { Poi } from "../src/engine/grid";
@@ -14,6 +15,7 @@ import {
   BASE_CARRY_SLOTS,
   STACK_CAP,
   MAP_TIER_MAX,
+  CATEGORY_LOOT_TABLE,
 } from "../src/data/constants";
 import type { GameState, GameEvent } from "../src/engine/types";
 
@@ -208,4 +210,41 @@ test("drop-mint stamps sourceTier+1, capped at MAP_TIER_MAX", () => {
   const { events: t5Events } = fightToEnd(t5State);
   const t5Drop = t5Events.find((e) => e.type === "map-dropped") as { tier: number } | undefined;
   expect(t5Drop?.tier).toBe(MAP_TIER_MAX);
+});
+
+// F5 regression (playtest 2026-07-15, idle-adventure-ohl): a report of "killed a
+// non-humanoid mirage-wisp → 'looted a map' log, but no map banked" was a log-
+// attribution artifact — map-dropped is a separate line from fought, and the drop
+// came from a humanoid in the same auto-routed batch. These lock the invariants that
+// make the reported bug impossible: (a) only humanoids mint maps, (b) a carried map
+// is never destroyed silently — it banks even when the run soft-fails on defeat.
+
+test("F5: only the humanoid category grants a map-scroll — no other category can spuriously drop one", () => {
+  for (const [cat, entries] of Object.entries(CATEGORY_LOOT_TABLE)) {
+    const grantsMap = entries.some((e) => e.defId === MAP_SCROLL_ID);
+    expect(grantsMap).toBe(cat === "humanoid");
+  }
+});
+
+test("F5: a fae mirage-wisp never rolls a map-scroll on ANY tile (the reported creature can't drop a map)", () => {
+  for (let x = 0; x < 20; x++) {
+    for (let y = 0; y < 60; y++) {
+      expect(rollLoot("g", "mirage-wisp", { x, y }).some((s) => s.defId === MAP_SCROLL_ID)).toBe(false);
+    }
+  }
+});
+
+test("F5: a carried map survives DEFEAT (soft-fail) and banks — never destroyed silently", () => {
+  const { seed, poi } = humanoidFight(true);
+  // Naked player at 3 HP dies to any T1 humanoid before landing a kill — a guaranteed
+  // defeat (see reduce-fight.test.ts). A map held BEFORE the fight must still bank home.
+  const before = atMonster(seed, poi, (s) => {
+    s.expedition!.loadout.equipment.weapon = null; // unarmed → guaranteed defeat
+    s.expedition!.hp = 3;
+    s.expedition!.carriedMaps = [{ mapSeed: "held-before-death", biomeId: "desert", vintage: 1, tier: 2 }];
+  });
+  const { state, events } = fightToEnd(before);
+  expect(events).toContainEqual({ type: "run-ended", reason: "defeated" });
+  expect(state.phase).toBe("town");
+  expect((state.maps ?? []).some((m) => m.mapSeed === "held-before-death")).toBe(true);
 });
