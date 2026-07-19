@@ -16,7 +16,7 @@ import { toolSpeedFor } from "../engine/tools";
 import { perceive } from "../engine/perceive";
 import {
   flavorDetail,
-  matchupLessons,
+  formatEvent,
   weaponHint,
   logisticsEffect,
   enhancementHint,
@@ -34,7 +34,7 @@ import { usedSlots, carryCap, mapCarryCap } from "../engine/carry";
 import { costToReach } from "../engine/reach";
 import { foodEnergyOf } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
-import type { Action, GameEvent, GameState } from "../engine/types";
+import type { Action, GameState } from "../engine/types";
 
 // Optional `--reach` flag: an OPT-IN query that prints the gear-adjusted energy
 // cost to reach each node (one Dijkstra covers the whole map) — run it only when
@@ -50,46 +50,14 @@ const actions: Action[] = actionsArg ? (JSON.parse(actionsArg) as Action[]) : []
 const { state, events } = play(seed, actions);
 
 // --- events this batch (human-readable; fights include the lesson) ---
-function fmtEvent(e: GameEvent): string {
-  switch (e.type) {
-    case "embarked": return `▶ embarked on a ${e.biomeId} map — ${e.energy} energy`;
-    case "moved": return `walked to (${e.to.x},${e.to.y}) on ${e.terrain} · −${e.cost}e → ${e.energy}e`;
-    case "gathered": return `gathered ${e.qty}× ${e.material} · −${e.cost}e → ${e.energy}e`;
-    case "dropped": return `dropped ${e.qty}× ${e.defId}`;
-    case "ate": return `${e.campMeal ? "🏕 camp meal — ate" : "🍖 ate"} ${e.defId} · +${e.restored}e → ${e.energy}e${e.campMeal ? " (over max — banked reach)" : ""}`;
-    case "auto-eat-set": return e.defId ? `🍴 auto-eat food set to ${e.defId}` : `🍴 auto-eat off`;
-    case "fought": {
-      const lessons = matchupLessons(e.matchup, null);
-      const tail = lessons.length ? ` · ${lessons.join(" · ")}` : "";
-      const ff = e.rounds ? ` ⏩ (${e.rounds} rounds)` : ""; // 67e: auto-finish collapsed the fight
-      return (e.victory
-        ? `⚔ beat it${ff} · −${e.hpLost}hp · loot ${e.loot.map((l) => `${l.qty}× ${l.defId}`).join(", ") || "none"}`
-        : `☠ you were downed${ff} · run ends, haul kept`) + tail;
-    }
-    case "crafted": return `✦ ${e.where === "field" ? "field-crafted 🔥 " : "crafted "}${e.output.qty}× ${e.output.defId}`;
-    case "map-dropped": return e.carried
-      ? `🗺️ looted a T${e.tier} ${e.biomeId} map (takes 1 carry slot — banks home with you)`
-      : `🗺️ a T${e.tier} ${e.biomeId} map dropped — pack full, left behind`;
-    case "map-discarded": return `🗺️ discarded a carried map`;
-    case "packed": return `packed ${e.defId} → ${e.slot}`;
-    case "quaffed": return `🧪 quaffed ${e.defId} · +${e.healed}hp → ${e.hp}hp${e.energy !== undefined ? ` · energy → ${e.energy}e` : ""}`;
-    case "item-used": return `⚗ used ${e.defId} this fight${e.damageAdd ? ` · +${e.damageAdd} dmg` : ""}${e.mitigationAdd ? ` · +${e.mitigationAdd} mitigation` : ""}`;
-    case "enhanced": return `🗡️ coated your weapon with ${e.id} · ${e.charges} charge${e.charges === 1 ? "" : "s"} (spent per strike; a new coating replaces this one)`;
-    case "surveyed": return `🔭 surveyed the ${e.kind} at (${e.at.x},${e.at.y}) — its detail is now in focus`;
-    case "inked": { const mat = affixMaterialHint(e.affix); return `🖋 inked — this map now favours ${mat ?? "its domain"} (of ${AFFIX_EFFECTS[e.affix]?.label ?? e.affix})`; }
-    case "donned": return `🧤 donned ${e.defId}${e.displaced ? ` (stowed ${e.displaced} in the bag)` : ""} · energy → ${e.energy}e`;
-    case "doffed": return `🎒 doffed ${e.defId} to the bag (takes a slot) · energy → ${e.energy}e`;
-    case "auto-finish-toggled": return `auto-finish fights ${e.on ? "on" : "off"}`;
-    case "provoked": return `⚔ the ${e.creature} strikes while you act · −${e.hit}hp → ${e.hp}hp`;
-    case "run-ended": return e.flavor ? `${e.flavor}\n— run ended (${e.reason})` : `— run ended (${e.reason})`;
-    case "action-rejected": return `✗ ${e.action} rejected: ${e.reason}`;
-    default: return JSON.stringify(e);
-  }
-}
+// exm: the console shares the ONE formatEvent switch (render.ts); its `name` fn is the
+// identity, so defIds stay raw — the blind-playtest vocabulary (no display names leaking
+// creature/item identity into the transcript).
+const raw = (defId: string) => defId;
 
 console.log("=== EVENTS (this batch) ===");
 if (events.length === 0) console.log("(none)");
-for (const e of events) console.log(fmtEvent(e));
+for (const e of events) console.log(formatEvent(e, raw));
 
 // --- you ---
 const s = summarize(state);

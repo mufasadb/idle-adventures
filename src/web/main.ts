@@ -22,17 +22,11 @@ import { heldFoodEnergy } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
 import { RECIPE, MATERIAL_GATE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, INKS, AFFIX_EFFECTS, WEAPON_ENHANCEMENT } from "../data/constants";
 import type { BiomeId, GatherableNodeType } from "../data/constants";
-import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, matchupLessons, weaponHint, logisticsEffect, enhancementHint, affixMaterialHint, describe, recipeGateHint, nodeToolHint, nodeGateNote, name, rejectCopy, combatForecast } from "../render/render";
+import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, weaponHint, logisticsEffect, enhancementHint, affixMaterialHint, describe, recipeGateHint, nodeToolHint, nodeGateNote, name, rejectCopy, combatForecast, formatEvent, GATHER_VERB } from "../render/render";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, Expedition, LoadoutSlot, MapItem, RejectionReason } from "../engine/types";
 
 // Per-node verb so the UI reads right: you don't "mine" an animal.
-const GATHER_VERB: Record<string, { label: string; past: string; noun: string }> = {
-  mining: { label: "⛏ Mine", past: "mined", noun: "ore vein" },
-  wood: { label: "🪓 Chop", past: "chopped", noun: "stand of trees" },
-  herb: { label: "🌿 Forage", past: "foraged", noun: "forage patch" },
-  animal: { label: "🔪 Hunt", past: "hunted", noun: "animal" },
-};
 
 
 const params = new URLSearchParams(location.search);
@@ -134,7 +128,7 @@ function apply(action: Action): void {
     if (e.type === "action-rejected" && e.action === "craft" && action.type === "craft") {
       log.unshift(`✗ craft — ${rejectCopy(e.reason, action.recipeId)}`);
     } else {
-      log.unshift(fmt(e));
+      log.unshift(formatEvent(e, name).replace(/\n/g, "<br>")); // run-ended's flavor break → HTML
     }
   }
   trimAndDraw();
@@ -147,48 +141,6 @@ function planReset(): void {
   note("· cleared the loadout plan");
 }
 
-function fmt(e: GameEvent): string {
-  switch (e.type) {
-    case "embarked": return `▶ embarked on a ${e.biomeId} map — ${e.energy} energy`;
-    case "moved": return `walked to (${e.to.x},${e.to.y}) on ${e.terrain} · −${round(e.cost)}e → ${round(e.energy)}e`;
-    case "gathered": return `${GATHER_VERB[e.kind]?.past ?? "gathered"} ${e.qty}× ${name(e.material)} · −${round(e.cost)}e → ${round(e.energy)}e`;
-    case "dropped": return `dropped ${e.qty}× ${name(e.defId)}`;
-    case "ate": return `${e.campMeal ? "🏕 camp meal — ate" : "🍖 ate"} ${name(e.defId)} · +${round(e.restored)}e → ${round(e.energy)}e${e.campMeal ? " (over max — banked reach)" : ""}`;
-    case "auto-eat-set": return e.defId ? `🍴 auto-eat: ${name(e.defId)}` : `🍴 auto-eat off`;
-    case "fought": {
-      const lessons = matchupLessons(e.matchup, null);
-      const tail = lessons.length ? ` · ${lessons.join(" · ")}` : "";
-      const ff = e.rounds ? ` ⏩ (${e.rounds} rounds)` : ""; // 67e: auto-finish collapsed the fight
-      return (e.victory
-        ? `⚔ beat the ${name(e.creature)}${ff} · −${round(e.hpLost)}hp${e.potionsUsed ? ` (${e.potionsUsed} potion${e.potionsUsed > 1 ? "s" : ""})` : ""} · loot ${e.loot.map((l) => `${l.qty}× ${name(l.defId)}`).join(", ") || "none"}`
-        : `☠ the ${name(e.creature)} downed you${ff} · run ends, haul kept`) + tail;
-    }
-    case "crafted": return `✦ ${e.where === "field" ? "field-crafted 🔥 " : "crafted "}${e.output.qty}× ${name(e.output.defId)}`;
-    case "map-dropped": return e.carried
-      ? `🗺️ looted a T${e.tier} ${name(e.biomeId)} map (takes 1 slot — banks home with you)`
-      : `🗺️ a T${e.tier} ${name(e.biomeId)} map dropped — pack full, left behind`;
-    case "map-discarded": return `🗺️ discarded a carried map`;
-    case "packed": return `packed ${name(e.defId)} → ${e.slot}`;
-    case "run-ended": return e.flavor ? `${e.flavor}<br>— run ended (${e.reason}) —` : `— run ended (${e.reason}) —`;
-    case "action-rejected": return `✗ ${e.action} — ${rejectCopy(e.reason)}`;
-    case "engaged": return e.ranged
-      ? `🏹 engaged the ${name(e.creature)} from a tile away — your opener lands before it can answer`
-      : `⚔ engaged the ${name(e.creature)}`;
-    case "exchanged": return `⚔ traded blows with the ${name(e.creature)} — dealt ${round(e.dmgDealt)}, took ${round(e.dmgTaken)} · ${round(e.hp)}hp left${e.arrowSpent ? " · 🏹 −1 arrow" : ""}${e.poisonDmg ? ` · ☠ poison ${round(e.poisonDmg)}` : ""}`;
-    case "fled": return `🏃 fled the ${name(e.creature)} · −${round(e.partingHit)}hp → ${round(e.hp)}hp`;
-    case "quaffed": return `🧪 quaffed ${name(e.defId)} · +${round(e.healed)}hp → ${round(e.hp)}hp${e.energy !== undefined ? ` · −${QUAFF_ENERGY}e → ${round(e.energy)}e` : ""}`;
-    case "item-used": return `⚗ used ${name(e.defId)} this fight${e.damageAdd ? ` · +${round(e.damageAdd)} dmg` : ""}${e.mitigationAdd ? ` · +${round(e.mitigationAdd)} mitigation` : ""}`;
-    case "enhanced": return `🗡️ coated your weapon with ${name(e.id)} · ${e.charges} charge${e.charges === 1 ? "" : "s"}`;
-    case "surveyed": return `🔭 surveyed the ${e.kind} at (${e.at.x},${e.at.y}) — its detail is now in focus`;
-    case "inked": { const mat = affixMaterialHint(e.affix); return `🖋 inked — this map now favours ${mat ? name(mat) : "its domain"} (of ${AFFIX_EFFECTS[e.affix]?.label ?? e.affix})`; }
-    case "auto-quaff-toggled": return `auto-quaff ${e.on ? "on" : "off"}`;
-    case "auto-finish-toggled": return `auto-finish fights ${e.on ? "on" : "off"}`;
-    case "auto-gather-toggled": return `auto-gather ${e.on ? "on" : "off"}`;
-    case "provoked": return `⚔ the ${name(e.creature)} strikes while you act · −${round(e.hit)}hp → ${round(e.hp)}hp`;
-    case "donned": return `🧤 donned ${name(e.defId)}${e.displaced ? ` (stowed ${name(e.displaced)})` : ""} · −${DON_DOFF_ENERGY}e → ${round(e.energy)}e`;
-    case "doffed": return `🎒 doffed ${name(e.defId)} to the bag · −${DON_DOFF_ENERGY}e → ${round(e.energy)}e`;
-  }
-}
 const round = (n: number) => Math.round(n * 10) / 10;
 const kk = (p: Pos) => `${p.x},${p.y}`;
 
