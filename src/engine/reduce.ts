@@ -238,34 +238,14 @@ function fieldCraftAction(state: GameState, recipeId: string): { state: GameStat
   const qty = recipeOutputQty(recipe, toolPool);
   const outDef = recipe.output.defId;
   const output = { defId: outDef, qty };
-  // A CONSUMABLE output lives in the loadout (food → food, potion → potions) and
-  // counts as slots; append to the BACK (food auto-eats last; a fresh potion is a
-  // reserve — quaff drinks the front). A material/gear output goes to carry. Food
-  // uses the post-auto-eat list; potions are untouched by auto-eat.
-  const target: "food" | "potions" | null = FOOD.includes(outDef) ? "food" : POTION.includes(outDef) ? "potions" : null;
-  if (target) {
-    const cur = target === "food" ? fed.food : loadout.potions;
-    const last = cur[cur.length - 1];
-    const nextList = last && last.defId === outDef
-      ? [...cur.slice(0, -1), { defId: outDef, qty: last.qty + qty }]
-      : [...cur, output];
-    const candidate = target === "food"
-      ? { ...loadout, food: nextList }
-      : { ...loadout, food: fed.food, potions: nextList };
-    if (usedSlots(candidate, consumed.carry) > carryCap(candidate.equipment)) {
-      return rejected(state, "craft", "carry-full");
-    }
-    return {
-      state: { ...state, expedition: { ...expedition, energy: fed.energy, carry: consumed.carry, loadout: candidate } },
-      events: [{ type: "crafted", recipeId, output, where: "field" }],
-    };
-  }
-  // Material/gear output → carry, slot-fit-checked against the post-consume inventory.
-  const loadoutFed = { ...loadout, food: fed.food };
-  const carry = addToCarry(consumed.carry, outDef, qty, freeLootStacks(loadoutFed));
-  if (carry === null) return rejected(state, "craft", "carry-full");
+  // Route the output (xkz): a CONSUMABLE (food/potion) lands in the loadout at the
+  // BACK — food auto-eats last, a fresh potion is a reserve (quaff drinks the front) —
+  // and counts as slots; a material/gear output stacks into carry. Food routes against
+  // the post-auto-eat list (fed.food); potions are untouched by auto-eat.
+  const placed = placeYield({ ...loadout, food: fed.food }, consumed.carry, outDef, qty, "back");
+  if (placed === null) return rejected(state, "craft", "carry-full");
   return {
-    state: { ...state, expedition: { ...expedition, energy: fed.energy, carry, loadout: loadoutFed } },
+    state: { ...state, expedition: { ...expedition, energy: fed.energy, carry: placed.carry, loadout: placed.loadout } },
     events: [{ type: "crafted", recipeId, output, where: "field" }],
   };
 }
@@ -388,58 +368,24 @@ function gather(state: GameState): { state: GameState; events: GameEvent[] } {
   const energy = fed.energy;
   const loadout = { ...expedition.loadout, food: fed.food };
   const qty = GATHER_YIELD[kind] * (NODE_MAGNITUDE_YIELD[poi.magnitude ?? 1] ?? 1);
-  // Fresh forage (e3j): a yield that IS food (FOOD catalog) joins the food
-  // reserve at the FRONT — eaten before packed food, since fresh stales on
-  // return while rations bank back. One slot per unit, like packed food.
-  if (FOOD.includes(poi.material)) {
-    const front = loadout.food[0];
-    const food =
-      front && front.defId === poi.material
-        ? [{ defId: front.defId, qty: front.qty + qty }, ...loadout.food.slice(1)]
-        : [{ defId: poi.material, qty }, ...loadout.food];
-    const candidate = { ...loadout, food };
-    if (usedSlots(candidate, expedition.carry) > carryCap(candidate.equipment)) {
-      return rejected(state, "gather", "carry-full");
-    }
-    return {
-      state: {
-        ...state,
-        expedition: {
-          ...expedition,
-          energy,
-          cleared: [...expedition.cleared, { x: pos.x, y: pos.y }],
-          loadout: candidate,
-        },
-      },
-      events: [
-        { type: "gathered", at: { x: pos.x, y: pos.y }, kind: poi.kind, material: poi.material, qty, cost, energy },
-      ],
-    };
-  }
-  const maxStacks = freeLootStacks(loadout);
-  const carry = addToCarry(expedition.carry, poi.material, qty, maxStacks);
-  if (carry === null) return rejected(state, "gather", "carry-full");
+  // Fresh forage (e3j): a yield that IS food (FOOD catalog) joins the food reserve at
+  // the FRONT — eaten before packed food, since fresh stales on return while rations
+  // bank back. One slot per unit; a material/gear yield stacks into carry instead.
+  const placed = placeYield(loadout, expedition.carry, poi.material, qty, "front");
+  if (placed === null) return rejected(state, "gather", "carry-full");
   return {
     state: {
       ...state,
       expedition: {
         ...expedition,
         energy,
-        carry,
+        carry: placed.carry,
         cleared: [...expedition.cleared, { x: pos.x, y: pos.y }],
-        loadout,
+        loadout: placed.loadout,
       },
     },
     events: [
-      {
-        type: "gathered",
-        at: { x: pos.x, y: pos.y },
-        kind: poi.kind,
-        material: poi.material,
-        qty,
-        cost,
-        energy,
-      },
+      { type: "gathered", at: { x: pos.x, y: pos.y }, kind: poi.kind, material: poi.material, qty, cost, energy },
     ],
   };
 }
@@ -881,6 +827,42 @@ function removeOneFromCarry(carry: ItemStack[], defId: string): ItemStack[] | nu
   const idx = carry.findIndex((s) => s.defId === defId);
   if (idx === -1) return null;
   return consumeOne(carry, idx);
+}
+
+// Route a produced defId — a gather yield or a field-craft output — into the
+// expedition inventory (xkz): FOOD → the food list, POTION → potions (both count as
+// slots, so the placement is fit-checked against carryCap), else → carry as a loot
+// stack. `end` picks where a consumable stack lands: "front" for fresh forage (eaten
+// before packed food, since it stales on return) or "back" for a crafted reserve.
+// Same-defId stacks coalesce. Returns the updated {loadout, carry}, or null when it
+// won't fit (the caller maps that to its own carry-full rejection).
+function placeYield(
+  loadout: Loadout,
+  carry: ItemStack[],
+  defId: string,
+  qty: number,
+  end: "front" | "back",
+): { loadout: Loadout; carry: ItemStack[] } | null {
+  const slot: "food" | "potions" | null = FOOD.includes(defId) ? "food" : POTION.includes(defId) ? "potions" : null;
+  if (slot) {
+    const cur = slot === "food" ? loadout.food : loadout.potions;
+    const head = cur[0];
+    const tail = cur[cur.length - 1];
+    const nextList =
+      end === "front"
+        ? head && head.defId === defId
+          ? [{ defId, qty: head.qty + qty }, ...cur.slice(1)]
+          : [{ defId, qty }, ...cur]
+        : tail && tail.defId === defId
+          ? [...cur.slice(0, -1), { defId, qty: tail.qty + qty }]
+          : [...cur, { defId, qty }];
+    const nextLoadout = slot === "food" ? { ...loadout, food: nextList } : { ...loadout, potions: nextList };
+    if (usedSlots(nextLoadout, carry) > carryCap(nextLoadout.equipment)) return null;
+    return { loadout: nextLoadout, carry };
+  }
+  const nextCarry = addToCarry(carry, defId, qty, freeLootStacks(loadout));
+  if (nextCarry === null) return null;
+  return { loadout, carry: nextCarry };
 }
 
 // Shared don/doff plumbing (82r): the pre-fight prep actions. Both are rejected
