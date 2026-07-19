@@ -34,9 +34,16 @@ const seed = params.get("seed") ?? "play";
 const SAVE_KEY = `idle-adv:${seed}`;
 
 type Pos = { x: number; y: number };
+// Log stored as DATA (exm), not pre-rendered HTML — so a reload can re-format, filter,
+// or restyle past entries. Reduce events keep their GameEvent (re-rendered live via
+// formatEvent); one-off UI notices are notes; an auto-walk summary is its own variant.
+type LogEntry =
+  | { t: "event"; e: GameEvent }
+  | { t: "note"; text: string }
+  | { t: "walk"; steps: number; pos: Pos; net: number; ate: number; gathered: number };
 
 let state: GameState = load() ?? newGame(seed);
-let log: string[] = loadLog();
+let log: LogEntry[] = loadLog();
 // eot: routing is the PLAYER's job. `route` is the planned list of waypoints (the
 // player's tile is the implicit head); each leg between consecutive points is drawn
 // as a naive STRAIGHT line (lineTiles), never an energy-optimal path. Clicks build,
@@ -58,16 +65,18 @@ const app = document.querySelector<HTMLDivElement>("#app")!;
 function save(): void {
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(state));
-    localStorage.setItem(`${SAVE_KEY}:log`, JSON.stringify(log));
+    localStorage.setItem(`${SAVE_KEY}:log2`, JSON.stringify(log));
   } catch { /* storage disabled — non-fatal */ }
 }
 function load(): GameState | null {
   try { const raw = localStorage.getItem(SAVE_KEY); return raw ? (JSON.parse(raw) as GameState) : null; } catch { return null; }
 }
-function loadLog(): string[] {
-  try { const raw = localStorage.getItem(`${SAVE_KEY}:log`); return raw ? (JSON.parse(raw) as string[]) : []; } catch { return []; }
+function loadLog(): LogEntry[] {
+  // :log2 is the structured log (exm). Old ":log" held pre-rendered strings — it's a
+  // log, so it's dropped unread rather than migrated.
+  try { const raw = localStorage.getItem(`${SAVE_KEY}:log2`); return raw ? (JSON.parse(raw) as LogEntry[]) : []; } catch { return []; }
 }
-function newRun(): void { state = newGame(seed); log = ["· new game"]; route = []; draw(); }
+function newRun(): void { state = newGame(seed); log = [{ t: "note", text: "· new game" }]; route = []; draw(); }
 
 // --- repack-last-loadout (nuy) -----------------------------------------------
 // The plan is consumed at embark by design (D22/D28) — correct, but it read as a
@@ -126,14 +135,31 @@ function apply(action: Action): void {
     // gate-legibility (playtest 2026-07-09 #1): a rejected CRAFT knows its recipeId
     // here (the event doesn't carry it) — name the exact missing station/tool/terrain.
     if (e.type === "action-rejected" && e.action === "craft" && action.type === "craft") {
-      log.unshift(`✗ craft — ${rejectCopy(e.reason, action.recipeId)}`);
+      // craft rejection needs the recipeId (not on the event) to name the exact gate — a
+      // note, since formatEvent can't reconstruct it from the event alone.
+      log.unshift({ t: "note", text: `✗ craft — ${rejectCopy(e.reason, action.recipeId)}` });
     } else {
-      log.unshift(formatEvent(e, name).replace(/\n/g, "<br>")); // run-ended's flavor break → HTML
+      log.unshift({ t: "event", e });
     }
   }
   trimAndDraw();
 }
-function note(line: string): void { log.unshift(line); trimAndDraw(); }
+function note(line: string): void { log.unshift({ t: "note", text: line }); trimAndDraw(); }
+// Render a stored log entry to HTML at draw time (exm): events re-format live via the
+// shared formatEvent (run-ended's \n → <br>), notes are verbatim, a walk rebuilds its
+// summary from the structured fields.
+function formatLogEntry(entry: LogEntry): string {
+  switch (entry.t) {
+    case "event": return formatEvent(entry.e, name).replace(/\n/g, "<br>");
+    case "note": return entry.text;
+    case "walk": {
+      const delta = entry.net >= 0 ? `−${round(entry.net)}e` : `+${round(-entry.net)}e`;
+      const ateClause = entry.ate > 0 ? ` · auto-ate ${entry.ate}× ration` : "";
+      const gatheredClause = entry.gathered > 0 ? ` · auto-gathered ${entry.gathered}× node${entry.gathered !== 1 ? "s" : ""}` : "";
+      return `🚶 walked ${entry.steps} tile${entry.steps !== 1 ? "s" : ""} → (${entry.pos.x},${entry.pos.y}) · ${delta}${ateClause}${gatheredClause}`;
+    }
+  }
+}
 function trimAndDraw(): void { log = log.slice(0, 16); draw(); }
 function planReset(): void {
   // pack is only a PLAN on state.loadout (D28: bank untouched until embark).
@@ -220,14 +246,11 @@ function walkRoute(wps: Pos[]): void {
   // spend/food computed once from start→end state — no per-step sign juggling,
   // so auto-eat refills mid-walk net out correctly and never print "−-45e" (1te-b).
   const net = startEnergy - exp.energy; // >0 spent, <0 net gain from auto-eat
-  const delta = net >= 0 ? `−${round(net)}e` : `+${round(-net)}e`;
   const ate = foodUnits(startFood) - foodUnits(exp.loadout.food);
-  const ateClause = ate > 0 ? ` · auto-ate ${ate}× ration` : "";
-  const gatheredClause = gathered > 0 ? ` · auto-gathered ${gathered}× node${gathered !== 1 ? "s" : ""}` : "";
-  if (steps > 0) log.unshift(`🚶 walked ${steps} tile${steps !== 1 ? "s" : ""} → (${exp.pos.x},${exp.pos.y}) · ${delta}${ateClause}${gatheredClause}`);
-  if (engaged) log.unshift(`⚔ engaged the ${name(exp.combat!.creature)} — resolve the fight in the panel below`);
-  if (bagFull) log.unshift(`🎒 bag full — dropped anchor at (${exp.pos.x},${exp.pos.y}); make room and Walk to resume`);
-  if (stopReason) log.unshift(`✋ stopped — ${rejectCopy(stopReason)}`);
+  if (steps > 0) log.unshift({ t: "walk", steps, pos: { x: exp.pos.x, y: exp.pos.y }, net, ate, gathered });
+  if (engaged) log.unshift({ t: "note", text: `⚔ engaged the ${name(exp.combat!.creature)} — resolve the fight in the panel below` });
+  if (bagFull) log.unshift({ t: "note", text: `🎒 bag full — dropped anchor at (${exp.pos.x},${exp.pos.y}); make room and Walk to resume` });
+  if (stopReason) log.unshift({ t: "note", text: `✋ stopped — ${rejectCopy(stopReason)}` });
   // Preserve the remaining route only on a bag-full pause (resume after making room);
   // a fight or an obstacle clears it so you re-plan from where you are.
   route = bagFull ? remaining : [];
@@ -872,7 +895,7 @@ function expeditionView(): string {
 }
 
 function logView(): string {
-  return `<section class="logbox"><h2>Log</h2>${log.length ? log.map((l) => `<div class="logline">${l}</div>`).join("") : `<span class="muted">—</span>`}</section>`;
+  return `<section class="logbox"><h2>Log</h2>${log.length ? log.map((l) => `<div class="logline">${formatLogEntry(l)}</div>`).join("") : `<span class="muted">—</span>`}</section>`;
 }
 
 // --- wiring: attach handlers after each render -------------------------------
