@@ -4,6 +4,18 @@ import { BASE_CARRY_SLOTS, BACKPACK_SLOTS, STACK_CAP, TRANSPORT_CARRY, BEAST_TRA
 import { isGear, CONSUMABLE_KINDS, CONSUMABLE_KEYS } from "./catalog";
 import type { ItemStack, Loadout, Equipment } from "./types";
 
+// Remove one unit from the stack at `idx` (default 0 = the FIFO front), returning a
+// FRESH list with every stack cloned, the decremented one dropped if it hits zero,
+// and order preserved. The shared "decrement one consumable" primitive behind
+// quaff / eat / use-item / enhance / ammo / auto-quaff (xkz). Consumable lists never
+// hold qty-0 stacks (this helper is what keeps that true), so dropping every empty
+// is equivalent to dropping only `idx`.
+export function consumeOne<T extends { qty: number }>(list: readonly T[], idx = 0): T[] {
+  return list
+    .map((s, i) => (i === idx ? { ...s, qty: s.qty - 1 } : { ...s }))
+    .filter((s) => s.qty > 0);
+}
+
 // Gear takes one slot PER PIECE in carry (82r) — consistent with tools costing a
 // slot each in the loadout — so a spare sword is a real slot commitment. Loot
 // keeps stacking to STACK_CAP. Ammo (D45) stacks deep — ARROW_STACK_CAP per slot,

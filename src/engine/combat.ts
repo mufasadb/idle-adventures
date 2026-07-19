@@ -27,6 +27,7 @@ import type { DmgType } from "../data/constants";
 import type { Loadout, ItemStack } from "./types";
 import { rand } from "./rng";
 import { ARMOUR_SLOTS } from "./pack";
+import { consumeOne } from "./carry";
 
 export type CombatResult = {
   victory: boolean;
@@ -246,7 +247,7 @@ export function strikeExchange(
     poisonDmg = poisonState.dmg;
     poisonAfter = poisonState.rounds - 1 > 0 ? { dmg: poisonState.dmg, rounds: poisonState.rounds - 1 } : undefined;
   }
-  const potions = loadout.potions.map((p) => ({ ...p }));
+  let potions = loadout.potions.map((p) => ({ ...p }));
   let potionsUsed = 0;
   let current = hp;
   const monsterAfter = monsterHp - dmgDealt - poisonDmg;
@@ -258,8 +259,7 @@ export function strikeExchange(
     else if (autoQuaff && current <= AUTO_POTION_THRESHOLD * PLAYER_BASE_HP && potions.length > 0) {
       const heal = POTION_HEAL_BY[potions[0]!.defId] ?? POTION_HEAL;
       current = Math.min(PLAYER_BASE_HP, current + heal);
-      potions[0]!.qty -= 1;
-      if (potions[0]!.qty <= 0) potions.shift();
+      potions = consumeOne(potions);
       potionsUsed = 1;
     }
   }

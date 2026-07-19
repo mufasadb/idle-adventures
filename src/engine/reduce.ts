@@ -2,7 +2,7 @@ import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot, RejectionRea
 import { expeditionGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
-import { addToCarry, freeLootStacks, usedSlots, carryCap, consumeExpeditionInputs, mapCarryCap } from "./carry";
+import { addToCarry, freeLootStacks, usedSlots, carryCap, consumeExpeditionInputs, mapCarryCap, consumeOne } from "./carry";
 import { toolSpeedFor, gatherCost, gateSatisfied, secondaryToolSatisfied } from "./tools";
 import { strikeExchange, rollLoot, explainMatchup, damageTaken, wieldsRanged, hasAmmo } from "./combat";
 import { eatToRefill, foodEnergyOf } from "./food";
@@ -581,11 +581,7 @@ function fightRound(state: GameState): { state: GameState; events: GameEvent[] }
     expedition.weaponBuff, combat.poison, // D60: coating charges spent per strike; poison ticks per round (same math as resolveCombat)
   );
   let ammo = expedition.loadout.ammo ?? [];
-  if (spendsArrow) {
-    ammo = ammo.map((s) => ({ ...s }));
-    ammo[0]!.qty -= 1; // front stack, FIFO — mirrors potions/food
-    if (ammo[0]!.qty <= 0) ammo.shift();
-  }
+  if (spendsArrow) ammo = consumeOne(ammo); // front stack, FIFO — mirrors potions/food
   const potionsUsed = combat.potionsUsed + round.potionsUsed;
   const exchanged: GameEvent = {
     type: "exchanged", creature: combat.creature, dmgDealt: round.dmgDealt,
@@ -720,9 +716,7 @@ function quaff(state: GameState): { state: GameState; events: GameEvent[] } {
   const front = potions[0]!;
   const heal = POTION_HEAL_BY[front.defId] ?? POTION_HEAL;
   const hp = Math.min(PLAYER_BASE_HP, expedition.hp + heal);
-  const next = potions.map((p) => ({ ...p }));
-  next[0]!.qty -= 1;
-  if (next[0]!.qty <= 0) next.shift();
+  const next = consumeOne(potions);
   if (!combat) {
     const fed = autoRefill({ ...expedition, loadout: { ...expedition.loadout, potions: next } }, expedition.energy - QUAFF_ENERGY);
     return {
@@ -762,9 +756,7 @@ function useItem(state: GameState, itemId: string): { state: GameState; events: 
   const buff = COMBAT_BUFF[itemId] ?? {};
   const damageAdd = buff.damageAdd ?? 0;
   const mitigationAdd = buff.mitigationAdd ?? 0;
-  const next = items.map((s) => ({ ...s }));
-  next[idx]!.qty -= 1;
-  if (next[idx]!.qty <= 0) next.splice(idx, 1);
+  const next = consumeOne(items, idx);
   return {
     state: {
       ...state,
@@ -792,9 +784,7 @@ function enhance(state: GameState, id: string): { state: GameState; events: Game
   const idx = held.findIndex((s) => s.defId === id);
   if (idx === -1) return rejected(state, "enhance", "insufficient");
   const charges = WEAPON_ENHANCEMENT[id]!.charges;
-  const next = held.map((s) => ({ ...s }));
-  next[idx]!.qty -= 1;
-  if (next[idx]!.qty <= 0) next.splice(idx, 1);
+  const next = consumeOne(held, idx);
   const nextExp = {
     ...expedition,
     loadout: { ...expedition.loadout, enhancements: next },
@@ -890,9 +880,7 @@ function provokeTurn(
 function removeOneFromCarry(carry: ItemStack[], defId: string): ItemStack[] | null {
   const idx = carry.findIndex((s) => s.defId === defId);
   if (idx === -1) return null;
-  return carry
-    .map((s, i) => (i === idx ? { ...s, qty: s.qty - 1 } : s))
-    .filter((s) => s.qty > 0);
+  return consumeOne(carry, idx);
 }
 
 // Shared don/doff plumbing (82r): the pre-fight prep actions. Both are rejected
@@ -1058,9 +1046,7 @@ function eat(state: GameState, action: Extract<Action, { type: "eat" }>): { stat
   // Camp meal over-eats past max; a plain meal caps at max (no waste-into-nothing).
   const energy = campMeal ? expedition.energy + restore : Math.min(expedition.energy + restore, maxEnergy);
   if (energy <= expedition.energy) return rejected(state, "eat", "insufficient"); // no gain (at/over max, no camp meal)
-  const nextFood = food.map((s) => ({ ...s }));
-  nextFood[idx]!.qty -= 1;
-  const filtered = nextFood.filter((s) => s.qty > 0);
+  const filtered = consumeOne(food, idx);
   return {
     state: {
       ...state,
