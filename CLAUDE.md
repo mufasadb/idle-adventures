@@ -100,7 +100,7 @@ The engine-purity boundary (no `render`/`sim`/`web` imports, no `Math.random`/`D
 
 ## Architecture Overview
 
-One pure engine, three thin surfaces. The reducer is the single source of truth for every rule; UI and sim never decide legality themselves.
+One pure engine, one shared presentation layer, two thin surfaces. The reducer is the single source of truth for every rule; UI and sim never decide legality themselves, and both render through the same presentation helpers so their text can't drift.
 
 **`src/engine/`** (pure — lint-enforced boundary):
 - `types.ts` — the contract: `GameState`/`Expedition`/`Engagement`, `Action`, `GameEvent`, `RejectionReason` (closed unions; adding an Action without a reducer case is a compile error).
@@ -119,9 +119,11 @@ One pure engine, three thin surfaces. The reducer is the single source of truth 
 
 **`src/data/constants.ts`** — every lever and catalog. The only file where numbers live.
 
-**`src/sim/`** — `legal.ts` (candidate actions filtered through speculative `reduce` — D29: legality can never drift), `playtest.ts` + `cli.ts` (the headless console; the blind-playtest surface — append to its output, never reshape existing lines).
+**`src/render/`** — `render.ts`: the **shared presentation layer** (extracted under `eho`). Pure `state`/`defId` → text + data-shaped derivations that BOTH surfaces format, so the web and the blind-playtest console can't drift. Key exports: `name` (display names), `rejectCopy` (`RejectionReason` → player copy), `formatEvent` (the ONE exhaustive `GameEvent` → text switch — `exm`; web passes display `name`, playtest passes identity for raw defIds), `combatForecast`, the node/gate hints (`nodeToolHint`, `nodeGateNote`, `materialGated`, `materialLocked`), `describe`, `GATHER_VERB`, terrain/POI glyph maps. **Rule:** presentation logic both surfaces need lives here; web-only HTML builders (recipe-book rows, held-map card) stay in `main.ts` until a second UI exists. For legality-with-reason in a surface, use `whyNot(state, action)` (sim/legal.ts) → `rejectCopy` — never re-derive "why not" from the catalog (`ciq`, D29 one level up).
 
-**`src/web/`** — `main.ts` (the whole UI: string templates re-rendered from state on every action, one generic `data-act` click delegation in `wire()`) + `index.html` (all CSS).
+**`src/sim/`** — `legal.ts` (candidate actions filtered through speculative `reduce` — D29: legality can never drift; `whyNot` hands back the reducer's own `RejectionReason`), `playtest.ts` + `cli.ts` (the headless console; the blind-playtest surface — append to its output, never reshape existing lines).
+
+**`src/web/`** — `main.ts` (the whole UI: string templates re-rendered from state on every action, one generic `data-act` click delegation in `wire()`) + `index.html` (all CSS). The event log is stored as structured `LogEntry[]` (`exm`) formatted at draw time, not pre-rendered HTML. **Before verifying any web change, read `docs/working-on-this-codebase.md` — and always start a FRESH server + append `?cb=$RANDOM` to every `agent-browser open` (stale-bundle cache is the #1 web-verification footgun; symptoms read as game-breaking bugs but are pure caching).**
 
 ## Pixel-art assets (epic idle-adventure-48l)
 
