@@ -27,6 +27,7 @@ export type DerivedRoute = {
   endEnergy: number; // simulated CURRENT energy after the walk, mirroring the reducer's pay-then-auto-eat per tile (df3)
   strands: boolean; // the walk would truly run energy ≤ 0 before completing, EVEN WITH designated auto-eat (df3)
   blocked: boolean; // any leg hits a wall → Walk disabled
+  crossedMonster: { pos: Pos; creature: string } | null; // first UNCLEARED monster on the walkable prefix — the walk auto-engages it (2i8: warn before you commit the route into a fight)
   end: Pos; // last waypoint (or the player, if the route is empty)
 };
 
@@ -59,6 +60,7 @@ export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: S
     }
   };
   let strands = false; // the walk truly can't finish even WITH auto-eat
+  let crossedMonster: { pos: Pos; creature: string } | null = null; // first monster the walk would auto-engage
   let globallyBlocked = false; // once the walk hits any wall, later tiles aren't traversed
   let prevWalk: Pos = exp.pos; // previous WALKED tile — sets the next step's diagonal cost
   let legStart: Pos = exp.pos;
@@ -74,6 +76,12 @@ export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: S
         globallyBlocked = true;
       } else if (!globallyBlocked) {
         walkable.push(t);
+        // First uncleared monster on the walk: the reducer auto-engages when you step
+        // onto a monster tile, so this is the fight the route commits you to (2i8).
+        if (!crossedMonster && !cleared.has(kk(t))) {
+          const mon = grid.pois.find((p) => p.x === t.x && p.y === t.y && p.kind === "monster" && p.creature);
+          if (mon) crossedMonster = { pos: { x: t.x, y: t.y }, creature: mon.creature! };
+        }
         const diagonal = prevWalk.x !== t.x && prevWalk.y !== t.y;
         const mc = moveCost(grid.terrain[t.y]![t.x]!, eq.transport, eq.tools, diagonal);
         prevWalk = t;
@@ -102,5 +110,5 @@ export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: S
     legs.push({ tiles, blockedAt });
     legStart = wp;
   }
-  return { legs, drawn, walkable, waypointKeys, blockKeys, walkCost, actionCost, endEnergy: simEnergy, strands, blocked: legs.some((l) => l.blockedAt !== null), end: wps.length ? wps[wps.length - 1]! : exp.pos };
+  return { legs, drawn, walkable, waypointKeys, blockKeys, walkCost, actionCost, endEnergy: simEnergy, strands, crossedMonster, blocked: legs.some((l) => l.blockedAt !== null), end: wps.length ? wps[wps.length - 1]! : exp.pos };
 }

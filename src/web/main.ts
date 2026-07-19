@@ -195,9 +195,9 @@ const TRANSPORT_ROLE: Record<string, string> = {
 // tile already on the drawn path — this is the "un-click to unwind" gesture, and it
 // resolves self-crossing routes deterministically), or APPENDS a new waypoint. The
 // truncation target becomes the new final waypoint.
-function routeAfterClick(exp: Expedition, wps: Pos[], to: Pos): Pos[] {
+function routeAfterClick(exp: Expedition, wps: Pos[], to: Pos, blocked: boolean): Pos[] {
   if (to.x === exp.pos.x && to.y === exp.pos.y) return []; // click self = clear
-  // earliest walk-order occurrence of `to` across the legs → truncate there
+  // earliest walk-order occurrence of `to` across the legs → truncate there (unwind)
   let legStart: Pos = exp.pos;
   for (let i = 0; i < wps.length; i++) {
     for (const t of lineTiles(legStart, wps[i]!)) {
@@ -205,7 +205,10 @@ function routeAfterClick(exp: Expedition, wps: Pos[], to: Pos): Pos[] {
     }
     legStart = wps[i]!;
   }
-  return [...wps, to]; // not on the path → new leg
+  // Not on the path → a new leg. But if the route is ALREADY blocked, appending would
+  // just stack more ghost-blocked legs that never clear (playtest F5) — so a fresh click
+  // starts OVER with a single leg from the player instead of poisoning the plan further.
+  return blocked ? [to] : [...wps, to];
 }
 
 const foodUnits = (food: ItemStack[]) => food.reduce((n, s) => n + s.qty, 0);
@@ -819,10 +822,17 @@ function expeditionView(): string {
       })()
     : "";
   const surveyAtEnd = legal.some((a) => a.type === "survey" && a.at.x === rt.end.x && a.at.y === rt.end.y);
+  // Ambush warning (2i8, playtest F5): the walk auto-engages the FIRST monster on the
+  // line — warn prominently when that fight is a forecast LOSS (a mid-line drake sank a
+  // 132-energy route), so the player reroutes before committing.
+  const cm = rt.crossedMonster;
+  const crossWarn = cm && !combatForecast(exp.loadout, cm.creature, exp.hp, exp.weaponBuff).winning
+    ? `<b class="over">⚠ this line runs into a ${name(cm.creature)} at (${cm.pos.x},${cm.pos.y}) — the forecast says you'd LOSE that fight. Reroute around it.</b> · `
+    : "";
   const pathBanner = exp.combat
     ? `<div class="pathbanner engaged">⚔ <b>ENGAGED — the ${name(exp.combat.creature)}</b> · fight or flee in the panel below ↓</div>`
     : hasRoute
-    ? `<div class="pathbanner${rt.blocked ? " blocked" : ""}">${rt.blocked ? `<b class="over">✗ blocked — a leg crosses impassable terrain (red).</b> Click a tile on the line to unwind past it, or reroute. · ` : ""}${fight ? `⚔ walk in &amp; <b>fight the ${name(fight)}</b> · ` : ""}→ (${rt.end.x},${rt.end.y}): ${rt.walkable.length} tile${rt.walkable.length !== 1 ? "s" : ""}, ${costClause}${forecastClause} · <button data-walk${rt.blocked ? " disabled title=\"clear the blocked leg first\"" : ""}>${fight ? "Fight ▶" : "Walk ▶"}</button> ${shoot ? `<button data-shoot title="engage from here with your bow — your opener lands before it can answer, and you don't step in">🏹 Shoot</button> ` : ""}${surveyAtEnd ? `<button data-survey-x="${rt.end.x}" data-survey-y="${rt.end.y}" title="study it through the glass without walking over — resolves its detail for −${SURVEY_ENERGY}e">🔭 Survey (−${SURVEY_ENERGY}e)</button> ` : ""}<button class="link" data-cancelpath title="remove the whole planned route">✕ clear route</button></div>`
+    ? `<div class="pathbanner${rt.blocked ? " blocked" : ""}">${rt.blocked ? `<b class="over">✗ blocked — a leg crosses impassable terrain (red).</b> Click a tile on the line to unwind, or click elsewhere to start a fresh route. · ` : ""}${crossWarn}${fight ? `⚔ walk in &amp; <b>fight the ${name(fight)}</b> · ` : ""}→ (${rt.end.x},${rt.end.y}): ${rt.walkable.length} tile${rt.walkable.length !== 1 ? "s" : ""}, ${costClause}${forecastClause} · <button data-walk${rt.blocked ? " disabled title=\"clear the blocked leg first\"" : ""}>${fight ? "Fight ▶" : "Walk ▶"}</button> ${shoot ? `<button data-shoot title="engage from here with your bow — your opener lands before it can answer, and you don't step in">🏹 Shoot</button> ` : ""}${surveyAtEnd ? `<button data-survey-x="${rt.end.x}" data-survey-y="${rt.end.y}" title="study it through the glass without walking over — resolves its detail for −${SURVEY_ENERGY}e">🔭 Survey (−${SURVEY_ENERGY}e)</button> ` : ""}<button class="link" data-cancelpath title="remove the whole planned route">✕ clear route</button></div>`
     : `<div class="pathbanner muted">Click a tile → draws a straight line + previews energy. Click more tiles to add waypoints; click a tile already on the line to unwind to it. Then <b>Walk</b>. Monsters (<b>X</b>) are fought when your line reaches them.</div>`;
 
   const cap = carryCap(exp.loadout.equipment);
@@ -957,7 +967,7 @@ function currentDerived(): DerivedRoute | null {
 function onTileClick(to: Pos): void {
   const exp = state.expedition;
   if (!exp) return;
-  route = routeAfterClick(exp, route, to);
+  route = routeAfterClick(exp, route, to, currentDerived()?.blocked ?? false);
   draw();
 }
 

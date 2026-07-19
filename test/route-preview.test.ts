@@ -2,6 +2,8 @@ import { test, expect } from "bun:test";
 import { deriveRoute } from "../src/web/route";
 import { reduce } from "../src/engine/reduce";
 import { generateGrid, rollBiome } from "../src/engine/grid";
+import { moveCost } from "../src/engine/move";
+import { MAP_WIDTH, MAP_HEIGHT } from "../src/data/constants";
 import type { Expedition, GameState } from "../src/engine/types";
 import { emptyLoadout } from "../src/engine/loadout";
 
@@ -84,4 +86,30 @@ test("baseline: preview end-energy tracks a real walk when auto-eat is off (no r
     state = reduce(state, { type: "move", to: { x: START.x, y: START.y - (i + 1) } }).state;
   }
   expect(state.expedition!.energy).toBeCloseTo(rt.endEnergy, 5);
+});
+
+// 2i8: the walk auto-engages the FIRST monster on the line, so the preview surfaces it
+// (used to warn on a route that runs into a fight you'd lose). Clearing it drops it.
+test("deriveRoute surfaces the first uncleared monster crossed; a cleared one is not", () => {
+  const walkableAt = (grid: ReturnType<typeof generateGrid>, x: number, y: number) =>
+    x >= 0 && y >= 0 && x < MAP_WIDTH && y < MAP_HEIGHT && Number.isFinite(moveCost(grid.terrain[y]![x]!, null, []));
+  for (let i = 0; i < 400; i++) {
+    const seed = `cm-${i}`;
+    const grid = generateGrid(seed, rollBiome(seed));
+    const mon = grid.pois.find((p) => p.kind === "monster" && p.creature);
+    if (!mon) continue;
+    // a walkable 4-neighbour to start the line from (monster tiles are walkable)
+    const start = [{ x: mon.x - 1, y: mon.y }, { x: mon.x + 1, y: mon.y }, { x: mon.x, y: mon.y - 1 }, { x: mon.x, y: mon.y + 1 }]
+      .find((c) => walkableAt(grid, c.x, c.y));
+    if (!start) continue;
+    const exp: Expedition = { mapSeed: seed, pos: start, energy: 300, maxEnergy: 300, hp: 30, loadout: emptyLoadout(), carry: [], cleared: [] };
+    const wps = [{ x: mon.x, y: mon.y }];
+    const rt = deriveRoute(grid, exp, wps, new Set(), new Set());
+    expect(rt.crossedMonster).toEqual({ pos: { x: mon.x, y: mon.y }, creature: mon.creature! });
+    // once that tile is cleared, the walk no longer engages it → not surfaced
+    const rtCleared = deriveRoute(grid, exp, wps, new Set(), new Set([`${mon.x},${mon.y}`]));
+    expect(rtCleared.crossedMonster).toBeNull();
+    return;
+  }
+  throw new Error("no monster-on-line fixture found in scan range");
 });
