@@ -40,6 +40,13 @@ import {
   AFFINITIES,
   FOOD,
   POTION,
+  CATEGORY_LOOT_TABLE,
+  FRESH_TO_STALE,
+  STARTER_BANK,
+  FOOD_ENERGY,
+  POTION_HEAL_BY,
+  BATTLE_ITEM,
+  COMBAT_BUFF,
 } from "../src/data/constants";
 
 test("constants: lever groups exist with the documented shape", () => {
@@ -262,4 +269,81 @@ test("constants: the acceptance affinity pairing exists (silver ↔ werewolf)", 
   expect(
     AFFINITIES.some((a) => a.monsterTag === "werewolf" && a.itemTag === "silver"),
   ).toBe(true);
+});
+
+// --- content invariants (7dt): the catalog's safety net before the content glow-up
+// multiplies recipes/items. These catch typo'd defIds that would otherwise ship
+// through a green suite (the seal-blubber class of bug: an uncraftable recipe, a
+// silent-fallback effect key, a dead material that banks and does nothing). -------
+
+// The set of defIds the game can actually PRODUCE: gathered materials (every biome
+// materialTable), combat drops (monster + category loot), fresh→stale bank transforms,
+// anything a recipe outputs, and the starter bank. A recipe input outside this set is
+// uncraftable in real play.
+const PRODUCIBLE: Set<string> = (() => {
+  const s = new Set<string>();
+  for (const id of BIOME_IDS) {
+    for (const kind of ["mining", "wood", "herb", "animal"] as const) {
+      for (const defId of Object.keys(BIOMES[id].materialTable[kind] ?? {})) s.add(defId);
+    }
+  }
+  for (const table of Object.values(LOOT_TABLE)) for (const stack of table) s.add(stack.defId);
+  for (const table of Object.values(CATEGORY_LOOT_TABLE)) for (const stack of table) s.add(stack.defId);
+  for (const [fresh, stale] of Object.entries(FRESH_TO_STALE)) { s.add(fresh); s.add(stale); }
+  for (const recipe of Object.values(RECIPE)) s.add(recipe.output.defId);
+  for (const stack of STARTER_BANK) s.add(stack.defId);
+  return s;
+})();
+
+// 7dt (1) SOURCED-INPUTS — the highest-leverage invariant in the repo. Every input
+// of every recipe must be producible; otherwise the recipe is dead (the seal-blubber
+// bug, idle-adventure-7pi, shipped through a green suite because this didn't exist).
+test("content: every recipe input is producible (no uncraftable recipe)", () => {
+  for (const [id, recipe] of Object.entries(RECIPE)) {
+    for (const input of recipe.inputs) {
+      expect(PRODUCIBLE.has(input.defId) || `recipe ${id} needs unsourced input ${input.defId}`).toBe(true);
+    }
+  }
+});
+
+// 7dt (2) PARITY — an effect-table key that isn't a real catalog member silently
+// falls back (FOOD_ENERGY→ENERGY_PER_FOOD, POTION_HEAL_BY→POTION_HEAL) or no-ops
+// (COMBAT_BUFF); a catalog member missing from its effect table takes the default.
+test("content: FOOD_ENERGY keys are all real foods (no silent ENERGY_PER_FOOD fallback from a typo)", () => {
+  for (const defId of Object.keys(FOOD_ENERGY)) {
+    expect(FOOD.includes(defId) || `FOOD_ENERGY key ${defId} is not a FOOD`).toBe(true);
+  }
+});
+
+test("content: POTION_HEAL_BY keys are all real potions (no silent POTION_HEAL fallback from a typo)", () => {
+  for (const defId of Object.keys(POTION_HEAL_BY)) {
+    expect(POTION.includes(defId) || `POTION_HEAL_BY key ${defId} is not a POTION`).toBe(true);
+  }
+});
+
+test("content: BATTLE_ITEM ⇔ COMBAT_BUFF are the same set (no battle item with a silent no-buff)", () => {
+  for (const defId of BATTLE_ITEM) {
+    expect(COMBAT_BUFF[defId] || `battle item ${defId} has no COMBAT_BUFF (silent no-buff)`).toBeTruthy();
+  }
+  for (const defId of Object.keys(COMBAT_BUFF)) {
+    expect(BATTLE_ITEM.includes(defId) || `COMBAT_BUFF key ${defId} is not a BATTLE_ITEM`).toBe(true);
+  }
+});
+
+// 7dt (3) MATERIALS-MEANINGFUL — a gathered material must DO something: feed a recipe
+// input, or be directly consumable (food/potion/battle-item). There is no item-value
+// table (the loop's value IS what you craft/eat), so a material that feeds nothing is
+// dead weight — it generates, banks, and does nothing (grid.ts documents affixes
+// silently no-op on unknown defIds).
+test("content: every biome material feeds a recipe or is directly consumable (no dead material)", () => {
+  const recipeInputs = new Set(Object.values(RECIPE).flatMap((r) => r.inputs.map((i) => i.defId)));
+  const consumable = new Set<string>([...FOOD, ...POTION, ...BATTLE_ITEM]);
+  for (const id of BIOME_IDS) {
+    for (const kind of ["mining", "wood", "herb", "animal"] as const) {
+      for (const defId of Object.keys(BIOMES[id].materialTable[kind] ?? {})) {
+        const meaningful = recipeInputs.has(defId) || consumable.has(defId);
+        expect(meaningful || `${id}/${kind} material ${defId} feeds no recipe and is not consumable`).toBe(true);
+      }
+    }
+  }
 });
