@@ -6,7 +6,7 @@
 // actions; each step is still validated by `reduce`.
 import { newGame, localMap, mapEpithet } from "../engine/town";
 import { reduce } from "../engine/reduce";
-import { legalActions } from "../sim/legal";
+import { legalActions, whyNot } from "../sim/legal";
 import { expeditionGrid, rollBiome } from "../engine/grid";
 import type { Grid } from "../engine/grid";
 import { slotOf } from "../engine/catalog";
@@ -20,9 +20,9 @@ import { deriveRoute } from "./route";
 import type { DerivedRoute } from "./route";
 import { heldFoodEnergy } from "../engine/food";
 import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
-import { RECIPE, MATERIAL_GATE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, INKS, AFFIX_EFFECTS, WEAPON_ENHANCEMENT } from "../data/constants";
+import { RECIPE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, ARROW_STACK_CAP, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, INKS, AFFIX_EFFECTS, WEAPON_ENHANCEMENT } from "../data/constants";
 import type { BiomeId, GatherableNodeType } from "../data/constants";
-import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, weaponHint, logisticsEffect, enhancementHint, affixMaterialHint, describe, recipeGateHint, nodeToolHint, nodeGateNote, name, rejectCopy, combatForecast, formatEvent, GATHER_VERB } from "../render/render";
+import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, weaponHint, logisticsEffect, enhancementHint, affixMaterialHint, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, combatForecast, formatEvent, GATHER_VERB } from "../render/render";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action, GameEvent, ItemStack, Loadout, Equipment, Expedition, LoadoutSlot, MapItem, RejectionReason } from "../engine/types";
 
@@ -592,30 +592,30 @@ function herePanel(grid: Grid, exp: NonNullable<GameState["expedition"]>, legal:
     return `<div class="here monster">
       <b>Here:</b> a <b>${name(poi.creature!)}</b> — <i>${desc}</i>.
       It's static: it won't touch you unless you Fight. You can just walk past it.
-      ${canFight ? `<button data-act="fight">⚔ Engage the ${name(poi.creature!)}</button>` : `<span class="warn">can't fight (bag full for its loot?)</span>`}
+      ${canFight ? `<button data-act="fight">⚔ Engage the ${name(poi.creature!)}</button>` : `<span class="warn">can't fight — ${rejectCopy(whyNot(state, { type: "fight" }) ?? "carry-full")}</span>`}
     </div>`;
   }
   // gatherable node
   const verb = GATHER_VERB[poi.kind]!;
-  // D78: the material's ACCESS gate (any-of tool list), or null when ungated.
-  const gate = poi.material ? (MATERIAL_GATE[poi.material]?.tools ?? null) : null;
-  const gateSatisfied = !gate || gate.some((t) => exp.loadout.equipment.tools.includes(t));
-  // gate-legibility (playtest 2026-07-09 #1): distinguish the two "can't gather"
-  // reasons and name each. NO tool of the required KIND → "needs a knife"; has the
-  // kind but the material is access-gated by a tool you lack → "needs iron-pick or …".
-  // D83: tool-aware — names whatever tool(s) are missing (animal → trap AND knife),
-  // null when the player holds them all. Drives the tool-locked vs gate-locked split.
-  const toolNeed = nodeToolHint(poi.kind as GatherableNodeType, exp.loadout.equipment.tools);
-  const toolLocked = !canGather && toolNeed !== null;
-  const gateLocked = !canGather && toolNeed === null && !gateSatisfied;
-  const locked = toolLocked || gateLocked;
+  // Legality — and the REASON — come from the reducer, not a hand-derived rule (ciq):
+  // whyNot returns the exact gather rejection (missing-tool / tool-too-weak / carry-full
+  // / …). The web only chooses copy per reason; it no longer re-decides which applies.
+  const reason = canGather ? null : whyNot(state, { type: "gather" });
+  const gated = materialGated(poi.material!); // catalog "is there a gate at all" → the badge
+  const per = perceive(grid, pos, exp.loadout.equipment.tools, exp.surveyed ?? []).find((p) => p.x === poi.x && p.y === poi.y);
   const article = /^[aeiou]/i.test(verb.noun) ? "an" : "a";
-  return `<div class="here ${locked ? "locked" : ""}">
-    <b>Here:</b> ${article} ${verb.noun} — <b>${name(poi.material!)}</b>${gate ? ` <span class="tier">gated</span>` : ""}.
+  // A tool/gate lock is a HARD lock (🔒, dimmed) — you need a tool; carry-full/exhausted
+  // are transient (plain warn). Rich per-reason copy names the missing tool or the
+  // access gate (from the PERCEIVED gate) — both render hints; else rejectCopy.
+  const hardLock = reason === "missing-tool" || reason === "tool-too-weak";
+  const lockCopy =
+    reason === "missing-tool" ? `${nodeToolHint(poi.kind as GatherableNodeType, exp.loadout.equipment.tools)} to work ${name(poi.material!)}`
+    : reason === "tool-too-weak" ? `${nodeGateNote(per?.detail ?? null) ?? "locked"} to work ${name(poi.material!)}`
+    : rejectCopy(reason ?? "carry-full");
+  return `<div class="here ${hardLock ? "locked" : ""}">
+    <b>Here:</b> ${article} ${verb.noun} — <b>${name(poi.material!)}</b>${gated ? ` <span class="tier">gated</span>` : ""}.
     ${canGather ? `<button data-act="gather">${verb.label} it</button>`
-      : toolLocked ? `🔒 <span class="warn">${toolNeed} to work ${name(poi.material!)}</span>`
-      : gateLocked ? `🔒 <span class="warn">locked — needs ${gate!.join(" or ")} to work ${name(poi.material!)}</span>`
-      : `<span class="warn">can't ${verb.past.replace(/ed$/, "")} — bag full (need a free loot slot)</span>`}
+      : `${hardLock ? "🔒 " : ""}<span class="warn">${lockCopy}</span>`}
   </div>`;
 }
 
@@ -664,7 +664,7 @@ function engagementPanel(exp: NonNullable<GameState["expedition"]>, legal: Actio
     <div class="actions">
       <button data-act="fight">⚔ Fight (1 round)</button>
       <button data-act="flee" title="disengage — take one parting hit (${round(dmgIn)}); unused battle items keep for later">🏃 Flee (−${round(dmgIn)} HP)</button>
-      ${canQuaff ? `<button data-act="quaff" title="drink a potion — costs a turn (the ${name(c.creature)} strikes)">🧪 Potion</button>` : `<button disabled title="no potions, or full HP">🧪 Potion</button>`}
+      ${canQuaff ? `<button data-act="quaff" title="drink a potion — costs a turn (the ${name(c.creature)} strikes)">🧪 Potion</button>` : `<button disabled title="${rejectCopy(whyNot(state, { type: "quaff" }) ?? "insufficient")}">🧪 Potion</button>`}
       <button data-act="toggle-auto-quaff">Auto-potion: <b>${(exp.autoQuaff ?? true) ? "on" : "off"}</b></button>
       <button data-act="toggle-auto-finish" title="fast-forward whole fights to victory or defeat in one click">Auto-finish: <b>${(exp.autoFinish ?? false) ? "on" : "off"}</b></button>
       ${(exp.loadout.battleItems ?? []).map((s) => { const b = COMBAT_BUFF[s.defId] ?? {}; const eff = [b.damageAdd ? `+${b.damageAdd} dmg` : "", b.mitigationAdd ? `+${b.mitigationAdd} mitigation` : ""].filter(Boolean).join(", "); return `<button data-use-item="${s.defId}" title="use it this fight only (${eff})">⚗ ${name(s.defId)} (${eff})${s.qty > 1 ? ` ×${s.qty}` : ""}</button>`; }).join("")}
@@ -727,8 +727,7 @@ function expeditionView(): string {
     // D78: loadout-aware lock — a gated material whose any-of tool list is
     // unsatisfied by the currently-equipped tools (strictly better than the old
     // tier>1 marker: it clears once you're carrying the key).
-    const gate = poi && !isCleared && poi.material ? (MATERIAL_GATE[poi.material]?.tools ?? null) : null;
-    const locked = gate !== null && !gate.some((t) => exp.loadout.equipment.tools.includes(t));
+    const locked = !!poi && !isCleared && !!poi.material && materialLocked(poi.material, exp.loadout.equipment.tools);
     if (locked) cls.push("locked");
     const per = poi ? perceived.get(k) : undefined;
     // cww: a RESOLVED forage node shows its material glyph (f/d/b) + a material colour
@@ -845,7 +844,7 @@ function expeditionView(): string {
       <h2>Actions</h2>
       <div class="actions">
         ${exp.loadout.equipment.tools.includes("tent") ? `<span class="campmeal-badge${campMealReady ? " ready" : " spent"}" title="${campMealReady ? "left-click a food in your bag to eat it as a CAMP MEAL — over-eat past max at +50%, once per run" : "camp meal spent this run — eating is now a normal capped meal"}">🏕 camp meal ${campMealReady ? "ready" : "spent"}</span>` : ""}
-        ${legal.some((a) => a.type === "quaff") ? `<button data-act="quaff" title="drink a potion here (−${QUAFF_ENERGY}e)">🧪 Potion (−${QUAFF_ENERGY}e)</button>` : `<button disabled title="no potions, full HP, or too tired">🧪 Potion</button>`}
+        ${legal.some((a) => a.type === "quaff") ? `<button data-act="quaff" title="drink a potion here (−${QUAFF_ENERGY}e)">🧪 Potion (−${QUAFF_ENERGY}e)</button>` : `<button disabled title="${rejectCopy(whyNot(state, { type: "quaff" }) ?? "insufficient")}">🧪 Potion</button>`}
         <button data-act="toggle-auto-quaff" title="auto-drink a potion when HP drops below the threshold mid-fight">Auto-potion: <b>${(exp.autoQuaff ?? true) ? "on" : "off"}</b></button>
         <button data-act="toggle-auto-finish" title="67e: fast-forward whole fights to victory or defeat in one click — flip off to make in-fight decisions">Auto-finish fights: <b>${(exp.autoFinish ?? false) ? "on" : "off"}</b></button>
         ${enhanceButtons(exp)}

@@ -30,6 +30,8 @@ export function rejectCopy(reason: RejectionReason, recipeId?: string): string {
     case "carry-full": return "bag full — a monster fight needs a free loot slot";
     case "exhausted": return "out of energy";
     case "engaged": return "you're engaged — fight or flee below";
+    case "insufficient": return "nothing to use for that (or it'd have no effect)"; // no potion/material/charge, or already at full HP/max
+    case "no-monster": return "nothing to fight here";
     case "missing-station": return gate ? `can't craft — ${gate} (build the station first)` : "needs a station you haven't built";
     case "missing-tool": return gate ? `can't craft — ${gate}` : "needs a tool you don't have";
     case "tool-too-weak": return "your tool is too weak for this material's tier";
@@ -329,6 +331,19 @@ export function nodeGateNote(detail: PoiDetail | null): string | null {
   const gate = detail.gatedBy;
   if (!gate || gate.length === 0) return null;
   return `locked — needs ${gate.join(" or ")}`;
+}
+
+// Catalog projections of a material's ACCESS gate (ciq): the map's per-tile "locked"
+// overlay and the herePanel "gated" badge paint EVERY visible node from current tools —
+// that's a data lookup over the catalog, not a rejected action, so it belongs here (not
+// as a whyNot). materialGated = has any access gate at all; materialLocked = that gate
+// names no tool the player currently holds.
+export function materialGated(material: string): boolean {
+  return (MATERIAL_GATE[material]?.tools?.length ?? 0) > 0;
+}
+export function materialLocked(material: string, tools: string[]): boolean {
+  const gate = MATERIAL_GATE[material]?.tools ?? null;
+  return gate !== null && !gate.some((t) => tools.includes(t));
 }
 
 const MAGNITUDE_SUFFIX: Record<NodeType, Record<number, string>> = {

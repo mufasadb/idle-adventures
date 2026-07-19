@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { townActions, expeditionActions, legalActions } from "../src/sim/legal";
+import { townActions, expeditionActions, legalActions, whyNot } from "../src/sim/legal";
 import { reduce } from "../src/engine/reduce";
 import { newGame, localMap } from "../src/engine/town";
 const OFFER_S = localMap("s", 0).mapSeed; // the free local map for seed "s" (9u9.3)
@@ -12,6 +12,18 @@ import type { Action, GameState } from "../src/engine/types";
 
 const accepts = (state: GameState, action: Action) =>
   reduce(state, action).events.every((e) => e.type !== "action-rejected");
+
+test("whyNot: a rejected action returns its RejectionReason; a legal one returns null (ciq)", () => {
+  const town = newGame("s");
+  // legal in town: embark on the free local map → null
+  expect(whyNot(town, { type: "embark", mapSeed: OFFER_S })).toBeNull();
+  // illegal in town: gather is expedition-only → the reducer's own reason
+  expect(whyNot(town, { type: "gather" })).toBe("not-on-expedition");
+  // craft with an empty bank can't afford its inputs → insufficient-materials
+  expect(whyNot(town, { type: "craft", recipeId: "club" })).toBe("insufficient-materials");
+  // whyNot agrees with legalActions: every offered action has no reason
+  for (const a of townActions(town)) expect(whyNot(town, a)).toBeNull();
+});
 
 test("townActions: offers pack + embark on a fresh game, never move/gather", () => {
   const state = newGame("s");

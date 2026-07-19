@@ -3,7 +3,7 @@
 // phase-appropriate CANDIDATE actions, then keep only those reduce accepts — one
 // source of truth for legality, so this can never drift from the reducer (and
 // future terrain-gating gear is reflected for free).
-import type { Action, GameState } from "../engine/types";
+import type { Action, GameState, RejectionReason } from "../engine/types";
 import { reduce } from "../engine/reduce";
 import { RECIPE, INKS } from "../data/constants";
 import { slotOf, isGear } from "../engine/catalog";
@@ -15,6 +15,17 @@ import { perceive } from "../engine/perceive";
 // An action is legal iff reducing it emits no rejection. reduce is pure + cheap.
 function accepts(state: GameState, action: Action): boolean {
   return reduce(state, action).events.every((e) => e.type !== "action-rejected");
+}
+
+// Legality WITH the reason (ciq). The reducer already computes the RejectionReason
+// when it rejects an action — this hands it back instead of throwing it away, so a
+// surface can render an accurate "why not" via rejectCopy instead of hand-guessing.
+// Returns the FIRST failing check in handler order (one actionable reason at a time),
+// or null when the action is legal. The reason is FREE — one speculative reduce, the
+// same one accepts() already runs.
+export function whyNot(state: GameState, action: Action): RejectionReason | null {
+  const rej = reduce(state, action).events.find((e) => e.type === "action-rejected");
+  return rej ? rej.reason : null;
 }
 
 export function townActions(state: GameState): Action[] {
