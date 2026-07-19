@@ -163,7 +163,7 @@ export function simFight(loadout: Loadout, monsterId: string): FightReport {
   let potionsUsed = 0;
   const rounds: FightRound[] = [];
   for (let round = 1; ; round++) {
-    const r = strikeExchange({ ...loadout, potions }, hp, monsterHp, monsterId, 0, 0, true);
+    const r = strikeExchange({ ...loadout, potions }, hp, monsterHp, monsterId); // damageAdd/mitigationAdd 0, autoQuaff on = defaults
     rounds.push({ round, dmgDealt: round1(r.dmgDealt), dmgTaken: round1(r.dmgTaken), monsterHp: round1(r.monsterHp), hp: round1(r.hp), quaffed: r.potionsUsed > 0 });
     hp = r.hp;
     monsterHp = r.monsterHp;

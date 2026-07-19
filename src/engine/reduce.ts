@@ -1,8 +1,8 @@
-import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot, RejectionReason, Expedition, Equipment, Loadout } from "./types";
+import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot, RejectionReason, Expedition, Loadout } from "./types";
 import { expeditionGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { stepToward, moveCost } from "./move";
-import { addToCarry, freeLootStacks, usedSlots, carryCap, consumeExpeditionInputs, mapCarryCap, consumeOne } from "./carry";
+import { addToCarry, freeLootStacks, usedSlots, carryCap, consumeExpeditionInputs, mapCarryCap, consumeOne, energyCapOf } from "./carry";
 import { toolSpeedFor, gatherCost, gateSatisfied, secondaryToolSatisfied } from "./tools";
 import { strikeExchange, rollLoot, explainMatchup, damageTaken, wieldsRanged, hasAmmo } from "./combat";
 import type { ExchangeResult } from "./combat";
@@ -15,7 +15,7 @@ import { packItem, reserveLoadout, EQUIP_SLOTS } from "./pack";
 import type { EquipSlot } from "./pack";
 import { slotOf, isGear } from "./catalog";
 import { localMap, previewHints } from "./town";
-import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS, ENERGY_CAP_BONUS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MAP_SCROLL_ID, FOOD, POTION, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, INKS, RECIPE, WEAPON_ENHANCEMENT } from "../data/constants";
+import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS, PLAYER_BASE_HP, MAP_WIDTH, MAP_HEIGHT, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, MAP_SCROLL_ID, FOOD, POTION, MONSTERS, MONSTER_TIER_HP_CURVE, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, DON_DOFF_ENERGY, MAP_TIER_MAX, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, INKS, RECIPE, WEAPON_ENHANCEMENT } from "../data/constants";
 import { visionRadius } from "./perceive";
 
 // Pure reducer. M2 fills embark/move; M3 fills gather/drop; M4 fills fight; remaining cases are no-op stubs:
@@ -523,9 +523,14 @@ function fightRound(state: GameState): { state: GameState; events: GameEvent[] }
   const spendsArrow = wieldsRanged(expedition.loadout) && hasAmmo(expedition.loadout);
   const round = strikeExchange(
     expedition.loadout, expedition.hp, combat.monsterHp, combat.creature,
-    combat.damageAdd, combat.mitigationAdd, expedition.autoQuaff ?? true,
-    combat.opener ?? false, // ranged opener (D45): skip the monster's FIRST retaliation
-    expedition.weaponBuff, combat.poison, // D60: coating charges spent per strike; poison ticks per round (same math as resolveCombat)
+    {
+      damageAdd: combat.damageAdd,
+      mitigationAdd: combat.mitigationAdd,
+      autoQuaff: expedition.autoQuaff ?? true,
+      skipRetaliation: combat.opener ?? false, // ranged opener (D45): skip the monster's FIRST retaliation
+      weaponBuff: expedition.weaponBuff, // D60: coating charges spent per strike
+      poison: combat.poison, // poison ticks per round (same math as resolveCombat)
+    },
   );
   let ammo = expedition.loadout.ammo ?? [];
   if (spendsArrow) ammo = consumeOne(ammo); // front stack, FIFO — mirrors potions/food
@@ -999,12 +1004,6 @@ function doff(state: GameState, itemId: string): { state: GameState; events: Gam
 // (future tiered tents) counts, keeping the tool a data-only addition (e96).
 function tentMultOf(expedition: Expedition): number {
   return toolSpeedFor(expedition.loadout.equipment.tools, "camp") !== null ? TENT_FOOD_MULTIPLIER : 1;
-}
-
-// Sum of ENERGY_CAP_BONUS over equipped tools (si7.2): the flat maxEnergy raise
-// from capacity gear. Mirrors tentMultOf's read-gear-on-demand pattern.
-export function energyCapOf(equipment: Equipment): number {
-  return equipment.tools.reduce((sum, t) => sum + (ENERGY_CAP_BONUS[t] ?? 0), 0);
 }
 
 // Drain-then-refill helper for move/gather: given the post-spend current energy,

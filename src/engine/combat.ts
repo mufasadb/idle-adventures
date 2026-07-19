@@ -224,13 +224,16 @@ export function strikeExchange(
   hp: number,
   monsterHp: number,
   monsterId: string,
-  damageAdd = 0,
-  mitigationAdd = 0,
-  autoQuaff = true,
-  skipRetaliation = false,
-  weaponBuff?: { id: string; charges: number },
-  poison?: { dmg: number; rounds: number },
+  opts: {
+    damageAdd?: number;
+    mitigationAdd?: number;
+    autoQuaff?: boolean;
+    skipRetaliation?: boolean;
+    weaponBuff?: { id: string; charges: number };
+    poison?: { dmg: number; rounds: number };
+  } = {},
 ): ExchangeResult {
+  const { damageAdd = 0, mitigationAdd = 0, autoQuaff = true, skipRetaliation = false, weaponBuff, poison } = opts;
   const dmgDealt = playerDamage(loadout, monsterId, weaponBuff) + damageAdd;
   // Weapon-enhancement bookkeeping (D60). The strike always spends one charge; at
   // 0 the coating clears. A poison coating set/refreshes the engagement's poison on
@@ -308,7 +311,7 @@ export function resolveCombat(
   for (;;) {
     const round = strikeExchange(
       { ...loadout, potions }, current, monsterHp, monsterId,
-      damageAdd, mitigationAdd, true, false, coating, poison,
+      { damageAdd, mitigationAdd, weaponBuff: coating, poison },
     );
     current = round.hp;
     monsterHp = round.monsterHp;

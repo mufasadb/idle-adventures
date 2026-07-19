@@ -3,7 +3,7 @@ import { reduce } from "../src/engine/reduce";
 import { localMap } from "../src/engine/town";
 import { emptyLoadout } from "../src/engine/loadout";
 import { MAX_ENERGY, ENERGY_CAP_BONUS } from "../src/data/constants";
-import { energyCapOf } from "../src/engine/reduce";
+import { energyCapOf } from "../src/engine/carry";
 import type { GameState, Action } from "../src/engine/types";
 
 function town(bank: { defId: string; qty: number }[]): GameState {

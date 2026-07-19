@@ -1,6 +1,6 @@
 // Carry-slot accounting. Loot stacks hold STACK_CAP each; consumables and tools
 // each occupy ONE slot per unit (Phase 2, pqp — no stacking for consumables).
-import { BASE_CARRY_SLOTS, BACKPACK_SLOTS, STACK_CAP, TRANSPORT_CARRY, BEAST_TRANSPORTS, PANNIERS_SLOTS, AMMO, ARROW_STACK_CAP, MAP_CARRY_BASE, MAP_HOLDER_CAP } from "../data/constants";
+import { BASE_CARRY_SLOTS, BACKPACK_SLOTS, STACK_CAP, TRANSPORT_CARRY, BEAST_TRANSPORTS, PANNIERS_SLOTS, AMMO, ARROW_STACK_CAP, MAP_CARRY_BASE, MAP_HOLDER_CAP, ENERGY_CAP_BONUS } from "../data/constants";
 import { isGear, CONSUMABLE_KINDS, CONSUMABLE_KEYS } from "./catalog";
 import type { ItemStack, Loadout, Equipment } from "./types";
 
@@ -91,6 +91,12 @@ export function carryCap(equipment: Equipment): number {
     cap += PANNIERS_SLOTS[equipment.panniers] ?? 0;
   }
   return cap;
+}
+
+// Energy-ceiling bonus from equipped tools (e.g. a canteen) — the MAX_ENERGY raiser,
+// a gear-stat sibling of carryCap (xkz: moved here from reduce.ts).
+export function energyCapOf(equipment: Equipment): number {
+  return equipment.tools.reduce((sum, t) => sum + (ENERGY_CAP_BONUS[t] ?? 0), 0);
 }
 
 // Pure: returns the new carry, or null if qty can't FULLY fit within
