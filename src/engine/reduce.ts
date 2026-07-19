@@ -5,6 +5,7 @@ import { stepToward, moveCost } from "./move";
 import { addToCarry, freeLootStacks, usedSlots, carryCap, consumeExpeditionInputs, mapCarryCap, consumeOne } from "./carry";
 import { toolSpeedFor, gatherCost, gateSatisfied, secondaryToolSatisfied } from "./tools";
 import { strikeExchange, rollLoot, explainMatchup, damageTaken, wieldsRanged, hasAmmo } from "./combat";
+import type { ExchangeResult } from "./combat";
 import { eatToRefill, foodEnergyOf } from "./food";
 import { endExpedition, subtractStacks } from "./bank";
 import { pickReturnFlavor } from "./flavor";
@@ -560,10 +561,28 @@ function fightRound(state: GameState): { state: GameState; events: GameEvent[] }
       events: [exchanged],
     };
   }
-  // Victory: apply loot/maps/cleared/relocation exactly as the old fightAt did. The
-  // fit was checked at engage AND re-checked by any mid-fight don/doff (xe4,
-  // pendingLootFits) — so this can't overflow; fail loudly if that invariant ever
-  // breaks again rather than writing carry:null into state.
+  // Victory: loot/maps/cleared/relocation all applied in applyVictory (the clean seam
+  // the deferred positional-combat work will want, D69).
+  return applyVictory(state, round, loadout, loot, mapDrops, [exchanged, fought(true)]);
+}
+
+// Apply a won exchange (xkz, extracted from fightRound): route the kill's loot into
+// carry, mint any map drop into the carried-map pool, clear the tile, relocate on a
+// walk-in win, and end the engagement. `precedingEvents` are the exchange/fought
+// events fightRound already assembled; map-dropped events append after them.
+// The carry fit was checked at engage AND re-checked by any mid-fight don/doff (xe4,
+// pendingLootFits) — so this can't overflow; fail loudly if that invariant ever
+// breaks again rather than writing carry:null into state.
+function applyVictory(
+  state: GameState,
+  round: ExchangeResult,
+  loadout: Loadout,
+  loot: ItemStack[],
+  mapDrops: ItemStack[],
+  precedingEvents: GameEvent[],
+): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition!;
+  const combat = expedition.combat!;
   const maxStacks = freeLootStacks(loadout);
   let carryWithLoot: typeof expedition.carry = expedition.carry;
   for (const stack of loot) {
@@ -596,7 +615,7 @@ function fightRound(state: GameState): { state: GameState; events: GameEvent[] }
         combat: undefined,
       },
     },
-    events: [exchanged, fought(true), ...mapEvents],
+    events: [...precedingEvents, ...mapEvents],
   };
 }
 
