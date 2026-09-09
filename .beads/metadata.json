@@ -1,7 +1,7 @@
 {
-  "database": "dolt",
   "backend": "dolt",
-  "dolt_mode": "embedded",
+  "database": "dolt",
   "dolt_database": "idle_adventure",
+  "dolt_mode": "server",
   "project_id": "b42c7c4e-4a4c-420e-99d0-1899aaaccef2"
 }

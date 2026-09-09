@@ -8,3 +8,10 @@
 # Dependencies
 node_modules/
 .claude/worktrees/
+
+# Gas City
+.beads/*
+!.beads/identity.toml
+.gc/
+.claude/skills/.gc-skill-ownership.json
+.claude/skills/core.gc-*
