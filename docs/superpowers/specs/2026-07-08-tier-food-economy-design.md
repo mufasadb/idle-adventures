@@ -4,7 +4,7 @@
 
 ## Problem
 
-Playtest v3 (`docs/2026-07-08-playtest-findings.md` §4) re-baselined the stamina
+Playtest v3 (`docs/archive/playtests/2026-07-08-playtest-findings.md` §4) re-baselined the stamina
 rework. The **outbound** reach-budgeting half is alive and praised ("routing under
 budget" was a top delight) — do **not** nerf movement gear. The live problem is the
 **food side**: there is no obvious *sustainable, tier-appropriate* food loop. Once

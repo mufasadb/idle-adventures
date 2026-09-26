@@ -10,8 +10,16 @@ node_modules/
 .claude/worktrees/
 
 # Gas City
+# .beads/ is mostly machine-local (Dolt DB, interactions.jsonl, runtime state);
+# beads data syncs via `bd dolt push`, not git. Only these are tracked — config.yaml
+# and metadata.json carry shared project settings (sync.remote, prefix, …):
 .beads/*
+!.beads/.gitignore
+!.beads/README.md
+!.beads/hooks/
 !.beads/identity.toml
+!.beads/config.yaml
+!.beads/metadata.json
 .gc/
 .codex/hooks.json
 .agents/skills/.gc-skill-ownership.json

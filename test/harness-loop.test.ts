@@ -7,9 +7,8 @@ import { generateGrid, rollBiome } from "../src/engine/grid";
 import { MAP_WIDTH, MAP_HEIGHT } from "../src/data/constants";
 import type { Action, GameState } from "../src/engine/types";
 import type { BiomeId } from "../src/data/constants";
+import { accepts } from "./helpers";
 
-const accepts = (s: GameState, a: Action) =>
-  reduce(s, a).events.every((e) => e.type !== "action-rejected");
 
 // This driver targets non-monster gatherable POIs, but the greedy walk can
 // still step onto a monster tile en route. si7.1: that ENGAGES rather than

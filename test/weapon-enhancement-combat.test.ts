@@ -1,11 +1,11 @@
 import { test, expect } from "bun:test";
 import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
-import { generateGrid, rollBiome } from "../src/engine/grid";
-import type { Grid, Poi } from "../src/engine/grid";
+import type { Poi } from "../src/engine/grid";
 import { playerDamage, resolveCombat } from "../src/engine/combat";
 import { PLAYER_BASE_HP, WEAPON_ENHANCEMENT, MONSTERS, AFFINITY_MULTIPLIER } from "../src/data/constants";
 import type { GameState, GameEvent, Loadout } from "../src/engine/types";
+import { mapWithMonster as scanMonsterMap } from "./helpers";
 
 // --- playerDamage with a coating (§8) ---------------------------------------
 
@@ -46,15 +46,7 @@ function fightToEndWithBuff(state: GameState): GameState {
   return s.state;
 }
 
-function mapWithMonster(creature: string): { seed: string; poi: Poi; grid: Grid } {
-  for (let i = 0; i < 800; i++) {
-    const seed = `enh-scan-${i}`;
-    const grid = generateGrid(seed, rollBiome(seed), 1);
-    const poi = grid.pois.find((p) => p.kind === "monster" && p.creature === creature);
-    if (poi) return { seed, poi, grid };
-  }
-  throw new Error(`no map with ${creature}`);
-}
+const mapWithMonster = (creature: string) => scanMonsterMap("enh-scan", creature, { tries: 800 });
 
 function atMonster(seed: string, poi: Poi, buffId: string, weapon: string, hp = PLAYER_BASE_HP): GameState {
   const loadout: Loadout = emptyLoadout();

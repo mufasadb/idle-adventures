@@ -3,10 +3,8 @@ import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
 import { RECIPE } from "../src/data/constants";
 import type { GameState } from "../src/engine/types";
+import { town } from "./helpers";
 
-function town(bank: { defId: string; qty: number }[]): GameState {
-  return { seed: "c", phase: "town", bank, loadout: emptyLoadout(), expedition: null };
-}
 
 // ke3.2 station tests inject throwaway recipes so the mechanism is exercised without
 // committing station CONTENT (that lands in ke3.5/6/7). Cleaned up around assertions.

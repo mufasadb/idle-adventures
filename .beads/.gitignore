@@ -72,5 +72,6 @@ db.sqlite
 bd.db
 # NOTE: Do NOT add negation patterns here.
 # They would override fork protection in .git/info/exclude.
-# Config files (metadata.json, config.yaml) are tracked by git by default
-# since no pattern above ignores them.
+# Config files (metadata.json, config.yaml) are NOT ignored here. In this repo the
+# root .gitignore ignores `.beads/*` (Gas City) and re-includes .gitignore,
+# README.md, hooks/, identity.toml, config.yaml and metadata.json.

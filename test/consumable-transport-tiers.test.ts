@@ -5,16 +5,15 @@ import { moveCost } from "../src/engine/move";
 import { slotCap } from "../src/engine/carry";
 import { emptyLoadout } from "../src/engine/loadout";
 import { localMap } from "../src/engine/town";
-import type { GameState } from "../src/engine/types";
+import type { GameState, ItemStack } from "../src/engine/types";
+import { town as baseTown } from "./helpers";
 
 const OFFER_T = localMap("t", 0).mapSeed; // an offered map for seed "t" (9u9.3)
 
 // Consumable/transport/backpack tiers (2026-07-04). Better consumables give more
 // per item — progression EARNS efficiency against the firm carry squeeze.
 
-function town(bank: { defId: string; qty: number }[]): GameState {
-  return { seed: "t", phase: "town", bank, loadout: emptyLoadout(), expedition: null };
-}
+const town = (bank: ItemStack[]): GameState => baseTown(bank, undefined, { seed: "t" });
 
 test("eat: trail-ration RESTORES 2× a ration (per-food lever now = restore, ff7/dtv)", () => {
   // Stamina model (dtv): FOOD_ENERGY is restore-per-unit, not embark energy. Both

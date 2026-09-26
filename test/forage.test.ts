@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { scanForPoi } from "./helpers";
+import { scanForPoi, standingOn as baseStandingOn } from "./helpers";
 import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
 import type { Poi } from "../src/engine/grid";
@@ -11,29 +11,9 @@ import type { GameState } from "../src/engine/types";
 // "berries") — mirrors reduce-gather.test.ts's mapWith scan.
 const berryMap = (): { seed: string; poi: Poi } => scanForPoi("forage-scan", (p) => p.kind === "herb" && p.material === "berries", 600);
 
-function standingOn(
-  seed: string,
-  poi: Poi,
-  opts: { energy?: number; food?: { defId: string; qty: number }[] } = {},
-): GameState {
-  const loadout = emptyLoadout();
-  loadout.food = opts.food ?? [];
-  return {
-    seed: "g",
-    phase: "expedition",
-    bank: [],
-    loadout: emptyLoadout(),
-    expedition: {
-      mapSeed: seed,
-      pos: { x: poi.x, y: poi.y },
-      energy: opts.energy ?? MAX_ENERGY,
-      hp: 10,
-      loadout,
-      carry: [],
-      cleared: [],
-    },
-  };
-}
+// forage's fixture differs from the shared default only in hp (10, not 0); every call passes energy.
+const standingOn = (seed: string, poi: Poi, opts: Parameters<typeof baseStandingOn>[2] = {}) =>
+  baseStandingOn(seed, poi, { hp: 10, ...opts });
 
 test("berries are food, stale-berries are not packable anywhere", () => {
   expect(slotOf("berries")).toBe("food");

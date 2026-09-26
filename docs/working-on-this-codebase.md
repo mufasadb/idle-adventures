@@ -13,11 +13,11 @@ All three green before every commit. Lint enforces the engine-purity boundary (n
 ## The non-negotiables
 
 - **Engine purity:** `reduce(state, action) → {state, events}`. Zero RNG in fight math; all generation deterministic in `(mapSeed, biomeId)`. Seeded randomness goes through `rand`/`weightedPick` (sorted keys) with namespaced seed strings.
-- **Lever discipline:** no magic numbers in engine logic — every tunable is a named, commented constant in `src/data/constants.ts`, and lands with a `decisions.md` D-row + `balance-levers.md` update.
+- **Lever discipline:** no magic numbers in engine logic — every tunable is a named, commented constant under `src/data/` (`constants.ts` + its re-exported domain splits `combat.ts`/`crafting.ts`/`spec.ts`), and lands with a `decisions.md` D-row + `balance-levers.md` update.
 - **Items are `{defId, qty}`** — no per-instance state, ever. State transitions (freshness, etc.) are defId swaps at run boundaries.
 - **Rejected actions return the ORIGINAL state** plus an `action-rejected` event — no mutation leaks from partially-computed candidates.
 - **`legalActions` filters candidates through speculative `reduce` (D29)** — never encode legality rules anywhere but the reducer.
-- **New consumable category (0ps):** a new `ItemStack[]` list on `Loadout` = a `Loadout` field + a `CONSUMABLE_KINDS` row (`catalog.ts`) + a catalog list in `constants.ts`. The registry drives slot accounting / packing / banking; omitting the row is a compile error. The per-kind ACTION handler (eat/quaff/use-item/enhance) is still bespoke — the registry does not genericize consumption semantics.
+- **New consumable category (0ps):** a new `ItemStack[]` list on `Loadout` = a `Loadout` field + a `CONSUMABLE_KINDS` row (`catalog.ts`) + a catalog list under `src/data/` (consumable catalogs live in `crafting.ts`, re-exported by `constants.ts`). The registry drives slot accounting / packing / banking; omitting the row is a compile error. The per-kind ACTION handler (eat/quaff/use-item/enhance) is still bespoke — the registry does not genericize consumption semantics.
 
 ## Harness invariants (tune levers, never these tests)
 
@@ -27,11 +27,11 @@ All three green before every commit. Lint enforces the engine-purity boundary (n
 
 ## Test idioms
 
-- **Seed-scan helpers:** to test against a generated map, scan deterministic seeds for the fixture you need (see `mapWith`/`standingOn` in `test/reduce-gather.test.ts`, `monsterMap`/`onMonster` in `test/engagement.test.ts`). When a data change shifts what seeds produce, **widen the scan range or tighten its filter — never weaken an assertion**.
+- **Seed-scan helpers:** to test against a generated map, scan deterministic seeds for the fixture you need (see `mapWith` in `test/reduce-gather.test.ts`, `monsterMap`/`onMonster` in `test/engagement.test.ts`). Shared fixtures live in **`test/helpers.ts`** (`scanForPoi`, `mapWithMonster`, `standingOn`, `town`, `fightToEnd`, `accepts`, `cheb`) — reuse them instead of copy-pasting; seed prefixes are per-caller parameters and load-bearing. When a data change shifts what seeds produce, **widen the scan range or tighten its filter — never weaken an assertion**.
 - **Snapshots:** generation/data changes shift snapshots under every seed. Eyeball ONE diff first (shape/identity changes only — the glyph vocabulary and terrain topology should match your change's story), then `bun test -u`. A non-snapshot failure means fix the code, not the test.
 - **Premise-breaks:** if a test's premise is invalidated by an approved design change (not just its numbers), rewrite it to assert the new contract meaningfully — and say so in your report. Watch for the vacuous-assertion trap (e.g. `0 >= 0` after both scenarios die).
 - **Value updates:** when expected numbers change, show the arithmetic in a comment where it isn't obvious.
-- **Slow statistical tests:** the 120-seed generation tests run ~12s at 20×60; per-test timeouts are bumped with an explanatory comment. Follow that pattern if you add seed sweeps.
+- **Slow statistical tests:** the 120-seed generation tests are multi-second (`grid.test.ts` + `barrier.test.ts` together take ~20s on the 35×35 map); per-test timeouts are bumped with an explanatory comment. Follow that pattern if you add seed sweeps.
 - **Multi-round combat in drivers:** after any `move`, a walk-in may engage — loop `fight` until the engagement resolves (see the harness hardening in `test/harness-loop.test.ts`).
 
 ## Running the game
@@ -45,6 +45,6 @@ All three green before every commit. Lint enforces the engine-purity boundary (n
 ## Session conventions (controller-side)
 
 - **SDD scratch files** go under `.superpowers/sdd/<feature>/` (briefs, reports, review packages) — per-feature subdirectories, because bare `task-N-*.md` names collide across features and stale reports mislead reviewers.
-- **Beads:** subagents don't touch `bd` — the controller owns claim/close/sync. `.beads/*.jsonl` export churn gets its own `beads:` bookkeeping commit at session close.
+- **Beads:** subagents don't touch `bd` — the controller owns claim/close/sync (`bd dolt push`). Beads state lives in Dolt, not git — there is no JSONL export and nothing under `.beads/` should churn in git.
 - **Docs numbering:** check `docs/decisions.md` for the highest D-row before writing the next one.
 - **Parallel worktree agents (2026-07-09/10 lessons):** dispatching two `isolation: "worktree"` agents on independent features works well, but integrate deliberately: (1) **reserve D-numbers up front** — both agents grabbed the same next D-number (D59) since each read the same `main`; when dispatching N doc-writing agents, tell each which D-number to use, or renumber on merge. (2) **`.claude/worktrees/**` is git-ignored + eslint-ignored** — nested worktrees otherwise break `eslint .` ("multiple candidate TSConfigRootDirs") and get staged by `git add -A` as embedded repos. Never `git add -A` while worktrees are live; stage explicit paths. (3) **Merge the smaller/lower-risk feature first**, run the FULL gates on the integrated tree (not just each worktree's own green), then the second — conflicts land in shared surfaces (`types.ts`/`constants.ts`/`web/main.ts`/`playtest.ts`). (4) `git worktree remove --force <path>` + `git branch -D` to clean up after merging.

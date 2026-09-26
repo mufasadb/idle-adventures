@@ -3,8 +3,9 @@ import { reduce } from "../src/engine/reduce";
 import { newGame, localMap } from "../src/engine/town";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import { MAP_WIDTH, MAP_HEIGHT, STACK_CAP } from "../src/data/constants";
-import type { GameState, Action } from "../src/engine/types";
+import type { GameState } from "../src/engine/types";
 import type { BiomeId } from "../src/data/constants";
+import { accepts, cheb } from "./helpers";
 
 // Long-run SUSTAINABILITY harness (2026-07-05). The earlier tests each proved a
 // single loop; none proved you can keep going. This drives a greedy reference
@@ -13,8 +14,6 @@ import type { BiomeId } from "../src/data/constants";
 // it's a real regression test, not a flake. If food (or the bare-slot opening)
 // is retuned into a starvation spiral, this goes red.
 
-const accepts = (s: GameState, a: Action) => reduce(s, a).events.every((e) => e.type !== "action-rejected");
-const cheb = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 const qtyOf = (s: GameState, id: string) => s.bank.find((x) => x.defId === id)?.qty ?? 0;
 
 // material defId → its ration recipe. Food comes from foraging herbs OR hunting

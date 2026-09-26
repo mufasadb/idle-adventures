@@ -1,17 +1,12 @@
 import { test, expect } from "bun:test";
 import { reduce } from "../src/engine/reduce";
-import { emptyLoadout } from "../src/engine/loadout";
 import { RECIPE, ARMOUR } from "../src/data/constants";
 import { slotOf } from "../src/engine/catalog";
-import type { GameState, ItemStack } from "../src/engine/types";
+import type { ItemStack } from "../src/engine/types";
+import { town } from "./helpers";
 
 // ke3.7: the forge — anvil station + blacksmith's hammer gate all metal plate.
 
-function town(bank: ItemStack[], stations?: GameState["stations"], tools?: string[]): GameState {
-  const loadout = emptyLoadout();
-  if (tools) loadout.equipment.tools = tools;
-  return { seed: "c", phase: "town", bank, loadout, expedition: null, ...(stations ? { stations } : {}) };
-}
 
 test("forge: blacksmiths-hammer is a town-crafted, carriable tool (ke3.7)", () => {
   expect(slotOf("blacksmiths-hammer")).toBe("tool");
@@ -39,7 +34,7 @@ test("forge: plate rejects missing-station, then missing-tool, then crafts (ke3.
 });
 
 test("forge: the hammer counts whether it's in the bank OR equipped (town pool) (ke3.7)", () => {
-  const forged = reduce(town([{ defId: "iron-ore", qty: 3 }], ["anvil"], ["blacksmiths-hammer"]), { type: "craft", recipeId: "plate-helmet" });
+  const forged = reduce(town([{ defId: "iron-ore", qty: 3 }], ["anvil"], { tools: ["blacksmiths-hammer"] }), { type: "craft", recipeId: "plate-helmet" });
   expect(forged.state.bank.find((s) => s.defId === "plate-helmet")?.qty).toBe(1);
 });
 

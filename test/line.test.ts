@@ -1,5 +1,6 @@
 import { test, expect } from "bun:test";
 import { lineTiles } from "../src/engine/line";
+import { cheb } from "./helpers";
 
 // eot.1: lineTiles is the naive direct-line stepper for player-planned routing —
 // a Bresenham dominant-axis walk, START-EXCLUSIVE and END-INCLUSIVE, one grid step
@@ -8,8 +9,6 @@ import { lineTiles } from "../src/engine/line";
 // straight line gives.
 
 const key = (p: { x: number; y: number }) => `${p.x},${p.y}`;
-const cheb = (a: { x: number; y: number }, b: { x: number; y: number }) =>
-  Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 
 test("lineTiles: zero-length (a === b) is empty", () => {
   expect(lineTiles({ x: 3, y: 3 }, { x: 3, y: 3 })).toEqual([]);

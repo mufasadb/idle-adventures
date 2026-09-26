@@ -6,9 +6,8 @@ import { perceive, visionRadius } from "../src/engine/perceive";
 import { newGame } from "../src/engine/town";
 import { SURVEY_ENERGY } from "../src/data/constants";
 import type { GameState, GameEvent, Expedition } from "../src/engine/types";
+import { cheb } from "./helpers";
 
-const cheb = (a: { x: number; y: number }, b: { x: number; y: number }) =>
-  Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 
 // A grid + a POI that sits BEYOND the spyglass's passive radius from entry.
 function farPoi() {
