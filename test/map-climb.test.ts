@@ -244,4 +244,4 @@ test("climb harness: fresh game → local T1 earns T2 → embark T2 earns T3 (ti
 
   // The climb is closed: from a fresh game we reached a banked T3 via real runs.
   expect((step2.home.maps ?? []).some((m) => (m.tier ?? 1) === 3)).toBe(true);
-}, 20000); // full-loop harness: seed scans + per-step Dijkstra pathing over 20×60 — bump the 5s default
+}, 20000); // full-loop harness: seed scans + per-step Dijkstra pathing over the 35×35 map — bump the 5s default

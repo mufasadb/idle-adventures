@@ -14,7 +14,7 @@ function terrainCounts(seed: string, biome: "woodland" | "desert" | "tundra") {
   return counts;
 }
 
-test("generateGrid: 20×60, row-major, fully terrained", () => {
+test("generateGrid: MAP_WIDTH×MAP_HEIGHT (35×35), row-major, fully terrained", () => {
   const grid = generateGrid("map-1", "woodland");
   expect(grid.terrain.length).toBe(MAP_HEIGHT);
   for (const row of grid.terrain) {
@@ -201,7 +201,7 @@ test("generateGrid: reachability guard — every seed keeps >= FOOD_REACH_MIN fo
     // Guard only promises the minimum when the map actually has that much food.
     expect(reachableFood).toBeGreaterThanOrEqual(Math.min(FOOD_REACH_MIN, totalFood));
   }
-// 120 seeds × costToReach over the 20×60 grid (e3j, was 20×20) exceeds bun's
+// 120 seeds × costToReach over the 35×35 grid (D84; e3j was 20×60, before that 20×20) exceeds bun's
 // default 5s test timeout on the min-scan Dijkstra; bump it rather than shrink
 // the sample size that gives the guard its statistical confidence.
 }, 20000);

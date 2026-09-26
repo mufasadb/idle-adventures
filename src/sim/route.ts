@@ -15,7 +15,7 @@ const NEIGHBORS: readonly (readonly [number, number])[] = [[1, 0], [-1, 0], [0, 
 
 // One Dijkstra from `from` over passable, non-`blocked` tiles → cost grid + prev
 // pointers. `blocked` = tiles to route AROUND (live monsters), so a path never steps
-// onto them. Linear-scan frontier is fine at POC scale (20×60 = 1200 tiles).
+// onto them. Linear-scan frontier is fine at POC scale (35×35 = 1225 tiles).
 export function dijkstraFrom(
   terrain: Terrain[][], from: Pt, transport: string | null, tools: string[], blocked: Set<string>,
 ): { cost: number[][]; prev: (string | null)[][] } {
