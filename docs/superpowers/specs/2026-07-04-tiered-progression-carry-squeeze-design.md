@@ -4,7 +4,7 @@
 
 **Date:** 2026-07-04
 **Status:** Design approved (brainstorm), implemented; progression half superseded by D78 (see note above).
-**Motivation:** M7 feel-assessment (`docs/m7-feel-assessment.md`) findings F1 (best gear trivializes combat with no climb behind it), F2 (carry squeeze too soft), F4 (first upgrade too slow / undifferentiated). This is the M7 → iterate pass.
+**Motivation:** M7 feel-assessment (`docs/archive/playtests/m7-feel-assessment.md`) findings F1 (best gear trivializes combat with no climb behind it), F2 (carry squeeze too soft), F4 (first upgrade too slow / undifferentiated). This is the M7 → iterate pass.
 
 **User calls that frame this design:**
 - Best gear *should* trivialize combat — that's fine **as long as it's hard and slow to earn**. Early game, before full gear, must require choices.

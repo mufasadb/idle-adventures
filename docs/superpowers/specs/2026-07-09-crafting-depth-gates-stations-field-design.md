@@ -92,7 +92,7 @@ Content that exercises all four mechanics through the **real player surface** so
 These are **content, not m7 fixes**: the plate-walling (F1) and carry-squeeze (F2) problems they once brushed are already tuned out (§5.5). The only obligation is the normal one — the existing test/sim suite must stay green, i.e. don't *regress* the current balance. No re-verification of m7 findings is owned here.
 
 ### 5.5 m7 reconciliation (verified 2026-07-09 — resolved, do not re-touch)
-The m7 feel-assessment (`docs/m7-feel-assessment.md` §8, bead **868.8**, dated 2026-07-04) predates si7.1/si7.2/D27/D34/tiers. Verified against current code: **F1/F2/F4 are already resolved** — recorded with evidence so future work doesn't re-open correct code:
+The m7 feel-assessment (`docs/archive/playtests/m7-feel-assessment.md` §8, bead **868.8**, dated 2026-07-04) predates si7.1/si7.2/D27/D34/tiers. Verified against current code: **F1/F2/F4 are already resolved** — recorded with evidence so future work doesn't re-open correct code:
 
 | Finding | Status | Evidence |
 |---|---|---|
@@ -141,7 +141,7 @@ New epic **Crafting depth — tools-as-gates, stations, field crafting** (own ep
 
 Separate parked bead (under si7.6): **Breadth charter** (§6) — `si7.6.4`, biome slate + vertical map + obstacle menu as the umbrella map.
 
-**m7-close — DONE (2026-07-09):** F1/F2/F4 verified resolved and recorded in `m7-feel-assessment.md §8`; **F3/preview-fidelity filed as `3iq`** (open); human verdict via v2/v3; **868.8 closed**. Nothing pending here.
+**m7-close — DONE (2026-07-09):** F1/F2/F4 verified resolved and recorded in `docs/archive/playtests/m7-feel-assessment.md §8`; **F3/preview-fidelity filed as `3iq`** (open); human verdict via v2/v3; **868.8 closed**. Nothing pending here.
 
 **Convention reminders for implementers:** every lever lands with a `decisions.md` D-row (next is **D54**) + `balance-levers.md` update; `GameEvent`/`RejectionReason` are closed unions (typecheck enforces exhaustiveness); optional state fields read with `?? default`; gates surface in `legalActions` for free via speculative reduce (D29); hand `docs/working-on-this-codebase.md` to any subagent. Quality gates: `bun test` + `bun run typecheck` + `bun run lint` green before landing.
 

@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-05
 **Status:** Design draft for review.
-**Source:** M7 playtest findings (`docs/m7-playtest-findings.md`) + a three-agent design brainstorm (loadout economy / in-map pressure / combat rewards). This is the next milestone after the 2026-07-05 map-rotation + combat-rebalance + monster-blocking pass.
+**Source:** M7 playtest findings (`docs/archive/playtests/m7-playtest-findings.md`) + a three-agent design brainstorm (loadout economy / in-map pressure / combat rewards). This is the next milestone after the 2026-07-05 map-rotation + combat-rebalance + monster-blocking pass.
 
 ## 1. The problem
 
