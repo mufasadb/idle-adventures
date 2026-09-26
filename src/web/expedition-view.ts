@@ -9,10 +9,10 @@ import { ASSET_TRIAL, TILE_BG, MONSTER_SPRITES, MONSTER_SIZE, NODE_ICON } from "
 import { carryCap, mapCarryCap } from "../engine/carry";
 import { deriveRoute } from "./route";
 import type { Pos } from "./route";
-import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
-import { RECIPE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_CAMP_MEALS, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, COMBAT_BUFF, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, WEAPON_ENHANCEMENT } from "../data/constants";
+import { wieldsRanged } from "../engine/combat";
+import { PLAYER_BASE_HP, RECIPE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_CAMP_MEALS, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
-import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, combatForecast, GATHER_VERB, round1 } from "../render/render";
+import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, combatForecast, GATHER_VERB, round1, engagementForecast, enhancementHint, battleItemEffect } from "../render/render";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action } from "../engine/types";
 import { inventoryGrid } from "./inventory";
@@ -62,7 +62,7 @@ function herePanel(state: GameState, grid: Grid, exp: NonNullable<GameState["exp
     return `<div class="here monster">
       <b>Here:</b> a <b>${name(poi.creature!)}</b> — <i>${desc}</i>.
       It's static: it won't touch you unless you Fight. You can just walk past it.
-      ${canFight ? `<button data-act="fight">⚔ Engage the ${name(poi.creature!)}</button>` : `<span class="warn">can't fight — ${rejectCopy(whyNot(state, { type: "fight" }) ?? "carry-full")}</span>`}
+      ${canFight ? `<button data-act="fight">⚔ Engage the ${name(poi.creature!)}</button>` : `<span class="warn">can't fight — ${rejectCopy(whyNot(state, { type: "fight" }) ?? "carry-full", undefined, "fight")}</span>`}
     </div>`;
   }
   // gatherable node
@@ -99,9 +99,7 @@ function coatingLine(exp: NonNullable<GameState["expedition"]>): string {
 // reduce (D29). Works engaged or unengaged; applying over an active coating replaces it.
 function enhanceButtons(exp: NonNullable<GameState["expedition"]>): string {
   return (exp.loadout.enhancements ?? []).map((s) => {
-    const e = WEAPON_ENHANCEMENT[s.defId];
-    const eff = e ? [e.flatDamage ? `+${e.flatDamage} dmg` : "", e.affinityTag ? `×2 vs ${e.affinityTag}` : "", e.poison ? `poison ${e.poison.dmg}/rd ×${e.poison.rounds}` : ""].filter(Boolean).join(", ") : "";
-    return `<button data-enhance="${s.defId}" title="coat your weapon (${e?.charges ?? 0} charges: ${eff})${exp.weaponBuff ? " — replaces the current coating" : ""}">🗡️ Apply ${name(s.defId)}${s.qty > 1 ? ` ×${s.qty}` : ""}</button>`;
+    return `<button data-enhance="${s.defId}" title="coat your weapon (${enhancementHint(s.defId) ?? ""})${exp.weaponBuff ? " — replaces the current coating" : ""}">🗡️ Apply ${name(s.defId)}${s.qty > 1 ? ` ×${s.qty}` : ""}</button>`;
   }).join("");
 }
 
@@ -111,11 +109,7 @@ function enhanceButtons(exp: NonNullable<GameState["expedition"]>): string {
 function engagementPanel(state: GameState, exp: NonNullable<GameState["expedition"]>, legal: Action[]): string {
   const c = exp.combat!;
   const maxHp = MONSTER_TIER_HP_CURVE[MONSTERS[c.creature]!.tier]!;
-  const dmgOut = playerDamage(exp.loadout, c.creature, exp.weaponBuff) + c.damageAdd; // D60: forecast reflects the coating
-  const dmgIn = damageTaken(exp.loadout, c.creature, c.mitigationAdd);
-  const toKill = Math.ceil(c.monsterHp / dmgOut);
-  const toDie = Math.ceil(exp.hp / dmgIn); // raw race — potions extend it (noted in the forecast line)
-  const winning = toKill <= toDie;
+  const { dmgOut, dmgIn, toKill, toDie, winning } = engagementForecast(exp); // D60: reflects the coating; potions extend it (noted in the forecast line)
   const canQuaff = legal.some((a) => a.type === "quaff");
   // Quiver readout (D45): a wielded bow spends an arrow per round; empty = club.
   const arrows = (exp.loadout.ammo ?? []).reduce((n, s) => n + s.qty, 0);
@@ -137,7 +131,7 @@ function engagementPanel(state: GameState, exp: NonNullable<GameState["expeditio
       ${canQuaff ? `<button data-act="quaff" title="drink a potion — costs a turn (the ${name(c.creature)} strikes)">🧪 Potion</button>` : `<button disabled title="${rejectCopy(whyNot(state, { type: "quaff" }) ?? "insufficient")}">🧪 Potion</button>`}
       <button data-act="toggle-auto-quaff">Auto-potion: <b>${(exp.autoQuaff ?? true) ? "on" : "off"}</b></button>
       <button data-act="toggle-auto-finish" title="fast-forward whole fights to victory or defeat in one click">Auto-finish: <b>${(exp.autoFinish ?? false) ? "on" : "off"}</b></button>
-      ${(exp.loadout.battleItems ?? []).map((s) => { const b = COMBAT_BUFF[s.defId] ?? {}; const eff = [b.damageAdd ? `+${b.damageAdd} dmg` : "", b.mitigationAdd ? `+${b.mitigationAdd} mitigation` : ""].filter(Boolean).join(", "); return `<button data-use-item="${s.defId}" title="use it this fight only (${eff})">⚗ ${name(s.defId)} (${eff})${s.qty > 1 ? ` ×${s.qty}` : ""}</button>`; }).join("")}
+      ${exp.loadout.battleItems.map((s) => { const eff = battleItemEffect(s.defId) ?? ""; return `<button data-use-item="${s.defId}" title="use it this fight only (${eff})">⚗ ${name(s.defId)} (${eff})${s.qty > 1 ? ` ×${s.qty}` : ""}</button>`; }).join("")}
       ${enhanceButtons(exp)}
       ${swapGearButtons(exp, legal)}
     </div>
@@ -268,7 +262,7 @@ export function expeditionView(state: GameState, route: Pos[]): string {
   const autoGatherOn = exp.autoGather ?? true;
   const bars = `
     <div class="bar"><span>Energy</span><div class="track">${energyFill}</div><b>${energyLabel}</b></div>
-    <div class="bar"><span>HP</span><div class="track"><div class="fill hp" style="width:${Math.min(100, (exp.hp / 30) * 100)}%"></div></div><b>${round1(exp.hp)}</b></div>
+    <div class="bar"><span>HP</span><div class="track"><div class="fill hp" style="width:${Math.min(100, (exp.hp / PLAYER_BASE_HP) * 100)}%"></div></div><b>${round1(exp.hp)}</b></div>
     <div class="muted small">🌿 auto-gather <b>${autoGatherOn ? "on" : "off"}</b> — <button class="link" data-toggle-autogather>${autoGatherOn ? "walk over nodes without harvesting" : "harvest nodes you cross"}</button></div>`;
 
   // End-of-route affordances (eot): the LAST waypoint drives Fight/Shoot/Survey.
@@ -331,14 +325,10 @@ export function expeditionView(state: GameState, route: Pos[]): string {
         // gate-legibility (playtest 2026-07-09 #1, field-craft discoverability): 3/3
         // testers never found field crafting because the panel only appeared once the
         // kit was already equipped — the fire-kit was an unmarked key. Show the DOOR
-        // before the key: any field recipe gated on a kit-tool you lack renders greyed
-        // with its "needs: fire-kit" requirement, so the branch is visible to plan for.
-        const kitLocked = Object.keys(RECIPE).filter((id) => {
-          const r = RECIPE[id]!;
-          if (!r.field || craftable.has(id)) return false;
-          const tools = r.requires?.tools;
-          return tools && tools.some((t) => !pool.includes(t)); // missing a kit-tool
-        });
+        // before the key: any field recipe the reducer rejects for a missing kit-tool
+        // renders greyed with its "needs: fire-kit" requirement (whyNot — ciq).
+        const kitLocked = Object.keys(RECIPE).filter((id) =>
+          RECIPE[id]!.field && !craftable.has(id) && whyNot(state, { type: "craft", recipeId: id }) === "missing-tool");
         if (!fieldCrafts.length && !kitLocked.length) return "";
         const readyRows = fieldCrafts.map((a) => {
           const r = RECIPE[a.recipeId]!;

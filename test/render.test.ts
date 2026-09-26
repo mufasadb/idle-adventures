@@ -43,10 +43,10 @@ test("flavorDetail: null detail gives kind-only text; monster detail is vague, n
 });
 
 test("matchupLessons: surfaces affinity + weapon-vs-hide + armour result", () => {
-  const l = matchupLessons({ weaponVsHide: 0.5, affinityFired: true, armourVsAttack: "exposed" }, "bow");
+  const l = matchupLessons({ weaponVsHide: 0.5, affinityFired: true, armourVsAttack: "exposed" });
   expect(l.length).toBeGreaterThan(0);
   expect(l.join(" ")).toMatch(/savaged|something/i); // affinity line present
-  const none = matchupLessons({ weaponVsHide: 1, affinityFired: false, armourVsAttack: "neutral" }, "sword");
+  const none = matchupLessons({ weaponVsHide: 1, affinityFired: false, armourVsAttack: "neutral" });
   expect(none.length).toBe(0); // nothing notable → no noise
 });
 

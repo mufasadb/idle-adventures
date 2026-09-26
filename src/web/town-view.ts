@@ -1,16 +1,16 @@
 // Town screens (zpm.3 two-step flow): the map overview (where to?) and the prep
 // screen (loadout plan + embark), plus the bank and the recipe book.
 import { localMap, mapEpithet } from "../engine/town";
-import { legalActions } from "../sim/legal";
+import { legalActions, whyNot } from "../sim/legal";
 import { slotOf } from "../engine/catalog";
 import { recipeOutputQty } from "../engine/craft";
 import { carryCap } from "../engine/carry";
 import { ARMOUR_SLOTS } from "../engine/pack";
 import { heldFoodEnergy } from "../engine/food";
 import { wieldsRanged } from "../engine/combat";
-import { RECIPE, MAX_ENERGY, TENT_FOOD_MULTIPLIER, INKS, AFFIX_EFFECTS } from "../data/constants";
+import { RECIPE, MAX_ENERGY, TENT_FOOD_MULTIPLIER, INKS } from "../data/constants";
 import type { BiomeId } from "../data/constants";
-import { weaponHint, logisticsEffect, enhancementHint, affixMaterialHint, describe, recipeGateHint, name } from "../render/render";
+import { weaponHint, logisticsEffect, enhancementHint, describe, recipeGateHint, name, heldMapTitle, townRecipeIds } from "../render/render";
 import type { GameState, Action, MapItem } from "../engine/types";
 import { inventoryGrid } from "./inventory";
 import { planActions } from "./persist";
@@ -28,18 +28,14 @@ function epithetSuffix(mapSeed: string, biomeId: BiomeId, tier = 1): string {
   return e ? ` <span class="muted">of ${e}</span>` : "";
 }
 
-// A held map's name suffix: cxq affix labels (explicit, player-inked) take
-// precedence over the q2k emergent epithet — the affix IS the notability signal.
+// A held map's name suffix (affix labels or epithet — heldMapTitle); egd: a title
+// tooltip names the favoured material(s) so an inked map's benefit is legible on
+// the card, not just the moment it was inked.
 function heldMapSuffix(m: MapItem): string {
-  const affixes = m.affixes ?? [];
-  if (affixes.length) {
-    // egd: a title tooltip names the favoured material(s) so an inked map's benefit
-    // is legible on the card, not just the moment it was inked.
-    const favours = affixes.map(affixMaterialHint).filter(Boolean).map((mat) => name(mat!));
-    const tip = favours.length ? ` title="favours ${favours.join(", ")}"` : "";
-    return ` <span class="muted"${tip}>of ${affixes.map((a) => AFFIX_EFFECTS[a]?.label ?? a).join(", ")}</span>`;
-  }
-  return epithetSuffix(m.mapSeed, m.biomeId, m.tier ?? 1);
+  const { label, favours } = heldMapTitle(m);
+  if (!label) return "";
+  const tip = favours.length ? ` title="favours ${favours.map(name).join(", ")}"` : "";
+  return ` <span class="muted"${tip}>of ${label}</span>`;
 }
 
 export function townView(state: GameState, prep: string | null, hasLastPlan: boolean): string {
@@ -169,14 +165,10 @@ function recipeSection(state: GameState): string {
       <div class="craftlist">
         ${(() => {
           const affordable = new Set(craftable.map((a) => a.recipeId));
-          // group recipe ids by the defId they output, preserving insertion order
+          // group recipe ids by the defId they output, preserving catalog order
           const byOutput = new Map<string, string[]>();
-          const built = new Set(state.stations ?? []); // ke3.2: an already-built station has no rebuild option
-          for (const id of Object.keys(RECIPE)) {
-            const r = RECIPE[id]!;
-            if (r.field) continue; // ke3.4: field-only recipes never render as town rows (they'd be permanently locked)
-            if (r.buildsStation && built.has(r.buildsStation)) continue; // hide, don't render locked
-            const out = r.output.defId;
+          for (const id of townRecipeIds(state.stations ?? [])) {
+            const out = RECIPE[id]!.output.defId;
             (byOutput.get(out) ?? byOutput.set(out, []).get(out)!).push(id);
           }
           // outputs with any affordable path first, else stable insertion order
@@ -198,13 +190,10 @@ function recipeSection(state: GameState): string {
               const can = affordable.has(id);
               // gate-legibility (playtest 2026-07-09 #1): a locked row named its
               // ingredients but not its STATION/TOOL gate — players only inferred
-              // "I lack mats." If a hard gate (station/tool) is unmet, name it.
-              const req = r.requires;
-              const gateUnmet = !can && req && (
-                (req.station && !built.has(req.station)) ||
-                (req.tools?.some((t) => !townTools.includes(t)))
-              );
-              const gate = gateUnmet ? recipeGateHint(id) : null;
+              // "I lack mats." If the reducer rejects on a hard gate, name it (ciq:
+              // the reason comes from whyNot, never re-derived from the catalog).
+              const why = can ? null : whyNot(state, { type: "craft", recipeId: id });
+              const gate = why === "missing-station" || why === "missing-tool" ? recipeGateHint(id) : null;
               return `<div class="craftpath${can ? "" : " locked"}">← ${ing}${
                 can ? ` <button data-craft="${id}">craft ✓</button>` : gate ? ` <span class="warn small">🔒 ${gate}</span>` : ""
               }</div>`;

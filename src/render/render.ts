@@ -3,14 +3,12 @@ import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType } from 
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
 import { playerDamage, damageTaken } from "../engine/combat";
-import type { Loadout, RejectionReason, GameEvent } from "../engine/types";
-
-// Dumb view: state → string. The grid is REGENERATED from mapSeed (D14) —
-// render holds no state and makes no decisions.
+import type { Action, Expedition, Loadout, MapItem, RejectionReason, GameEvent } from "../engine/types";
+import { mapEpithet } from "../engine/town";
 
 // --- Shared presentation selectors (eho): pure defId→text + data-shaped derivations
-// any surface (the web today, a real UI later) can format. The web-only HTML builders
-// (recipe-book rows, held-map card) stay in main.ts until a second UI actually exists.
+// that BOTH surfaces (the web UI and the blind-playtest console) format, so their
+// text can't drift. Web-only HTML builders stay in src/web/.
 
 // Display names for defIds whose title-cased id reads wrong ("leather" alone →
 // which leather?). Everything else title-cases its kebab defId — e.g.
@@ -23,11 +21,13 @@ export function name(defId: string): string {
 
 // A rejected action's cause → one human sentence (gate-legibility, playtest 2026-07-09).
 // recipeId lets a craft rejection name the exact missing station/tool/terrain.
-export function rejectCopy(reason: RejectionReason, recipeId?: string): string {
+// `action` tailors copy that differs by verb (a full bag blocks a fight's loot slot
+// vs a gather's yield).
+export function rejectCopy(reason: RejectionReason, recipeId?: string, action?: Action["type"]): string {
   const gate = recipeId ? recipeGateHint(recipeId) : null; // "needs anvil + blacksmiths-hammer"
   switch (reason) {
     case "impassable": return "blocked by terrain";
-    case "carry-full": return "bag full — a monster fight needs a free loot slot";
+    case "carry-full": return action === "fight" ? "bag full — a monster fight needs a free loot slot" : "bag full — no free slot for that";
     case "exhausted": return "out of energy";
     case "engaged": return "you're engaged — fight or flee below";
     case "insufficient": return "nothing to use for that (or it'd have no effect)"; // no potion/material/charge, or already at full HP/max
@@ -71,7 +71,7 @@ export function formatEvent(e: GameEvent, name: (defId: string) => string): stri
     case "ate": return `${e.campMeal ? "🏕 camp meal — ate" : "🍖 ate"} ${name(e.defId)} · +${round1(e.restored)}e → ${round1(e.energy)}e${e.campMeal ? " (over max — banked reach)" : ""}`;
     case "auto-eat-set": return e.defId ? `🍴 auto-eat: ${name(e.defId)}` : `🍴 auto-eat off`;
     case "fought": {
-      const lessons = matchupLessons(e.matchup, null);
+      const lessons = matchupLessons(e.matchup);
       const tail = lessons.length ? ` · ${lessons.join(" · ")}` : "";
       const ff = e.rounds ? ` ⏩ (${e.rounds} rounds)` : ""; // 67e: auto-finish collapsed the fight
       return (e.victory
@@ -85,7 +85,7 @@ export function formatEvent(e: GameEvent, name: (defId: string) => string): stri
     case "map-discarded": return `🗺️ discarded a carried map`;
     case "packed": return `packed ${name(e.defId)} → ${e.slot}`;
     case "run-ended": return e.flavor ? `${e.flavor}\n— run ended (${e.reason}) —` : `— run ended (${e.reason}) —`;
-    case "action-rejected": return `✗ ${e.action} — ${rejectCopy(e.reason)}`;
+    case "action-rejected": return `✗ ${e.action} — ${rejectCopy(e.reason, undefined, e.action)}`;
     case "engaged": return e.ranged
       ? `🏹 engaged the ${name(e.creature)} from a tile away — your opener lands before it can answer`
       : `⚔ engaged the ${name(e.creature)}`;
@@ -119,6 +119,18 @@ export function combatForecast(
   const dmgIn = damageTaken(loadout, creature, 0);
   const toKill = Math.ceil(MONSTER_TIER_HP_CURVE[MONSTERS[creature]!.tier]! / dmgOut);
   const toDie = Math.ceil(hp / dmgIn);
+  return { dmgOut, dmgIn, toKill, toDie, winning: toKill <= toDie };
+}
+
+// The same race mid-fight (67e): the live monster HP, this fight's battle-item
+// adds and any active coating. Shared by the web engagement panel and the console
+// ENGAGED header.
+export function engagementForecast(exp: Expedition): { dmgOut: number; dmgIn: number; toKill: number; toDie: number; winning: boolean } {
+  const c = exp.combat!;
+  const dmgOut = playerDamage(exp.loadout, c.creature, exp.weaponBuff) + c.damageAdd;
+  const dmgIn = damageTaken(exp.loadout, c.creature, c.mitigationAdd);
+  const toKill = Math.ceil(c.monsterHp / dmgOut);
+  const toDie = Math.ceil(exp.hp / dmgIn); // raw race — potions extend it
   return { dmgOut, dmgIn, toKill, toDie, winning: toKill <= toDie };
 }
 
@@ -215,6 +227,39 @@ export function enhancementHint(defId: string): string | null {
   return `${parts.join(", ")} · ${e.charges} hits`;
 }
 
+// A battle item's one-fight effect ("+2 dmg, +1 mitigation"), or null.
+export function battleItemEffect(defId: string): string | null {
+  const b = COMBAT_BUFF[defId];
+  if (!b) return null;
+  return [b.damageAdd ? `+${b.damageAdd} dmg` : "", b.mitigationAdd ? `+${b.mitigationAdd} mitigation` : ""].filter(Boolean).join(", ");
+}
+
+// A held map's title parts: cxq affix labels (explicit, player-inked) take
+// precedence over the q2k emergent epithet — the affix IS the notability signal.
+// `label` is what follows "of" (null = plain map); `favours` names the material
+// defIds an inked map favours (egd), empty for an un-inked map.
+export function heldMapTitle(m: MapItem): { label: string | null; favours: string[] } {
+  const affixes = m.affixes ?? [];
+  if (affixes.length) {
+    return {
+      label: affixes.map((a) => AFFIX_EFFECTS[a]?.label ?? a).join(", "),
+      favours: affixes.map(affixMaterialHint).filter((x): x is string => x !== null),
+    };
+  }
+  return { label: mapEpithet(m.mapSeed, m.biomeId, m.tier ?? 1), favours: [] };
+}
+
+// The town recipe book's rows, in catalog order: field-only recipes never show in
+// town (ke3.4 — they surface in the field-craft list) and an already-built station
+// has no rebuild row (ke3.2).
+export function townRecipeIds(stations: readonly string[]): string[] {
+  const built = new Set(stations);
+  return Object.keys(RECIPE).filter((id) => {
+    const r = RECIPE[id]!;
+    return !r.field && !(r.buildsStation && built.has(r.buildsStation));
+  });
+}
+
 // egd: the material an affix favours, for the ink confirmation. Material-specific
 // (user call): the ink names the boosted material AND keeps the affix label, so
 // applying it both pays off and teaches the "of gleaming = mithril" vocabulary.
@@ -233,11 +278,8 @@ export function describe(defId: string): string {
   if (a) return `${a.slot} armour · ${a.defense} defense · ${a.armourType}`;
   if (FOOD.includes(defId)) return `food · restores ${FOOD_ENERGY[defId] ?? ENERGY_PER_FOOD} energy per unit`;
   if (POTION.includes(defId)) return `potion · heals ${POTION_HEAL_BY[defId] ?? POTION_HEAL} HP`;
-  const buff = COMBAT_BUFF[defId];
-  if (buff) {
-    const parts = [buff.damageAdd ? `+${buff.damageAdd} dmg` : "", buff.mitigationAdd ? `+${buff.mitigationAdd} mitigation` : ""].filter(Boolean);
-    return `battle item · ${parts.join(", ")} for one fight`;
-  }
+  const buff = battleItemEffect(defId);
+  if (buff) return `battle item · ${buff} for one fight`;
   if (ENERGY_CAP_BONUS[defId]) return `gear · +${ENERGY_CAP_BONUS[defId]} max energy`;
   // wzk: terrain gear before the generic tool branch — raft/waders/ice-cleats/
   // climbing-pick are TOOL_CAPABILITY entries, but their VALUE is the terrain
@@ -370,7 +412,7 @@ export function flavorDetail(detail: PoiDetail | null, kind: NodeType): string {
 
 // 0-2 salient post-fight lessons; empty when nothing notable happened. `weaponId`
 // is part of the interface for callers that flavor per-weapon later.
-export function matchupLessons(matchup: Matchup, _weaponId: string | null): string[] {
+export function matchupLessons(matchup: Matchup): string[] {
   const out: string[] = [];
   if (matchup.affinityFired) out.push("something in your weapon savaged it");
   if (matchup.weaponVsHide !== null && matchup.weaponVsHide < 1) out.push("your weapon skated off its hide");
@@ -412,7 +454,7 @@ export const FORAGE_MATERIAL_CHAR: Record<string, string> = {
 // The map glyph for a perceived POI. Precedence: a humanoid CAMP landmark (wzx — the
 // map-dropper, "C", visible at any range) > a RESOLVED forage material (f/d/b) > the
 // kind glyph. Shared by the console map and the web grid so both teach identically.
-export const CAMP_CHAR = "C";
+const CAMP_CHAR = "C";
 export function poiGlyph(kind: NodeType, detail: PoiDetail | null, landmark?: "camp"): string {
   if (landmark === "camp") return CAMP_CHAR;
   if (kind === "herb" && detail?.material) return FORAGE_MATERIAL_CHAR[detail.material] ?? POI_CHAR.herb;

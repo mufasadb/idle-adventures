@@ -6,7 +6,7 @@
 // the JSON array and re-run to advance.
 //   bun run playtest <seed> '[actions json]'
 import { play } from "./play";
-import { legalActions } from "./legal";
+import { legalActions, whyNot } from "./legal";
 import { summarize } from "./report";
 import { localMap, mapEpithet } from "../engine/town";
 import { expeditionGrid } from "../engine/grid";
@@ -22,18 +22,21 @@ import {
   enhancementHint,
   recipeGateHint,
   nodeToolHint,
-  affixMaterialHint,
+  heldMapTitle,
+  townRecipeIds,
+  engagementForecast,
+  round1,
   TERRAIN_CHAR,
   poiGlyph,
   PLAYER_CHAR,
 } from "../render/render";
-import { RECIPE, MAP_WIDTH, MAP_HEIGHT, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, AFFIX_EFFECTS, TOOL_CAPABILITY, TOOL_PURPOSE, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS } from "../data/constants";
+import { RECIPE, MAP_WIDTH, MAP_HEIGHT, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, TOOL_PURPOSE, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 import { moveCostBreakdown } from "../engine/move";
 import { usedSlots, carryCap, mapCarryCap } from "../engine/carry";
 import { costToReach } from "../engine/reach";
 import { foodEnergyOf } from "../engine/food";
-import { damageTaken, playerDamage, wieldsRanged } from "../engine/combat";
+import { wieldsRanged } from "../engine/combat";
 import type { Action, GameState } from "../engine/types";
 
 // Optional `--reach` flag: an OPT-IN query that prints the gear-adjusted energy
@@ -115,13 +118,10 @@ function printTown(st: GameState): void {
   console.log("\nYour maps (earned from drops — embarking one SPENDS it):");
   if (held.length === 0) console.log("  (none — kill a humanoid to loot a map)");
   for (const m of held) {
-    // cxq affix labels (player-inked) take precedence over the q2k emergent epithet.
-    const affixes = m.affixes ?? [];
-    // egd: inked maps name the favoured material inline (console has no tooltips).
-    const favours = affixes.map(affixMaterialHint).filter(Boolean);
-    const nameSuffix = affixes.length
-      ? ` of ${affixes.map((a) => AFFIX_EFFECTS[a]?.label ?? a).join(", ")}${favours.length ? ` (favours ${favours.join(", ")})` : ""}`
-      : (() => { const e = mapEpithet(m.mapSeed, m.biomeId, m.tier ?? 1); return e ? ` of ${e}` : ""; })();
+    // Affix labels or epithet (heldMapTitle); egd: inked maps name the favoured
+    // material inline (console has no tooltips).
+    const { label, favours } = heldMapTitle(m);
+    const nameSuffix = label ? ` of ${label}${favours.length ? ` (favours ${favours.join(", ")})` : ""}` : "";
     const inkActions = legalActions(st).filter((a) => a.type === "ink" && a.mapSeed === m.mapSeed) as Extract<Action, { type: "ink" }>[];
     const inkHint = inkActions.length ? `  ·  ink: ${inkActions.map((a) => `ink mapSeed="${m.mapSeed}" inkId="${a.inkId}"`).join(" | ")}` : "";
     console.log(`  • T${m.tier ?? 1} ${m.biomeId} map${nameSuffix} · ${(st.runs ?? 0) - m.vintage} runs old  →  embark mapSeed="${m.mapSeed}" (spends it)${inkHint}`);
@@ -130,12 +130,9 @@ function printTown(st: GameState): void {
     legalActions(st).filter((a) => a.type === "craft").map((a) => (a as { recipeId: string }).recipeId),
   );
   console.log("\nRecipe book (every craftable output + its ingredients; where to FIND ingredients is for you to discover):");
-  // ke3.4/ke3.2 parity with the web town craftlist: field-only recipes never
-  // show in town (they surface in the field-craft list on expedition), and an
-  // already-built station has no rebuild row.
-  const built = new Set(st.stations ?? []);
-  const ids = Object.keys(RECIPE)
-    .filter((id) => !RECIPE[id]!.field && !(RECIPE[id]!.buildsStation && built.has(RECIPE[id]!.buildsStation!)))
+  // Same rows as the web town craftlist (townRecipeIds: no field-only recipes, no
+  // rebuild row for an already-built station).
+  const ids = townRecipeIds(st.stations ?? [])
     .sort((a, b) => (affordable.has(a) ? 0 : 1) - (affordable.has(b) ? 0 : 1));
   // ke3.3: outputScale recipes report their REAL yield at the current knife tier.
   const townTools = [...st.bank.map((s) => s.defId), ...st.loadout.equipment.tools];
@@ -149,12 +146,9 @@ function printTown(st: GameState): void {
     // gate-legibility (playtest 2026-07-09 #1): a locked recipe with a STATION/TOOL
     // gate unmet names it — "[needs anvil + blacksmiths-hammer]" — so a blind player
     // stops inferring "I lack mats" for a hard gate (append-only).
-    const req = r.requires;
-    const gateUnmet = !affordable.has(id) && req && (
-      (req.station && !built.has(req.station)) ||
-      (req.tools?.some((t) => !townTools.includes(t)))
-    );
-    const gateNote = gateUnmet ? `  ·  [${recipeGateHint(id)}]` : "";
+    // The reason comes from the reducer (whyNot — ciq), never re-derived here.
+    const why = affordable.has(id) ? null : whyNot(st, { type: "craft", recipeId: id });
+    const gateNote = why === "missing-station" || why === "missing-tool" ? `  ·  [${recipeGateHint(id)}]` : "";
     console.log(`  ${affordable.has(id) ? "✓" : "·"} ${recipeOutputQty(r, townTools)}× ${r.output.defId}  ←  ${ing}  ·  craft recipeId="${id}"${hint ? `  ·  ${hint}` : ""}${gateNote}`);
   }
   console.log("\nTip: tools each take one bag slot — you can pack several (pick + axe + knife + …).");
@@ -167,9 +161,9 @@ function printExpedition(st: GameState): void {
   const cleared = new Set(exp.cleared.map((c) => `${c.x},${c.y}`));
   if (exp.combat) {
     const c = exp.combat;
-    const r1 = (n: number) => Math.round(n * 10) / 10; // c5l: % mitigation makes these floats — round for the console
-    const dmgOut = r1(playerDamage(exp.loadout, c.creature, exp.weaponBuff) + c.damageAdd); // D60: reflects the coating
-    const dmgIn = r1(damageTaken(exp.loadout, c.creature, c.mitigationAdd));
+    const f = engagementForecast(exp); // D60: reflects the coating
+    const dmgOut = round1(f.dmgOut); // c5l: % mitigation makes these floats — round for the console
+    const dmgIn = round1(f.dmgIn);
     // 57l: quiver state in the fight header — a clubbed bow must be legible mid-fight.
     const quiver = wieldsRanged(exp.loadout)
       ? (() => { const n = (exp.loadout.ammo ?? []).reduce((s, a) => s + a.qty, 0); return n > 0 ? ` · 🏹 ${n} arrows` : " · 🏹 NO ARROWS — bow is a club!"; })()
@@ -180,7 +174,7 @@ function printExpedition(st: GameState): void {
       : "";
     // D60: active coating + held enhancements + the enhance action (usable mid-fight).
     const coating = exp.weaponBuff ? ` · 🗡️ coating: ${exp.weaponBuff.id} (${exp.weaponBuff.charges} strikes left)` : "";
-    const poisonHdr = c.poison ? ` · ☠ poisoned (${r1(c.poison.dmg)}/rd, ${c.poison.rounds} left)` : "";
+    const poisonHdr = c.poison ? ` · ☠ poisoned (${round1(c.poison.dmg)}/rd, ${c.poison.rounds} left)` : "";
     const enh = (exp.loadout.enhancements ?? []).length
       ? ` · enhancements: ${(exp.loadout.enhancements ?? []).map((en) => `${en.qty}× ${en.defId} (${enhancementHint(en.defId)})`).join(", ")} (enhance id="…" — coat now; costs a turn, 67e)`
       : "";
@@ -263,11 +257,11 @@ function printExpedition(st: GameState): void {
     const onFoot = costToReach(grid.terrain, exp.pos, null, []);
     // df3 (web parity): the affordability verdict accounts for DESIGNATED auto-eat.
     // If autoEatFood is set, the walk refills waste-free en route, so a node can be
-    // reached on energy + the designated food's total restore (× tent bonus), not
-    // just current energy. Auto-eat off ⇒ pool 0 ⇒ unchanged raw-energy verdict.
-    const tentMult = toolSpeedFor(exp.loadout.equipment.tools, "camp") !== null ? TENT_FOOD_MULTIPLIER : 1;
+    // reached on energy + the designated food's total restore, not just current
+    // energy. Auto-eat off ⇒ pool 0 ⇒ unchanged raw-energy verdict. 7lr: auto-eat
+    // gets NO tent bonus (the tent's +50% is the manual camp meal only).
     const refillPool = exp.autoEatFood
-      ? exp.loadout.food.filter((f) => f.defId === exp.autoEatFood).reduce((sum, f) => sum + f.qty * foodEnergyOf(f.defId) * tentMult, 0)
+      ? exp.loadout.food.filter((f) => f.defId === exp.autoEatFood).reduce((sum, f) => sum + f.qty * foodEnergyOf(f.defId), 0)
       : 0;
     const budget = exp.energy + refillPool;
     const poolNote = refillPool > 0 ? ` (+${Math.round(refillPool)}e auto-eat reserve)` : "";
