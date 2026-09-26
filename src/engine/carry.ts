@@ -40,17 +40,12 @@ export function consumableSlots(loadout: Loadout): number {
 }
 
 // Free carry stacks for loot after consumables + tools take their slots (pqp):
-// food is eaten to refill stamina over the run (food.eatToRefill, dtv), so this grows as you go.
-// Single source for gather/fight (M3/M4) and pack (M5).
-export function freeCarryStacks(loadout: Loadout): number {
-  return carryCap(loadout.equipment) - consumableSlots(loadout);
-}
-
-// Loot capacity available (zpm.2): carried maps NO LONGER take loot slots — they
-// have their own dedicated pool (mapCarryCap). So loot stacks are just whatever
-// carry room is left after consumables + tools. Gather + fightAt size their budget here.
+// food is eaten to refill stamina over the run (food.eatToRefill, dtv), so this grows
+// as you go. Carried maps take NO loot slots — they have their own dedicated pool
+// (mapCarryCap, zpm.2). Single source for gather, the engage/victory loot fit-check,
+// and pack.
 export function freeLootStacks(loadout: Loadout): number {
-  return freeCarryStacks(loadout);
+  return carryCap(loadout.equipment) - consumableSlots(loadout);
 }
 
 // Whole-bag occupancy (e3j): consumable units + loot stacks. Carried maps are NOT

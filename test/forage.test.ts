@@ -64,8 +64,8 @@ test("gathering berries rejects carry-full when the bag can't hold the units", (
 });
 
 test("berries eat like food (30 restore)", () => {
-  // manual eat (m0a) jumps energy TO foodEnergy×tentMult. Use energy 0 so
-  // boosted(30) > current(0) and the eat is accepted.
+  // manual eat (7lr) adds the food's restore, capped at max. Use energy 0 so
+  // the +30 is a real gain and the eat is accepted.
   const { seed, poi } = berryMap();
   const before = standingOn(seed, poi, { energy: 0, food: [{ defId: "berries", qty: 1 }] });
   const { state, events } = reduce(before, { type: "eat", defId: "berries" });

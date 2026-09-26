@@ -183,12 +183,12 @@ export const AFFIX_EFFECTS: Record<string, AffixEffect> = {
   "of-sage": { label: "sage", nodeTypeWeightMul: { herb: 1.5 }, materialWeightMul: { "desert-sage": 4 } },
   "of-thorns": { label: "thorns", nodeTypeWeightMul: { herb: 1.5 }, materialWeightMul: { thistle: 4 } },
 };
-// Each ink defId declares its DOMAIN (for same-domain replacement) and the POOL
-// of affixes the world rolls from. Inks are bank materials crafted via RECIPE
-// and consumed by the `ink` action (never packed).
-export const INKS: Record<string, { domain: string; pool: string[] }> = {
-  "ore-ink": { domain: "ore", pool: ["of-carbon", "of-gleaming"] },
-  "herb-ink": { domain: "herb", pool: ["of-sage", "of-thorns"] },
+// Each ink defId declares the POOL of affixes the world rolls from; the pool IS
+// the ink's domain (re-inking replaces any affix already drawn from the same pool).
+// Inks are bank materials crafted via RECIPE and consumed by the `ink` action (never packed).
+export const INKS: Record<string, { pool: string[] }> = {
+  "ore-ink": { pool: ["of-carbon", "of-gleaming"] }, // ore domain
+  "herb-ink": { pool: ["of-sage", "of-thorns"] }, // herb domain
 };
 
 // --- Energy economy (filled in M2; rescaled ×10 for graded movement, svz) ---
@@ -199,7 +199,7 @@ export const ENERGY_PER_FOOD = 80; // default energy RESTORED per food unit eate
 // Stamina model (2026-07-06, dtv — supersedes BASE_ENERGY_FLOOR/qrl): energy is
 // now current STAMINA on a max/current bar. You embark at MAX_ENERGY regardless
 // of food; move/gather drain current energy; eating a food unit refills toward
-// max (FOOD_ENERGY × tentMult). MAX_ENERGY is the base ceiling (gear-raisable
+// max (FOOD_ENERGY per unit; the tent only boosts the manual camp meal, 7lr). MAX_ENERGY is the base ceiling (gear-raisable
 // later — a future progression axis). See reduce.embark / food.eatToRefill.
 export const MAX_ENERGY = 300;
 // A tent (durable "camp" tool) powers the once-per-run "CAMP MEAL" (7lr): a manual
@@ -223,9 +223,9 @@ export const FOOD_ENERGY: Record<string, number> = {
   "trail-ration": 130, // compressed from 160 (si7.2) — opens ladder headroom above it
   berries: 30, // fresh forage (e3j): weak-but-immediate — eat on the trail or lose them to staleness
   jam: 120, // processed stale-berries — hauling the harvest home beats eating it raw (1.5 rations/slot)
-  pemmican: 240, // tier-food line (si7.2): dense trail food (meat + berries). Auto-eat only fires if you DESIGNATE it (mco); otherwise it's a RESERVE you cash in with a manual `eat` (over-eats up to foodEnergy×tentMult, may exceed maxEnergy). No tent-safe density cap needed (m0a).
+  pemmican: 240, // tier-food line (si7.2): dense trail food (meat + berries). Auto-eat only fires if you DESIGNATE it (mco); otherwise it's a RESERVE you cash in with a manual `eat` (capped at maxEnergy; a tent's once-per-run camp meal restores ×TENT_FOOD_MULTIPLIER and may exceed it, 7lr). No tent-safe density cap needed (m0a).
   apple: 40, // fresh forage (m0a): woodland orchard fruit — weak-but-immediate, stales to bruised-apple
-  "smoked-venison": 200, // m0a: woodland cured meat — a manual-over-eat reserve under a tent
+  "smoked-venison": 200, // m0a: woodland cured meat — a strong camp-meal (tent) reserve
   "blubber-stew": 160, // m0a: tundra rendered fat + moss
   "cooked-venison": 150, // ke3.4: field-cooked over a fire-kit — denser than a ration, less than the home-smoked (200) version; turns raw meat into mid-run stamina
   "cooked-berries": 100, // ke3.5: field-roasted fresh berries — a universal-forage field cook (berries appear in every biome); denser than 2 raw berries (60) and a keeper (doesn't stale)
@@ -333,7 +333,7 @@ export const TOOL_CAPABILITY: Record<string, string> = {
   raft: "ford", // gating capability for rivers (boo)
   waders: "wade", // graded-movement gear (svz); NODE_TOOL never asks for it
   "ice-cleats": "trek",
-  tent: "camp", // stamina gear (dtv): multiplies food restore; NODE_TOOL never asks for "camp", so no gather impact
+  tent: "camp", // stamina gear (dtv; 7lr): powers the once-per-run camp meal (×TENT_FOOD_MULTIPLIER); NODE_TOOL never asks for "camp", so no gather impact
   canteen: "provision", // stamina gear (si7.2): raises maxEnergy; NODE_TOOL never asks for "provision", so no gather impact
   "fletchers-knife": "fletch", // crafting tool (ke3.3): gates + quality-scales the arrow-shaft recipe. NODE_TOOL never asks for "fletch", so no gather impact — the payoff is on the CRAFT (outputScale), not gathering
   "steel-fletchers-knife": "fletch", // data-only tier-2 fletch tool (like iron-pick): more shafts per log

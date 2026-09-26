@@ -244,21 +244,21 @@ export const LOOT_TABLE: Record<string, ItemStackSpec[]> = {
   "mirage-wisp": [{ defId: "wisp-essence", qty: 2 }],
   "ice-crab": [{ defId: "crab-shell", qty: 2 }],
   // Boss (D34): wyrm-scale always → dragonscale-cuirass; dragonheart @0.2 (the
-  // 1/5 rare) → wyrmfang. `chance` is rolled per-encounter in fightAt (§4.5).
+  // 1/5 rare) → wyrmfang. `chance` is rolled per-encounter by rollLoot (§4.5).
   "ancient-wyrm": [{ defId: "wyrm-scale", qty: 3 }, { defId: "dragonheart", qty: 1, chance: 0.2 }],
   // Mid-game tier 2 (m0a): giant-elk drops only rich-venison (elk-antler omitted — drop-only path keeps roster clean)
   "giant-elk": [{ defId: "rich-venison", qty: 2 }],
   drake: [{ defId: "drake-hide", qty: 2 }], // D83: drake-hide is now a combat drop (was a steel-knife-gated hunt)
   "dust-djinn": [{ defId: "djinn-ember", qty: 1 }],
   // frost-hatchling: hatchling-scale (armour shortcut) + map-scroll @15% (the wyrm herald's map drop)
-  // map-scroll is intercepted by rollLoot/fightAt and minted as a MapItem — it never enters carry as a material.
+  // map-scroll is intercepted on victory (reduce-combat fightRound/applyVictory) and minted as a MapItem — it never enters carry as a material.
   "frost-hatchling": [{ defId: "hatchling-scale", qty: 1 }, { defId: "map-scroll", qty: 1, chance: 0.15 }],
-}; // monster fixed loot drops (entries with `chance` roll deterministically in fightAt)
+}; // monster fixed loot drops (entries with `chance` roll deterministically in rollLoot)
 
 // Category-level loot (8ec): rolled IN ADDITION to the monster's own LOOT_TABLE
 // entries, so loot can hang off a specific monster, a whole category, or both.
 // Humanoids are the map category: a regular-but-not-guaranteed map-scroll drop
-// (MAP_DROP_CHANCE lever). fightAt intercepts MAP_SCROLL_ID — it never enters
+// (MAP_DROP_CHANCE lever). The victory path intercepts MAP_SCROLL_ID — it never enters
 // carry as a material; it mints a carried MapItem instead (spec §4).
 export const MAP_SCROLL_ID = "map-scroll";
 export const MAP_DROP_CHANCE = 0.5; // lever: humanoid map-drop rate (docs/balance-levers.md)

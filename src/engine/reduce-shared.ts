@@ -27,8 +27,7 @@ export function autoRefill(
     expedition.loadout.food,
     energy,
     expedition.maxEnergy ?? MAX_ENERGY,
-    target,
-    1, // 7lr: auto-eat gets NO tent bonus — the tent's +50% now lives only in the manual camp meal
+    target, // 7lr: auto-eat gets NO tent bonus — the tent's +50% lives only in the manual camp meal
   );
 }
 

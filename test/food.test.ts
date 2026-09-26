@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { eatToRefill, foodEnergyOf, heldFoodEnergy } from "../src/engine/food";
-import { MAX_ENERGY, TENT_FOOD_MULTIPLIER } from "../src/data/constants";
+import { MAX_ENERGY } from "../src/data/constants";
 import type { ItemStack } from "../src/engine/types";
 
 // Stamina model (dtv/mco): eatToRefill eats whole units of the DESIGNATED food to
@@ -33,12 +33,6 @@ test("eatToRefill: stops when food runs out", () => {
   const { food: out, energy } = eatToRefill(food, 0, 300, "ration");
   expect(energy).toBe(80);
   expect(out).toEqual([]);
-});
-
-test("eatToRefill: tent multiplier boosts restore per unit (×1.5)", () => {
-  const food: ItemStack[] = [{ defId: "ration", qty: 3 }];
-  const { energy } = eatToRefill(food, 0, 300, "ration", TENT_FOOD_MULTIPLIER); // each unit restores 120
-  expect(energy).toBe(240); // 2 units (120+120=240); a 3rd (360) overfills
 });
 
 test("eatToRefill: empty food is a no-op", () => {
