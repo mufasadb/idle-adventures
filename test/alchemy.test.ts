@@ -5,13 +5,11 @@ import { generateGrid, rollBiome } from "../src/engine/grid";
 import { RECIPE, POTION, POTION_HEAL_BY, PLAYER_BASE_HP } from "../src/data/constants";
 import { slotOf } from "../src/engine/catalog";
 import type { GameState, ItemStack } from "../src/engine/types";
+import { town } from "./helpers";
 
 // ke3.6 alchemy vertical: the fullest home-vs-field split — field brews a basic
 // draught from a river-filled vial; home's alchemical-desk brews the strong one.
 
-function town(bank: ItemStack[], stations?: GameState["stations"]): GameState {
-  return { seed: "c", phase: "town", bank, loadout: emptyLoadout(), expedition: null, ...(stations ? { stations } : {}) };
-}
 
 function field(opts: { tools?: string[]; carry?: ItemStack[]; potions?: ItemStack[]; hp?: number; energy?: number; seed?: string; pos?: { x: number; y: number } } = {}): GameState {
   const loadout = emptyLoadout();

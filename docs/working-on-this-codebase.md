@@ -27,7 +27,7 @@ All three green before every commit. Lint enforces the engine-purity boundary (n
 
 ## Test idioms
 
-- **Seed-scan helpers:** to test against a generated map, scan deterministic seeds for the fixture you need (see `mapWith`/`standingOn` in `test/reduce-gather.test.ts`, `monsterMap`/`onMonster` in `test/engagement.test.ts`). When a data change shifts what seeds produce, **widen the scan range or tighten its filter — never weaken an assertion**.
+- **Seed-scan helpers:** to test against a generated map, scan deterministic seeds for the fixture you need (see `mapWith` in `test/reduce-gather.test.ts`, `monsterMap`/`onMonster` in `test/engagement.test.ts`). Shared fixtures live in **`test/helpers.ts`** (`scanForPoi`, `mapWithMonster`, `standingOn`, `town`, `fightToEnd`, `accepts`, `cheb`) — reuse them instead of copy-pasting; seed prefixes are per-caller parameters and load-bearing. When a data change shifts what seeds produce, **widen the scan range or tighten its filter — never weaken an assertion**.
 - **Snapshots:** generation/data changes shift snapshots under every seed. Eyeball ONE diff first (shape/identity changes only — the glyph vocabulary and terrain topology should match your change's story), then `bun test -u`. A non-snapshot failure means fix the code, not the test.
 - **Premise-breaks:** if a test's premise is invalidated by an approved design change (not just its numbers), rewrite it to assert the new contract meaningfully — and say so in your report. Watch for the vacuous-assertion trap (e.g. `0 >= 0` after both scenarios die).
 - **Value updates:** when expected numbers change, show the arithmetic in a comment where it isn't obvious.

@@ -7,10 +7,10 @@ import { emptyLoadout } from "../src/engine/loadout";
 import { legalActions } from "../src/sim/legal";
 import { localMap } from "../src/engine/town";
 import { stackCapOf } from "../src/engine/carry";
-import { generateGrid, rollBiome } from "../src/engine/grid";
 import { rollLoot } from "../src/engine/combat";
 import { DON_DOFF_ENERGY, STACK_CAP, BASE_CARRY_SLOTS, PLAYER_BASE_HP } from "../src/data/constants";
 import type { GameState, ItemStack } from "../src/engine/types";
+import { mapWithMonster as scanMonsterMap } from "./helpers";
 
 function onMap(opts: {
   carry?: ItemStack[];
@@ -141,19 +141,11 @@ test("legalActions surfaces don/doff/pack-spare candidates through speculative r
 // Doffing armour adds a carry stack without touching freeLootStacks, so the
 // engage-time loot fit-check is invalidated — victory's addToCarry(...)! then
 // returns null and carry:null gets written into state (silent corruption).
-function mapWithMonster(creature: string): { seed: string; poi: { x: number; y: number; creature: string } } {
-  for (let i = 0; i < 500; i++) {
-    const seed = `xe4-scan-${i}`;
-    const grid = generateGrid(seed, rollBiome(seed), 1);
-    const poi = grid.pois.find((p) => p.kind === "monster" && p.creature === creature);
-    if (poi) return { seed, poi: { x: poi.x, y: poi.y, creature: poi.creature! } };
-  }
-  throw new Error("no map with " + creature);
-}
+const mapWithMonster = (creature: string) => scanMonsterMap("xe4-scan", creature);
 
 test("doff mid-fight with the bag at the loot edge is rejected carry-full (xe4)", () => {
   const { seed, poi } = mapWithMonster("forest-boar");
-  const loot = rollLoot("g", poi.creature, { x: poi.x, y: poi.y }).filter((s) => s.defId !== "map-scroll");
+  const loot = rollLoot("g", poi.creature!, { x: poi.x, y: poi.y }).filter((s) => s.defId !== "map-scroll");
   expect(loot.length).toBeGreaterThan(0); // the fit-check must have something to reject on
   const loadout = emptyLoadout();
   loadout.equipment.weapon = "sword";

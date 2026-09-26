@@ -8,10 +8,9 @@ import { generateGrid, rollBiome } from "../src/engine/grid";
 import type { Poi } from "../src/engine/grid";
 import { emptyLoadout } from "../src/engine/loadout";
 import { MATERIAL_GATE } from "../src/data/constants";
-import type { Action, GameState } from "../src/engine/types";
+import type { GameState } from "../src/engine/types";
+import { accepts } from "./helpers";
 
-const accepts = (state: GameState, action: Action) =>
-  reduce(state, action).events.every((e) => e.type !== "action-rejected");
 
 test("whyNot: a rejected action returns its RejectionReason; a legal one returns null (ciq)", () => {
   const town = newGame("s");

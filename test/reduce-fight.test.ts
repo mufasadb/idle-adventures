@@ -1,39 +1,19 @@
 import { test, expect } from "bun:test";
 import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
-import { generateGrid, rollBiome } from "../src/engine/grid";
-import type { Grid, Poi } from "../src/engine/grid";
+import type { Poi } from "../src/engine/grid";
 import { resolveCombat, rollLoot, explainMatchup } from "../src/engine/combat";
 import { PLAYER_BASE_HP, BASE_CARRY_SLOTS } from "../src/data/constants";
 import type { GameState, GameEvent, Loadout } from "../src/engine/types";
+import { fightToEnd, mapWithMonster as scanMonsterMap } from "./helpers";
 
 // Combat is no longer atomic (si7.1): `fight` engages, then each subsequent
 // `fight` runs ONE exchange via strikeExchange. This loops fight-to-resolution
 // so these tests can keep asserting on the terminal outcome exactly as the old
 // atomic API did — the accumulated events are all exposed for callers that
 // want to inspect the engage/exchange trail too.
-function fightToEnd(state: GameState): { state: GameState; events: GameEvent[] } {
-  let s = reduce(state, { type: "fight" });
-  const all = [...s.events];
-  let guard = 0;
-  while (s.state.expedition?.combat && ++guard < 100) {
-    s = reduce(s.state, { type: "fight" });
-    all.push(...s.events);
-  }
-  return { state: s.state, events: all };
-}
 
-function mapWithMonster(creature?: string, mapTier = 1): { seed: string; grid: Grid; poi: Poi } {
-  for (let i = 0; i < 500; i++) {
-    const seed = `m4-scan-${i}`;
-    const grid = generateGrid(seed, rollBiome(seed), mapTier);
-    const poi = grid.pois.find(
-      (p) => p.kind === "monster" && (creature === undefined || p.creature === creature),
-    );
-    if (poi) return { seed, grid, poi };
-  }
-  throw new Error(`no map with monster ${creature ?? "(any)"} in scan range`);
-}
+const mapWithMonster = (creature?: string) => scanMonsterMap("m4-scan", creature);
 
 function atMonster(seed: string, poi: Poi, mutate?: (loadout: Loadout) => void, hp = PLAYER_BASE_HP): GameState {
   const loadout = emptyLoadout();

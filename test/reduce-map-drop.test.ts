@@ -17,21 +17,12 @@ import {
   MAP_TIER_MAX,
   CATEGORY_LOOT_TABLE,
 } from "../src/data/constants";
-import type { GameState, GameEvent } from "../src/engine/types";
+import type { GameState } from "../src/engine/types";
+import { fightToEnd } from "./helpers";
 
 // Combat is no longer atomic (si7.1): the first `fight` engages, subsequent
 // `fight`s each run one exchange. Loop to the terminal outcome so these tests
 // can assert on the same victory/defeat/loot facts the old atomic API gave.
-function fightToEnd(state: GameState): { state: GameState; events: GameEvent[] } {
-  let s = reduce(state, { type: "fight" });
-  const all = [...s.events];
-  let guard = 0;
-  while (s.state.expedition?.combat && ++guard < 100) {
-    s = reduce(s.state, { type: "fight" });
-    all.push(...s.events);
-  }
-  return { state: s.state, events: all };
-}
 
 // Find a map with a tier-1 humanoid the base sword build beats, where the
 // map-scroll roll PASSES (drop=true) or FAILS (drop=false) on the game seed "g".

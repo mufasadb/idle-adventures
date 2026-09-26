@@ -4,12 +4,10 @@ import { emptyLoadout } from "../src/engine/loadout";
 import { RECIPE, FOOD, FOOD_ENERGY, FIELD_CRAFT_ENERGY } from "../src/data/constants";
 import { slotOf } from "../src/engine/catalog";
 import type { GameState, ItemStack } from "../src/engine/types";
+import { town } from "./helpers";
 
 // ke3.5 proof slice: the food/cooking loop end-to-end on the real player surface.
 
-function town(bank: ItemStack[], stations?: GameState["stations"]): GameState {
-  return { seed: "c", phase: "town", bank, loadout: emptyLoadout(), expedition: null, ...(stations ? { stations } : {}) };
-}
 
 function field(opts: { tools?: string[]; carry?: ItemStack[]; energy?: number; food?: ItemStack[] } = {}): GameState {
   const loadout = emptyLoadout();

@@ -18,19 +18,10 @@ import {
   MAP_DROP_CHANCE, MAP_SCROLL_ID, MAX_ENERGY,
 } from "../src/data/constants";
 import type { GameState, GameEvent } from "../src/engine/types";
+import { fightToEnd } from "./helpers";
 
 // Combat is not atomic (si7.1): first `fight` engages, each subsequent one runs an
 // exchange. Loop to the terminal outcome, collecting every event.
-function fightToEnd(state: GameState): { state: GameState; events: GameEvent[] } {
-  let s = reduce(state, { type: "fight" });
-  const all = [...s.events];
-  let guard = 0;
-  while (s.state.expedition?.combat && ++guard < 100) {
-    s = reduce(s.state, { type: "fight" });
-    all.push(...s.events);
-  }
-  return { state: s.state, events: all };
-}
 
 // A humanoid POI on the given (seed, tier) grid whose guaranteed-drop roll passes,
 // that is REACHABLE on foot from the entry with a real energy budget. Returns the

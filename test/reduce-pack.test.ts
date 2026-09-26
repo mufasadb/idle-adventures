@@ -3,11 +3,10 @@ import { reduce } from "../src/engine/reduce";
 import { emptyLoadout } from "../src/engine/loadout";
 import { reserveLoadout } from "../src/engine/pack";
 import { slotCap } from "../src/engine/carry";
-import type { GameState } from "../src/engine/types";
+import type { GameState, ItemStack } from "../src/engine/types";
+import { town as baseTown } from "./helpers";
 
-function town(bank: { defId: string; qty: number }[]): GameState {
-  return { seed: "p", phase: "town", bank, loadout: emptyLoadout(), expedition: null };
-}
+const town = (bank: ItemStack[]): GameState => baseTown(bank, undefined, { seed: "p" });
 
 test("pack: equipment slot is set, bank untouched (D28 plan)", () => {
   const { state, events } = reduce(town([{ defId: "iron-sword", qty: 1 }]), {

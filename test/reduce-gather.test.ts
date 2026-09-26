@@ -11,6 +11,7 @@ import {
 } from "../src/data/constants";
 import type { NodeType } from "../src/data/constants";
 import type { GameState } from "../src/engine/types";
+import { standingOn } from "./helpers";
 
 // Deterministically find a map whose rolled biome contains a POI of `kind`.
 // For gatherable kinds, default to an UNGATED material so these scenario tests
@@ -35,30 +36,6 @@ function mapWith(
   throw new Error(`no map with a ${kind} POI (${opts.material ?? "ungated"}) in scan range`);
 }
 
-function standingOn(
-  seed: string,
-  poi: Poi,
-  opts: { tools?: string[]; energy?: number; food?: { defId: string; qty: number }[] } = {},
-): GameState {
-  const loadout = emptyLoadout();
-  loadout.equipment.tools = opts.tools ?? [];
-  loadout.food = opts.food ?? [];
-  return {
-    seed: "g",
-    phase: "expedition",
-    bank: [],
-    loadout: emptyLoadout(),
-    expedition: {
-      mapSeed: seed,
-      pos: { x: poi.x, y: poi.y },
-      energy: opts.energy ?? 100,
-      hp: 0,
-      loadout,
-      carry: [],
-      cleared: [],
-    },
-  };
-}
 
 test("gather: ore without a pick fails (bead acceptance)", () => {
   const { seed, poi } = mapWith("mining");
