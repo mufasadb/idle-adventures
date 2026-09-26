@@ -19,7 +19,6 @@ import {
   AUTO_POTION_THRESHOLD,
   UNARMED_DAMAGE,
   CHIP_DAMAGE_MIN,
-  COMBAT_BUFF,
   MITIGATION_K,
   WEAPON_ENHANCEMENT,
 } from "../data/constants";
@@ -37,28 +36,13 @@ export type CombatResult = {
   potionsAfter: ItemStack[];
 };
 
-// Sum the packed battle-item buffs (bzd). Kept as the canonical buff-value helper
-// (COMBAT_BUFF summing) — harness callers that want to model a fully-buffed fight
-// pass battleBuff(kit.battleItems) into resolveCombat's damageAdd/mitigationAdd
-// (yoo: resolveCombat no longer applies these automatically — see its header).
-export function battleBuff(battleItems: ItemStack[]): { damageAdd: number; mitigationAdd: number } {
-  let damageAdd = 0;
-  let mitigationAdd = 0;
-  for (const stack of battleItems) {
-    const buff = COMBAT_BUFF[stack.defId];
-    if (!buff) continue;
-    damageAdd += (buff.damageAdd ?? 0) * stack.qty;
-    mitigationAdd += (buff.mitigationAdd ?? 0) * stack.qty;
-  }
-  return { damageAdd, mitigationAdd };
-}
-
 // Deterministic loot roll (2026-07-05, t07). Loot lives OUTSIDE resolveCombat
 // because it needs a seed and resolveCombat is pure fight-math. `chance` entries
 // (e.g. the Wyrm's dragonheart @0.2) roll per-encounter; absent chance = always.
 // The roll is keyed by (seed, creature, tile, defId) so it's replayable (D14)
 // and multiple chance drops on one creature stay independent (defId disambiguates
-// beyond the spec's bare context). fightAt calls this on victory only.
+// beyond the spec's bare context). The engagement path (engage's fit-check,
+// fightRound's victory) calls this.
 export function rollLoot(
   seed: string,
   creature: string,
@@ -94,6 +78,33 @@ export function hasAmmo(loadout: Loadout): boolean {
   return (loadout.ammo ?? []).some((s) => s.qty > 0);
 }
 
+// D45 arrows-out: a ranged weapon with no ammo held swings as a club (no matrix, no tags).
+function isClubbed(loadout: Loadout): boolean {
+  return wieldsRanged(loadout) && !hasAmmo(loadout);
+}
+
+// Does the hidden affinity (×AFFINITY_MULTIPLIER) fire for this strike? The ONE
+// resolution shared by playerDamage and explainMatchup so the post-fight lesson can
+// never disagree with the damage actually dealt. Fires if the WEAPON's tag pairs
+// with the monster (a clubbed bow has no tags) OR an active coating's affinityTag
+// (D60 oil path) matches a monster tag directly. Boolean OR — never stacks.
+export function affinityFires(
+  loadout: Loadout,
+  monsterId: string,
+  weaponBuff?: { id: string },
+): boolean {
+  const monster = MONSTERS[monsterId];
+  if (!monster) throw new Error(`unknown monster: ${monsterId}`);
+  const weaponId = loadout.equipment.weapon;
+  const weapon = weaponId === null ? undefined : WEAPONS[weaponId];
+  const tags = isClubbed(loadout) ? [] : weapon?.tags ?? [];
+  const enh = weaponBuff ? WEAPON_ENHANCEMENT[weaponBuff.id] : undefined;
+  return (
+    AFFINITIES.some((a) => monster.tags.includes(a.monsterTag) && tags.includes(a.itemTag)) ||
+    (enh?.affinityTag !== undefined && monster.tags.includes(enh.affinityTag))
+  );
+}
+
 // Damage per player strike: weapon × visible matrix (vs the monster's hide
 // class) × hidden affinity (×AFFINITY_MULTIPLIER on any tag pairing).
 // Arrows-out (D45): a ranged weapon with no ammo held swings as a club —
@@ -117,18 +128,12 @@ export function playerDamage(
   // degrades to bare hands rather than throwing — same spirit as unknown
   // armour pieces contributing 0 mitigation.
   const weapon = weaponId === null ? undefined : WEAPONS[weaponId];
-  const clubbed = weapon?.dmgType === "ranged" && !hasAmmo(loadout); // D45 arrows-out
+  const clubbed = isClubbed(loadout);
   const base = weapon && !clubbed
     ? weapon.damage * DMG_ARMOUR_MATRIX[weapon.dmgType][monster.armourType]
     : UNARMED_DAMAGE;
-  const tags = clubbed ? [] : weapon?.tags ?? [];
   const enh = weaponBuff ? WEAPON_ENHANCEMENT[weaponBuff.id] : undefined;
-  // Affinity fires if the WEAPON's tag pairs with the monster (existing path) OR
-  // the coating's affinityTag matches a monster tag directly (the oil path). It's
-  // a boolean OR, so it never stacks past ×AFFINITY_MULTIPLIER.
-  const affine =
-    AFFINITIES.some((a) => monster.tags.includes(a.monsterTag) && tags.includes(a.itemTag)) ||
-    (enh?.affinityTag !== undefined && monster.tags.includes(enh.affinityTag));
+  const affine = affinityFires(loadout, monsterId, weaponBuff);
   const flat = enh?.flatDamage ?? 0; // whetstone: flat add, after the ×matrix/affinity scaling
   return Math.max(CHIP_DAMAGE_MIN, base * (affine ? AFFINITY_MULTIPLIER : 1) + flat);
 }
@@ -169,7 +174,9 @@ export type Matchup = {
 
 // Post-fight lesson facts (9u9.2). Pure — the render layer flavors these into
 // "your blade skated off its hide" etc. Teaches the RPS system + affinity by playing.
-export function explainMatchup(loadout: Loadout, monsterId: string): Matchup {
+// weaponBuff: the coating active on the strike being explained — affinity resolves
+// exactly as playerDamage does (affinityFires), so an oil's affinityTag counts.
+export function explainMatchup(loadout: Loadout, monsterId: string, weaponBuff?: { id: string }): Matchup {
   const monster = MONSTERS[monsterId];
   if (!monster) throw new Error(`unknown monster: ${monsterId}`);
   const weaponId = loadout.equipment.weapon;
@@ -177,9 +184,7 @@ export function explainMatchup(loadout: Loadout, monsterId: string): Matchup {
   const weaponVsHide = weapon
     ? DMG_ARMOUR_MATRIX[weapon.dmgType][monster.armourType]
     : null;
-  const affinityFired = AFFINITIES.some(
-    (a) => monster.tags.includes(a.monsterTag) && (weapon?.tags ?? []).includes(a.itemTag),
-  );
+  const affinityFired = affinityFires(loadout, monsterId, weaponBuff);
   // Average how each equipped armour piece's class fares vs the incoming dmg type.
   let sum = 0;
   let n = 0;
@@ -289,7 +294,7 @@ export function strikeExchange(
 // starts engagements at damageAdd/mitigationAdd 0 and only buffs when the player
 // spends a battle item mid-fight via use-item — auto-buffing every strike modelled
 // a stronger player than the game delivers. Callers that WANT to model a buffed
-// fight pass damageAdd/mitigationAdd explicitly (e.g. battleBuff(kit.battleItems)).
+// fight pass damageAdd/mitigationAdd explicitly.
 export function resolveCombat(
   loadout: Loadout,
   hp: number,

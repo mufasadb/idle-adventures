@@ -131,7 +131,7 @@ function fightRound(state: GameState): { state: GameState; events: GameEvent[] }
     // quaffing above startHp reads as 0 lost, not negative
     victory, hpLost: Math.max(0, combat.startHp - round.hp), potionsUsed,
     loot: victory ? loot : [],
-    hp: round.hp, matchup: explainMatchup(expedition.loadout, combat.creature),
+    hp: round.hp, matchup: explainMatchup(expedition.loadout, combat.creature, expedition.weaponBuff), // the coating on THIS strike
   });
   if (round.defeated) {
     // D60: the coating clears with the run; endExpedition doesn't read weaponBuff, but drop it cleanly.

@@ -201,6 +201,18 @@ test("explainMatchup: affinity pairing fires", () => {
   expect(explainMatchup(loadoutWith({ weapon: "sword" }), "werewolf").affinityFired).toBe(false);
 });
 
+test("explainMatchup: an oil coating's affinityTag fires the lesson exactly when playerDamage applies it", () => {
+  // silver-oil (affinityTag werewolf) on a plain sword: playerDamage takes ×AFFINITY_MULTIPLIER,
+  // so the post-fight lesson must say affinity fired too (it used to ignore the coating).
+  const sword = loadoutWith({ weapon: "sword" });
+  const oil = { id: "silver-oil" };
+  expect(playerDamage(sword, "werewolf", oil)).toBe(playerDamage(sword, "werewolf") * AFFINITY_MULTIPLIER);
+  expect(explainMatchup(sword, "werewolf", oil).affinityFired).toBe(true);
+  // Same coating vs a non-werewolf: neither path fires.
+  expect(playerDamage(sword, "forest-boar", oil)).toBe(playerDamage(sword, "forest-boar"));
+  expect(explainMatchup(sword, "forest-boar", oil).affinityFired).toBe(false);
+});
+
 test("explainMatchup: armour class vs incoming damage type classifies", () => {
   // sand-raider = ranged; plate→ranged matrix 0.5 (<1) → resisted
   expect(explainMatchup(loadoutWith({ chest: "plate-chest" }), "sand-raider").armourVsAttack).toBe("resisted");
