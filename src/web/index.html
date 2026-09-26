@@ -33,7 +33,7 @@
       /* wzx: a humanoid camp (the map-dropper) — a landmark visible at any range so you can pick a heading toward the map economy. Teal ring + the 'C' glyph (non-trial). */
       .tile.landmark-camp { box-shadow: inset 0 0 0 2px #35c2b0; border-radius: 3px; }
       .tile.landmark-camp.poi { color: #6fe0d0; }
-      /* cww: a resolved forage node tinted by its material — flint/deadwood pop against the herb yellow so the bootstrap tool-materials are legible at a glance. `.grid` prefix outranks the asset-trial .poi gold in both render modes. */
+      /* cww: a resolved forage node tinted by its material — flint/deadwood pop against the herb yellow so the bootstrap tool-materials are legible at a glance. */
       .grid .tile.poi.mat-flint { color: #cfe0ea; }    /* pale stone */
       .grid .tile.poi.mat-deadwood { color: #d9a662; } /* dry wood */
       .grid .tile.poi.mat-berries { color: #e07a97; }  /* berry red */
@@ -52,19 +52,19 @@
       .tile.path-waypoint { outline: 2px dashed #8ab4ff; outline-offset: -2px; }
       .pathbanner.blocked { color: #ff9b9b; }
       .pathbanner { font-size: 0.82rem; margin: 0.4rem 0; min-height: 1.2rem; }
-      /* 48l.6 asset trial: pixel-art tiles + ¾ billboard sprites */
-      .grid.asset-trial .tile { width: 32px; height: 32px; font-size: 0; background-size: 32px 32px; image-rendering: pixelated; position: relative; }
-      .grid.asset-trial .tile .sprite { position: absolute; left: 50%; bottom: 1px; transform: translateX(-50%); width: 48px; height: 48px; image-rendering: pixelated; pointer-events: none; z-index: 2; }
-      .grid.asset-trial .tile .nodeicon { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 24px; height: 24px; image-rendering: pixelated; pointer-events: none; z-index: 2; filter: drop-shadow(0 1px 1px #000a); }
-      .grid.asset-trial .tile.player { font-size: 20px; color: #ffd75e; text-shadow: 0 0 3px #000, 0 0 3px #000; z-index: 3; }
-      .grid.asset-trial .tile.poi { color: #ffd75e; text-shadow: 0 0 3px #000; }
+      /* 48l.10 approved atlas: pixel-art tiles + ¾ billboard sprites */
+      .grid.atlas-assets .tile { width: 32px; height: 32px; font-size: 0; background-size: auto; background-repeat: no-repeat; image-rendering: pixelated; position: relative; }
+      .grid.atlas-assets .tile .sprite { position: absolute; left: 50%; bottom: 1px; transform: translateX(-50%); image-rendering: pixelated; background-repeat: no-repeat; pointer-events: none; z-index: 2; }
+      .grid.atlas-assets .tile .nodeicon { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); image-rendering: pixelated; background-repeat: no-repeat; pointer-events: none; z-index: 2; filter: drop-shadow(0 1px 1px #000a); }
+      .grid.atlas-assets .tile.player { font-size: 20px; color: #ffd75e; text-shadow: 0 0 3px #000, 0 0 3px #000; z-index: 3; }
+      .grid.atlas-assets .tile.poi { color: #ffd75e; text-shadow: 0 0 3px #000; }
       /* cww: in sprite mode a resolved forage material shows its LETTER (no material icon exists yet) — the generic herb icon is suppressed, so make the f/d/b visible + material-coloured (beats the .poi gold above by source order at equal specificity). */
-      .grid.asset-trial .tile.poi.mat-flint,
-      .grid.asset-trial .tile.poi.mat-deadwood,
-      .grid.asset-trial .tile.poi.mat-berries { font-size: 18px; font-weight: bold; }
-      .grid.asset-trial .tile.poi.mat-flint { color: #cfe0ea; }
-      .grid.asset-trial .tile.poi.mat-deadwood { color: #d9a662; }
-      .grid.asset-trial .tile.poi.mat-berries { color: #e07a97; }
+      .grid.atlas-assets .tile.poi.mat-flint,
+      .grid.atlas-assets .tile.poi.mat-deadwood,
+      .grid.atlas-assets .tile.poi.mat-berries { font-size: 18px; font-weight: bold; }
+      .grid.atlas-assets .tile.poi.mat-flint { color: #cfe0ea; }
+      .grid.atlas-assets .tile.poi.mat-deadwood { color: #d9a662; }
+      .grid.atlas-assets .tile.poi.mat-berries { color: #e07a97; }
       .pathbanner .over { color: #ff6b6b; } /* route costs more energy than you have */
       .pathbanner.engaged { color: #ffb454; font-weight: 600; } /* a fight is live — point at the panel */
 

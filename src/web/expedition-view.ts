@@ -5,7 +5,7 @@ import { expeditionGrid, rollBiome } from "../engine/grid";
 import type { Grid } from "../engine/grid";
 import { recipeOutputQty } from "../engine/craft";
 import { moveCostBreakdown } from "../engine/move";
-import { ASSET_TRIAL, TILE_BG, MONSTER_SPRITES, MONSTER_SIZE, NODE_ICON } from "./assets-trial";
+import { iconStyle, monsterStyle, nodeIconId, tileStyle } from "./assets";
 import { carryCap, mapCarryCap } from "../engine/carry";
 import { deriveRoute } from "./route";
 import type { Pos } from "./route";
@@ -210,31 +210,23 @@ export function expeditionView(state: GameState, route: Pos[]): string {
           ? `${kindLabel(poi.kind)} · ${flavorDetail(per.detail, poi.kind)}${tierNote ? ` · ${tierNote}` : ""}`
           : poi.kind === "monster" ? "a monster" : `a ${kindLabel(poi.kind)} node`)
       : grid.terrain[y]![x]!;
-    // 48l.6 trial: paint the terrain tile texture + overlay a ¾ billboard sprite
-    // on monster POIs / a node icon where we have one. Flag-gated; the real
-    // delivery is an atlas+manifest keyed by defId.
-    let trialStyle = "";
+    // 48l.10: paint approved atlas frames. Missing defIds deliberately keep the
+    // glyph path below; a creature must never borrow another creature's sprite.
+    let tileAssetStyle = "";
     let overlay = "";
-    if (ASSET_TRIAL) {
-      const bg = TILE_BG[grid.terrain[y]![x]!];
-      if (bg) trialStyle = ` style="background-image:url('${bg}')"`;
-      if (poi && !isCleared) {
-        if (poi.kind === "monster") {
-          const keys = Object.keys(MONSTER_SPRITES);
-          const cr = poi.creature && MONSTER_SPRITES[poi.creature] ? poi.creature : keys[(x * 31 + y * 17) % keys.length]!;
-          const sp = MONSTER_SPRITES[cr];
-          const msz = MONSTER_SIZE[cr] ?? 48;
-          if (sp) overlay = `<img class="sprite" src="${sp}" style="width:${msz}px;height:${msz}px" alt="">`;
-        } else if (NODE_ICON[poi.kind] && !(poi.kind === "herb" && per?.detail?.material && FORAGE_MATERIAL_CHAR[per.detail.material])) {
-          // cww: a resolved forage TOOL-material (flint/deadwood/berries) suppresses the
-          // generic herb icon so its colored glyph (f/d/b) shows through — the map teaches
-          // forage variety even in sprite mode. Unresolved / actual-herb nodes keep the icon.
-          overlay = `<img class="nodeicon" src="${NODE_ICON[poi.kind]}" alt="">`;
-        }
+    const terrainStyle = tileStyle(grid.terrain[y]![x]!);
+    if (terrainStyle) tileAssetStyle = ` style="${terrainStyle}"`;
+    if (poi && !isCleared) {
+      if (poi.kind === "monster" && poi.creature) {
+        const spriteStyle = monsterStyle(poi.creature);
+        if (spriteStyle) overlay = `<span class="sprite" style="${spriteStyle}" aria-hidden="true"></span>`;
+      } else if (!(poi.kind === "herb" && per?.detail?.material && FORAGE_MATERIAL_CHAR[per.detail.material])) {
+        const iconStyleValue = iconStyle(nodeIconId(poi.kind, per?.detail?.material));
+        if (iconStyleValue) overlay = `<span class="nodeicon" style="${iconStyleValue}" aria-hidden="true"></span>`;
       }
     }
-    const glyph = ASSET_TRIAL && !isPlayer && (overlay !== "" || !poi) ? "" : ch;
-    cells += `<div class="${cls.join(" ")}"${trialStyle} data-x="${x}" data-y="${y}" title="${title}">${overlay}${glyph}</div>`;
+    const glyph = !isPlayer && (overlay !== "" || !poi) ? "" : ch;
+    cells += `<div class="${cls.join(" ")}"${tileAssetStyle} data-x="${x}" data-y="${y}" title="${title}">${overlay}${glyph}</div>`;
   }
 
   const maxEnergy = exp.maxEnergy ?? MAX_ENERGY;
@@ -302,7 +294,7 @@ export function expeditionView(state: GameState, route: Pos[]): string {
     <section class="mapwrap">
       ${bars}
       ${pathBanner}
-      <div class="gridscroll"><div class="grid${ASSET_TRIAL ? " asset-trial" : ""}" style="grid-template-columns:repeat(${MAP_WIDTH}, ${ASSET_TRIAL ? "32px" : "1.4rem"});">${cells}</div></div>
+      <div class="gridscroll"><div class="grid atlas-assets" style="grid-template-columns:repeat(${MAP_WIDTH}, 32px);">${cells}</div></div>
     </section>
     <section>
       ${exp.combat ? engagementPanel(state, exp, legal) : herePanel(state, grid, exp, legal)}

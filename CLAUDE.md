@@ -133,7 +133,7 @@ One pure engine, one shared presentation layer, two thin surfaces. The reducer i
 
 Art is produced by a **separate pipeline repo** at `../idle-adventure-assets` (bun/TS + `py/`, Retro Diffusion) — it imports this repo's `src/data` as pure data and delivers game-ready sprites keyed by `defId`. As of 2026-07-13: **162 assets approved** (all terrains/monsters/icons), reviewed over two user rounds. Art direction (see `bd memories`): **pixel art, Diablo-2 mood, top-down floor + ¾ billboard monster sprites, per-creature size classes**; palette coercion deferred (ship raw). Full state + commands: `bd memories asset-pipeline-state`, and that repo's `README.md` / `review/round-1.md`.
 
-In THIS repo, `src/web/assets-trial.ts` (behind the `ASSET_TRIAL` flag, rendered in `expedition-view.ts`) is a **throwaway** woodland-only render test — the real delivery (atlas + manifest) is bead `idle-adventure-48l.10`, not yet built.
+In THIS repo the delivered art is `src/web/assets/atlas-{tile,monster,icon}.{png,json}` (packed in the assets repo, manifest keyed by defId), read by `src/web/assets.ts` (`tileStyle`/`monsterStyle`/`iconStyle` → CSS background frames) and painted in `expedition-view.ts` (48l.10). A defId with no frame falls back to its glyph — a creature never borrows another's sprite. To refresh art: re-pack in `../idle-adventure-assets` and copy the six atlas files over.
 
 ## Conventions & Patterns
 
