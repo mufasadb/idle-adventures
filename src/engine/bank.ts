@@ -6,6 +6,7 @@
 import type { GameState, Expedition, ItemStack } from "./types";
 import { emptyLoadout } from "./loadout";
 import { CONSUMABLE_KEYS } from "./catalog";
+import { wornPieces } from "./pack";
 import { FRESH_TO_STALE } from "../data/constants";
 
 export function bankStacks(bank: ItemStack[], stacks: ItemStack[]): ItemStack[] {
@@ -33,20 +34,9 @@ export function subtractStacks(bank: ItemStack[], stacks: ItemStack[]): ItemStac
 export function endExpedition(state: GameState, expedition: Expedition): GameState {
   const { equipment } = expedition.loadout;
   const durables: ItemStack[] = [];
-  for (const piece of [
-    equipment.weapon,
-    equipment.helmet,
-    equipment.chest,
-    equipment.legs,
-    equipment.boots,
-    equipment.gloves,
-  ]) {
+  for (const piece of [...wornPieces(equipment), ...equipment.tools]) {
     if (piece !== null) durables.push({ defId: piece, qty: 1 });
   }
-  for (const tool of equipment.tools) durables.push({ defId: tool, qty: 1 });
-  if (equipment.transport !== null) durables.push({ defId: equipment.transport, qty: 1 });
-  if (equipment.backpack !== null) durables.push({ defId: equipment.backpack, qty: 1 });
-  if (equipment.panniers !== null) durables.push({ defId: equipment.panniers, qty: 1 });
   // 0ps: every consumable kind banks back — one loop over the registry, with the
   // FRESH_TO_STALE per-defId transform applied uniformly (only fresh forage is a
   // key, so it's a no-op for potions/battle-items/ammo/enhancements). This closes

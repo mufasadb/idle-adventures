@@ -7,12 +7,12 @@ import { endExpedition } from "./bank";
 import { previewHints } from "./town";
 import { slotOf } from "./catalog";
 import { MAP_SCROLL_ID, MONSTERS, MONSTER_TIER_HP_CURVE, MAP_TIER_MAX, PLAYER_BASE_HP, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, COMBAT_BUFF, WEAPON_ENHANCEMENT } from "../data/constants";
-import { rejected, autoRefill } from "./reduce-shared";
+import { rejected, autoRefill, livePoiAt } from "./reduce-shared";
 
 // Start an engagement (si7.1, replaces atomic fightAt): the fit-check still
-// runs BEFORE any blood (rejecting is free), battle items are consumed NOW and
-// their buffs ride the Engagement for all its rounds. No exchange here — the
-// player sees the forecast before the first swing.
+// runs BEFORE any blood (rejecting is free). Battle items are NOT consumed here
+// (90j) — the engagement's buff starts at zero and grows only via mid-fight
+// use-item. No exchange here — the player sees the forecast before the first swing.
 export function engage(
   state: GameState,
   expedition: Expedition,
@@ -22,13 +22,8 @@ export function engage(
   moveOnWin: boolean,
   ranged = false, // D45: engaged from an adjacent tile with a bow — grants the opener
 ): { state: GameState; events: GameEvent[] } {
-  const rolled = rollLoot(state.seed, creature, at);
-  const loot = rolled.filter((s) => s.defId !== MAP_SCROLL_ID);
-  const maxStacks = freeLootStacks(expedition.loadout);
-  let carryWithLoot: typeof expedition.carry | null = expedition.carry;
-  for (const stack of loot) {
-    carryWithLoot = addToCarry(carryWithLoot, stack.defId, stack.qty, maxStacks);
-    if (carryWithLoot === null) return rejected(state, action, "carry-full");
+  if (!pendingLootFits(state, { creature, at }, expedition.loadout, expedition.carry)) {
+    return rejected(state, action, "carry-full");
   }
   const monsterHp = MONSTER_TIER_HP_CURVE[MONSTERS[creature]!.tier]!;
   return {
@@ -63,9 +58,8 @@ export function fight(state: GameState, at?: { x: number; y: number }): { state:
       // tile, with a bow wielded and ≥1 arrow held. Engages without stepping in
       // (moveOnWin false — you never relocate onto a tile you shot from afar).
       const adjacent = Math.max(Math.abs(at.x - pos.x), Math.abs(at.y - pos.y)) === 1;
-      const poi = grid.pois.find((p) => p.x === at.x && p.y === at.y);
-      const targetCleared = expedition.cleared.some((c) => c.x === at.x && c.y === at.y);
-      if (!adjacent || !poi || poi.kind !== "monster" || targetCleared || poi.creature === null) {
+      const poi = livePoiAt(grid, expedition, at);
+      if (!adjacent || !poi || poi.kind !== "monster" || poi.creature === null) {
         return rejected(state, "fight", "no-monster");
       }
       if (!wieldsRanged(expedition.loadout) || !hasAmmo(expedition.loadout)) {
@@ -74,9 +68,8 @@ export function fight(state: GameState, at?: { x: number; y: number }): { state:
       return maybeAutoFinish(engage(state, expedition, at, poi.creature, "fight", false, true), expedition);
     }
     // Not engaged, no target: engage the live monster on the CURRENT tile (as before).
-    const poi = grid.pois.find((p) => p.x === pos.x && p.y === pos.y);
-    const alreadyCleared = expedition.cleared.some((c) => c.x === pos.x && c.y === pos.y);
-    if (!poi || poi.kind !== "monster" || alreadyCleared || poi.creature === null) {
+    const poi = livePoiAt(grid, expedition, pos);
+    if (!poi || poi.kind !== "monster" || poi.creature === null) {
       return rejected(state, "fight", "no-monster");
     }
     return maybeAutoFinish(engage(state, expedition, pos, poi.creature, "fight", false), expedition);
@@ -299,7 +292,7 @@ export function useItem(state: GameState, itemId: string): { state: GameState; e
   const combat = expedition.combat;
   if (!combat) return rejected(state, "use-item", "not-engaged");
   if (slotOf(itemId) !== "battle-item") return rejected(state, "use-item", "wrong-slot");
-  const items = expedition.loadout.battleItems ?? [];
+  const items = expedition.loadout.battleItems;
   const idx = items.findIndex((s) => s.defId === itemId);
   if (idx === -1) return rejected(state, "use-item", "insufficient");
   const buff = COMBAT_BUFF[itemId] ?? {};
@@ -375,14 +368,14 @@ export function provokeTurn(
   return { state: { ...state, expedition: { ...exp, hp } }, events: [...events, provoked] };
 }
 
-// idle-adventure-xe4: the victory path applies the engaged monster's rolled loot
-// with a bare addToCarry(...)! trusting the fit-check that ran at engage. Since 67e
-// a mid-fight don/doff is legal and mutates carry, so any in-combat swap must RE-
-// verify the pending loot still fits the candidate kit — else victory would write
-// carry:null (silent state corruption). Mirrors engage()'s pre-check.
+// Would this monster's (deterministic) loot fit `carry` under `loadout`? The ONE
+// fit-check: engage() runs it before any blood (rejecting is free), and — since
+// 67e made mid-fight don/doff legal (it mutates carry) — every in-combat swap RE-
+// verifies it against the candidate kit (idle-adventure-xe4), because the victory
+// path applies the loot trusting this check and would otherwise write carry:null.
 export function pendingLootFits(
   state: GameState,
-  combat: NonNullable<Expedition["combat"]>,
+  combat: { creature: string; at: { x: number; y: number } },
   loadout: Loadout,
   carry: ItemStack[],
 ): boolean {
