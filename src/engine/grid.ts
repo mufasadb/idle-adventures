@@ -275,7 +275,8 @@ function buildGrid(mapSeed: string, biomeId: BiomeId, mapTier: number, affixes: 
     terrain[cy]![cx] = carveTerrainOf(biome);
     carveConnectivity(terrain, biome);
   }
-  // Phase 3 (b91): place POIs in two steps so we can bias value against terrain.
+  // Phase 3 (b91): place POIs in two steps — positions, then specs — paired by
+  // index (step c; value-agnostic since D57r/D73).
   // (a) Collect accepted POSITIONS via seeded rejection sampling — walk a
   //     deterministic candidate stream, keep candidates that clear POI_MIN_SPACING
   //     (Chebyshev, 8-dir) from every accepted position and avoid the entry tile.
@@ -292,10 +293,10 @@ function buildGrid(mapSeed: string, biomeId: BiomeId, mapTier: number, affixes: 
     const y = Math.floor(rand(mapSeed, "poi-y", attempt) * MAP_HEIGHT);
     if (x === entry.x && y === entry.y) continue; // entry tile stays clear (M2: embark lands here)
     // Walls carry no nodes (e3j final review): reject unwalkable candidates so
-    // the value-vs-reach pairing never strands its highest-value specs on
-    // impassable terrain (mountain-top content can return deliberately with a
-    // future cartography/climbing pass). 2000 attempts on ~1000 walkable tiles
-    // cannot starve the POI_DENSITY budget.
+    // no POI is ever stranded on impassable terrain (mountain-top content can
+    // return deliberately with a future cartography/climbing pass). The attempt
+    // budget (POI_PLACEMENT_ATTEMPTS) comfortably exceeds the walkable-tile count,
+    // so this cannot starve the POI_DENSITY budget.
     if (!walkableTerrain(terrain[y]![x]!)) continue;
     const clear = positions.every(
       (p) => Math.max(Math.abs(p.x - x), Math.abs(p.y - y)) >= POI_MIN_SPACING,
@@ -304,7 +305,7 @@ function buildGrid(mapSeed: string, biomeId: BiomeId, mapTier: number, affixes: 
     positions.push({ x, y });
   }
   // (b) Roll a SPEC (kind/creature/material) per accepted position, indexed by
-  //     acceptance order — decoupled from position so we can reassign by value.
+  //     acceptance order — rolled independently of the position's terrain/reach.
   const specs = positions.map((_, i) => {
     const kind = weightedPick(biome.nodeTypeWeights, NODE_TYPES, rand(mapSeed, "poi-kind", i));
     const creatureKeys = Object.keys(biome.creatureTable).sort(); // deterministic order, like rollMaterial

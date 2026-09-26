@@ -19,9 +19,9 @@ export function heldFoodEnergy(food: ItemStack[]): number {
 
 // Eat whole units of the DESIGNATED food to refill CURRENT energy toward maxEnergy,
 // waste-free (mco — supersedes least-dense-first, D48). Only units whose defId ===
-// `targetDefId` are eaten, and only while a unit's boosted restore still fits under
-// maxEnergy (never overfills). tentMult multiplies restore-per-unit (TENT_FOOD_MULTIPLIER
-// with a tent equipped). Pure — returns remaining food + new energy. Scoping to one
+// `targetDefId` are eaten, and only while a unit's restore still fits under
+// maxEnergy (never overfills). No tent bonus here (7lr: the tent's multiplier lives
+// only in the manual camp meal). Pure — returns remaining food + new energy. Scoping to one
 // food replaces the old least-dense-first selection: the player designates which
 // food auto-eats (Expedition.autoEatFood), so there's no cross-food ordering to pick.
 export function eatToRefill(
@@ -29,11 +29,10 @@ export function eatToRefill(
   energy: number,
   maxEnergy: number,
   targetDefId: string,
-  tentMult = 1,
 ): { food: ItemStack[]; energy: number } {
   const next = food.map((s) => ({ ...s }));
   let e = energy;
-  const restore = foodEnergyOf(targetDefId) * tentMult;
+  const restore = foodEnergyOf(targetDefId);
   if (restore > 0) {
     for (const s of next) {
       if (s.defId !== targetDefId) continue;

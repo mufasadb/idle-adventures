@@ -108,9 +108,9 @@ test("reserveLoadout: enumerates every defId the plan pulls from the bank", () =
   loadout.potions = [{ defId: "potion", qty: 2 }];
   expect(reserveLoadout(loadout)).toEqual([
     { defId: "iron-sword", qty: 1 },
+    { defId: "leather", qty: 1 }, // wornPieces (EQUIP_SLOTS) order, then tools
     { defId: "pick", qty: 1 },
     { defId: "spyglass", qty: 1 },
-    { defId: "leather", qty: 1 },
     { defId: "ration", qty: 3 },
     { defId: "potion", qty: 2 },
   ]);

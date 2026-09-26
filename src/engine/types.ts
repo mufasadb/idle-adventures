@@ -22,7 +22,7 @@ export type Loadout = {
   equipment: Equipment;
   food: ItemStack[];
   potions: ItemStack[];
-  battleItems: ItemStack[]; // combat consumables (bzd): buff a single fight, consumed at fight start
+  battleItems: ItemStack[]; // combat consumables (bzd): used mid-fight via use-item (90j), buff that one fight
   spares?: ItemStack[]; // spare gear packed into carry slots (82r): 1 slot per piece; expanded into expedition.carry at embark. Optional/absent = [] (old saves, terse test states); reads guard with `?? []`.
   ammo?: ItemStack[]; // arrows (D45): spent 1/exchange while a bow is wielded; stacks ARROW_STACK_CAP per slot (consumableSlots counts ceil); unspent ammo banks back at run end. Optional/absent = []; reads guard with `?? []`.
   enhancements?: ItemStack[]; // weapon enhancements (D60): whetstone/oils packed like battle-items (1 slot/unit, no stacking); applied mid-run by the `enhance` action, unused ones bank back. Optional/absent = []; reads guard with `?? []`.
@@ -86,7 +86,7 @@ export type GameState = {
   expedition: Expedition | null;
   runs?: number; // completed expeditions — advances the candidate-map offer so town shows FRESH maps each visit (not the same 3 forever). Optional/absent = 0 (old saves, terse test states); reads guard with `?? 0`.
   maps?: MapItem[]; // held maps (xzx): pocketed from the offer, consumed on embark. Optional/absent = [] (old saves, terse test states); reads guard with `?? []`.
-  stations?: StationId[]; // built home stations (ke3): non-bank permanent infra that gates deep recipes. Optional/absent = [] (old saves, pre-ke3 states); reads guard with `?? []`. Write path (buildsStation) lands in ke3.2.
+  stations?: StationId[]; // built home stations (ke3): non-bank permanent infra that gates deep recipes. Optional/absent = [] (old saves, pre-ke3 states); reads guard with `?? []`. Written by crafting a recipe with `buildsStation` (ke3.2).
 };
 
 // Loadout slots an action can target when packing.

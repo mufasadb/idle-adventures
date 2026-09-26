@@ -1,7 +1,7 @@
 // Return flavor beat (xwp): pure selection of a cosmetic line shown on a
-// VOLUNTARY return (reduce.returnHome). Reframes the loop as value-extraction
-// under fatigue — see the RETURN_FLAVOR levers in ../data/constants. Kept out of
-// reduce.ts (already large) as a small, independently testable unit.
+// VOLUNTARY return (returnHome in reduce-expedition.ts). Reframes the loop as
+// value-extraction under fatigue — see the RETURN_FLAVOR levers in ../data/constants.
+// Kept as a small, independently testable unit.
 import type { ItemStack } from "./types";
 import { rand } from "./rng";
 import {

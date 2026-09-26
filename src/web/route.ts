@@ -54,7 +54,7 @@ export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: S
   const payThenEat = (cost: number): void => {
     simEnergy -= cost;
     if (autoEatFood) {
-      const fed = eatToRefill(simFood, simEnergy, maxEnergy, autoEatFood, 1);
+      const fed = eatToRefill(simFood, simEnergy, maxEnergy, autoEatFood);
       simFood = fed.food;
       simEnergy = fed.energy;
     }

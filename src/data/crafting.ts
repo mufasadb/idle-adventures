@@ -87,7 +87,7 @@ export const RECIPE: Record<
   raft: { inputs: [{ defId: "pine-log", qty: 2 }, { defId: "deer-hide", qty: 1 }], output: { defId: "raft", qty: 1 } }, // discounts rivers (30 → 10)
   waders: { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "pine-log", qty: 1 }], output: { defId: "waders", qty: 1 } }, // discounts mud (15 → 10)
   "ice-cleats": { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "wolf-pelt", qty: 1 }], output: { defId: "ice-cleats", qty: 1 } }, // glide on ice (20 → 5)
-  tent: { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "pine-log", qty: 2 }], output: { defId: "tent", qty: 1 } }, // camp gear (dtv): food restores +50% energy
+  tent: { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "pine-log", qty: 2 }], output: { defId: "tent", qty: 1 } }, // camp gear (dtv; 7lr): once-per-run camp meal restores ×TENT_FOOD_MULTIPLIER
   canteen: { inputs: [{ defId: "copper-ore", qty: 2 }, { defId: "deer-hide", qty: 1 }], output: { defId: "canteen", qty: 1 } }, // provision gear (si7.2): +maxEnergy; a copper sink
   // Backpack — carry upgrades. `small-backpack` is your FIRST pack (you start
   // bare): cheap, one hunt's worth of hide. Then leather (5), large-pack (7, T2).

@@ -1,6 +1,6 @@
 import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot, Expedition, Loadout } from "./types";
 import { expeditionGrid } from "./grid";
-import { stepToward, moveCost } from "./move";
+import { stepToward, moveCost, isDiagonalStep } from "./move";
 import { addToCarry, freeLootStacks, usedSlots, carryCap, consumeExpeditionInputs, consumeOne } from "./carry";
 import { toolSpeedFor, gatherCost, gateSatisfied, secondaryToolSatisfied } from "./tools";
 import { foodEnergyOf } from "./food";
@@ -12,7 +12,7 @@ import type { EquipSlot } from "./pack";
 import { slotOf, isGear } from "./catalog";
 import { MAX_ENERGY, MAP_WIDTH, MAP_HEIGHT, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, FOOD, POTION, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, RECIPE } from "../data/constants";
 import { visionRadius } from "./perceive";
-import { rejected, autoRefill } from "./reduce-shared";
+import { rejected, autoRefill, livePoiAt, isCleared } from "./reduce-shared";
 import { engage, maybeAutoFinish, provokeTurn, pendingLootFits } from "./reduce-combat";
 
 export function move(
@@ -36,13 +36,12 @@ export function move(
   // Walking INTO a live monster is a fight, not a step (2026-07-05): monsters
   // block their tile until beaten, so pathing through one is a real choice
   // (fight it, or route around). No energy cost — combat spends HP, not energy.
-  const poiAtStep = grid.pois.find((p) => p.x === step.x && p.y === step.y);
-  const stepCleared = expedition.cleared.some((c) => c.x === step.x && c.y === step.y);
-  if (poiAtStep && poiAtStep.kind === "monster" && poiAtStep.creature !== null && !stepCleared) {
+  const poiAtStep = livePoiAt(grid, expedition, step);
+  if (poiAtStep && poiAtStep.kind === "monster" && poiAtStep.creature !== null) {
     return maybeAutoFinish(engage(state, expedition, step, poiAtStep.creature, "move", true), expedition); // 67e: auto-finish resolves a walked-into fight
   }
   const terrain = grid.terrain[step.y]![step.x]!;
-  const cost = moveCost(terrain, expedition.loadout.equipment.transport, expedition.loadout.equipment.tools, from.x !== step.x && from.y !== step.y); // l2w: diagonal steps cost √2×
+  const cost = moveCost(terrain, expedition.loadout.equipment.transport, expedition.loadout.equipment.tools, isDiagonalStep(from, step)); // l2w: diagonal steps cost √2×
   if (!Number.isFinite(cost)) return rejected(state, "move", "impassable");
   if (cost > expedition.energy) return rejected(state, "move", "exhausted");
   const fed = autoRefill(expedition, expedition.energy - cost); // drain, then waste-free auto-eat (dtv)
@@ -64,11 +63,8 @@ export function gather(state: GameState): { state: GameState; events: GameEvent[
   const { pos } = expedition;
   const grid = expeditionGrid(expedition);
   const poi = grid.pois.find((p) => p.x === pos.x && p.y === pos.y);
-  const alreadyCleared = expedition.cleared.some(
-    (c) => c.x === pos.x && c.y === pos.y,
-  );
   if (!poi) return rejected(state, "gather", "no-node");
-  if (alreadyCleared) return rejected(state, "gather", "already-cleared");
+  if (isCleared(expedition, pos)) return rejected(state, "gather", "already-cleared");
   if (poi.kind === "monster" || poi.material === null) {
     return rejected(state, "gather", "not-gatherable");
   }
@@ -229,10 +225,10 @@ export function toggleAutoGather(state: GameState): { state: GameState; events: 
   return { state: { ...state, expedition: { ...expedition, autoGather: on } }, events: [{ type: "auto-gather-toggled", on }] };
 }
 
-// Shared don/doff plumbing (82r): the pre-fight prep actions. Both are rejected
-// mid-engagement (the agency is BEFORE stepping onto the monster, not mid-swing)
-// and cost DON_DOFF_ENERGY. The candidate (equipment + carry) must fit its OWN
-// capacity — carryCap of the candidate equipment — which makes backpack /
+// Shared don/doff plumbing (82r). Out of combat a swap costs DON_DOFF_ENERGY;
+// since 67e it is also legal while engaged, where it costs a monster turn
+// (provokeTurn) instead of energy. The candidate (equipment + carry) must fit its
+// OWN capacity — carryCap of the candidate equipment — which makes backpack /
 // transport / panniers swaps safe with no special cases: you can't doff the
 // horse while the panniers capacity it enables is holding your loot.
 function donDoffChecks(
@@ -245,6 +241,34 @@ function donDoffChecks(
   // in don/doff via provokeTurn), not energy. The energy gate only bites out of combat.
   if (!expedition.combat && DON_DOFF_ENERGY > expedition.energy) return { rejected: rejected(state, action, "exhausted") };
   return { expedition };
+}
+
+// The common tail of don/doff: capacity check on the candidate kit, the xe4
+// pending-loot re-check while engaged, then the cost — a monster turn in combat
+// (67e), DON_DOFF_ENERGY (+ auto-refill) out of it. `event` builds the action's
+// own event from the post-refill energy.
+function finishSwap(
+  state: GameState,
+  expedition: Expedition,
+  action: "don" | "doff",
+  loadout: Loadout,
+  carryNext: ItemStack[],
+  event: (energy: number) => GameEvent,
+): { state: GameState; events: GameEvent[] } {
+  if (usedSlots(loadout, carryNext) > carryCap(loadout.equipment)) {
+    return rejected(state, action, "carry-full");
+  }
+  // xe4: while engaged, the swap must also leave room for the pending victory loot.
+  if (expedition.combat && !pendingLootFits(state, expedition.combat, loadout, carryNext)) {
+    return rejected(state, action, "carry-full");
+  }
+  // 67e: in-combat swap costs the monster's turn, NOT energy; out-of-combat keeps DON_DOFF_ENERGY.
+  const spend = expedition.combat ? 0 : DON_DOFF_ENERGY;
+  const fed = autoRefill({ ...expedition, loadout }, expedition.energy - spend);
+  const nextExp = { ...expedition, energy: fed.energy, loadout: { ...loadout, food: fed.food }, carry: carryNext };
+  const ev = event(fed.energy);
+  if (nextExp.combat) return provokeTurn(state, nextExp, [ev]);
+  return { state: { ...state, expedition: nextExp }, events: [ev] };
 }
 
 export function don(state: GameState, itemId: string): { state: GameState; events: GameEvent[] } {
@@ -268,20 +292,7 @@ export function don(state: GameState, itemId: string): { state: GameState; event
     if (displaced !== null) carryNext = [...carryNext, { defId: displaced, qty: 1 }];
   }
   const loadout = { ...expedition.loadout, equipment };
-  if (usedSlots(loadout, carryNext) > carryCap(equipment)) {
-    return rejected(state, "don", "carry-full");
-  }
-  // xe4: while engaged, the swap must also leave room for the pending victory loot.
-  if (expedition.combat && !pendingLootFits(state, expedition.combat, loadout, carryNext)) {
-    return rejected(state, "don", "carry-full");
-  }
-  // 67e: in-combat swap costs the monster's turn, NOT energy; out-of-combat keeps DON_DOFF_ENERGY.
-  const spend = expedition.combat ? 0 : DON_DOFF_ENERGY;
-  const fed = autoRefill({ ...expedition, loadout }, expedition.energy - spend);
-  const nextExp = { ...expedition, energy: fed.energy, loadout: { ...loadout, food: fed.food }, carry: carryNext };
-  const donned: GameEvent = { type: "donned", defId: itemId, slot, displaced, energy: fed.energy };
-  if (nextExp.combat) return provokeTurn(state, nextExp, [donned]);
-  return { state: { ...state, expedition: nextExp }, events: [donned] };
+  return finishSwap(state, expedition, "don", loadout, carryNext, (energy) => ({ type: "donned", defId: itemId, slot, displaced, energy }));
 }
 
 export function doff(state: GameState, itemId: string): { state: GameState; events: GameEvent[] } {
@@ -302,20 +313,7 @@ export function doff(state: GameState, itemId: string): { state: GameState; even
   }
   const carryNext = [...expedition.carry, { defId: itemId, qty: 1 }];
   const loadout = { ...expedition.loadout, equipment };
-  if (usedSlots(loadout, carryNext) > carryCap(equipment)) {
-    return rejected(state, "doff", "carry-full");
-  }
-  // xe4: while engaged, the swap must also leave room for the pending victory loot.
-  if (expedition.combat && !pendingLootFits(state, expedition.combat, loadout, carryNext)) {
-    return rejected(state, "doff", "carry-full");
-  }
-  // 67e: in-combat swap costs the monster's turn, NOT energy (mirrors don).
-  const spend = expedition.combat ? 0 : DON_DOFF_ENERGY;
-  const fed = autoRefill({ ...expedition, loadout }, expedition.energy - spend);
-  const nextExp = { ...expedition, energy: fed.energy, loadout: { ...loadout, food: fed.food }, carry: carryNext };
-  const doffed: GameEvent = { type: "doffed", defId: itemId, slot, energy: fed.energy };
-  if (nextExp.combat) return provokeTurn(state, nextExp, [doffed]);
-  return { state: { ...state, expedition: nextExp }, events: [doffed] };
+  return finishSwap(state, expedition, "doff", loadout, carryNext, (energy) => ({ type: "doffed", defId: itemId, slot, energy }));
 }
 
 // ke3.4: is `terrain` the current tile or one of its 4-neighbours? (field-craft

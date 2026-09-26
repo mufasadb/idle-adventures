@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { slotCap, carryCap, addToCarry, freeCarryStacks, mapCarryCap } from "../src/engine/carry";
+import { slotCap, carryCap, addToCarry, freeLootStacks, mapCarryCap } from "../src/engine/carry";
 import { BASE_CARRY_SLOTS, BACKPACK_SLOTS, STACK_CAP, TRANSPORT_CARRY, PANNIERS_SLOTS, MAP_CARRY_BASE, MAP_HOLDER_CAP } from "../src/data/constants";
 import type { ItemStack } from "../src/engine/types";
 import { emptyLoadout } from "../src/engine/loadout";
@@ -68,14 +68,14 @@ test("addToCarry: zero free stacks still allows a pure merge", () => {
   expect(addToCarry(carry, "iron-ore", 3, 1)).toEqual([{ defId: "iron-ore", qty: 5 }]);
 });
 
-test("freeCarryStacks: consumable units + tools each take a slot (pqp)", () => {
+test("freeLootStacks: consumable units + tools each take a slot (pqp)", () => {
   const loadout = emptyLoadout();
-  expect(freeCarryStacks(loadout)).toBe(BASE_CARRY_SLOTS);
+  expect(freeLootStacks(loadout)).toBe(BASE_CARRY_SLOTS);
   loadout.equipment.backpack = "small-backpack";
   loadout.food = [{ defId: "bread", qty: 3 }]; // 3 units → 3 slots (no stacking)
   loadout.potions = [{ defId: "healing-potion", qty: 2 }]; // 2 units → 2 slots
   loadout.equipment.tools = ["pick"]; // tools cost a slot too
-  expect(freeCarryStacks(loadout)).toBe(BACKPACK_SLOTS["small-backpack"]! - 3 - 2 - 1);
+  expect(freeLootStacks(loadout)).toBe(BACKPACK_SLOTS["small-backpack"]! - 3 - 2 - 1);
 });
 
 // --- Map-carry capacity (zpm.2): a dedicated pool, separate from loot slots ---

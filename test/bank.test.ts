@@ -53,10 +53,10 @@ test("endExpedition: banks carry + durables + potions + uneaten food (D26, pqp)"
     { defId: "sword", qty: 2 }, // pre-existing 1 + the equipped one
     { defId: "silver-ore", qty: 3 },
     { defId: "plate-chest", qty: 1 },
+    { defId: "horse", qty: 1 }, // durables bank in wornPieces (EQUIP_SLOTS) order, then tools
+    { defId: "small-backpack", qty: 1 },
     { defId: "pick", qty: 1 },
     { defId: "spyglass", qty: 1 },
-    { defId: "horse", qty: 1 },
-    { defId: "small-backpack", qty: 1 },
     { defId: "bread", qty: 2 }, // uneaten food banks back (pqp); 0ps: consumables bank in registry order (food before potions)
     { defId: "healing-potion", qty: 1 },
   ]);

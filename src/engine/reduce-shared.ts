@@ -1,4 +1,5 @@
 import type { GameState, Action, GameEvent, RejectionReason, Expedition } from "./types";
+import type { Grid, Poi } from "./grid";
 import { eatToRefill } from "./food";
 import { MAX_ENERGY } from "../data/constants";
 
@@ -26,7 +27,18 @@ export function autoRefill(
     expedition.loadout.food,
     energy,
     expedition.maxEnergy ?? MAX_ENERGY,
-    target,
-    1, // 7lr: auto-eat gets NO tent bonus — the tent's +50% now lives only in the manual camp meal
+    target, // 7lr: auto-eat gets NO tent bonus — the tent's +50% lives only in the manual camp meal
   );
+}
+
+// Has the POI at `at` already been gathered / beaten this run?
+export function isCleared(expedition: Expedition, at: { x: number; y: number }): boolean {
+  return expedition.cleared.some((c) => c.x === at.x && c.y === at.y);
+}
+
+// The POI at `at` if there is one AND it isn't cleared yet — the "is something
+// still there?" lookup shared by walk-in engage, fight, and ranged fight.
+export function livePoiAt(grid: Grid, expedition: Expedition, at: { x: number; y: number }): Poi | undefined {
+  const poi = grid.pois.find((p) => p.x === at.x && p.y === at.y);
+  return poi && !isCleared(expedition, at) ? poi : undefined;
 }

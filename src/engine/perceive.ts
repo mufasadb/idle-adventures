@@ -2,7 +2,8 @@
 // a node's qualitative identity resolves only within the effective detail radius
 // (DETAIL_RADIUS + equipped VISION_RANGE_BONUS). Returns STRUCTURED FACTS ONLY —
 // never a fight outcome, never the hidden affinity (discovered post-fight).
-import { DETAIL_RADIUS, VISION_RANGE_BONUS, MONSTERS, MATERIAL_GATE } from "../data/constants";
+import { DETAIL_RADIUS, VISION_RANGE_BONUS, MONSTERS } from "../data/constants";
+import { materialGate } from "./tools";
 import type { NodeType, DmgType, ArmourType } from "../data/constants";
 import type { Grid } from "./grid";
 import type { Coord } from "./move";
@@ -51,7 +52,7 @@ export function perceive(grid: Grid, playerPos: Coord, tools: string[], surveyed
       const m = MONSTERS[p.creature]!;
       detail = { tier: m.tier, dmgType: m.dmgType, armourType: m.armourType, creature: p.creature };
     } else {
-      const gatedBy = p.material ? (MATERIAL_GATE[p.material]?.tools ?? null) : null;
+      const gatedBy = p.material ? materialGate(p.material) : null;
       detail = { gatedBy, ...(p.material ? { material: p.material } : {}), ...(p.magnitude ? { magnitude: p.magnitude } : {}) };
     }
     return { x: p.x, y: p.y, kind: p.kind, detail, ...camp };

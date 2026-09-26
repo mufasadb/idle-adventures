@@ -35,7 +35,7 @@ export function isGear(defId: string): boolean {
 // list on Loadout, so a new consumable category (magic scrolls, reagents, …) is
 // one Loadout field + one row here + one catalog list — instead of ~7 hand-copied
 // plumbing sites (slot accounting, packing, banking). The action handlers
-// (eat/quaff/use-item/enhance in reduce.ts) keep their bespoke consumption-order
+// (eat in reduce-expedition.ts; quaff/use-item/enhance in reduce-combat.ts) keep their bespoke consumption-order
 // logic; this table unifies slot accounting / packing / banking ONLY.
 //
 // ConsumableKey is DERIVED from Loadout: any field whose type is ItemStack[]

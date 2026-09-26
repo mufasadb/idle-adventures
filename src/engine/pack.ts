@@ -39,13 +39,9 @@ export function wornPieces(equipment: Equipment): (string | null)[] {
 export function reserveLoadout(loadout: Loadout): ItemStack[] {
   const { equipment } = loadout;
   const out: ItemStack[] = [];
-  for (const piece of [equipment.weapon, ...ARMOUR_SLOTS.map((s) => equipment[s])]) {
+  for (const piece of [...wornPieces(equipment), ...equipment.tools]) {
     if (piece !== null) out.push({ defId: piece, qty: 1 });
   }
-  for (const tool of equipment.tools) out.push({ defId: tool, qty: 1 });
-  if (equipment.transport !== null) out.push({ defId: equipment.transport, qty: 1 });
-  if (equipment.backpack !== null) out.push({ defId: equipment.backpack, qty: 1 });
-  if (equipment.panniers !== null) out.push({ defId: equipment.panniers, qty: 1 });
   // 0ps: every consumable kind's units reserve from the bank (food/potions/
   // battle-items/spares/ammo/enhancements) — one loop over the registry.
   for (const key of CONSUMABLE_KEYS) {
