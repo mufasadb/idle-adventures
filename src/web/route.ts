@@ -112,3 +112,24 @@ export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: S
   }
   return { legs, drawn, walkable, waypointKeys, blockKeys, walkCost, actionCost, endEnergy: simEnergy, strands, crossedMonster, blocked: legs.some((l) => l.blockedAt !== null), end: wps.length ? wps[wps.length - 1]! : exp.pos };
 }
+
+// --- click → waypoint list (eot) --------------------------------------------
+// A click either clears, TRUNCATES (snaps to the earliest walk-order occurrence of a
+// tile already on the drawn path — this is the "un-click to unwind" gesture, and it
+// resolves self-crossing routes deterministically), or APPENDS a new waypoint. The
+// truncation target becomes the new final waypoint.
+export function routeAfterClick(exp: Expedition, wps: Pos[], to: Pos, blocked: boolean): Pos[] {
+  if (to.x === exp.pos.x && to.y === exp.pos.y) return []; // click self = clear
+  // earliest walk-order occurrence of `to` across the legs → truncate there (unwind)
+  let legStart: Pos = exp.pos;
+  for (let i = 0; i < wps.length; i++) {
+    for (const t of lineTiles(legStart, wps[i]!)) {
+      if (t.x === to.x && t.y === to.y) return [...wps.slice(0, i), to];
+    }
+    legStart = wps[i]!;
+  }
+  // Not on the path → a new leg. But if the route is ALREADY blocked, appending would
+  // just stack more ghost-blocked legs that never clear (playtest F5) — so a fresh click
+  // starts OVER with a single leg from the player instead of poisoning the plan further.
+  return blocked ? [to] : [...wps, to];
+}

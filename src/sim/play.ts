@@ -2,7 +2,7 @@
 // concatenated event log. Pure — same seed + actions always reproduce the run.
 // This is the unit-test and AI entry point; the interactive web view is a
 // separate driver over the same reduce.
-import type { GameState, Action, GameEvent } from "../engine/types";
+import type { GameState, Action, GameEvent, RejectionReason } from "../engine/types";
 import { reduce } from "../engine/reduce";
 import { newGame } from "../engine/town";
 import { lineTiles } from "../engine/line";
@@ -12,7 +12,7 @@ import { lineTiles } from "../engine/line";
 // auto-routing around walls — and walks each tile through reduce, auto-gathering
 // nodes it crosses (gated by autoGather). The agent plans the whole multi-leg route
 // up front, exactly as a human clicks waypoints. Dijkstra auto-routing is retired
-// from the agent surface (routeTo stays parked for the balance player, harvest.ts).
+// from the agent surface (routeTo in route.ts stays parked for bead s2e).
 export type RouteDirective = { type: "route"; waypoints: { x: number; y: number }[] };
 export type DriverAction = Action | RouteDirective;
 
@@ -21,36 +21,55 @@ export type DriverAction = Action | RouteDirective;
 // a hand-typed move, D29). Auto-gather (autoGather ?? true) harvests each node the
 // line steps ONTO. The whole route halts on the first blocking tile (impassable /
 // exhausted), a walked-into fight, or a full bag on an auto-gather — so the agent
-// re-plans from where it stopped, exactly as a human re-clicks.
-export function route(state: GameState, waypoints: { x: number; y: number }[]): { state: GameState; events: GameEvent[] } {
-  if (!state.expedition) return { state, events: [{ type: "action-rejected", action: "move", reason: "not-on-expedition" }] };
+// re-plans from where it stopped, exactly as a human re-clicks. The web's Walk
+// button drives this same function, so the two surfaces can't drift.
+export type RouteHalt =
+  | { kind: "rejected"; reason: RejectionReason } // wall / exhausted — the move's true cause
+  | { kind: "engaged" } // walked into a monster
+  | { kind: "bag-full" }; // an auto-gather found no room — pause, the rest of the route stands
+export type RouteResult = {
+  state: GameState;
+  events: GameEvent[];
+  steps: number; // tiles actually moved
+  gathered: number; // auto-gathers that landed
+  halt: RouteHalt | null; // null = every waypoint reached
+  remaining: { x: number; y: number }[]; // waypoints not yet reached (the current one included)
+};
+
+export function route(state: GameState, waypoints: { x: number; y: number }[]): RouteResult {
+  if (!state.expedition) {
+    return { state, events: [{ type: "action-rejected", action: "move", reason: "not-on-expedition" }], steps: 0, gathered: 0, halt: { kind: "rejected", reason: "not-on-expedition" }, remaining: [...waypoints] };
+  }
   let cur = state;
   const events: GameEvent[] = [];
-  for (const wp of waypoints) {
-    let halted = false;
-    for (const tile of lineTiles(cur.expedition!.pos, wp)) {
+  let steps = 0;
+  let gathered = 0;
+  for (let i = 0; i < waypoints.length; i++) {
+    const halt = (h: RouteHalt): RouteResult => ({ state: cur, events, steps, gathered, halt: h, remaining: waypoints.slice(i) });
+    for (const tile of lineTiles(cur.expedition!.pos, waypoints[i]!)) {
       const moved = reduce(cur, { type: "move", to: tile });
-      cur = moved.state;
       events.push(...moved.events);
-      if (moved.events.some((e) => e.type === "action-rejected")) { halted = true; break; } // wall / exhausted
-      if (cur.expedition?.combat) { halted = true; break; } // walked into a monster → engaged
+      const rej = moved.events.find((e): e is Extract<GameEvent, { type: "action-rejected" }> => e.type === "action-rejected");
+      if (rej) return halt({ kind: "rejected", reason: rej.reason }); // wall / exhausted
+      cur = moved.state;
+      if (cur.expedition?.combat) return halt({ kind: "engaged" }); // walked into a monster → engaged
+      steps += 1;
 
       if (cur.expedition && (cur.expedition.autoGather ?? true)) {
         const g = reduce(cur, { type: "gather" });
         if (g.events.some((e) => e.type === "gathered")) {
           cur = g.state;
           events.push(...g.events);
+          gathered += 1;
         } else if (g.events.some((e) => e.type === "action-rejected" && e.reason === "carry-full")) {
           events.push(...g.events); // bag full → pause the route here
-          halted = true;
-          break;
+          return halt({ kind: "bag-full" });
         }
         // any other gather rejection (no node / too weak / exhausted) — skip, keep walking
       }
     }
-    if (halted) break;
   }
-  return { state: cur, events };
+  return { state: cur, events, steps, gathered, halt: null, remaining: [] };
 }
 
 export function play(

@@ -54,7 +54,7 @@ export const GATHER_VERB: Record<string, { label: string; past: string; noun: st
 };
 
 // One-decimal display rounding for log numbers (matches the web's historical style).
-const round1 = (n: number) => Math.round(n * 10) / 10;
+export const round1 = (n: number) => Math.round(n * 10) / 10;
 
 // THE GameEvent → text formatter (exm): one exhaustive switch, shared by the web and
 // the headless playtest console. The `name` fn is the surface's only vocabulary knob —
