@@ -4,12 +4,13 @@ This file provides instructions and context for AI coding agents working on this
 
 ## This project — Idle Adventure (POC)
 
-A turn-based exploration RPG built as a "logistics puzzle on a grid": pack a loadout, drop onto a procedural 20×60 map, make routing/gather/fight calls to **extract as much value as you can before fatigue forces you home** (return is free — the tension is depth-vs-haul under an **energy + HP budget**, not turn-back timing; see D62), craft upgrades, go again. The POC validates exactly one thing — **is that loop fun?**
+A turn-based exploration RPG built as a "logistics puzzle on a grid": pack a loadout, drop onto a procedural 35×35 map (D84: square, entry at the centre), make routing/gather/fight calls to **extract as much value as you can before fatigue forces you home** (return is free — the tension is depth-vs-haul under an **energy + HP budget**, not turn-back timing; see D62), craft upgrades, go again. The POC validates exactly one thing — **is that loop fun?**
 
 **Read first (in `docs/`):**
 - `superpowers/specs/2026-06-30-idle-adventure-poc-core-loop-design.md` — the design (what + why), including the engine contract.
-- `superpowers/plans/2026-06-30-poc-core-loop-plan.md` — milestone plan M0→M7.
-- `decisions.md` — decision history (D1–D19, with rationale).
+- `superpowers/plans/2026-06-30-poc-core-loop-plan.md` — milestone plan M0→M7 (completed milestone/feature plans are archived under `archive/plans/`; old playtest write-ups under `archive/playtests/`).
+- `superpowers/specs/2026-07-31-breadth-charter-biomes-verticals.md` — **the current roadmap**: biomes × verticals ordered into buildable sets (epic `si7.6`).
+- `decisions.md` — decision history (D1–D87 as of 2026-09, with rationale — check the highest D-number before adding one).
 - `balance-levers.md` — every tunable is a named lever; tuning happens here.
 - Full vision/notes: the user's Obsidian vault, `Project Ideas/idle adventures/`.
 
@@ -49,7 +50,7 @@ bd close <id>         # Complete work
 - Run `bd prime` for detailed command reference and session close protocol
 - Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
 
-**Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md for details and anti-patterns.
+**Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote (`bd dolt push`/`pull`). There is no JSONL export in this repo (`export.auto: false`), and the only tracked `.beads/` files are `README.md`, `.gitignore`, `hooks/*` and `identity.toml`. See https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md for details and anti-patterns.
 
 ## Agent Context Profiles
 
@@ -105,7 +106,7 @@ One pure engine, one shared presentation layer, two thin surfaces. The reducer i
 **`src/engine/`** (pure — lint-enforced boundary):
 - `types.ts` — the contract: `GameState`/`Expedition`/`Engagement`, `Action`, `GameEvent`, `RejectionReason` (closed unions; adding an Action without a reducer case is a compile error).
 - `reduce.ts` — the reducer's **dispatch switch only** (ehr): one exhaustive `switch (action.type)` + `assertNever`. The drift guarantee lives HERE, not in file colocation — adding an Action without a case is a compile error. The rules themselves live in domain handler modules: **`reduce-town.ts`** (embark, ink, town-craft, pack), **`reduce-expedition.ts`** (move, gather, drop, eat, survey, don/doff, field-craft, return, toggles + `placeYield`/`donDoffChecks`), **`reduce-combat.ts`** (fight/engage/fightRound/applyVictory, flee, quaff, use-item, enhance, provokeTurn, auto-finish), and **`reduce-shared.ts`** (`rejected()`, `autoRefill()`). Import chain is acyclic: `shared ← combat ← expedition ← town ← reduce`. To add an action: add a case in `reduce.ts` + a handler in the matching domain module. A rejected action returns the ORIGINAL state plus an `action-rejected` event (`rejected()` in reduce-shared).
-- `grid.ts` — deterministic map generation: base Perlin terrain + low-frequency barrier layer, connectivity carve (all walkable tiles = one component), south-edge entry (must be walkable), value-agnostic POI rejection-sampling on walkable tiles (D57r retired the value-vs-reach pairing). Memoized per `(mapSeed, biomeId, mapTier, affixes)`.
+- `grid.ts` — deterministic map generation: base Perlin terrain + low-frequency barrier layer, connectivity carve (all walkable tiles = one component), centre entry (D84: walkable tile nearest the geometric centre), value-agnostic POI rejection-sampling on walkable tiles (D57r retired the value-vs-reach pairing). Memoized per `(mapSeed, biomeId, mapTier, affixes)`.
 - `noise.ts` / `rng.ts` — seeded primitives: `perlin2`, `rand` (stateless hash — namespace seeds like `` `${seed}:barrier` ``), `weightedPick` (always over sorted keys for determinism).
 - `reach.ts` — `costToReach` (Dijkstra) + `reachableTiles` (flood); honours gear/transport via `moveCost`.
 - `line.ts` — `lineTiles(a,b)`: pure Bresenham direct-line stepper for player-planned routing (eot); one 8-neighbour grid step per tile.
@@ -115,15 +116,18 @@ One pure engine, one shared presentation layer, two thin surfaces. The reducer i
 - `food.ts` — stamina refills: `eatToRefill` eats whole units off the FRONT, waste-free (fresh forage inserts at the front so it's eaten before rations).
 - `pack.ts` — town-side loadout planning validated against `bank − reservations`; bank debits only at embark.
 - `bank.ts` — run-end banking (`endExpedition`, shared by return + combat soft-fail); applies `FRESH_TO_STALE` defId transforms.
-- `craft.ts` / `catalog.ts` (`slotOf` derives slots from the catalog lists) / `town.ts` (`newGame`, `candidateMaps`, `previewHints`) / `loadout.ts`.
+- `craft.ts` / `catalog.ts` (`slotOf` derives slots from the catalog lists) / `town.ts` (`newGame`, `localMap`, `mapEpithet`/`epithetForGrid`, `previewHints`; `candidateMaps` retired in D80) / `loadout.ts`.
+- `tools.ts` — gather tool gating: `gatherCost`, `materialGate`/`gateSatisfied`, `toolSpeedFor` (capabilities via `TOOL_CAPABILITY`).
+- `perceive.ts` — passive range-gated perception (`perceive`, `visionRadius`): structured facts only, never fight outcomes or hidden affinity.
+- `flavor.ts` — cosmetic return-flavor line selection (`pickReturnFlavor`, `RETURN_FLAVOR` levers).
 
-**`src/data/constants.ts`** — every lever and catalog. The only file where numbers live.
+**`src/data/`** — every lever and catalog; the only place numbers live. `constants.ts` is the entry point and re-exports the domain splits `combat.ts` (damage matrix, monsters/weapons/armour, loot, ammo, enhancements), `crafting.ts` (food/potion/battle-item catalogs, stations, `RECIPE`) and `spec.ts` (shared `ItemStackSpec`) — import from `constants` so consumers stay unchanged.
 
 **`src/render/`** — `render.ts`: the **shared presentation layer** (extracted under `eho`). Pure `state`/`defId` → text + data-shaped derivations that BOTH surfaces format, so the web and the blind-playtest console can't drift. Key exports: `name` (display names), `rejectCopy` (`RejectionReason` → player copy), `formatEvent` (the ONE exhaustive `GameEvent` → text switch — `exm`; web passes display `name`, playtest passes identity for raw defIds), `combatForecast`, the node/gate hints (`nodeToolHint`, `nodeGateNote`, `materialGated`, `materialLocked`), `describe`, `GATHER_VERB`, terrain/POI glyph maps. **Rule:** presentation logic both surfaces need lives here; web-only HTML builders (recipe-book rows, held-map card) stay in `main.ts` until a second UI exists. For legality-with-reason in a surface, use `whyNot(state, action)` (sim/legal.ts) → `rejectCopy` — never re-derive "why not" from the catalog (`ciq`, D29 one level up).
 
-**`src/sim/`** — `legal.ts` (candidate actions filtered through speculative `reduce` — D29: legality can never drift; `whyNot` hands back the reducer's own `RejectionReason`), `playtest.ts` + `cli.ts` (the headless console; the blind-playtest surface — append to its output, never reshape existing lines).
+**`src/sim/`** — `legal.ts` (candidate actions filtered through speculative `reduce` — D29: legality can never drift; `whyNot` hands back the reducer's own `RejectionReason`), `playtest.ts` + `cli.ts` (the headless console; the blind-playtest surface — append to its output, never reshape existing lines), `play.ts` (pure headless driver: seed + actions → state + event log, incl. the straight-line `route` directive) + `report.ts` (`summarize`: JSON snapshot for the CLI), `balance.ts` + `balance-cli.ts` (balance sim composing the pure engine; `bun run sim`, `bun run sim:tables` regenerates `docs/balance/`), `harvest.ts` (harvest-fraction reference player), `route.ts` (monster-aware Dijkstra auto-router — parked; serves only `harvest.ts`).
 
-**`src/web/`** — `main.ts` (the whole UI: string templates re-rendered from state on every action, one generic `data-act` click delegation in `wire()`) + `index.html` (all CSS). The event log is stored as structured `LogEntry[]` (`exm`) formatted at draw time, not pre-rendered HTML. **Before verifying any web change, read `docs/working-on-this-codebase.md` — and always start a FRESH server + append `?cb=$RANDOM` to every `agent-browser open` (stale-bundle cache is the #1 web-verification footgun; symptoms read as game-breaking bugs but are pure caching).**
+**`src/web/`** — `main.ts` (the whole UI: string templates re-rendered from state on every action, one generic `data-act` click delegation in `wire()`) + `route.ts` (pure, DOM-free `deriveRoute`: hand-planned straight-line waypoint preview + energy estimate) + `index.html` (all CSS). The event log is stored as structured `LogEntry[]` (`exm`) formatted at draw time, not pre-rendered HTML. **Before verifying any web change, read `docs/working-on-this-codebase.md` — and always start a FRESH server + append `?cb=$RANDOM` to every `agent-browser open` (stale-bundle cache is the #1 web-verification footgun; symptoms read as game-breaking bugs but are pure caching).**
 
 ## Pixel-art assets (epic idle-adventure-48l)
 
@@ -133,9 +137,9 @@ In THIS repo, `src/web/assets-trial.ts` (behind the `ASSET_TRIAL` flag in `main.
 
 ## Conventions & Patterns
 
-- Grids are `[y][x]`; `x ∈ [0, MAP_WIDTH)`, `y ∈ [0, MAP_HEIGHT)` (20×60 portrait strip).
+- Grids are `[y][x]`; `x ∈ [0, MAP_WIDTH)`, `y ∈ [0, MAP_HEIGHT)` (35×35 square since D84).
 - Optional `Expedition`/`GameState` fields exist for old saves + terse test states — always read with the documented `??` default (`autoQuaff ?? true`, `autoGather ?? true`, `maps ?? []`, …; note `autoEat` the boolean is gone — D48 replaced it with the `autoEatFood` defId). New optional fields follow this pattern and document their default in `types.ts`.
 - `GameEvent` is a closed union and the web `fmt()` switch is exhaustive — adding an event without a log line breaks typecheck (by design).
 - Every lever change lands with its docs: a `decisions.md` D-row (dense single-row style, cite the spec) and a `balance-levers.md` update. Check the highest D-number before writing.
 - Deeper working rules (gates, test idioms, harness invariants, browser verification): **`docs/working-on-this-codebase.md`** — hand this to any subagent touching code.
-- Beads export churn (`.beads/*.jsonl`) gets a `beads:` bookkeeping commit at session close — don't leave it dirty, don't fold it into feature commits.
+- Beads state lives in Dolt and syncs via `bd dolt push` — nothing under `.beads/` should churn in git (machine-local files are ignored). If a tracked `.beads/` file (hooks, `identity.toml`) does change, commit it on its own, not folded into a feature commit.
