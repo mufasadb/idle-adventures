@@ -8,9 +8,10 @@ import { moveCost } from "./move";
 import type { Coord } from "./move";
 
 // Count tiles reachable on foot from `entry` (plain flood over finite-cost
-// terrain). Cheaper than costToReach — used to pick an entry that opens onto a
-// real basin rather than a boxed-in corner pocket (b91). The entry tile itself
-// counts (you are placed there); expansion uses the same passability as movement.
+// terrain). Cheaper than costToReach. (b91 used it to pick a south-edge entry
+// opening onto a real basin; since D84 the entry is the walkable tile nearest the
+// centre, so generation no longer calls it.) The entry tile itself counts (you are
+// placed there); expansion uses the same passability as movement.
 export function reachableTiles(
   terrain: Terrain[][],
   entry: Coord,
@@ -50,7 +51,7 @@ export function costToReach(
   );
   cost[entry.y]![entry.x] = 0;
   const visited = new Set<string>();
-  // Grid is now 20×60 = 1200 tiles; the plain min-scan Dijkstra is still fine.
+  // Grid is MAP_WIDTH×MAP_HEIGHT (35×35 = 1225 tiles); the plain min-scan Dijkstra is still fine.
   for (;;) {
     let bx = -1, by = -1, best = Infinity;
     for (let y = 0; y < MAP_HEIGHT; y++) {

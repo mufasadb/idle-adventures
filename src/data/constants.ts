@@ -22,7 +22,7 @@ export const MAP_WIDTH = 35; // tiles across (square)
 export const MAP_HEIGHT = 35; // tiles down (square)
 export const NOISE_FREQUENCY = 0.15; // Perlin sample step per tile; lower = larger terrain regions
 // Barrier layer (e3j): a SECOND, lower-frequency noise field lays long walls of
-// each biome's barrierTerrain across the strip — the navigation puzzle. Tiles
+// each biome's barrierTerrain across the map — the navigation puzzle. Tiles
 // whose barrier sample exceeds BARRIER_THRESHOLD become wall; a connectivity
 // pass then guarantees all walkable tiles stay one component (nothing is ever
 // literally unreachable barefoot — mountains are cost-walls, not prisons).
