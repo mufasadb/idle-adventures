@@ -1,6 +1,6 @@
 // Item classification (M5): maps a defId to the loadout slot it belongs to, so
 // `pack` can reject items in the wrong slot. Reads the code-side catalog only.
-import { WEAPONS, ARMOUR, TOOL_CAPABILITY, TRANSPORT_MULTIPLIER, BACKPACK_SLOTS, FOOD, POTION, BATTLE_ITEM, PANNIERS, AMMO, ENHANCEMENT, ARROW_STACK_CAP } from "../data/constants";
+import { WEAPONS, ARMOUR, TOOL_CAPABILITY, TRANSPORT_MULTIPLIER, BACKPACK_SLOTS, FOOD, POTION, BATTLE_ITEM, PANNIERS, AMMO, ENHANCEMENT, ARROW_STACK_CAP, QUIVER_AMMO_CAP } from "../data/constants";
 import type { LoadoutSlot, Loadout, ItemStack } from "./types";
 
 export function slotOf(defId: string): LoadoutSlot | null {
@@ -10,6 +10,7 @@ export function slotOf(defId: string): LoadoutSlot | null {
   if (defId in TRANSPORT_MULTIPLIER) return "transport";
   if (defId in BACKPACK_SLOTS) return "backpack";
   if (PANNIERS.includes(defId)) return "panniers";
+  if (defId in QUIVER_AMMO_CAP) return "quiver";
   // Consumable kinds derive their intrinsic slot from the registry's member
   // predicates (0ps). 'spares' is skipped: "spare" is a packing INTENT (any gear
   // defId), not an item's intrinsic slot — and every gear item already returned
@@ -24,7 +25,7 @@ export function slotOf(defId: string): LoadoutSlot | null {
 
 // Gear = anything worn/wielded (durable); consumables (food/potion/battle-item)
 // are not. Drives the "spare" pack slot and per-piece carry stacking (82r).
-const GEAR_SLOTS: readonly LoadoutSlot[] = ["weapon", "helmet", "chest", "legs", "boots", "gloves", "tool", "transport", "backpack", "panniers"];
+const GEAR_SLOTS: readonly LoadoutSlot[] = ["weapon", "helmet", "chest", "legs", "boots", "gloves", "tool", "transport", "backpack", "panniers", "quiver"];
 
 export function isGear(defId: string): boolean {
   const slot = slotOf(defId);

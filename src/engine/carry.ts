@@ -1,6 +1,6 @@
 // Carry-slot accounting. Loot stacks hold STACK_CAP each; consumables and tools
 // each occupy ONE slot per unit (Phase 2, pqp — no stacking for consumables).
-import { BASE_CARRY_SLOTS, BACKPACK_SLOTS, STACK_CAP, TRANSPORT_CARRY, BEAST_TRANSPORTS, PANNIERS_SLOTS, AMMO, ARROW_STACK_CAP, MAP_CARRY_BASE, MAP_HOLDER_CAP, ENERGY_CAP_BONUS } from "../data/constants";
+import { BASE_CARRY_SLOTS, BACKPACK_SLOTS, STACK_CAP, TRANSPORT_CARRY, BEAST_TRANSPORTS, PANNIERS_SLOTS, AMMO, ARROW_STACK_CAP, MAP_CARRY_BASE, MAP_HOLDER_CAP, ENERGY_CAP_BONUS, QUIVER_AMMO_CAP } from "../data/constants";
 import { isGear, CONSUMABLE_KINDS, CONSUMABLE_KEYS } from "./catalog";
 import type { ItemStack, Loadout, Equipment } from "./types";
 
@@ -34,9 +34,19 @@ export function consumableSlots(loadout: Loadout): number {
   let slots = 0;
   for (const key of CONSUMABLE_KEYS) {
     const cap = CONSUMABLE_KINDS[key].stackCapPerSlot;
-    for (const s of loadout[key] ?? []) slots += Math.ceil(s.qty / cap);
+    let kindSlots = 0;
+    for (const s of loadout[key] ?? []) kindSlots += Math.ceil(s.qty / cap);
+    // ke3.7.1 (D92): a worn quiver absorbs AMMO slots only (never loot — F2 guard).
+    if (key === "ammo") kindSlots = Math.max(0, kindSlots - quiverAmmoSlots(loadout.equipment));
+    slots += kindSlots;
   }
   return slots + loadout.equipment.tools.length;
+}
+
+// Ammo slots a worn quiver takes off the carry count (D92): its unit capacity in slots.
+export function quiverAmmoSlots(equipment: Equipment): number {
+  const q = equipment.quiver ?? null;
+  return q === null ? 0 : Math.floor((QUIVER_AMMO_CAP[q] ?? 0) / ARROW_STACK_CAP);
 }
 
 // Free carry stacks for loot after consumables + tools take their slots (pqp):

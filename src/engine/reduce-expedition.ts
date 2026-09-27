@@ -369,7 +369,7 @@ export function don(state: GameState, itemId: string): { state: GameState; event
     if (worn.tools.includes(itemId)) return rejected(state, "don", "already-packed");
     equipment = { ...worn, tools: [...worn.tools, itemId] };
   } else {
-    displaced = worn[slot as EquipSlot];
+    displaced = worn[slot as EquipSlot] ?? null;
     equipment = { ...worn, [slot as EquipSlot]: itemId };
     if (displaced !== null) carryNext = [...carryNext, { defId: displaced, qty: 1 }];
   }

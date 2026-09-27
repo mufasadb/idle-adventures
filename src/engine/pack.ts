@@ -16,7 +16,7 @@ function addConsumable(list: ItemStack[], defId: string): ItemStack[] {
 
 // Single-occupancy equipment slots keyed exactly by LoadoutSlot name.
 // Exported for don/doff (82r), which swaps the same slots mid-run.
-export const EQUIP_SLOTS = ["weapon", "helmet", "chest", "legs", "boots", "gloves", "transport", "backpack", "panniers"] as const;
+export const EQUIP_SLOTS = ["weapon", "helmet", "chest", "legs", "boots", "gloves", "transport", "backpack", "panniers", "quiver"] as const;
 export type EquipSlot = (typeof EQUIP_SLOTS)[number];
 
 // The armour subset of the durable slots (07u): the single source for "what counts
@@ -29,7 +29,7 @@ export const ARMOUR_SLOTS = ["helmet", "chest", "legs", "boots", "gloves"] as co
 // whenever a slot was added. tools (a multi-slot array) are appended by callers that
 // want the FULL kit. nulls are kept — callers filter(Boolean) as they need.
 export function wornPieces(equipment: Equipment): (string | null)[] {
-  return EQUIP_SLOTS.map((slot) => equipment[slot]);
+  return EQUIP_SLOTS.map((slot) => equipment[slot] ?? null); // ?? null: optional slots (quiver) absent on old saves
 }
 
 // Every defId the plan reserves from the bank (each equipment piece ×1, each

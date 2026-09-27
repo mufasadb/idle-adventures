@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { craft } from "../src/engine/craft";
-import { RECIPE, ARMOUR, WEAPONS, TOOL_CAPABILITY, BACKPACK_SLOTS, TRANSPORT_MULTIPLIER, FOOD, POTION, BATTLE_ITEM, PANNIERS, AMMO, INKS, ENHANCEMENT, MAP_HOLDER_CAP } from "../src/data/constants";
+import { RECIPE, ARMOUR, WEAPONS, TOOL_CAPABILITY, BACKPACK_SLOTS, TRANSPORT_MULTIPLIER, FOOD, POTION, BATTLE_ITEM, PANNIERS, AMMO, INKS, ENHANCEMENT, MAP_HOLDER_CAP, QUIVER_AMMO_CAP } from "../src/data/constants";
 import { slotOf } from "../src/engine/catalog";
 
 // ke3.1 recipe-gate tests inject a throwaway recipe into the RECIPE catalog so the
@@ -160,6 +160,7 @@ test("recipes: every output is a real equippable/consumable defId — or a craft
     d in TRANSPORT_MULTIPLIER || FOOD.includes(d) || POTION.includes(d) || BATTLE_ITEM.includes(d) || PANNIERS.includes(d) || AMMO.includes(d) ||
     ENHANCEMENT.includes(d) || // weapon enhancements (D60): whetstone/oils packed as `enhancement`, applied by the `enhance` action
     d in INKS || // cartography inks (cxq): bank materials consumed by the `ink` action, not a recipe
+    d in QUIVER_AMMO_CAP || // quiver (ke3.7.1, D92): its own equipment slot
     d in MAP_HOLDER_CAP; // map holders (zpm.2): OWNED (not equipped) bank items that raise mapCarryCap — never packed, no slot
   // Crafted intermediates (D45 ranged-combat spec, 2026-07-07): `bowstring` is the
   // first recipe OUTPUT that is itself a material — legal iff some other recipe

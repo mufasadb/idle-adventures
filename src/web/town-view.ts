@@ -8,7 +8,7 @@ import { carryCap } from "../engine/carry";
 import { ARMOUR_SLOTS } from "../engine/pack";
 import { heldFoodEnergy } from "../engine/food";
 import { wieldsRanged, hasAmmo } from "../engine/combat";
-import { RECIPE, MAX_ENERGY, TENT_FOOD_MULTIPLIER, INKS } from "../data/constants";
+import { RECIPE, MAX_ENERGY, TENT_FOOD_MULTIPLIER, INKS, QUIVER_AMMO_CAP } from "../data/constants";
 import type { BiomeId } from "../data/constants";
 import { weaponHint, logisticsEffect, enhancementHint, describe, recipeGateHint, name, heldMapTitle, townRecipeIds } from "../render/render";
 import type { GameState, Action, MapItem } from "../engine/types";
@@ -128,6 +128,7 @@ function loadoutSection(state: GameState, hasLastPlan: boolean): string {
       ${equipRow("armour", ARMOUR_SLOTS.map((s) => eq[s]).filter(Boolean).map((d) => name(d as string)).join(", ") || null)}
       ${equipRow("transport", eq.transport ? `${name(eq.transport)}${TRANSPORT_ROLE[eq.transport] ? ` — ${TRANSPORT_ROLE[eq.transport]}` : ""}` : null)}
       ${eq.panniers ? equipRow("panniers", name(eq.panniers)) : ""}
+      ${eq.quiver ? equipRow("quiver", `${name(eq.quiver)} — holds ${QUIVER_AMMO_CAP[eq.quiver] ?? 0} ammo off your back`) : ""}
       ${equipRow("backpack", eq.backpack ? name(eq.backpack) : "none")}
       ${equipRow("tools", eq.tools.map(name).join(", ") || null)}
       <div class="row"><span class="k">bag</span><span class="v">${inv.used}/${cap} slots</span></div>
