@@ -1,7 +1,7 @@
 import type { GameState, GameEvent, ItemStack, Expedition, Loadout, MapItem } from "./types";
 import { expeditionGrid, rollBiome } from "./grid";
 import { addToCarry, freeLootStacks, mapCarryCap, consumeOne } from "./carry";
-import { strikeExchange, rollLoot, explainMatchup, damageTaken, wieldsRanged, hasAmmo } from "./combat";
+import { strikeExchange, rollLoot, explainMatchup, damageTaken, wieldsRanged, hasAmmo, loadedAmmoIndex } from "./combat";
 import type { ExchangeResult } from "./combat";
 import { endExpedition } from "./bank";
 import { previewHints } from "./town";
@@ -105,12 +105,14 @@ function fightRound(state: GameState): { state: GameState; events: GameEvent[] }
     },
   );
   let ammo = expedition.loadout.ammo ?? [];
-  if (spendsArrow) ammo = consumeOne(ammo); // front stack, FIFO — mirrors potions/food
+  const shot = spendsArrow ? ammo[loadedAmmoIndex(expedition.loadout)]!.defId : null;
+  if (spendsArrow) ammo = consumeOne(ammo, loadedAmmoIndex(expedition.loadout)); // the first stack THIS weapon shoots (si7.6.6), FIFO
   const potionsUsed = combat.potionsUsed + round.potionsUsed;
   const exchanged: GameEvent = {
     type: "exchanged", creature: combat.creature, dmgDealt: round.dmgDealt,
     dmgTaken: round.dmgTaken, monsterHp: round.monsterHp, hp: round.hp, potionsUsed,
     ...(spendsArrow ? { arrowSpent: true } : {}),
+    ...(shot && shot !== "arrows" ? { ammoSpent: shot } : {}),
     ...(round.poisonDmg > 0 ? { poisonDmg: round.poisonDmg } : {}), // D60: poison DoT this round
   };
   const loadout = { ...expedition.loadout, potions: round.potionsAfter, ammo };

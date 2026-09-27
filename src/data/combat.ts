@@ -55,7 +55,22 @@ export const ARROWS_PER_CRAFT = 10; // arrows per craft batch — "three differe
 // fletched path is deliberately parallel to the direct `arrows` recipe at q1 (no
 // free lunch) and only pays off once you've climbed to the steel knife.
 export const ARROW_SHAFTS_PER_LOG = 3; // shafts per log per unit tool quality (outputScale qtyPer)
-export const AMMO: string[] = ["arrows"]; // ammo catalog (slotOf → "ammo"); packed like potions, spent per exchange
+export const AMMO: string[] = ["arrows", "blow-dart", "venom-dart"]; // ammo catalog (slotOf → "ammo"); packed like potions, spent per exchange
+// Which ammo a ranged weapon shoots (si7.6.6): the smallest step toward the full
+// weapon-resource table si7.6.7 parks until magic lands. A ranged weapon absent here
+// shoots arrows (every bow). It spends the FIRST matching stack; other ammo is ignored,
+// so a blowgun wielder holding only arrows is "out of ammo" and swings a club (D45).
+export const AMMO_FOR: Record<string, string[]> = {
+  blowgun: ["blow-dart", "venom-dart"],
+};
+// Poison a dart applies on the hit (si7.6.6): set/refresh the engagement's poison (the
+// D60 venom-oil DoT) unless a stronger poison is already ticking. The dart's poison
+// TIER is the gate: blow-dart = a herb poison, venom-dart = still-brewed venom-oil.
+export const AMMO_POISON: Record<string, { dmg: number; rounds: number }> = {
+  "blow-dart": { dmg: 1, rounds: 3 },
+  "venom-dart": { dmg: 3, rounds: 4 },
+};
+export const DARTS_PER_CRAFT = 10; // darts per craft batch (mirrors ARROWS_PER_CRAFT)
 
 // ⚠ balance surface: changing this requires `bun run sim:tables` (test/balance-tables.test.ts enforces)
 export const MONSTER_TIER_HP_CURVE: Record<number, number> = {
@@ -171,6 +186,7 @@ export const WEAPONS: Record<string, Weapon> = {
   sword: { dmgType: "melee", damage: 3, tags: [] },
   "iron-sword": { dmgType: "melee", damage: 3, tags: ["iron"] }, // fae affinity
   bow: { dmgType: "ranged", damage: 3, tags: [] },
+  blowgun: { dmgType: "ranged", damage: 2, tags: [] }, // si7.6.6: weaker shot than the bow; its darts' poison ignores armour — the matchup pick vs plated/hard-hided monsters
   "fire-staff": { dmgType: "magic", damage: 3, tags: [] },
   // T2 (damage 4) — gated by a T2 material; silver-sword is the werewolf pick
   "silver-sword": { dmgType: "melee", damage: 3, tags: ["silver"] }, // stays dmg 3; its edge is the ×2 affinity

@@ -205,7 +205,7 @@ export type GameEvent =
   | { type: "ate"; defId: string; restored: number; energy: number; campMeal?: boolean } // ate one food unit (dtv): restored energy, new current. campMeal (7lr) = a tent camp meal (over-max, +50%).
   | { type: "auto-eat-set"; defId: string | null } // designated (or cleared, null) the auto-eat food (mco)
   | { type: "engaged"; at: { x: number; y: number }; creature: string; monsterHp: number; ranged?: boolean } // ranged (D45): engaged from an adjacent tile with a bow — the first exchange skips its retaliation
-  | { type: "exchanged"; creature: string; dmgDealt: number; dmgTaken: number; monsterHp: number; hp: number; potionsUsed: number; arrowSpent?: boolean; poisonDmg?: number } // arrowSpent (D45): present when this exchange shot an arrow. poisonDmg (D60): poison DoT dealt to the monster this round, present when >0
+  | { type: "exchanged"; creature: string; dmgDealt: number; dmgTaken: number; monsterHp: number; hp: number; potionsUsed: number; arrowSpent?: boolean; ammoSpent?: string; poisonDmg?: number } // arrowSpent (D45): present when this exchange shot an arrow. ammoSpent (si7.6.6): the defId shot, present when it isn't arrows. poisonDmg (D60): poison DoT dealt to the monster this round, present when >0
   | { type: "fled"; creature: string; partingHit: number; hp: number }
   | { type: "quaffed"; defId: string; healed: number; hp: number; energy?: number } // energy present only when spent (out-of-combat quaff, 82r)
   | { type: "item-used"; defId: string; damageAdd: number; mitigationAdd: number } // battle item used mid-fight (90j); buff added to this engagement (also vb8's missing consumption log line)

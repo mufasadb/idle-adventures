@@ -3,7 +3,7 @@
 // re-exported by constants.ts so consumers are unchanged.
 import type { ItemStackSpec } from "./spec";
 import type { Terrain } from "./constants"; // RECIPE.requires.terrain (type-only; erased, no runtime cycle)
-import { ARROWS_PER_CRAFT, ARROW_SHAFTS_PER_LOG } from "./combat"; // ammo recipe yields
+import { ARROWS_PER_CRAFT, ARROW_SHAFTS_PER_LOG, DARTS_PER_CRAFT } from "./combat"; // ammo recipe yields
 
 // --- Consumable item catalogs (M5) ---
 // ENERGY_PER_FOOD / POTION_HEAL are flat, so these are single-item catalogs for
@@ -160,7 +160,12 @@ export const RECIPE: Record<
   // xls/9az bootstrap, so it needs a recipe or it'd be an orphan — the 7pi lesson.)
   sword: { inputs: [{ defId: "iron-ore", qty: 2 }], output: { defId: "sword", qty: 1 } },
   "iron-sword": { inputs: [{ defId: "iron-ore", qty: 3 }], output: { defId: "iron-sword", qty: 1 } },
-  bow: { inputs: [{ defId: "oak-log", qty: 2 }, { defId: "bowstring", qty: 1 }], output: { defId: "bow", qty: 1 } }, // D45 rework: bowstring replaces deer-hide — the whole bow line stays pick-free (starter axe)
+  bow: { inputs: [{ defId: "oak-log", qty: 2 }, { defId: "bowstring", qty: 1 }], output: { defId: "bow", qty: 1 } },
+  // Blowgun line (si7.6.6): reeds + amber are FISHED (D89 tables) — a different tree from
+  // the bow's wood + bowstring. The dart's poison is the tier gate.
+  blowgun: { inputs: [{ defId: "reed", qty: 3 }, { defId: "amber", qty: 1 }], output: { defId: "blowgun", qty: 1 } },
+  "blow-dart": { inputs: [{ defId: "reed", qty: 1 }, { defId: "amber", qty: 1 }, { defId: "forest-herb", qty: 1 }], output: { defId: "blow-dart", qty: DARTS_PER_CRAFT } }, // herb-poisoned: 1 dmg × 3 rounds
+  "venom-dart": { inputs: [{ defId: "reed", qty: 1 }, { defId: "amber", qty: 1 }, { defId: "venom-oil", qty: 1 }], output: { defId: "venom-dart", qty: DARTS_PER_CRAFT } }, // still-brewed venom: 3 dmg × 4 rounds // D45 rework: bowstring replaces deer-hide — the whole bow line stays pick-free (starter axe)
   "fire-staff": { inputs: [{ defId: "pine-log", qty: 2 }, { defId: "fae-dust", qty: 1 }], output: { defId: "fire-staff", qty: 1 } },
   // Weapons — T2 (each needs a T2 material → all sit behind the iron-pick/iron-axe tier)
   "silver-sword": { inputs: [{ defId: "silver-ore", qty: 3 }], output: { defId: "silver-sword", qty: 1 } }, // werewolf affinity; silver T2, best-farmed in tundra

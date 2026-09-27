@@ -111,10 +111,10 @@ export const BIOMES: Record<BiomeId, Biome> = {
     barrierTerrain: "mountain",
     water: { body: "lake", lakeThreshold: 0.72, shallowsBand: 0.05 }, // si7.6.5: ~8% lake + ~6% shallows ring per map; the raft crosses it
     fishTable: { // si7.6.2: banks give trout/crayfish; the lake edge perch; the deep middle (raft) pike + treasure
-      river: { trout: 6, crayfish: 4 },
-      shallows: { crayfish: 6, trout: 3 },
-      lake: { perch: 7, crayfish: 2, "sunken-lockbox": 1 },
-      "deep-lake": { pike: 6, perch: 2, "sunken-lockbox": 3, "sodden-map": 1 },
+      river: { trout: 6, crayfish: 4, reed: 3 }, // si7.6.6: reeds line the banks (blowgun + darts)
+      shallows: { crayfish: 6, trout: 3, reed: 4 },
+      lake: { perch: 7, crayfish: 2, "sunken-lockbox": 1, amber: 2 }, // si7.6.6: amber washes out of the lakebed (the dart/blowgun binder)
+      "deep-lake": { pike: 6, perch: 2, "sunken-lockbox": 3, "sodden-map": 1, amber: 1 },
     },
   },
   desert: {
@@ -128,7 +128,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
       animal: { "lizard-hide": 7, "deer-hide": 2, feather: 2 }, // D83: drake-hide removed — now a combat drop from the `drake` monster (was 'too high up' for a hunted node); feather (D45)
     },
     barrierTerrain: "mountain",
-    fishTable: { river: { crayfish: 5, trout: 2 } }, // si7.6.2: thin desert creeks — crayfish in the mud
+    fishTable: { river: { crayfish: 5, trout: 2, reed: 2 } }, // si7.6.2: thin desert creeks — crayfish in the mud
   },
   tundra: {
     terrainWeights: { ice: 0.5, mountain: 0.25, plains: 0.15, river: 0.1 },

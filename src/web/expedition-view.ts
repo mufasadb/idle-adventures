@@ -9,7 +9,7 @@ import { iconStyle, monsterStyle, nodeIconId, tileStyle } from "./assets";
 import { carryCap, mapCarryCap } from "../engine/carry";
 import { deriveRoute } from "./route";
 import type { Pos } from "./route";
-import { wieldsRanged } from "../engine/combat";
+import { wieldsRanged, loadedAmmoIndex } from "../engine/combat";
 import { PLAYER_BASE_HP, RECIPE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_CAMP_MEALS, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, FISH_CAST_ENERGY, FISH_DEEP_DEPTH } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, combatForecast, GATHER_VERB, round1, engagementForecast, enhancementHint, battleItemEffect } from "../render/render";
@@ -124,8 +124,11 @@ function engagementPanel(state: GameState, exp: NonNullable<GameState["expeditio
   const { dmgOut, dmgIn, toKill, toDie, winning } = engagementForecast(exp); // D60: reflects the coating; potions extend it (noted in the forecast line)
   const canQuaff = legal.some((a) => a.type === "quaff");
   // Quiver readout (D45): a wielded bow spends an arrow per round; empty = club.
-  const arrows = (exp.loadout.ammo ?? []).reduce((n, s) => n + s.qty, 0);
-  const quiver = wieldsRanged(exp.loadout) ? ` · 🏹 ${arrows} arrow${arrows === 1 ? "" : "s"}${arrows === 0 ? " — swinging it like a club!" : ""}` : "";
+  // si7.6.6: count only the ammo the wielded weapon can shoot, and name it.
+  const li = loadedAmmoIndex(exp.loadout);
+  const loaded = li === -1 ? null : exp.loadout.ammo![li]!;
+  const shots = loaded ? (exp.loadout.ammo ?? []).filter((s) => s.defId === loaded.defId).reduce((n, s) => n + s.qty, 0) : 0;
+  const quiver = wieldsRanged(exp.loadout) ? ` · 🏹 ${shots} ${loaded ? name(loaded.defId).toLowerCase() : "ammo"}${shots === 0 ? " — swinging it like a club!" : ""}` : "";
   // 67e: damage-change feedback — diff this forecast against the last render's so a
   // coat/swap/potion shows its effect ("→ kill in 3", "(was 4.5)"). Reset per fight.
   const key = `${c.creature}@${c.at.x},${c.at.y}`;
