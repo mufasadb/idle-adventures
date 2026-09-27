@@ -91,7 +91,7 @@ console.log(`equipped: ${worn.join(", ") || "(nothing)"} · food: ${active.food.
     const onFoot = moveCostBreakdown("plains", null, []).final;
     if (withT !== onFoot) notes.push(`${eq.transport}: plains ${withT}e vs ${onFoot}e on foot`);
   }
-  for (const gate of [["climbing-pick", "mountain"], ["raft", "river"], ["waders", "mud"], ["ice-cleats", "ice"]] as const) {
+  for (const gate of [["climbing-pick", "mountain"], ["raft", "river"], ["waders", "mud"], ["ice-cleats", "ice"], ["raft", "lake"]] as const) {
     if (!eq.tools.includes(gate[0])) continue;
     const bd = moveCostBreakdown(gate[1], null, eq.tools);
     const bare = moveCostBreakdown(gate[1], null, []).final;

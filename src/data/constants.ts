@@ -28,6 +28,7 @@ export const NOISE_FREQUENCY = 0.15; // Perlin sample step per tile; lower = lar
 // literally unreachable barefoot — mountains are cost-walls, not prisons).
 export const BARRIER_NOISE_FREQUENCY = 0.06; // ≪ NOISE_FREQUENCY → chunky ridges, not speckle
 export const BARRIER_THRESHOLD = 0.68; // the "how walled is the world" dial: lower = more maze
+export const WATER_NOISE_FREQUENCY = 0.07; // si7.6.5: standing-water field (a biome's `water` layer) — low, so lakes are blobs, not puddles
 export const POI_DENSITY = 60; // POIs per 35×35 map (D84): a geared+provisioned run should harvest ~half and CHOOSE which half (now: which DIRECTION). Area 1225 ≈ the old 20×60 = 1200, so the count/value budget carries over.
 export const POI_MIN_SPACING = 3; // min Chebyshev distance between POIs (spec: 3–4 tiles apart)
 export const POI_PLACEMENT_ATTEMPTS = 2000; // seeded rejection-sampling budget per map (scaled with density, e3j)
@@ -55,7 +56,11 @@ export const STARTER_BANK: { defId: string; qty: number }[] = [
 
 // Terrain vocabulary. Array order = elevation band order for noise→terrain
 // mapping (river lowest … mountain highest) — reordering it reshapes maps.
-export const TERRAINS = ["river", "mud", "plains", "ice", "mountain"] as const;
+// Water terrains (si7.6.5) are APPENDED so the noise→terrain bands above are
+// untouched; they never come from terrainWeights — only a biome's `water` layer
+// (below) places them, so a biome without one generates byte-identically.
+export const TERRAINS = ["river", "mud", "plains", "ice", "mountain", "shallows", "lake", "sea"] as const;
+export const WATER_TERRAINS: Terrain[] = ["river", "shallows", "lake", "sea"]; // fishable water (si7.6.2)
 export type Terrain = (typeof TERRAINS)[number];
 
 // Node (POI) vocabulary — what biome nodeTypeWeights and (M3) hardness/yield key on.
@@ -76,6 +81,11 @@ export type Biome = {
   creatureTable: Record<string, number>; // weighted monster defIds (si7.1): same shape as materialTable entries — tier-1/2 dominate, bosses rare
   materialTable: Partial<Record<NodeType, Record<string, number>>>; // node kind → weighted material defIds (D27)
   barrierTerrain: Terrain; // what a wall is made of here (e3j)
+  // Standing water (si7.6.5): an independent low-frequency noise field. Samples
+  // above `lakeThreshold` become `body` (lake/sea — boat-only), a band `shallowsBand`
+  // below that becomes wadeable shallows ringing it. Absent = no standing water
+  // (the biome's maps are byte-identical to before water existed).
+  water?: { body: Terrain; lakeThreshold: number; shallowsBand: number };
 };
 
 export const BIOMES: Record<BiomeId, Biome> = {
@@ -90,6 +100,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
       animal: { "deer-hide": 7, "wolf-pelt": 2, "lizard-hide": 1, feather: 2 }, // feather (D45): fletching from birds (knife)
     },
     barrierTerrain: "mountain",
+    water: { body: "lake", lakeThreshold: 0.72, shallowsBand: 0.05 }, // si7.6.5: ~8% lake + ~6% shallows ring per map; the raft crosses it
   },
   desert: {
     terrainWeights: { plains: 0.55, mountain: 0.3, river: 0.15 },
@@ -254,6 +265,9 @@ export const TERRAIN_COST: Record<Terrain, number> = {
   ice: 20,
   river: 30,
   mountain: Infinity, // impassable — climbing-pick enables it (TERRAIN_GATE)
+  shallows: 25, // si7.6.5: wadeable lake/sea margin — slow, not a wall
+  lake: Infinity, // si7.6.5: boat-only — a raft enables it (TERRAIN_GATE)
+  sea: Infinity, // si7.6.5: boat-only — needs a sea-going boat (coastal biome, later); a raft can't
 }; // absolute energy per tile stepped ONTO, on foot, before gear/transport
 // Equipped tools that modify gated terrain (svz). `enable` makes an impassable
 // terrain finite (mountain only); `discount` subtracts from the step energy. Each
@@ -261,6 +275,8 @@ export const TERRAIN_COST: Record<Terrain, number> = {
 export const TERRAIN_GATE: Partial<Record<Terrain, Record<string, { enable?: number; discount?: number }>>> = {
   mountain: { "climbing-pick": { enable: 40 } }, // ∞ → 40 (crossable at 4× plains)
   river: { raft: { discount: 20 } }, // 30 → 10 (≈ plains)
+  shallows: { raft: { discount: 15 }, waders: { discount: 10 } }, // 25 → 10 / 15 (si7.6.5)
+  lake: { raft: { enable: 15 } }, // si7.6.5: ∞ → 15 — the raft is the lake boat
   mud: { waders: { discount: 5 } }, // 15 → 10
   ice: { "ice-cleats": { discount: 15 } }, // 20 → 5 (faster than plains — a tundra highway)
 };

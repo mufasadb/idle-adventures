@@ -428,6 +428,9 @@ export const TERRAIN_CHAR: Record<Terrain, string> = {
   plains: ".",
   ice: "*",
   mountain: "^",
+  shallows: "-",
+  lake: "=",
+  sea: "#",
 };
 
 export const POI_CHAR: Record<NodeType, string> = {

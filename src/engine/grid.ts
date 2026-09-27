@@ -6,6 +6,7 @@ import {
   NOISE_FREQUENCY,
   BARRIER_NOISE_FREQUENCY,
   BARRIER_THRESHOLD,
+  WATER_NOISE_FREQUENCY,
   BIOMES,
   BIOME_IDS,
   TERRAINS,
@@ -144,7 +145,9 @@ function carveConnectivity(terrain: Terrain[][], biome: Biome): void {
     while (cx !== to.x || cy !== to.y) {
       cx += Math.sign(to.x - cx);
       cy += Math.sign(to.y - cy);
-      if (!walkableTerrain(terrain[cy]![cx]!)) terrain[cy]![cx] = carve;
+      const t = terrain[cy]![cx]!;
+      // A pass through standing water is a wadeable FORD, not dry land (si7.6.5).
+      if (!walkableTerrain(t)) terrain[cy]![cx] = t === "lake" || t === "sea" ? "shallows" : carve;
     }
   }
 }
@@ -244,11 +247,19 @@ function buildGrid(mapSeed: string, biomeId: BiomeId, mapTier: number, affixes: 
       // Barrier layer (e3j): a low-frequency field carves long walls; the seed is
       // namespaced so the two fields are independent.
       const barrier = perlin2(`${mapSeed}:barrier`, (x + 0.5) * BARRIER_NOISE_FREQUENCY, (y + 0.5) * BARRIER_NOISE_FREQUENCY);
-      row.push(
-        barrier > BARRIER_THRESHOLD
-          ? biome.barrierTerrain
-          : weightedPick(biome.terrainWeights, TERRAINS, noise),
-      );
+      let t: Terrain = barrier > BARRIER_THRESHOLD
+        ? biome.barrierTerrain
+        : weightedPick(biome.terrainWeights, TERRAINS, noise);
+      // Standing water (si7.6.5): its own namespaced field, so it never shifts the
+      // terrain/barrier samples above — a biome without `water` is byte-identical.
+      // The body floods everything; the shallows ring spares mountains (a shore wall
+      // stays a wall).
+      if (biome.water) {
+        const w = perlin2(`${mapSeed}:water`, (x + 0.5) * WATER_NOISE_FREQUENCY, (y + 0.5) * WATER_NOISE_FREQUENCY);
+        if (w > biome.water.lakeThreshold) t = biome.water.body;
+        else if (w > biome.water.lakeThreshold - biome.water.shallowsBand && t !== "mountain") t = "shallows";
+      }
+      row.push(t);
     }
     terrain.push(row);
   }
