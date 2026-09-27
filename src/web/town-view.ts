@@ -38,27 +38,29 @@ function heldMapSuffix(m: MapItem): string {
   return ` <span class="muted"${tip}>of ${label}</span>`;
 }
 
-export function townView(state: GameState, prep: string | null, hasLastPlan: boolean): string {
+export type TownTab = "main" | "bank" | "recipes";
+
+export function townView(state: GameState, prep: string | null, hasLastPlan: boolean, tab: TownTab = "main"): string {
   const local = localMap(state.seed, state.runs ?? 0);
   const heldMaps = state.maps ?? [];
   // prep may point at a map that no longer exists (consumed/rotated) — fall back to overview.
   const inPrep = prep !== null && (prep === local.mapSeed || heldMaps.some((m) => m.mapSeed === prep));
   const header = `<header><h1>Town</h1><span class="muted">seed "${state.seed}"</span><button class="link" data-newgame>new game</button></header>`;
-  if (inPrep) {
-    return `${header}
-    ${prepBar(state, prep!, local, heldMaps)}
-    <div class="cols">
-      ${loadoutSection(state, hasLastPlan)}
-      ${bankSection(state)}
-      ${recipeSection(state)}
-    </div>`;
-  }
+  // kml: on phones the three town panels are TABS (the recipe book alone is a long
+  // scroll); on wide screens they sit side by side and the tab bar hides (CSS).
+  const first = inPrep ? "Loadout" : "Maps";
+  const tabBtn = (t: TownTab, label: string) => `<button class="tab${(inPrep && tab === "bank" ? "main" : tab) === t ? " on" : ""}" data-town-tab="${t}">${label}</button>`;
+  // Packing moves items bank → loadout, so in prep the two share one tab (side by side).
+  const shown: TownTab = inPrep && tab === "bank" ? "main" : tab;
+  const nav = `<nav class="tabs town-tabs">${tabBtn("main", inPrep ? "Loadout & Bank" : first)}${inPrep ? "" : tabBtn("bank", "Bank")}${tabBtn("recipes", "Recipes")}</nav>`;
   return `${header}
-  <div class="cols">
-    ${mapSelectSection(state, local, heldMaps)}
-    ${bankSection(state)}
-    ${recipeSection(state)}
-  </div>`;
+    ${inPrep ? prepBar(state, prep!, local, heldMaps) : ""}
+    ${nav}
+    <div class="cols town show-${shown}">
+      <div class="tsec${inPrep ? " duo" : ""}" data-tsec="main">${inPrep ? loadoutSection(state, hasLastPlan) + bankSection(state) : mapSelectSection(state, local, heldMaps)}</div>
+      ${inPrep ? "" : `<div class="tsec" data-tsec="bank">${bankSection(state)}</div>`}
+      <div class="tsec" data-tsec="recipes">${recipeSection(state)}</div>
+    </div>`;
 }
 
 // STEP 1 (zpm.3): the town overview — pick where to go. The FREE local map reads

@@ -4,7 +4,7 @@ import { legalActions, whyNot } from "../sim/legal";
 import { expeditionGrid } from "../engine/grid";
 import type { Grid } from "../engine/grid";
 import { recipeOutputQty } from "../engine/craft";
-import { moveCostBreakdown } from "../engine/move";
+import { moveCostBreakdown, moveCost } from "../engine/move";
 import { iconStyle, monsterStyle, nodeIconId, tileStyle } from "./assets";
 import { carryCap, mapCarryCap } from "../engine/carry";
 import { deriveRoute } from "./route";
@@ -165,12 +165,16 @@ function swapGearButtons(exp: NonNullable<GameState["expedition"]>, legal: Actio
   return [...dons, ...doffs].join("");
 }
 
-export function expeditionView(state: GameState, route: Pos[]): string {
+export type DrawerTab = "here" | "bag" | "craft" | "log";
+export type ExpeditionUi = { drawerOpen: boolean; tab: DrawerTab; logHtml: string };
+
+export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi): string {
   const exp = state.expedition!;
   const { grid, perceived, cleared, rt } = currentDerived(state, route)!;
   const legal = legalActions(state);
 
   const poiAt = new Map(grid.pois.map((p) => [kk(p), p]));
+  const canFish = legal.some((a) => a.type === "fish");
   const drawnSet = new Set(rt.drawn.map(kk));
   const goalK = kk(rt.end);
 
@@ -183,8 +187,16 @@ export function expeditionView(state: GameState, route: Pos[]): string {
     const cls = ["tile", `terrain-${grid.terrain[y]![x]}`];
     // si7.6.2: deep water (the raft-only fishing ground) and already-fished water read
     // differently. Placeholder styling until the Muse water/boat mockups are picked.
-    if ((grid.depth?.[y]?.[x] ?? 0) >= FISH_DEEP_DEPTH) cls.push("deep");
+    const terr = grid.terrain[y]![x]!;
+    const depth = grid.depth?.[y]?.[x] ?? 0;
+    if (depth >= FISH_DEEP_DEPTH) cls.push("deep");
+    // 9e0 (Muse option 2): stepped depth bands on standing water, a crosshatch on any
+    // tile you can't cross with what you carry now, a bobber on water you could fish.
+    if (terr === "lake" || terr === "sea") cls.push(`d${Math.min(depth, 3)}`);
+    if (!Number.isFinite(moveCost(terr, exp.loadout.equipment.transport, exp.loadout.equipment.tools))) cls.push("blocked");
     if ((exp.fished ?? []).some((f) => f.x === x && f.y === y)) cls.push("fished");
+    else if (canFish && Math.abs(x - exp.pos.x) <= 1 && Math.abs(y - exp.pos.y) <= 1 && grid.catches?.[y]?.[x]) cls.push("bobber");
+    if (isPlayer && (terr === "lake" || terr === "sea")) cls.push("on-raft"); // Muse option 1: you're on the raft
     if (poi && !isCleared) cls.push("poi", `poi-${poi.kind}`);
     if (isPlayer) cls.push("player");
     const onPath = drawnSet.has(k);
@@ -244,7 +256,11 @@ export function expeditionView(state: GameState, route: Pos[]): string {
         if (iconStyleValue) overlay = `<span class="nodeicon" style="${iconStyleValue}" aria-hidden="true"></span>`;
       }
     }
-    const glyph = !isPlayer && (overlay !== "" || !poi) ? "" : ch;
+    if (isPlayer && cls.includes("on-raft")) {
+      const raft = iconStyle("player-raft");
+      if (raft) overlay = `<span class="nodeicon" style="${raft}" aria-hidden="true"></span>`;
+    }
+    const glyph = !isPlayer && (overlay !== "" || !poi) ? "" : isPlayer && overlay ? "" : ch;
     cells += `<div class="${cls.join(" ")}"${tileAssetStyle} data-x="${x}" data-y="${y}" title="${title}">${overlay}${glyph}</div>`;
   }
 
@@ -271,35 +287,43 @@ export function expeditionView(state: GameState, route: Pos[]): string {
     ? `${round1(exp.energy)}/${maxEnergy} → <b class="${overBudget ? "over" : ""}">${round1(Math.max(0, rt.endEnergy))}</b>${overBudget ? " ⚠ strands you" : ""}`
     : `${round1(exp.energy)}/${maxEnergy}${overSpan}`;
   const autoGatherOn = exp.autoGather ?? true;
+  // kml: compact HUD bars that float over the map (landscape-first layout).
   const bars = `
     <div class="bar"><span>Energy</span><div class="track">${energyFill}</div><b>${energyLabel}</b></div>
-    <div class="bar"><span>HP</span><div class="track"><div class="fill hp" style="width:${Math.min(100, (exp.hp / PLAYER_BASE_HP) * 100)}%"></div></div><b>${round1(exp.hp)}</b></div>
-    <div class="muted small">🌿 auto-gather <b>${autoGatherOn ? "on" : "off"}</b> — <button class="link" data-toggle-autogather>${autoGatherOn ? "walk over nodes without harvesting" : "harvest nodes you cross"}</button></div>`;
+    <div class="bar"><span>HP</span><div class="track"><div class="fill hp" style="width:${Math.min(100, (exp.hp / PLAYER_BASE_HP) * 100)}%"></div></div><b>${round1(exp.hp)}</b></div>`;
 
   // End-of-route affordances (eot): the LAST waypoint drives Fight/Shoot/Survey.
   const endPoi = route.length ? poiAt.get(goalK) : undefined;
   const fight = endPoi && endPoi.kind === "monster" && endPoi.creature && !cleared.has(goalK) ? endPoi.creature : undefined;
   const shoot = fight !== undefined && legal.some((a) => a.type === "fight" && a.at !== undefined && a.at.x === rt.end.x && a.at.y === rt.end.y);
-  const costClause = `<b class="${overBudget ? "over" : ""}">−${round1(rt.walkCost)} walk${rt.actionCost > 0 ? ` + −${round1(rt.actionCost)} gather` : ""}${rt.actionCost > 0 ? ` = −${round1(total)}` : ""} energy</b>`;
+  const costClause = `<b class="${overBudget ? "over" : ""}">−${round1(total)}e</b>${rt.actionCost > 0 ? ` <span class="muted">(${round1(rt.walkCost)} walk + ${round1(rt.actionCost)} gather)</span>` : ""}`;
   const forecastClause = fight
     ? (() => {
         const f = combatForecast(exp.loadout, fight, exp.hp, exp.weaponBuff); // D60: reflects an active coating
-        return ` · <span class="forecast" title="bare-kit forecast — battle items apply when the fight starts">forecast: you hit ${round1(f.dmgOut)}, it hits ${round1(f.dmgIn)} — <b class="${f.winning ? "good" : "over"}">${f.winning ? `kill in ${f.toKill}` : "it wins the race"}</b></span>`;
+        return ` · <span class="forecast" title="bare-kit forecast — battle items apply when the fight starts">you ${round1(f.dmgOut)} / it ${round1(f.dmgIn)} — <b class="${f.winning ? "good" : "over"}">${f.winning ? `kill in ${f.toKill}` : "it wins"}</b></span>`;
       })()
     : "";
   const surveyAtEnd = legal.some((a) => a.type === "survey" && a.at.x === rt.end.x && a.at.y === rt.end.y);
   // Ambush warning (2i8, playtest F5): the walk auto-engages the FIRST monster on the
-  // line — warn prominently when that fight is a forecast LOSS (a mid-line drake sank a
-  // 132-energy route), so the player reroutes before committing.
+  // line — warn prominently when that fight is a forecast LOSS.
   const cm = rt.crossedMonster;
   const crossWarn = cm && !combatForecast(exp.loadout, cm.creature, exp.hp, exp.weaponBuff).winning
-    ? `<b class="over">⚠ this line runs into a ${name(cm.creature)} at (${cm.pos.x},${cm.pos.y}) — the forecast says you'd LOSE that fight. Reroute around it.</b> · `
+    ? `<div class="over">⚠ runs into a ${name(cm.creature)} at (${cm.pos.x},${cm.pos.y}) you'd LOSE to — reroute.</div>`
     : "";
-  const pathBanner = exp.combat
-    ? `<div class="pathbanner engaged">⚔ <b>ENGAGED — the ${name(exp.combat.creature)}</b> · fight or flee in the panel below ↓</div>`
+  // kml: the route bar floats at the bottom of the map — only when there's something to say.
+  const routeBar = exp.combat
+    ? `<div class="routebar engaged">⚔ <b>Engaged — ${name(exp.combat.creature)}</b> <button data-open-tab="here">fight / flee ▸</button></div>`
     : hasRoute
-    ? `<div class="pathbanner${rt.blocked ? " blocked" : ""}">${rt.blocked ? `<b class="over">✗ blocked — a leg crosses impassable terrain (red).</b> Click a tile on the line to unwind, or click elsewhere to start a fresh route. · ` : ""}${crossWarn}${fight ? `⚔ walk in &amp; <b>fight the ${name(fight)}</b> · ` : ""}→ (${rt.end.x},${rt.end.y}): ${rt.walkable.length} tile${rt.walkable.length !== 1 ? "s" : ""}, ${costClause}${forecastClause} · <button data-walk${rt.blocked ? " disabled title=\"clear the blocked leg first\"" : ""}>${fight ? "Fight ▶" : "Walk ▶"}</button> ${shoot ? `<button data-shoot title="engage from here with your bow — your opener lands before it can answer, and you don't step in">🏹 Shoot</button> ` : ""}${surveyAtEnd ? `<button data-survey-x="${rt.end.x}" data-survey-y="${rt.end.y}" title="study it through the glass without walking over — resolves its detail for −${SURVEY_ENERGY}e">🔭 Survey (−${SURVEY_ENERGY}e)</button> ` : ""}<button class="link" data-cancelpath title="remove the whole planned route">✕ clear route</button></div>`
-    : `<div class="pathbanner muted">Click a tile → draws a straight line + previews energy. Click more tiles to add waypoints; click a tile already on the line to unwind to it. Then <b>Walk</b>. Monsters (<b>X</b>) are fought when your line reaches them.</div>`;
+    ? `<div class="routebar${rt.blocked ? " blocked" : ""}">${crossWarn}${rt.blocked ? `<div class="over">✗ a leg crosses terrain you can't pass — tap the line to unwind.</div>` : ""}<div class="routeline">${fight ? `⚔ ${name(fight)} · ` : ""}${rt.walkable.length} tile${rt.walkable.length !== 1 ? "s" : ""} · ${costClause}${forecastClause}</div><div class="routebtns"><button class="primary" data-walk${rt.blocked ? " disabled" : ""}>${fight ? "Fight ▶" : "Walk ▶"}</button>${shoot ? `<button data-shoot title="engage from here — your opener lands first">🏹 Shoot</button>` : ""}${surveyAtEnd ? `<button data-survey-x="${rt.end.x}" data-survey-y="${rt.end.y}" title="resolve its detail from here">🔭 −${SURVEY_ENERGY}e</button>` : ""}<button data-cancelpath title="clear the route">✕</button></div></div>`
+    : "";
+
+  // kml: contextual quick actions on the map itself (so the common verbs never need
+  // the drawer). Legality from reduce (D29).
+  const here = grid.pois.find((p) => p.x === exp.pos.x && p.y === exp.pos.y);
+  const quick: string[] = [];
+  if (!exp.combat && here && legal.some((a) => a.type === "gather")) quick.push(`<button data-act="gather">${GATHER_VERB[here.kind]?.label ?? "Gather"}</button>`);
+  if (canFish) quick.push(`<button data-act="fish" title="cast into the deepest water beside you (−${FISH_CAST_ENERGY}e)">🎣 Fish</button>`);
+  if (exp.combat) quick.push(`<button data-act="fight">⚔ Fight</button>`, `<button data-act="flee">🏃 Flee</button>`);
 
   const cap = carryCap(exp.loadout.equipment);
   // 7lr: which foods can actually be eaten right now (speculative-reduce filtered), and
@@ -307,60 +331,79 @@ export function expeditionView(state: GameState, route: Pos[]): string {
   const eatable = new Set(legal.filter((a): a is Extract<Action, { type: "eat" }> => a.type === "eat").map((a) => a.defId));
   const campMealReady = exp.loadout.equipment.tools.includes("tent") && (exp.campMealsUsed ?? 0) < TENT_CAMP_MEALS;
   const inv = inventoryGrid(exp.loadout, exp.carry, cap, exp.autoEatFood ?? null, eatable, campMealReady);
-  return `
-  <header><h1>${grid.biomeId} expedition</h1><span class="muted">pos (${exp.pos.x},${exp.pos.y})</span><button class="link" data-newgame>new game</button></header>
-  <div class="cols">
-    <section class="mapwrap">
-      ${bars}
-      ${pathBanner}
-      <div class="gridscroll"><div class="grid atlas-assets" style="grid-template-columns:repeat(${MAP_WIDTH}, 32px);">${cells}</div></div>
-    </section>
-    <section>
+
+  const hereTab = `
       ${exp.combat ? engagementPanel(state, exp, legal) : herePanel(state, grid, exp, legal) + fishLine(state, legal)}
-      <h2>Actions</h2>
       <div class="actions">
-        ${exp.loadout.equipment.tools.includes("tent") ? `<span class="campmeal-badge${campMealReady ? " ready" : " spent"}" title="${campMealReady ? "left-click a food in your bag to eat it as a CAMP MEAL — over-eat past max at +50%, once per run" : "camp meal spent this run — eating is now a normal capped meal"}">🏕 camp meal ${campMealReady ? "ready" : "spent"}</span>` : ""}
-        ${legal.some((a) => a.type === "quaff") ? `<button data-act="quaff" title="drink a potion here (−${QUAFF_ENERGY}e)">🧪 Potion (−${QUAFF_ENERGY}e)</button>` : `<button disabled title="${rejectCopy(whyNot(state, { type: "quaff" }) ?? "insufficient")}">🧪 Potion</button>`}
-        <button data-act="toggle-auto-quaff" title="auto-drink a potion when HP drops below the threshold mid-fight">Auto-potion: <b>${(exp.autoQuaff ?? true) ? "on" : "off"}</b></button>
-        <button data-act="toggle-auto-finish" title="67e: fast-forward whole fights to victory or defeat in one click — flip off to make in-fight decisions">Auto-finish fights: <b>${(exp.autoFinish ?? false) ? "on" : "off"}</b></button>
+        ${exp.loadout.equipment.tools.includes("tent") ? `<span class="campmeal-badge${campMealReady ? " ready" : " spent"}" title="${campMealReady ? "eat a food from your bag as a CAMP MEAL — over max at +50%, once per run" : "camp meal spent this run"}">🏕 camp meal ${campMealReady ? "ready" : "spent"}</span>` : ""}
+        ${legal.some((a) => a.type === "quaff") ? `<button data-act="quaff" title="drink a potion here (−${QUAFF_ENERGY}e)">🧪 Potion (−${QUAFF_ENERGY}e)</button>` : ""}
         ${enhanceButtons(exp)}
         <button data-act="return">⏎ Return to town</button>
       </div>
-      ${exp.weaponBuff ? `<div class="muted small">🗡️ active coating: <b>${name(exp.weaponBuff.id)}</b> · ${exp.weaponBuff.charges} strike${exp.weaponBuff.charges === 1 ? "" : "s"} left</div>` : ""}
-      ${(() => {
-        // ke3.4: field-craft list — legal craft candidates on expedition (reduce
-        // has already filtered to field recipes you can make right here).
-        const fieldCrafts = legal.filter((a): a is Extract<Action, { type: "craft" }> => a.type === "craft");
-        const craftable = new Set(fieldCrafts.map((a) => a.recipeId));
-        const pool = [...exp.loadout.equipment.tools, ...exp.carry.map((s) => s.defId)];
-        // gate-legibility (playtest 2026-07-09 #1, field-craft discoverability): 3/3
-        // testers never found field crafting because the panel only appeared once the
-        // kit was already equipped — the fire-kit was an unmarked key. Show the DOOR
-        // before the key: any field recipe the reducer rejects for a missing kit-tool
-        // renders greyed with its "needs: fire-kit" requirement (whyNot — ciq).
-        const kitLocked = Object.keys(RECIPE).filter((id) =>
-          RECIPE[id]!.field && !craftable.has(id) && whyNot(state, { type: "craft", recipeId: id }) === "missing-tool");
-        if (!fieldCrafts.length && !kitLocked.length) return "";
-        const readyRows = fieldCrafts.map((a) => {
-          const r = RECIPE[a.recipeId]!;
-          const ing = r.inputs.map((i) => `${i.qty}× ${name(i.defId)}`).join(" + ");
-          return `<div class="craftpath">🔥 <button data-craft="${a.recipeId}" title="field-craft (−${FIELD_CRAFT_ENERGY}e)">craft ✓</button> ${recipeOutputQty(r, pool)}× ${name(r.output.defId)} <span class="muted small">← ${ing}</span></div>`;
-        }).join("");
-        const lockedRows = kitLocked.map((id) => {
-          const r = RECIPE[id]!;
-          const ing = r.inputs.map((i) => `${i.qty}× ${name(i.defId)}`).join(" + ");
-          return `<div class="craftpath locked">🔒 ${r.output.qty}× ${name(r.output.defId)} <span class="muted small">← ${ing}</span> <span class="warn small">${recipeGateHint(id)}</span></div>`;
-        }).join("");
-        return `<h2>Field craft <span class="muted small">−${FIELD_CRAFT_ENERGY}e each</span></h2><div class="craftlist">${readyRows}${lockedRows}</div>`;
-      })()}
-      <h2>Bag <span class="muted small">${inv.used}/${cap} slots</span></h2>
+      ${exp.weaponBuff ? `<div class="muted small">🗡️ ${name(exp.weaponBuff.id)} · ${exp.weaponBuff.charges} strike${exp.weaponBuff.charges === 1 ? "" : "s"} left</div>` : ""}
+      <details class="settings"><summary>Settings</summary>
+        <div class="actions">
+          <button data-toggle-autogather>Auto-gather on walk: <b>${autoGatherOn ? "on" : "off"}</b></button>
+          <button data-act="toggle-auto-quaff" title="auto-drink a potion when HP drops low mid-fight">Auto-potion: <b>${(exp.autoQuaff ?? true) ? "on" : "off"}</b></button>
+          <button data-act="toggle-auto-finish" title="resolve whole fights in one tap">Auto-finish fights: <b>${(exp.autoFinish ?? false) ? "on" : "off"}</b></button>
+          <button class="link" data-newgame>new game</button>
+        </div>
+      </details>`;
+
+  const bagTab = `
+      <div class="muted small">${inv.used}/${cap} slots · tap a food to eat one · long-press / right-click a food to auto-eat it${exp.autoEatFood ? ` (now: <b>${name(exp.autoEatFood)}</b>)` : ""}</div>
       ${inv.html}
-      <div class="muted small">🍖 <b>left-click</b> a food in your bag to eat one${campMealReady ? " (with a tent, your first eat is a 🏕 camp meal — over-max, +50%)" : ""} · 🍴 auto-eat: ${exp.autoEatFood ? `<b>${name(exp.autoEatFood)}</b> refills as you travel — right-click it to stop` : "off — right-click a food to auto-eat it (waste-free refills, no tent bonus)"}</div>
-      <div class="muted small">food (green) is eaten to refill energy as you travel — freeing slots for loot (gold). Potions purple · battle items red · tools grey · worn gear ghosted (free).</div>
-      ${exp.carry.length ? `<div class="bank" style="margin-top:.5rem">${exp.carry.map((s) => `<div class="bankitem"><span class="chip" title="${describe(s.defId)}">${name(s.defId)} ×${s.qty}</span>${legal.some((a) => a.type === "don" && a.itemId === s.defId) ? `<button data-don="${s.defId}" title="equip it (−${DON_DOFF_ENERGY}e; swaps the worn piece into the bag)">don</button>` : ""}<button data-drop="${s.defId}">drop</button></div>`).join("")}</div>` : ""}
-      ${(() => { const doffable = legal.filter((a) => a.type === "doff").map((a) => (a as { itemId: string }).itemId); return doffable.length ? `<div class="bank" style="margin-top:.5rem">${doffable.map((id) => `<div class="bankitem"><span class="chip" title="worn · ${describe(id)}">${name(id)} (worn)</span><button data-doff="${id}" title="stow it in the bag (−${DON_DOFF_ENERGY}e; takes a slot)">doff</button></div>`).join("")}</div>` : ""; })()}
-      ${(exp.carriedMaps ?? []).length ? `<div class="muted" style="margin-top:.5rem;font-size:.85em">carried maps ${(exp.carriedMaps ?? []).length}/${mapCarryCap(state.bank)} map-pocket</div><div class="bank">${(exp.carriedMaps ?? []).map((m) => `<div class="bankitem"><span class="chip" title="map-pocket (separate from loot slots) — banks as a held map when the run ends">🗺️ T${m.tier ?? 1} ${name(m.biomeId)} map</span><button data-drop-map="${m.mapSeed}">drop</button></div>`).join("")}</div>` : ""}
-    </section>
+      ${exp.carry.length ? `<div class="bank">${exp.carry.map((s) => `<div class="bankitem"><span class="chip" title="${describe(s.defId)}">${name(s.defId)} ×${s.qty}</span>${legal.some((a) => a.type === "don" && a.itemId === s.defId) ? `<button data-don="${s.defId}" title="equip it (−${DON_DOFF_ENERGY}e)">don</button>` : ""}<button data-drop="${s.defId}">drop</button></div>`).join("")}</div>` : ""}
+      ${(() => { const doffable = legal.filter((a) => a.type === "doff").map((a) => (a as { itemId: string }).itemId); return doffable.length ? `<div class="bank">${doffable.map((id) => `<div class="bankitem"><span class="chip" title="worn · ${describe(id)}">${name(id)} (worn)</span><button data-doff="${id}" title="stow it (−${DON_DOFF_ENERGY}e; takes a slot)">doff</button></div>`).join("")}</div>` : ""; })()}
+      ${(exp.carriedMaps ?? []).length ? `<div class="muted small">maps ${(exp.carriedMaps ?? []).length}/${mapCarryCap(state.bank)}</div><div class="bank">${(exp.carriedMaps ?? []).map((m) => `<div class="bankitem"><span class="chip" title="banks as a held map when the run ends">🗺️ T${m.tier ?? 1} ${name(m.biomeId)}</span><button data-drop-map="${m.mapSeed}">drop</button></div>`).join("")}</div>` : ""}`;
+
+  const craftTab = (() => {
+    // ke3.4: field-craft list — legal craft candidates on expedition (reduce has already
+    // filtered to field recipes you can make right here). gate-legibility (playtest
+    // 2026-07-09 #1): also show kit-locked recipes greyed with what they need (whyNot — ciq).
+    const fieldCrafts = legal.filter((a): a is Extract<Action, { type: "craft" }> => a.type === "craft");
+    const craftable = new Set(fieldCrafts.map((a) => a.recipeId));
+    const pool = [...exp.loadout.equipment.tools, ...exp.carry.map((s) => s.defId)];
+    const kitLocked = Object.keys(RECIPE).filter((id) =>
+      RECIPE[id]!.field && !craftable.has(id) && whyNot(state, { type: "craft", recipeId: id }) === "missing-tool");
+    if (!fieldCrafts.length && !kitLocked.length) return `<div class="muted">Nothing to craft here. Field recipes need a kit (fire-kit, glassware…) and their ingredients.</div>`;
+    const readyRows = fieldCrafts.map((a) => {
+      const r = RECIPE[a.recipeId]!;
+      const ing = r.inputs.map((i) => `${i.qty}× ${name(i.defId)}`).join(" + ");
+      return `<div class="craftpath"><button data-craft="${a.recipeId}" title="field-craft (−${FIELD_CRAFT_ENERGY}e)">🔥 craft</button> ${recipeOutputQty(r, pool)}× ${name(r.output.defId)} <span class="muted small">← ${ing}</span></div>`;
+    }).join("");
+    const lockedRows = kitLocked.map((id) => {
+      const r = RECIPE[id]!;
+      return `<div class="craftpath locked">🔒 ${name(r.output.defId)} <span class="warn small">${recipeGateHint(id)}</span></div>`;
+    }).join("");
+    return `<div class="muted small">−${FIELD_CRAFT_ENERGY}e each</div><div class="craftlist">${readyRows}${lockedRows}</div>`;
+  })();
+
+  const tabBody = ui.tab === "bag" ? bagTab : ui.tab === "craft" ? craftTab : ui.tab === "log" ? ui.logHtml : hereTab;
+  const tabBtn = (t: DrawerTab, label: string) => `<button class="tab${ui.tab === t ? " on" : ""}" data-tab="${t}">${label}</button>`;
+  const hereSummary = exp.combat ? `⚔ ${name(exp.combat.creature)}` : here && !cleared.has(kk(here)) ? (here.kind === "monster" ? "a monster" : kindLabel(here.kind)) : grid.terrain[exp.pos.y]![exp.pos.x]!;
+
+  return `
+  <div class="exp">
+    <div class="viewport" data-viewport>
+      <div class="grid atlas-assets" data-grid style="grid-template-columns:repeat(${MAP_WIDTH}, 32px);">${cells}</div>
+      <div class="hud">
+        <div class="hud-title">${name(grid.biomeId)}${(exp.mapTier ?? 1) > 1 ? ` <span class="muted">T${exp.mapTier}</span>` : ""}</div>
+        ${bars}
+      </div>
+      <button class="pan pan-n" data-pan="0,-2" aria-label="pan north">▲</button>
+      <button class="pan pan-s" data-pan="0,2" aria-label="pan south">▼</button>
+      <button class="pan pan-w" data-pan="-2,0" aria-label="pan west">◀</button>
+      <button class="pan pan-e" data-pan="2,0" aria-label="pan east">▶</button>
+      <button class="recentre" data-recentre title="centre on you" aria-label="centre on you">◎</button>
+      ${quick.length ? `<div class="quick">${quick.join("")}</div>` : ""}
+      ${routeBar}
+    </div>
+    <aside class="drawer${ui.drawerOpen ? " open" : ""}">
+      <button class="drawer-handle" data-drawer-toggle><span class="grip"></span><span class="summary">${hereSummary} · ${inv.used}/${cap} bag</span><span class="chev">${ui.drawerOpen ? "▾" : "▴"}</span></button>
+      <nav class="tabs">${tabBtn("here", "Here")}${tabBtn("bag", `Bag ${inv.used}/${cap}`)}${tabBtn("craft", "Craft")}${tabBtn("log", "Log")}</nav>
+      <div class="drawer-body">${tabBody}</div>
+    </aside>
   </div>
   `;
 }
