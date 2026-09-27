@@ -9,6 +9,7 @@ import {
   WATER_NOISE_FREQUENCY,
   BIOMES,
   BIOME_IDS,
+  RARE_BIOMES,
   TERRAINS,
   POI_DENSITY,
   POI_MIN_SPACING,
@@ -87,9 +88,17 @@ function waterDepth(terrain: Terrain[][]): number[][] {
 
 // Each candidate map rolls its biome from its own seed — embark carries only
 // mapSeed, and anyone holding the seed can re-derive the biome (D21, M6 note).
-export function rollBiome(mapSeed: string): BiomeId {
-  const i = Math.floor(rand(mapSeed, "biome") * BIOME_IDS.length);
-  return BIOME_IDS[i] ?? BIOME_IDS[0]!;
+// D91: rare biomes (RARE_BIOMES) sit OUT of the uniform base roll and roll in on their
+// own chance at/above their minTier — so the base pick for any seed is unchanged and a
+// T1 map can never be a rare biome. `mapTier` defaults to 1 (the town's local map).
+const BASE_BIOMES = BIOME_IDS.filter((id) => !RARE_BIOMES[id]);
+export function rollBiome(mapSeed: string, mapTier = 1): BiomeId {
+  for (const id of [...BIOME_IDS].sort()) {
+    const rare = RARE_BIOMES[id];
+    if (rare && mapTier >= rare.minTier && rand(mapSeed, "biome-rare", id) < rare.chance) return id;
+  }
+  const i = Math.floor(rand(mapSeed, "biome") * BASE_BIOMES.length);
+  return BASE_BIOMES[i] ?? BASE_BIOMES[0]!;
 }
 
 // Roll a node's magnitude class from the tier's distribution (2yn). Numeric keys sorted
@@ -263,7 +272,7 @@ export function affixProfile(biome: Biome, affixes: string[]): Biome {
 // generation discriminator (mapTier, affixes) can never desync view↔engine
 // again. Town-side / offer-preview (localMap) stays separate.
 export function expeditionGrid(exp: { mapSeed: string; mapTier?: number; affixes?: string[] }): Grid {
-  return generateGrid(exp.mapSeed, rollBiome(exp.mapSeed), exp.mapTier ?? 1, exp.affixes ?? []);
+  return generateGrid(exp.mapSeed, rollBiome(exp.mapSeed, exp.mapTier ?? 1), exp.mapTier ?? 1, exp.affixes ?? []);
 }
 
 export function generateGrid(mapSeed: string, biomeId: BiomeId, mapTier = 1, affixes: string[] = []): Grid {

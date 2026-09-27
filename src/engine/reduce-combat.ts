@@ -156,8 +156,8 @@ export function mintMap(
 ): { carriedMaps: MapItem[]; event: GameEvent } {
   const expedition = state.expedition!;
   const carriedMaps = expedition.carriedMaps ?? [];
-  const biomeId = rollBiome(mapSeed);
   const tier = Math.min((expedition.mapTier ?? 1) + 1, MAP_TIER_MAX);
+  const biomeId = rollBiome(mapSeed, tier); // D91: a T2+ drop can be a rare biome (swamp)
   const carried = carriedMaps.length < mapCarryCap(state.bank); // zpm.2: maps have their own dedicated pool, not a loot slot
   return {
     carriedMaps: carried ? [...carriedMaps, { mapSeed, biomeId, vintage: state.runs ?? 0, tier }] : carriedMaps,

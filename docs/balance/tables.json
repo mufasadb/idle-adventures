@@ -183,6 +183,31 @@
         "beast"
       ]
     },
+    "giant-leech": {
+      "tier": 1,
+      "dmgType": "melee",
+      "armourType": "light",
+      "category": "beast",
+      "tags": [
+        "beast"
+      ]
+    },
+    "bog-lurker": {
+      "tier": 2,
+      "dmgType": "melee",
+      "armourType": "plate",
+      "category": "beast",
+      "tags": [
+        "beast"
+      ]
+    },
+    "marsh-hag": {
+      "tier": 2,
+      "dmgType": "ranged",
+      "armourType": "robe",
+      "category": "humanoid",
+      "tags": []
+    },
     "ancient-wyrm": {
       "tier": 4,
       "dmgType": "magic",
@@ -283,6 +308,32 @@
       }
     },
     "forest-boar": {
+      "bare": {
+        "victory": true,
+        "hpLost": 8,
+        "hpLostPct": 26.7,
+        "rounds": 3
+      },
+      "iron": {
+        "victory": true,
+        "hpLost": 4,
+        "hpLostPct": 13.3,
+        "rounds": 3
+      },
+      "steel": {
+        "victory": true,
+        "hpLost": 1.5,
+        "hpLostPct": 5,
+        "rounds": 2
+      },
+      "mithril": {
+        "victory": true,
+        "hpLost": 1.1,
+        "hpLostPct": 3.8,
+        "rounds": 2
+      }
+    },
+    "giant-leech": {
       "bare": {
         "victory": true,
         "hpLost": 8,
@@ -436,6 +487,32 @@
         "hpLost": 1.1,
         "hpLostPct": 3.8,
         "rounds": 2
+      }
+    },
+    "bog-lurker": {
+      "bare": {
+        "victory": false,
+        "hpLost": 30,
+        "hpLostPct": 100,
+        "rounds": 4
+      },
+      "iron": {
+        "victory": true,
+        "hpLost": 20,
+        "hpLostPct": 66.7,
+        "rounds": 6
+      },
+      "steel": {
+        "victory": true,
+        "hpLost": 9,
+        "hpLostPct": 30,
+        "rounds": 4
+      },
+      "mithril": {
+        "victory": true,
+        "hpLost": 4.6,
+        "hpLostPct": 15.2,
+        "rounds": 3
       }
     },
     "drake": {
@@ -592,6 +669,32 @@
         "hpLost": 4.6,
         "hpLostPct": 15.2,
         "rounds": 3
+      }
+    },
+    "marsh-hag": {
+      "bare": {
+        "victory": true,
+        "hpLost": 24,
+        "hpLostPct": 80,
+        "rounds": 4
+      },
+      "iron": {
+        "victory": true,
+        "hpLost": 8,
+        "hpLostPct": 26.7,
+        "rounds": 4
+      },
+      "steel": {
+        "victory": true,
+        "hpLost": 3.7,
+        "hpLostPct": 12.3,
+        "rounds": 3
+      },
+      "mithril": {
+        "victory": true,
+        "hpLost": 1.3,
+        "hpLostPct": 4.4,
+        "rounds": 2
       }
     },
     "snow-marauder": {

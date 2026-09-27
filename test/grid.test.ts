@@ -68,7 +68,22 @@ test("rollBiome: different seeds can roll different biomes", () => {
   const rolled = new Set(
     Array.from({ length: 30 }, (_, i) => rollBiome(`candidate-${i}`)),
   );
-  expect(rolled.size).toBe(BIOME_IDS.length); // 30 seeds should hit all 3
+  expect(rolled.size).toBe(BIOME_IDS.length - 1); // 30 seeds hit all 3 BASE biomes (swamp is rare, T2+ only — D91)
+  expect(rolled.has("swamp")).toBe(false);
+});
+
+test("rollBiome (D91): a rare biome never rolls below its minTier, and a base roll is unchanged by tier", () => {
+  let swampAtT2 = 0;
+  for (let i = 0; i < 200; i++) {
+    const seed = `rare-${i}`;
+    const t1 = rollBiome(seed, 1);
+    expect(t1).not.toBe("swamp");
+    const t2 = rollBiome(seed, 2);
+    if (t2 === "swamp") swampAtT2++;
+    else expect(t2 as string).toBe(t1); // not swamp ⇒ same base biome as T1
+  }
+  expect(swampAtT2).toBeGreaterThan(30); // RARE_BIOMES.swamp.chance 0.3 over 200 seeds
+  expect(swampAtT2).toBeLessThan(90);
 });
 
 test("generateGrid: places POI_DENSITY POIs, in bounds, with valid kinds", () => {

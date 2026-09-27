@@ -8,7 +8,7 @@ import { ARROWS_PER_CRAFT, ARROW_SHAFTS_PER_LOG, DARTS_PER_CRAFT } from "./comba
 // --- Consumable item catalogs (M5) ---
 // ENERGY_PER_FOOD / POTION_HEAL are flat, so these are single-item catalogs for
 // the POC; the list is what `pack`/`slotOf` validate a food/potion defId against.
-export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican", "apple", "smoked-venison", "blubber-stew", "cooked-venison", "cooked-berries", "stew", "crayfish", "trout", "perch", "pike", "grilled-pike", "crayfish-boil", "smoked-fish"];
+export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican", "apple", "smoked-venison", "blubber-stew", "cooked-venison", "cooked-berries", "stew", "crayfish", "trout", "perch", "pike", "grilled-pike", "crayfish-boil", "smoked-fish", "eel"];
 export const POTION: string[] = ["potion", "greater-potion", "draught", "greater-draught"];
 export const BATTLE_ITEM: string[] = ["elixir-of-power", "warding-draught"]; // combat consumables (bzd); COMBAT_BUFF keys
 
@@ -57,6 +57,8 @@ export const RECIPE: Record<
   jam: { inputs: [{ defId: "stale-berries", qty: 3 }], output: { defId: "jam", qty: 1 } }, // the stale-berry payoff (e3j): denser than ration, cheaper than trail-ration
   pemmican: { inputs: [{ defId: "drake-hide", qty: 1 }, { defId: "stale-berries", qty: 2 }], output: { defId: "pemmican", qty: 1 } }, // dense trail food (si7.2): meat + berries. Monster-drop-meat variant → m0a.
   potion: { inputs: [{ defId: "desert-sage", qty: 1 }, { defId: "forest-herb", qty: 1 }], output: { defId: "potion", qty: 1 } },
+  "iron-ore-bog": { inputs: [{ defId: "bog-iron", qty: 2 }], output: { defId: "iron-ore", qty: 1 } }, // si7.6.3: swamp bog-iron refines to iron-ore (lossy, but the swamp's mines feed the iron line)
+  "potion-leech": { inputs: [{ defId: "leech", qty: 2 }, { defId: "forest-herb", qty: 1 }], output: { defId: "potion", qty: 1 } }, // si7.6.3: swamp's sage-free potion (leech drops)
   // Cartography inks (cxq) — apply to a HELD map to roll an affix from the ink's
   // domain. Vague flavour only (the affix NAME carries the meaning). ore-ink is a
   // deliberate copper sink (playtest flagged copper as a trap).
@@ -165,6 +167,7 @@ export const RECIPE: Record<
   // the bow's wood + bowstring. The dart's poison is the tier gate.
   blowgun: { inputs: [{ defId: "reed", qty: 3 }, { defId: "amber", qty: 1 }], output: { defId: "blowgun", qty: 1 } },
   "blow-dart": { inputs: [{ defId: "reed", qty: 1 }, { defId: "amber", qty: 1 }, { defId: "forest-herb", qty: 1 }], output: { defId: "blow-dart", qty: DARTS_PER_CRAFT } }, // herb-poisoned: 1 dmg × 3 rounds
+  "toxin-dart": { inputs: [{ defId: "reed", qty: 1 }, { defId: "amber", qty: 1 }, { defId: "toad-venom", qty: 1 }], output: { defId: "toxin-dart", qty: DARTS_PER_CRAFT } }, // si7.6.3: swamp toad venom — the middle dart tier, no still needed (2 dmg × 5 rounds)
   "venom-dart": { inputs: [{ defId: "reed", qty: 1 }, { defId: "amber", qty: 1 }, { defId: "venom-oil", qty: 1 }], output: { defId: "venom-dart", qty: DARTS_PER_CRAFT } }, // still-brewed venom: 3 dmg × 4 rounds // D45 rework: bowstring replaces deer-hide — the whole bow line stays pick-free (starter axe)
   "fire-staff": { inputs: [{ defId: "pine-log", qty: 2 }, { defId: "fae-dust", qty: 1 }], output: { defId: "fire-staff", qty: 1 } },
   // Weapons — T2 (each needs a T2 material → all sit behind the iron-pick/iron-axe tier)
@@ -213,6 +216,7 @@ export const RECIPE: Record<
   "warg-jerkin": { inputs: [{ defId: "werewolf-pelt", qty: 2 }], output: { defId: "warg-jerkin", qty: 1 } },
   "scorpion-plate-chest": { inputs: [{ defId: "scorpion-carapace", qty: 2 }], output: { defId: "scorpion-plate-chest", qty: 1 } },
   "large-pack-troll": { inputs: [{ defId: "troll-hide", qty: 2 }, { defId: "ironwood-log", qty: 1 }], output: { defId: "large-pack", qty: 1 } }, // alt route to the top pack
+  "plate-legs-lurker": { inputs: [{ defId: "lurker-scale", qty: 3 }], output: { defId: "plate-legs", qty: 1 } }, // si7.6.3: bog-lurker scutes = plate legs without iron (mirrors beetle → boots)
   "plate-boots-beetle": { inputs: [{ defId: "beetle-shell", qty: 2 }], output: { defId: "plate-boots", qty: 1 } }, // beetle chitin = plate without iron (si7.1)
   "fire-staff-wisp": { inputs: [{ defId: "wisp-essence", qty: 1 }, { defId: "cactus-wood", qty: 2 }], output: { defId: "fire-staff", qty: 1 } }, // desert path to magic — no woodland fae needed (si7.1)
   "ration-crab": { inputs: [{ defId: "crab-shell", qty: 1 }], output: { defId: "ration", qty: 2 } }, // crab meat (si7.1)

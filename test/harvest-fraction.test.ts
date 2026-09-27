@@ -1,7 +1,8 @@
 import { test, expect } from "bun:test";
 import { simHarvest, harvestFractionReport } from "../src/sim/harvest";
 import { localMap } from "../src/engine/town";
-import { HARVEST_FRACTION_TIER_TARGET, HARVEST_FRACTION_BASE_TARGET } from "../src/data/constants";
+import { rollBiome } from "../src/engine/grid";
+import { HARVEST_FRACTION_TIER_TARGET, HARVEST_FRACTION_BASE_TARGET, RARE_BIOMES } from "../src/data/constants";
 
 const seeds = (n: number) => Array.from({ length: n }, (_, i) => localMap("hf", i).mapSeed);
 
@@ -23,7 +24,10 @@ const PROOF_TIER = 3;
 const BAND = 0.1; // seed-noise tolerance around each calibrated target
 
 test("calibrated harvest proof: tier food ≈2× base rations on a high-tier map", () => {
-  const maps = seeds(5);
+  // D91: calibrate the food ladder on BASE-biome maps. The rare swamp (T2+) is a harder,
+  // gear-specific biome (waders/raft); a 5-seed sample that happens to draw two of them
+  // measures the biome mix, not the food ladder this test exists for.
+  const maps = Array.from({ length: 12 }, (_, i) => localMap("hf", i).mapSeed).filter((m) => !RARE_BIOMES[rollBiome(m, PROOF_TIER)]).slice(0, 5);
   // Tier-matched loadout: dense pemmican + capacity gear + full reach kit.
   const tierPack = { tools: ["pick", "knife", "trap", "canteen", "tent", "ice-cleats", "climbing-pick"], backpack: "large-pack", transport: "horse", food: [{ defId: "pemmican", qty: 6 }] }; // D83: trap to hunt
   // Base loadout: the SAME reach gear but CHEAP food (base rations only).

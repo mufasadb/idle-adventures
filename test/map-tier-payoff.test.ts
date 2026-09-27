@@ -21,6 +21,7 @@ import type { Grid } from "../src/engine/grid";
 import {
   MATERIAL_MAP_TIER_WEIGHT, MATERIAL_GATE, NODE_MAGNITUDE_YIELD, GATHER_YIELD,
   BIOME_IDS,
+  RARE_BIOMES,
 } from "../src/data/constants";
 import type { BiomeId, GatherableNodeType } from "../src/data/constants";
 import { MONSTERS, MONSTER_TIER_HP_CURVE, LOOT_TABLE } from "../src/data/combat";
@@ -96,7 +97,7 @@ function seedsForBiome(biomeId: BiomeId, count: number): string[] {
   const out: string[] = [];
   for (let i = 0; out.length < count && i < 6000; i++) {
     const s = `payoff-${i}`;
-    if (rollBiome(s) === biomeId) out.push(s);
+    if (rollBiome(s, RARE_BIOMES[biomeId]?.minTier ?? 1) === biomeId) out.push(s); // D91: a rare biome only rolls at its minTier
   }
   return out;
 }
