@@ -19,7 +19,9 @@ import type { LogEntry } from "./log";
 import { logView } from "./log";
 import { save, load, loadLog, saveLastPlan, loadLastPlan } from "./persist";
 import { townView } from "./town-view";
+import type { TownTab } from "./town-view";
 import { expeditionView, currentDerived } from "./expedition-view";
+import type { DrawerTab } from "./expedition-view";
 
 const params = new URLSearchParams(location.search);
 const seed = params.get("seed") ?? "play";
@@ -39,6 +41,12 @@ let route: Pos[] = [];
 // we leave town (draw() guards it) so a consumed/rotated map can never linger.
 let prep: string | null = null;
 const app = document.querySelector<HTMLDivElement>("#app")!;
+// kml: landscape-first expedition UI. The drawer (slide-up on phones, a sidebar on wide
+// screens) holds everything that isn't the map; the map is a camera over the grid.
+let drawerOpen = false;
+let drawerTab: DrawerTab = "here";
+let wasEngaged = false;
+let townTab: TownTab = "main";
 
 function newRun(): void { state = newGame(seed); log = [{ t: "note", text: "· new game" }]; route = []; draw(); }
 
@@ -112,46 +120,104 @@ function walkRoute(wps: Pos[]): void {
 
 // --- rendering ---------------------------------------------------------------
 function draw(): void {
-  // boc: every action rebuilds app.innerHTML, which discards the scrollable play
-  // window (.gridscroll) and snaps it back to origin. Preserve its scroll offsets
-  // across the re-render (save before, restore after) so the view stays put. Only
-  // restores when a .gridscroll existed both before and after — phase transitions
-  // (town has none) correctly fall through to the fresh element's default 0,0.
   if (state.phase !== "town") prep = null; // leaving town drops the prep selection (zpm.3)
-  const prev = app.querySelector<HTMLElement>(".gridscroll");
-  const keepScroll = prev ? { top: prev.scrollTop, left: prev.scrollLeft } : null;
-  const body = state.phase === "town" ? townView(state, prep, loadLastPlan(SAVE_KEY).length > 0) : expeditionView(state, route);
-  app.innerHTML = `${body}${logView(log)}`;
-  if (keepScroll) {
-    const next = app.querySelector<HTMLElement>(".gridscroll");
-    if (next) { next.scrollTop = keepScroll.top; next.scrollLeft = keepScroll.left; }
-  }
+  const engaged = !!state.expedition?.combat;
+  if (engaged && !wasEngaged) { drawerOpen = true; drawerTab = "here"; } // a fight just started: show its panel
+  wasEngaged = engaged;
+  document.body.classList.toggle("in-expedition", state.phase !== "town");
+  app.innerHTML = state.phase === "town"
+    ? `${townView(state, prep, loadLastPlan(SAVE_KEY).length > 0, townTab)}${logView(log)}`
+    : expeditionView(state, route, { drawerOpen, tab: drawerTab, logHtml: logView(log) });
   wire(); save(SAVE_KEY, state, log);
-  // c67 (playtest F4): camera-follow. The map is taller than its scroll window, so a
-  // Walk that moves you north walks you off-screen and you must chase yourself. When
-  // the player's POSITION changes, re-centre the window on them. On a pos-UNCHANGED
-  // redraw (route planning, toggles) we leave the boc-preserved scroll alone, so
-  // scrolling ahead to inspect a far node is never yanked back.
+  // c67 camera-follow, now a real camera (kml): re-centre on the player when their
+  // POSITION changes; otherwise keep wherever the player panned to.
   if (state.phase !== "town" && state.expedition) {
     const p = `${state.expedition.pos.x},${state.expedition.pos.y}`;
-    if (p !== camPos) { centerOnPlayer(); camPos = p; }
+    if (p !== camPos) { centerOnPlayer(); camPos = p; } else applyCam();
   } else camPos = null;
 }
 
-// c67: scroll the play window so the player tile sits at its centre (the browser
-// clamps at the edges, so an edge player naturally shows the ground ahead).
+// --- map camera (kml) ----------------------------------------------------------
+// The grid is always zoomed (bigger on touch screens) and panned by a translate — no
+// re-render, so panning stays smooth. cam = the top-left of the view in scaled px.
+const TILE_PX = 33; // 32px tile + 1px grid gap
+const ZOOM = matchMedia("(pointer: coarse)").matches ? 1.35 : 1;
+let cam = { x: 0, y: 0 };
 let camPos: string | null = null;
-function centerOnPlayer(): void {
-  const gs = app.querySelector<HTMLElement>(".gridscroll");
-  const pl = gs?.querySelector<HTMLElement>(".tile.player");
-  if (!gs || !pl) return;
-  const gsR = gs.getBoundingClientRect(), plR = pl.getBoundingClientRect();
-  gs.scrollTop += (plR.top - gsR.top) - gs.clientHeight / 2 + plR.height / 2;
-  gs.scrollLeft += (plR.left - gsR.left) - gs.clientWidth / 2 + plR.width / 2;
+function viewportEl(): HTMLElement | null { return app.querySelector<HTMLElement>("[data-viewport]"); }
+function applyCam(): void {
+  const vp = viewportEl();
+  const g = app.querySelector<HTMLElement>("[data-grid]");
+  if (!vp || !g) return;
+  const w = g.offsetWidth * ZOOM, h = g.offsetHeight * ZOOM;
+  const slack = 48; // a little overscroll so edge tiles can clear the HUD
+  const clamp = (v: number, size: number, view: number) =>
+    size + 2 * slack <= view ? (size - view) / 2 : Math.max(-slack, Math.min(size - view + slack, v));
+  cam = { x: clamp(cam.x, w, vp.clientWidth), y: clamp(cam.y, h, vp.clientHeight) };
+  g.style.transform = `translate(${-cam.x}px, ${-cam.y}px) scale(${ZOOM})`;
 }
+function centerOnPlayer(): void {
+  const vp = viewportEl();
+  const pl = app.querySelector<HTMLElement>(".tile.player");
+  if (!vp || !pl) return;
+  cam = { x: (pl.offsetLeft + 16) * ZOOM - vp.clientWidth / 2, y: (pl.offsetTop + 16) * ZOOM - vp.clientHeight / 2 };
+  applyCam();
+}
+function panBy(dx: number, dy: number): void { cam = { x: cam.x + dx, y: cam.y + dy }; applyCam(); }
+
+// Drag-to-pan (mouse, one or two fingers): a pointer that moves past a small threshold
+// pans instead of clicking, and the click it would have produced is swallowed.
+const drag = { pointers: new Map<number, { x: number; y: number }>(), moved: 0, suppressClick: false };
+function centroid(): { x: number; y: number } {
+  let x = 0, y = 0;
+  for (const p of drag.pointers.values()) { x += p.x; y += p.y; }
+  const n = Math.max(1, drag.pointers.size);
+  return { x: x / n, y: y / n };
+}
+function wireCamera(): void {
+  const vp = viewportEl();
+  if (!vp) return;
+  vp.onpointerdown = (ev) => {
+    if ((ev.target as HTMLElement).closest("button, .routebar, .hud")) return;
+    drag.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (drag.pointers.size === 1) { drag.moved = 0; drag.suppressClick = false; }
+  };
+  vp.onpointermove = (ev) => {
+    const prev = drag.pointers.get(ev.pointerId);
+    if (!prev) return;
+    const before = centroid();
+    drag.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    const after = centroid();
+    const dx = after.x - before.x, dy = after.y - before.y;
+    drag.moved += Math.abs(dx) + Math.abs(dy);
+    if (drag.moved > 8 || drag.pointers.size > 1) { drag.suppressClick = true; panBy(-dx, -dy); }
+  };
+  const end = (ev: PointerEvent) => { drag.pointers.delete(ev.pointerId); };
+  vp.onpointerup = end;
+  vp.onpointercancel = end;
+  vp.addEventListener("click", (ev) => { if (drag.suppressClick) { ev.stopPropagation(); ev.preventDefault(); drag.suppressClick = false; } }, true);
+  vp.onwheel = (ev) => { ev.preventDefault(); panBy(ev.deltaX, ev.deltaY); };
+}
+document.addEventListener("keydown", (ev) => {
+  if (state.phase === "town" || (ev.target as HTMLElement).closest("input, textarea")) return;
+  const step = 2 * TILE_PX * ZOOM;
+  const d: Record<string, [number, number]> = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0] };
+  const v = d[ev.key];
+  if (!v) return;
+  ev.preventDefault();
+  panBy(v[0] * step, v[1] * step);
+});
+addEventListener("resize", () => applyCam());
 
 // --- wiring: attach handlers after each render -------------------------------
 function wire(): void {
+  wireCamera();
+  app.querySelectorAll<HTMLElement>("[data-town-tab]").forEach((el) => el.onclick = () => { townTab = el.dataset.townTab as TownTab; draw(); });
+  app.querySelectorAll<HTMLElement>("[data-pan]").forEach((el) => el.onclick = () => { const [dx, dy] = el.dataset.pan!.split(",").map(Number); panBy(dx! * TILE_PX * ZOOM, dy! * TILE_PX * ZOOM); });
+  const recentre = app.querySelector<HTMLElement>("[data-recentre]"); if (recentre) recentre.onclick = () => centerOnPlayer();
+  const handle = app.querySelector<HTMLElement>("[data-drawer-toggle]"); if (handle) handle.onclick = () => { drawerOpen = !drawerOpen; draw(); };
+  app.querySelectorAll<HTMLElement>("[data-tab]").forEach((el) => el.onclick = () => { drawerTab = el.dataset.tab as DrawerTab; drawerOpen = true; draw(); });
+  app.querySelectorAll<HTMLElement>("[data-open-tab]").forEach((el) => el.onclick = () => { drawerTab = el.dataset.openTab as DrawerTab; drawerOpen = true; draw(); });
   app.querySelectorAll<HTMLElement>("[data-embark]").forEach((el) => el.onclick = () => apply({ type: "embark", mapSeed: el.dataset.embark! }));
   app.querySelectorAll<HTMLElement>("[data-prepare]").forEach((el) => el.onclick = () => { prep = el.dataset.prepare!; route = []; draw(); }); // zpm.3: enter the prep screen for this map
   app.querySelectorAll<HTMLElement>("[data-back]").forEach((el) => el.onclick = () => { prep = null; draw(); }); // zpm.3: back to the map overview
