@@ -271,8 +271,11 @@ export function affixProfile(biome: Biome, affixes: string[]): Biome {
 // in-run VIEW and ENGINE site MUST derive the grid through this helper, so a new
 // generation discriminator (mapTier, affixes) can never desync view↔engine
 // again. Town-side / offer-preview (localMap) stays separate.
-export function expeditionGrid(exp: { mapSeed: string; mapTier?: number; affixes?: string[] }): Grid {
-  return generateGrid(exp.mapSeed, rollBiome(exp.mapSeed, exp.mapTier ?? 1), exp.mapTier ?? 1, exp.affixes ?? []);
+// D93: a map's biome is FROZEN when it's minted (MapItem.biomeId) and carried onto the
+// run at embark (Expedition.biomeId) — later lever changes (e.g. a new rare biome)
+// never turn a held desert map into a swamp. Only old saves re-derive it.
+export function expeditionGrid(exp: { mapSeed: string; mapTier?: number; affixes?: string[]; biomeId?: BiomeId }): Grid {
+  return generateGrid(exp.mapSeed, exp.biomeId ?? rollBiome(exp.mapSeed, exp.mapTier ?? 1), exp.mapTier ?? 1, exp.affixes ?? []);
 }
 
 export function generateGrid(mapSeed: string, biomeId: BiomeId, mapTier = 1, affixes: string[] = []): Grid {

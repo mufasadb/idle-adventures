@@ -240,3 +240,18 @@ test("generateGrid: POI kind does NOT correlate with reach — monsters and food
   const avgPrize = prizeSum / prizeN, avgFood = foodSum / foodN;
   expect(Math.abs(avgPrize - avgFood) / avgFood).toBeLessThan(0.1);
 }, 20000);
+
+test("D93: a held map keeps the biome it rolled — the run never re-rolls it", async () => {
+  const { reduce } = await import("../src/engine/reduce");
+  const { town } = await import("./helpers");
+  // Find a T2 seed whose tier-roll today is SWAMP, then hold it as a DESERT map (as if
+  // minted before swamp existed). Embark must land on desert.
+  let seed = "";
+  for (let i = 0; i < 400 && !seed; i++) if (rollBiome(`held-${i}`, 2) === "swamp") seed = `held-${i}`;
+  const s = { ...town([{ defId: "ration", qty: 2 }]), maps: [{ mapSeed: seed, biomeId: "desert" as const, vintage: 0, tier: 2 }] };
+  const r = reduce(s, { type: "embark", mapSeed: seed });
+  expect(r.state.expedition!.biomeId).toBe("desert");
+  expect(r.events[0]).toMatchObject({ type: "embarked", biomeId: "desert" });
+  const moved = reduce(r.state, { type: "move", to: { x: r.state.expedition!.pos.x + 1, y: r.state.expedition!.pos.y } });
+  expect(moved.state.expedition?.biomeId ?? "desert").toBe("desert");
+});

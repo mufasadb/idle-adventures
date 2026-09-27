@@ -73,6 +73,7 @@ export type Expedition = {
   autoFinish?: boolean; // auto-finish fights (67e): when true, a fight/engage resolves the WHOLE fight to victory or defeat in one action. Optional/absent = OFF; reads guard with `?? false`.
   campMealsUsed?: number; // tent "camp meals" spent this expedition (7lr): a tent lets you over-eat past max (+TENT_FOOD_MULTIPLIER) TENT_CAMP_MEALS times per run. Fresh per embark; reads guard with `?? 0`.
   autoGather?: boolean; // auto-interact with nodes the direct-line walk crosses (eot): ON ⇒ gather each node stepped over, pausing only on a full bag. Optional/absent = ON; reads guard with `?? true`. Flipped by toggle-auto-gather.
+  biomeId?: BiomeId; // D93: the biome the map ROLLED when it was minted/offered, frozen onto the run at embark — a held map never re-rolls. Absent (old saves) = re-derive via rollBiome(mapSeed, mapTier)
   mapTier?: number; // this run's map tier (2yn): set at embark from the chosen map's tier
                     // (offered map = 1, held MapItem = its tier). Optional/absent = 1.
   surveyed?: { x: number; y: number }[]; // POIs resolved at range by the survey action (54f): perceive treats these as always-in-radius. Optional/absent = [] (old saves, terse test states); reads guard with `?? []`.

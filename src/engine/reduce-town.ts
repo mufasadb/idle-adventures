@@ -1,5 +1,5 @@
 import type { GameState, GameEvent, ItemStack, LoadoutSlot } from "./types";
-import { expeditionGrid } from "./grid";
+import { expeditionGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { energyCapOf } from "./carry";
 import { subtractStacks } from "./bank";
@@ -34,7 +34,9 @@ export function embark(
   const heldMap = held.find((m) => m.mapSeed === mapSeed);
   const mapTier = heldMap?.tier ?? 1;
   const affixes = heldMap?.affixes ?? []; // cartography affixes ride onto the run (cxq)
-  const grid = expeditionGrid({ mapSeed, mapTier, affixes });
+  // D93: a held map keeps the biome it rolled when minted; the town's local map rolls now.
+  const biomeId = heldMap?.biomeId ?? rollBiome(mapSeed, mapTier);
+  const grid = expeditionGrid({ mapSeed, mapTier, affixes, biomeId });
   // Stamina model (dtv): current energy starts at MAX_ENERGY regardless of packed
   // food — food is a reserve you EAT to refill toward max mid-run, not the source
   // of the whole budget. Auto-eat starts OFF (mco): the player designates a food
@@ -58,6 +60,7 @@ export function embark(
       maps: wasHeld ? held.filter((m) => m.mapSeed !== mapSeed) : held, // spend the held map (xzx)
       expedition: {
         mapSeed,
+        biomeId,
         mapTier,
         pos: grid.entry,
         energy,

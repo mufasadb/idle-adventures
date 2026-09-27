@@ -1,7 +1,7 @@
 // The expedition screen: resource bars, the map grid + planned-route overlay, the
 // here/engagement panel, actions, field craft and the bag.
 import { legalActions, whyNot } from "../sim/legal";
-import { expeditionGrid, rollBiome } from "../engine/grid";
+import { expeditionGrid } from "../engine/grid";
 import type { Grid } from "../engine/grid";
 import { recipeOutputQty } from "../engine/craft";
 import { moveCostBreakdown } from "../engine/move";
@@ -308,7 +308,7 @@ export function expeditionView(state: GameState, route: Pos[]): string {
   const campMealReady = exp.loadout.equipment.tools.includes("tent") && (exp.campMealsUsed ?? 0) < TENT_CAMP_MEALS;
   const inv = inventoryGrid(exp.loadout, exp.carry, cap, exp.autoEatFood ?? null, eatable, campMealReady);
   return `
-  <header><h1>${rollBiome(exp.mapSeed, exp.mapTier ?? 1)} expedition</h1><span class="muted">pos (${exp.pos.x},${exp.pos.y})</span><button class="link" data-newgame>new game</button></header>
+  <header><h1>${grid.biomeId} expedition</h1><span class="muted">pos (${exp.pos.x},${exp.pos.y})</span><button class="link" data-newgame>new game</button></header>
   <div class="cols">
     <section class="mapwrap">
       ${bars}
