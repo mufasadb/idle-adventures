@@ -28,6 +28,7 @@ export const NOISE_FREQUENCY = 0.15; // Perlin sample step per tile; lower = lar
 // literally unreachable barefoot — mountains are cost-walls, not prisons).
 export const BARRIER_NOISE_FREQUENCY = 0.06; // ≪ NOISE_FREQUENCY → chunky ridges, not speckle
 export const BARRIER_THRESHOLD = 0.68; // the "how walled is the world" dial: lower = more maze
+export const WATER_NOISE_FREQUENCY = 0.07; // si7.6.5: standing-water field (a biome's `water` layer) — low, so lakes are blobs, not puddles
 export const POI_DENSITY = 60; // POIs per 35×35 map (D84): a geared+provisioned run should harvest ~half and CHOOSE which half (now: which DIRECTION). Area 1225 ≈ the old 20×60 = 1200, so the count/value budget carries over.
 export const POI_MIN_SPACING = 3; // min Chebyshev distance between POIs (spec: 3–4 tiles apart)
 export const POI_PLACEMENT_ATTEMPTS = 2000; // seeded rejection-sampling budget per map (scaled with density, e3j)
@@ -55,7 +56,11 @@ export const STARTER_BANK: { defId: string; qty: number }[] = [
 
 // Terrain vocabulary. Array order = elevation band order for noise→terrain
 // mapping (river lowest … mountain highest) — reordering it reshapes maps.
-export const TERRAINS = ["river", "mud", "plains", "ice", "mountain"] as const;
+// Water terrains (si7.6.5) are APPENDED so the noise→terrain bands above are
+// untouched; they never come from terrainWeights — only a biome's `water` layer
+// (below) places them, so a biome without one generates byte-identically.
+export const TERRAINS = ["river", "mud", "plains", "ice", "mountain", "shallows", "lake", "sea"] as const;
+export const WATER_TERRAINS: Terrain[] = ["river", "shallows", "lake", "sea"]; // fishable water (si7.6.2)
 export type Terrain = (typeof TERRAINS)[number];
 
 // Node (POI) vocabulary — what biome nodeTypeWeights and (M3) hardness/yield key on.
@@ -76,7 +81,21 @@ export type Biome = {
   creatureTable: Record<string, number>; // weighted monster defIds (si7.1): same shape as materialTable entries — tier-1/2 dominate, bosses rare
   materialTable: Partial<Record<NodeType, Record<string, number>>>; // node kind → weighted material defIds (D27)
   barrierTerrain: Terrain; // what a wall is made of here (e3j)
+  // Standing water (si7.6.5): an independent low-frequency noise field. Samples
+  // above `lakeThreshold` become `body` (lake/sea — boat-only), a band `shallowsBand`
+  // below that becomes wadeable shallows ringing it. Absent = no standing water
+  // (the biome's maps are byte-identical to before water existed).
+  water?: { body: Terrain; lakeThreshold: number; shallowsBand: number };
+  // Fishing (si7.6.2): what each KIND of water yields here, rolled per water tile
+  // at generation (D21 — gather-time never consults the biome). Absent kind =
+  // that water can't be fished in this biome.
+  fishTable?: Partial<Record<FishWater, Record<string, number>>>;
 };
+
+// Water classes fishing keys on (si7.6.2): the terrain, split by DEPTH for bodies —
+// a lake/sea tile FISH_DEEP_DEPTH+ tiles from any land is "deep" (reachable only by
+// boat), so going out on the water is what earns the rare catches.
+export type FishWater = "river" | "shallows" | "lake" | "deep-lake" | "sea" | "deep-sea";
 
 export const BIOMES: Record<BiomeId, Biome> = {
   woodland: {
@@ -90,6 +109,13 @@ export const BIOMES: Record<BiomeId, Biome> = {
       animal: { "deer-hide": 7, "wolf-pelt": 2, "lizard-hide": 1, feather: 2 }, // feather (D45): fletching from birds (knife)
     },
     barrierTerrain: "mountain",
+    water: { body: "lake", lakeThreshold: 0.72, shallowsBand: 0.05 }, // si7.6.5: ~8% lake + ~6% shallows ring per map; the raft crosses it
+    fishTable: { // si7.6.2: banks give trout/crayfish; the lake edge perch; the deep middle (raft) pike + treasure
+      river: { trout: 6, crayfish: 4 },
+      shallows: { crayfish: 6, trout: 3 },
+      lake: { perch: 7, crayfish: 2, "sunken-lockbox": 1 },
+      "deep-lake": { pike: 6, perch: 2, "sunken-lockbox": 3, "sodden-map": 1 },
+    },
   },
   desert: {
     terrainWeights: { plains: 0.55, mountain: 0.3, river: 0.15 },
@@ -102,6 +128,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
       animal: { "lizard-hide": 7, "deer-hide": 2, feather: 2 }, // D83: drake-hide removed — now a combat drop from the `drake` monster (was 'too high up' for a hunted node); feather (D45)
     },
     barrierTerrain: "mountain",
+    fishTable: { river: { crayfish: 5, trout: 2 } }, // si7.6.2: thin desert creeks — crayfish in the mud
   },
   tundra: {
     terrainWeights: { ice: 0.5, mountain: 0.25, plains: 0.15, river: 0.1 },
@@ -114,6 +141,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
       animal: { "wolf-pelt": 7, "deer-hide": 2, feather: 2, seal: 2 }, // D83: drake-hide removed (now the `drake` combat drop); seal (m0a) large prey — now huntable with the base trap+knife (steel-knife retired); feather (D45)
     },
     barrierTerrain: "mountain",
+    fishTable: { river: { trout: 6, crayfish: 1 } }, // si7.6.2: cold, clear tundra streams
   },
 };
 
@@ -227,6 +255,13 @@ export const FOOD_ENERGY: Record<string, number> = {
   apple: 40, // fresh forage (m0a): woodland orchard fruit — weak-but-immediate, stales to bruised-apple
   "smoked-venison": 200, // m0a: woodland cured meat — a strong camp-meal (tent) reserve
   "blubber-stew": 160, // m0a: tundra rendered fat + moss
+  crayfish: 30, // si7.6.2: fresh, weak alone — boil a pot of them (crayfish-boil)
+  trout: 40, // si7.6.2: river/shallows catch, fresh
+  perch: 60, // si7.6.2: lake-edge catch, fresh
+  pike: 90, // si7.6.2: deep-lake catch (raft) — grill it for a camp-meal-grade food
+  "grilled-pike": 220, // si7.6.2: field-cooked pike (fire-kit)
+  "crayfish-boil": 170, // si7.6.2: 3 crayfish in a pot (fire-kit + cooking-pot)
+  "smoked-fish": 150, // si7.6.2: the stale-fish payoff at the smokehouse
   "cooked-venison": 150, // ke3.4: field-cooked over a fire-kit — denser than a ration, less than the home-smoked (200) version; turns raw meat into mid-run stamina
   "cooked-berries": 100, // ke3.5: field-roasted fresh berries — a universal-forage field cook (berries appear in every biome); denser than 2 raw berries (60) and a keeper (doesn't stale)
   stew: 220, // ke3.5: the premium field cook — needs BOTH fire-kit + cooking-pot (2 tool slots) and 3 gathered inputs; denser than smoked-venison (200), still under the pemmican reserve (240)
@@ -237,7 +272,11 @@ export const FOOD_ENERGY: Record<string, number> = {
 // town-crafts into denser food (jam). Stale forms are materials — slotOf never
 // returns "food" for them — so they can't be packed back out: "old berries"
 // enforce themselves with no extra rule.
-export const FRESH_TO_STALE: Record<string, string> = { berries: "stale-berries", apple: "bruised-apple" };
+export const FRESH_TO_STALE: Record<string, string> = {
+  berries: "stale-berries",
+  apple: "bruised-apple",
+  trout: "stale-fish", perch: "stale-fish", pike: "stale-fish", crayfish: "stale-fish", // si7.6.2: fish spoils on the way home — the smokehouse turns it into smoked-fish
+};
 export const MIN_STEP = 5; // a discounted step never costs less than this (svz)
 // Diagonal steps cover √2 tiles of distance, so they cost √2× the orthogonal step,
 // rounded DOWN (l2w): floor(orthogonalFinal × DIAGONAL_MULTIPLIER). Applied by every
@@ -254,6 +293,9 @@ export const TERRAIN_COST: Record<Terrain, number> = {
   ice: 20,
   river: 30,
   mountain: Infinity, // impassable — climbing-pick enables it (TERRAIN_GATE)
+  shallows: 25, // si7.6.5: wadeable lake/sea margin — slow, not a wall
+  lake: Infinity, // si7.6.5: boat-only — a raft enables it (TERRAIN_GATE)
+  sea: Infinity, // si7.6.5: boat-only — needs a sea-going boat (coastal biome, later); a raft can't
 }; // absolute energy per tile stepped ONTO, on foot, before gear/transport
 // Equipped tools that modify gated terrain (svz). `enable` makes an impassable
 // terrain finite (mountain only); `discount` subtracts from the step energy. Each
@@ -261,6 +303,8 @@ export const TERRAIN_COST: Record<Terrain, number> = {
 export const TERRAIN_GATE: Partial<Record<Terrain, Record<string, { enable?: number; discount?: number }>>> = {
   mountain: { "climbing-pick": { enable: 40 } }, // ∞ → 40 (crossable at 4× plains)
   river: { raft: { discount: 20 } }, // 30 → 10 (≈ plains)
+  shallows: { raft: { discount: 15 }, waders: { discount: 10 } }, // 25 → 10 / 15 (si7.6.5)
+  lake: { raft: { enable: 15 } }, // si7.6.5: ∞ → 15 — the raft is the lake boat
   mud: { waders: { discount: 5 } }, // 15 → 10
   ice: { "ice-cleats": { discount: 15 } }, // 20 → 5 (faster than plains — a tundra highway)
 };
@@ -330,7 +374,8 @@ export const TOOL_CAPABILITY: Record<string, string> = {
   "steel-axe": "axe",
   spyglass: "vision", // perception-range capability (9u9.2); NODE_TOOL never asks for it, so no gather impact
   "climbing-pick": "climb", // gating capability (boo); NODE_TOOL never asks for "climb", so no gather impact
-  raft: "ford", // gating capability for rivers (boo)
+  raft: "ford", // gating capability for rivers (boo); D88: also the lake boat
+  "fishing-rod": "fish", // si7.6.2: fish any water tile you stand on or next to; NODE_TOOL never asks for "fish"
   waders: "wade", // graded-movement gear (svz); NODE_TOOL never asks for it
   "ice-cleats": "trek",
   tent: "camp", // stamina gear (dtv; 7lr): powers the once-per-run camp meal (×TENT_FOOD_MULTIPLIER); NODE_TOOL never asks for "camp", so no gather impact
@@ -354,6 +399,7 @@ export const TOOL_PURPOSE: Record<string, string> = {
   alchemy: "enables field brewing (draughts)",
   vision: "reveals a far node's material and gate when you survey it",
   smith: "forges metal plate at an anvil",
+  fish: "fishes the water you stand on or beside",
 };
 // Tool SPEED (D78): the gather-cost divisor ONLY (cost = NODE_HARDNESS ÷ speed).
 // Absent = speed 1 (a tool contributes no speedup — the base kind tool, or a tool
@@ -370,6 +416,21 @@ export const TOOL_SPEED: Record<string, number> = {
   "fletchers-knife": 1, // ke3.3: outputScale multiplier for arrow-shaft (qtyPer × speed)
   "steel-fletchers-knife": 2, // tier-2: 2× shafts per log — the visible tool payoff (repays 57l)
 }; // pick/axe/knife (the base kind tools) are absent = speed 1 — the ungated baseline
+// --- Fishing (si7.6.2) ---
+export const FISH_CAST_ENERGY = 25; // energy per cast — a bank of trout (40) nets little; lake/deep catches (60/90) are the payoff for going out on the raft
+export const FISH_DEEP_DEPTH = 3; // a lake/sea tile this many tiles (Chebyshev) from the nearest land is "deep" water
+// Special catches that aren't plain items (si7.6.2). A lockbox is opened on the spot
+// and its contents rolled per entry (like LOOT_TABLE chances); a sodden map joins your
+// carried maps exactly like a humanoid map-drop (tier = this map's + 1).
+export const LOCKBOX_LOOT: { defId: string; qty: number; chance: number }[] = [
+  { defId: "iron-ore", qty: 2, chance: 0.6 },
+  { defId: "copper-ore", qty: 2, chance: 0.4 },
+  { defId: "silver-ore", qty: 1, chance: 0.3 },
+  { defId: "potion", qty: 1, chance: 0.35 },
+  { defId: "salt", qty: 1, chance: 0.3 },
+];
+export const CATCH_EFFECT: Record<string, "lockbox" | "map"> = { "sunken-lockbox": "lockbox", "sodden-map": "map" };
+
 export const GATHER_YIELD: Record<GatherableNodeType, number> = {
   mining: 3,
   wood: 3,

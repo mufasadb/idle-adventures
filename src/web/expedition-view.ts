@@ -10,7 +10,7 @@ import { carryCap, mapCarryCap } from "../engine/carry";
 import { deriveRoute } from "./route";
 import type { Pos } from "./route";
 import { wieldsRanged } from "../engine/combat";
-import { PLAYER_BASE_HP, RECIPE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_CAMP_MEALS, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY } from "../data/constants";
+import { PLAYER_BASE_HP, RECIPE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_CAMP_MEALS, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, FISH_CAST_ENERGY, FISH_DEEP_DEPTH } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, combatForecast, GATHER_VERB, round1, engagementForecast, enhancementHint, battleItemEffect } from "../render/render";
 import { perceive } from "../engine/perceive";
@@ -87,6 +87,18 @@ function herePanel(state: GameState, grid: Grid, exp: NonNullable<GameState["exp
     ${canGather ? `<button data-act="gather">${verb.label} it</button>`
       : `${hardLock ? "🔒 " : ""}<span class="warn">${lockCopy}</span>`}
   </div>`;
+}
+
+// Fishing (si7.6.2): a Fish button when a cast is legal; otherwise, when there IS water
+// on or beside you, say why not (no rod / fished out / bag full / tired). Legality and
+// the reason both come from the reducer (D29, ciq).
+function fishLine(state: GameState, legal: Action[]): string {
+  if (legal.some((a) => a.type === "fish")) {
+    return `<div class="here fish"><button data-act="fish">🎣 Fish</button> the deepest water beside you (−${FISH_CAST_ENERGY}e) · each spot bites once; deeper water, bigger catch.</div>`;
+  }
+  const reason = whyNot(state, { type: "fish" });
+  if (!reason || reason === "no-water" || reason === "engaged") return "";
+  return `<div class="here fish">🎣 <span class="warn">${rejectCopy(reason, undefined, "fish")}</span></div>`;
 }
 
 // Weapon-enhancement readout (D60): the active coating + charges left, or nothing.
@@ -166,6 +178,10 @@ export function expeditionView(state: GameState, route: Pos[]): string {
     const poi = poiAt.get(k);
     const isCleared = cleared.has(k);
     const cls = ["tile", `terrain-${grid.terrain[y]![x]}`];
+    // si7.6.2: deep water (the raft-only fishing ground) and already-fished water read
+    // differently. Placeholder styling until the Muse water/boat mockups are picked.
+    if ((grid.depth?.[y]?.[x] ?? 0) >= FISH_DEEP_DEPTH) cls.push("deep");
+    if ((exp.fished ?? []).some((f) => f.x === x && f.y === y)) cls.push("fished");
     if (poi && !isCleared) cls.push("poi", `poi-${poi.kind}`);
     if (isPlayer) cls.push("player");
     const onPath = drawnSet.has(k);
@@ -297,7 +313,7 @@ export function expeditionView(state: GameState, route: Pos[]): string {
       <div class="gridscroll"><div class="grid atlas-assets" style="grid-template-columns:repeat(${MAP_WIDTH}, 32px);">${cells}</div></div>
     </section>
     <section>
-      ${exp.combat ? engagementPanel(state, exp, legal) : herePanel(state, grid, exp, legal)}
+      ${exp.combat ? engagementPanel(state, exp, legal) : herePanel(state, grid, exp, legal) + fishLine(state, legal)}
       <h2>Actions</h2>
       <div class="actions">
         ${exp.loadout.equipment.tools.includes("tent") ? `<span class="campmeal-badge${campMealReady ? " ready" : " spent"}" title="${campMealReady ? "left-click a food in your bag to eat it as a CAMP MEAL — over-eat past max at +50%, once per run" : "camp meal spent this run — eating is now a normal capped meal"}">🏕 camp meal ${campMealReady ? "ready" : "spent"}</span>` : ""}

@@ -1,9 +1,9 @@
 import { WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE, QUAFF_ENERGY, DON_DOFF_ENERGY } from "../data/constants";
-import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType } from "../data/constants";
+import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType, FishWater } from "../data/constants";
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
 import { playerDamage, damageTaken } from "../engine/combat";
-import type { Action, Expedition, Loadout, MapItem, RejectionReason, GameEvent } from "../engine/types";
+import type { Action, Expedition, Loadout, MapItem, RejectionReason, GameEvent, ItemStack } from "../engine/types";
 import { mapEpithet } from "../engine/town";
 
 // --- Shared presentation selectors (eho): pure defId→text + data-shaped derivations
@@ -33,7 +33,9 @@ export function rejectCopy(reason: RejectionReason, recipeId?: string, action?: 
     case "insufficient": return "nothing to use for that (or it'd have no effect)"; // no potion/material/charge, or already at full HP/max
     case "no-monster": return "nothing to fight here";
     case "missing-station": return gate ? `can't craft — ${gate} (build the station first)` : "needs a station you haven't built";
-    case "missing-tool": return gate ? `can't craft — ${gate}` : "needs a tool you don't have";
+    case "missing-tool": return gate ? `can't craft — ${gate}` : action === "fish" ? "needs a fishing-rod" : "needs a tool you don't have";
+    case "no-water": return "no water on or beside you to fish";
+    case "fished-out": return "you've fished all the water within reach — move along the bank (or out on a raft)";
     case "tool-too-weak": return "your tool is too weak for this material's tier";
     case "not-field-craftable": return "that recipe is town-only — it can't be made in the field";
     case "not-near-terrain": {
@@ -53,6 +55,18 @@ export const GATHER_VERB: Record<string, { label: string; past: string; noun: st
   animal: { label: "🔪 Hunt", past: "hunted", noun: "animal" },
 };
 
+// Fishing log vocabulary (si7.6.2), shared by both surfaces.
+export const FISH_WATER_WORDS: Record<FishWater, string> = {
+  river: "river", shallows: "shallows", lake: "lake edge", "deep-lake": "deep lake", sea: "sea", "deep-sea": "open sea",
+};
+function catchWords(caught: string, contents: ItemStack[], name: (defId: string) => string): string {
+  if (caught === "sunken-lockbox") {
+    return `hauled up a sunken lockbox: ${contents.map((c) => `${c.qty}× ${name(c.defId)}`).join(", ") || "empty, rusted through"}`;
+  }
+  if (caught === "sodden-map") return "something papery snagged the line";
+  return `caught 1× ${name(caught)}`;
+}
+
 // One-decimal display rounding for log numbers (matches the web's historical style).
 export const round1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -67,6 +81,7 @@ export function formatEvent(e: GameEvent, name: (defId: string) => string): stri
     case "embarked": return `▶ embarked on a ${e.biomeId} map — ${e.energy} energy`;
     case "moved": return `walked to (${e.to.x},${e.to.y}) on ${e.terrain} · −${round1(e.cost)}e → ${round1(e.energy)}e`;
     case "gathered": return `${GATHER_VERB[e.kind]?.past ?? "gathered"} ${e.qty}× ${name(e.material)} · −${round1(e.cost)}e → ${round1(e.energy)}e`;
+    case "fished": return `🎣 fished the ${FISH_WATER_WORDS[e.water]} — ${catchWords(e.catch, e.contents, name)} · −${round1(e.cost)}e → ${round1(e.energy)}e`;
     case "dropped": return `dropped ${e.qty}× ${name(e.defId)}`;
     case "ate": return `${e.campMeal ? "🏕 camp meal — ate" : "🍖 ate"} ${name(e.defId)} · +${round1(e.restored)}e → ${round1(e.energy)}e${e.campMeal ? " (over max — banked reach)" : ""}`;
     case "auto-eat-set": return e.defId ? `🍴 auto-eat: ${name(e.defId)}` : `🍴 auto-eat off`;
@@ -79,7 +94,9 @@ export function formatEvent(e: GameEvent, name: (defId: string) => string): stri
         : `☠ the ${name(e.creature)} downed you${ff} · run ends, haul kept`) + tail;
     }
     case "crafted": return `✦ ${e.where === "field" ? "field-crafted 🔥 " : "crafted "}${e.output.qty}× ${name(e.output.defId)}`;
-    case "map-dropped": return e.carried
+    case "map-dropped": return e.source === "fished"
+      ? (e.carried ? `🗺️ fished up a sodden T${e.tier} ${name(e.biomeId)} map — it dries out on the way home` : `🗺️ a sodden T${e.tier} ${name(e.biomeId)} map — no room for more maps, it sinks back`)
+      : e.carried
       ? `🗺️ looted a T${e.tier} ${name(e.biomeId)} map (takes 1 slot — banks home with you)`
       : `🗺️ a T${e.tier} ${name(e.biomeId)} map dropped — pack full, left behind`;
     case "map-discarded": return `🗺️ discarded a carried map`;
@@ -428,6 +445,9 @@ export const TERRAIN_CHAR: Record<Terrain, string> = {
   plains: ".",
   ice: "*",
   mountain: "^",
+  shallows: "-",
+  lake: "=",
+  sea: "#",
 };
 
 export const POI_CHAR: Record<NodeType, string> = {

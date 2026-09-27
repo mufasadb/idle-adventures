@@ -8,7 +8,7 @@ import { ARROWS_PER_CRAFT, ARROW_SHAFTS_PER_LOG } from "./combat"; // ammo recip
 // --- Consumable item catalogs (M5) ---
 // ENERGY_PER_FOOD / POTION_HEAL are flat, so these are single-item catalogs for
 // the POC; the list is what `pack`/`slotOf` validate a food/potion defId against.
-export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican", "apple", "smoked-venison", "blubber-stew", "cooked-venison", "cooked-berries", "stew"];
+export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican", "apple", "smoked-venison", "blubber-stew", "cooked-venison", "cooked-berries", "stew", "crayfish", "trout", "perch", "pike", "grilled-pike", "crayfish-boil", "smoked-fish"];
 export const POTION: string[] = ["potion", "greater-potion", "draught", "greater-draught"];
 export const BATTLE_ITEM: string[] = ["elixir-of-power", "warding-draught"]; // combat consumables (bzd); COMBAT_BUFF keys
 
@@ -126,6 +126,12 @@ export const RECIPE: Record<
   // fresh forage; adding a cooking-pot (a second tool slot) unlocks the dense stew.
   "cooked-berries": { inputs: [{ defId: "berries", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "cooked-berries", qty: 1 }, requires: { tools: ["fire-kit"] }, field: true }, // universal-forage field cook (berries in every biome) — turns fresh-that-stales into a keeper
   "cooking-pot": { inputs: [{ defId: "iron-ore", qty: 2 }], output: { defId: "cooking-pot", qty: 1 } }, // the second cooking tool (town-crafted, carried into the field)
+  // Fishing (si7.6.2): the rod is a stone-age-ish craft (wood + bark line); the catches
+  // cook in the field or smoke at home once they've gone stale.
+  "fishing-rod": { inputs: [{ defId: "oak-log", qty: 1 }, { defId: "stringybark", qty: 1 }], output: { defId: "fishing-rod", qty: 1 } },
+  "grilled-pike": { inputs: [{ defId: "pike", qty: 1 }, { defId: "deadwood", qty: 1 }], output: { defId: "grilled-pike", qty: 1 }, requires: { tools: ["fire-kit"] }, field: true }, // deep-lake payoff: 90 raw → 220 grilled
+  "crayfish-boil": { inputs: [{ defId: "crayfish", qty: 3 }, { defId: "deadwood", qty: 1 }], output: { defId: "crayfish-boil", qty: 1 }, requires: { tools: ["fire-kit", "cooking-pot"] }, field: true }, // 3×30 raw → 170 boiled
+  "smoked-fish": { inputs: [{ defId: "stale-fish", qty: 2 }], output: { defId: "smoked-fish", qty: 1 }, requires: { station: "smokehouse" } }, // the stale-fish payoff (mirrors stale-berries → jam)
   stew: { inputs: [{ defId: "rich-venison", qty: 1 }, { defId: "berries", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "stew", qty: 1 }, requires: { tools: ["fire-kit", "cooking-pot"] }, field: true }, // AND-gate: needs BOTH kit-tools; multi-ingredient premium field food
   // Smokehouse (station) — gates the EXISTING smoked-venison recipe behind home
   // infra (ke3.5). Near-zero new content: proves the station gate on real food.
