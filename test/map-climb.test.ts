@@ -31,7 +31,7 @@ function reachableHumanoid(
   mapSeed: string,
   tier: number,
 ): { poi: Poi; costToReach: number } | undefined {
-  const biome = rollBiome(mapSeed);
+  const biome = rollBiome(mapSeed, tier); // D91: T2+ can roll the rare swamp
   const grid = generateGrid(mapSeed, biome, tier);
   const reach = costToReach(grid.terrain, grid.entry);
   const humanoids = grid.pois.filter(

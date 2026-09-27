@@ -72,8 +72,15 @@ export type GatherableNodeType = Exclude<NodeType, "monster">;
 
 // --- Biomes (D21): generation profiles ONLY, consumed by generateGrid and
 // never consulted after generation. Adding a biome = adding one entry here.
-export const BIOME_IDS = ["woodland", "desert", "tundra"] as const;
+export const BIOME_IDS = ["woodland", "desert", "tundra", "swamp"] as const;
 export type BiomeId = (typeof BIOME_IDS)[number];
+// Rare biomes (si7.6.3 / r51, D91): excluded from the base uniform roll, then rolled in
+// on their own namespaced chance once the map tier reaches minTier. A base biome's roll
+// is untouched, so every T1 map (and every map below a rare biome's minTier) keeps the
+// biome it always had. Drop-maps and the in-run grid both roll with the map's tier.
+export const RARE_BIOMES: Partial<Record<BiomeId, { minTier: number; chance: number }>> = {
+  swamp: { minTier: 2, chance: 0.3 }, // ~30% of T2+ found maps are swamp
+};
 
 export type Biome = {
   terrainWeights: Partial<Record<Terrain, number>>; // relative mix; zero/absent = never generates
@@ -142,6 +149,28 @@ export const BIOMES: Record<BiomeId, Biome> = {
     },
     barrierTerrain: "mountain",
     fishTable: { river: { trout: 6, crayfish: 1 } }, // si7.6.2: cold, clear tundra streams
+  },
+  // Swamp (si7.6.3, D91): a RARE mid-tier biome — never offered at T1, found on T2+
+  // dropped maps (RARE_BIOMES). Mud + water heavy (waders and the raft finally star),
+  // plated/armoured monsters (blowgun country), toad venom for a middle dart tier.
+  swamp: {
+    terrainWeights: { mud: 0.45, plains: 0.2, river: 0.2, mountain: 0.15 },
+    nodeTypeWeights: { herb: 0.3, monster: 0.25, animal: 0.2, wood: 0.15, mining: 0.1 },
+    creatureTable: { "giant-leech": 5, "bog-lurker": 4, "marsh-hag": 3, "fae-sprite": 2, werewolf: 1 },
+    materialTable: {
+      mining: { "bog-iron": 6, "iron-ore": 3, "copper-ore": 2, "silver-ore": 1 }, // bog-iron refines to iron-ore in town (2 → 1)
+      wood: { deadwood: 5, "pine-log": 3, "oak-log": 3, "ironwood-log": 1 }, // drowned timber: mostly deadwood
+      herb: { thistle: 6, "forest-herb": 5, deadwood: 4, flint: 2, berries: 2 }, // thistle country (venom-oil's herb)
+      animal: { "toad-venom": 6, "deer-hide": 3, feather: 2 }, // bog toads: trap + knife, like any hunt
+    },
+    barrierTerrain: "mountain",
+    water: { body: "lake", lakeThreshold: 0.64, shallowsBand: 0.08 }, // ~18% lake + a wide shallows margin
+    fishTable: {
+      river: { eel: 5, crayfish: 4, reed: 4 },
+      shallows: { crayfish: 5, reed: 5, eel: 3 },
+      lake: { eel: 6, perch: 3, amber: 2, "sunken-lockbox": 1 },
+      "deep-lake": { pike: 5, eel: 3, "sunken-lockbox": 3, "sodden-map": 1, amber: 2 },
+    },
   },
 };
 
@@ -258,6 +287,7 @@ export const FOOD_ENERGY: Record<string, number> = {
   crayfish: 30, // si7.6.2: fresh, weak alone — boil a pot of them (crayfish-boil)
   trout: 40, // si7.6.2: river/shallows catch, fresh
   perch: 60, // si7.6.2: lake-edge catch, fresh
+  eel: 70, // si7.6.3: swamp catch, fresh
   pike: 90, // si7.6.2: deep-lake catch (raft) — grill it for a camp-meal-grade food
   "grilled-pike": 220, // si7.6.2: field-cooked pike (fire-kit)
   "crayfish-boil": 170, // si7.6.2: 3 crayfish in a pot (fire-kit + cooking-pot)
@@ -275,7 +305,7 @@ export const FOOD_ENERGY: Record<string, number> = {
 export const FRESH_TO_STALE: Record<string, string> = {
   berries: "stale-berries",
   apple: "bruised-apple",
-  trout: "stale-fish", perch: "stale-fish", pike: "stale-fish", crayfish: "stale-fish", // si7.6.2: fish spoils on the way home — the smokehouse turns it into smoked-fish
+  trout: "stale-fish", perch: "stale-fish", pike: "stale-fish", crayfish: "stale-fish", eel: "stale-fish", // si7.6.2: fish spoils on the way home — the smokehouse turns it into smoked-fish
 };
 export const MIN_STEP = 5; // a discounted step never costs less than this (svz)
 // Diagonal steps cover √2 tiles of distance, so they cost √2× the orthogonal step,
@@ -562,6 +592,7 @@ export const NODE_MAGNITUDE_YIELD: Record<number, number> = { 1: 1, 2: 2, 3: 3 }
 // for that tier (not a delta from the previous tier).
 export const MAP_TIER_CREATURE_ADD: Record<BiomeId, Record<number, Record<string, number>>> = {
   woodland: {}, // no gated bosses native to woodland in the POC
+  swamp: {}, // si7.6.3: no swamp boss yet
   desert: {
     2: { "dust-vampire": 1 },
     3: { "dust-vampire": 2 },

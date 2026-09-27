@@ -308,7 +308,7 @@ export function expeditionView(state: GameState, route: Pos[]): string {
   const campMealReady = exp.loadout.equipment.tools.includes("tent") && (exp.campMealsUsed ?? 0) < TENT_CAMP_MEALS;
   const inv = inventoryGrid(exp.loadout, exp.carry, cap, exp.autoEatFood ?? null, eatable, campMealReady);
   return `
-  <header><h1>${rollBiome(exp.mapSeed)} expedition</h1><span class="muted">pos (${exp.pos.x},${exp.pos.y})</span><button class="link" data-newgame>new game</button></header>
+  <header><h1>${rollBiome(exp.mapSeed, exp.mapTier ?? 1)} expedition</h1><span class="muted">pos (${exp.pos.x},${exp.pos.y})</span><button class="link" data-newgame>new game</button></header>
   <div class="cols">
     <section class="mapwrap">
       ${bars}

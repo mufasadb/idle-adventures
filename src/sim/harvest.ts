@@ -15,7 +15,7 @@ export type PackSpec = { tools?: string[]; backpack?: string; transport?: string
 export type HarvestResult = { mapSeed: string; mapTier: number; cleared: number; total: number; fraction: number };
 
 export function simHarvest(pack: PackSpec, mapSeed: string, mapTier: number): HarvestResult {
-  const biomeId = rollBiome(mapSeed) as BiomeId;
+  const biomeId = rollBiome(mapSeed, mapTier) as BiomeId; // D91: the tier can roll a rare biome — match the engine
   // A stocked bank that covers everything we pack (generous qty), plus a HELD map
   // carrying the tier so embark threads mapTier (reduce reads heldMap.tier).
   const bank = [

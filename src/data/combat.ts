@@ -55,19 +55,20 @@ export const ARROWS_PER_CRAFT = 10; // arrows per craft batch — "three differe
 // fletched path is deliberately parallel to the direct `arrows` recipe at q1 (no
 // free lunch) and only pays off once you've climbed to the steel knife.
 export const ARROW_SHAFTS_PER_LOG = 3; // shafts per log per unit tool quality (outputScale qtyPer)
-export const AMMO: string[] = ["arrows", "blow-dart", "venom-dart"]; // ammo catalog (slotOf → "ammo"); packed like potions, spent per exchange
+export const AMMO: string[] = ["arrows", "blow-dart", "toxin-dart", "venom-dart"]; // ammo catalog (slotOf → "ammo"); packed like potions, spent per exchange
 // Which ammo a ranged weapon shoots (si7.6.6): the smallest step toward the full
 // weapon-resource table si7.6.7 parks until magic lands. A ranged weapon absent here
 // shoots arrows (every bow). It spends the FIRST matching stack; other ammo is ignored,
 // so a blowgun wielder holding only arrows is "out of ammo" and swings a club (D45).
 export const AMMO_FOR: Record<string, string[]> = {
-  blowgun: ["blow-dart", "venom-dart"],
+  blowgun: ["blow-dart", "toxin-dart", "venom-dart"],
 };
 // Poison a dart applies on the hit (si7.6.6): set/refresh the engagement's poison (the
 // D60 venom-oil DoT) unless a stronger poison is already ticking. The dart's poison
 // TIER is the gate: blow-dart = a herb poison, venom-dart = still-brewed venom-oil.
 export const AMMO_POISON: Record<string, { dmg: number; rounds: number }> = {
   "blow-dart": { dmg: 1, rounds: 3 },
+  "toxin-dart": { dmg: 2, rounds: 5 }, // si7.6.3: swamp toad venom
   "venom-dart": { dmg: 3, rounds: 4 },
 };
 export const DARTS_PER_CRAFT = 10; // darts per craft batch (mirrors ARROWS_PER_CRAFT)
@@ -161,6 +162,11 @@ export const MONSTERS: Record<string, Monster> = {
   "shell-beetle": { tier: 1, dmgType: "melee", armourType: "plate", category: "beast", tags: ["beast"] }, // woodland: the first "my sword skates off it" moment
   "mirage-wisp": { tier: 1, dmgType: "magic", armourType: "robe", category: "fae", tags: ["fae"] }, // desert: early iron-sword affinity teacher
   "ice-crab": { tier: 1, dmgType: "melee", armourType: "plate", category: "beast", tags: ["beast"] }, // tundra: plate hide before the troll
+  // Swamp (si7.6.3): leech (T1 light), lurker (T2 plated — ranged is blunted, dart poison
+  // isn't), hag (T2 humanoid — the swamp's map-dropper and its ranged threat).
+  "giant-leech": { tier: 1, dmgType: "melee", armourType: "light", category: "beast", tags: ["beast"] },
+  "bog-lurker": { tier: 2, dmgType: "melee", armourType: "plate", category: "beast", tags: ["beast"] },
+  "marsh-hag": { tier: 2, dmgType: "ranged", armourType: "robe", category: "humanoid", tags: [] }, // hurls hexed bog-stones: the swamp's ranged incoming
   // Tier-4 boss (D34): magic damage into a plate hide — punishes the plate
   // strategy that carried the whole game (plate weak to magic, ÷1.5). The
   // dragon tag pairs with the wyrmbane affinity so wyrmfang farms it (§4.1).
@@ -259,6 +265,9 @@ export const LOOT_TABLE: Record<string, ItemStackSpec[]> = {
   "shell-beetle": [{ defId: "beetle-shell", qty: 2 }],
   "mirage-wisp": [{ defId: "wisp-essence", qty: 2 }],
   "ice-crab": [{ defId: "crab-shell", qty: 2 }],
+  "giant-leech": [{ defId: "leech", qty: 2 }], // → potion-leech
+  "bog-lurker": [{ defId: "lurker-scale", qty: 2 }], // → plate-legs-lurker
+  "marsh-hag": [{ defId: "raider-supplies", qty: 1 }], // + the humanoid map-scroll chance
   // Boss (D34): wyrm-scale always → dragonscale-cuirass; dragonheart @0.2 (the
   // 1/5 rare) → wyrmfang. `chance` is rolled per-encounter by rollLoot (§4.5).
   "ancient-wyrm": [{ defId: "wyrm-scale", qty: 3 }, { defId: "dragonheart", qty: 1, chance: 0.2 }],
