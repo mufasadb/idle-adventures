@@ -21,8 +21,10 @@ import {
   TERRAIN_WEIGHT_TIER_SHIFT,
   NODE_MAGNITUDE_WEIGHTS,
   AFFIX_EFFECTS,
+  WATER_TERRAINS,
+  FISH_DEEP_DEPTH,
 } from "../data/constants";
-import type { Terrain, NodeType, BiomeId, Biome } from "../data/constants";
+import type { Terrain, NodeType, BiomeId, Biome, FishWater } from "../data/constants";
 import { rand, weightedPick } from "./rng";
 import { perlin2 } from "./noise";
 import { moveCost } from "./move";
@@ -42,7 +44,46 @@ export type Grid = {
   terrain: Terrain[][]; // [y][x]
   pois: Poi[];
   entry: { x: number; y: number };
+  // Fishing (si7.6.2), both [y][x]. depth: Chebyshev tiles from the nearest land for a
+  // water tile (1 = touching the shore), 0 on land. catches: the defId one cast of this
+  // water tile yields, pre-rolled from the biome's fishTable (null = unfishable). Optional
+  // so hand-built test grids stay terse (absent = no fishing anywhere).
+  depth?: number[][];
+  catches?: (string | null)[][];
 };
+
+// Which fishTable row a water tile reads (si7.6.2). Depth only splits standing bodies.
+export function fishWaterOf(terrain: Terrain, depth: number): FishWater | null {
+  if (terrain === "river" || terrain === "shallows") return terrain;
+  if (terrain === "lake") return depth >= FISH_DEEP_DEPTH ? "deep-lake" : "lake";
+  if (terrain === "sea") return depth >= FISH_DEEP_DEPTH ? "deep-sea" : "sea";
+  return null;
+}
+
+// Multi-source BFS (8-neighbour) outward from every land tile: each water tile's depth
+// is its Chebyshev distance to the shore. A map edge is not a shore.
+function waterDepth(terrain: Terrain[][]): number[][] {
+  const depth = terrain.map((row) => row.map(() => 0));
+  let frontier: { x: number; y: number }[] = [];
+  for (let y = 0; y < MAP_HEIGHT; y++) for (let x = 0; x < MAP_WIDTH; x++) {
+    if (WATER_TERRAINS.includes(terrain[y]![x]!)) depth[y]![x] = -1;
+    else frontier.push({ x, y });
+  }
+  for (let d = 1; frontier.length > 0; d++) {
+    const next: { x: number; y: number }[] = [];
+    for (const c of frontier) {
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const x = c.x + dx, y = c.y + dy;
+        if (x < 0 || y < 0 || x >= MAP_WIDTH || y >= MAP_HEIGHT || depth[y]![x] !== -1) continue;
+        depth[y]![x] = d;
+        next.push({ x, y });
+      }
+    }
+    frontier = next;
+  }
+  // An all-water map (no land at all) would leave -1s; treat them as deep.
+  return depth.map((row) => row.map((d) => (d === -1 ? FISH_DEEP_DEPTH : d)));
+}
 
 // Each candidate map rolls its biome from its own seed — embark carries only
 // mapSeed, and anyone holding the seed can re-derive the biome (D21, M6 note).
@@ -350,5 +391,12 @@ function buildGrid(mapSeed: string, biomeId: BiomeId, mapTier: number, affixes: 
     return { x: p.x, y: p.y, kind: s.kind, material: s.material, creature: s.creature,
              ...(s.magnitude && s.magnitude > 1 ? { magnitude: s.magnitude } : {}) };
   });
-  return { biomeId, terrain, pois, entry };
+  // Fishing (si7.6.2): pre-roll each water tile's catch from the biome's fishTable, on
+  // its own namespaced rand stream so nothing above shifts.
+  const depth = waterDepth(terrain);
+  const catches = terrain.map((row, y) => row.map((t, x) => {
+    const water = fishWaterOf(t, depth[y]![x]!);
+    return water ? rollMaterial(biome.fishTable?.[water], rand(mapSeed, "fish", x, y)) : null;
+  }));
+  return { biomeId, terrain, pois, entry, depth, catches };
 }

@@ -1,6 +1,6 @@
 // The engine contract — single source of truth for state, actions, events.
 // Lifted from the design spec §10. Pure data; no behaviour here.
-import type { BiomeId, Terrain, NodeType, StationId } from "../data/constants";
+import type { BiomeId, Terrain, NodeType, StationId, FishWater } from "../data/constants";
 import type { Matchup } from "./combat"; // type-only: erased at runtime, no import cycle
 
 export type ItemStack = { defId: string; qty: number }; // fungible; gear referenced by defId too
@@ -62,6 +62,7 @@ export type Expedition = {
   loadout: Loadout;
   carry: ItemStack[]; // capped by backpack slots
   cleared: { x: number; y: number }[]; // POIs consumed this run (D24): gathered nodes; M4 adds defeated monsters
+  fished?: { x: number; y: number }[]; // water tiles already fished this run (si7.6.2) — one catch per tile. Optional/absent = [] (old saves, terse test states)
   // grid regenerated from mapSeed on demand, not stored
   maxEnergy?: number; // stamina ceiling (dtv): set to MAX_ENERGY at embark (gear-raisable later). Optional/absent = MAX_ENERGY (old saves, terse test states); reads guard with `?? MAX_ENERGY`.
   autoEatFood?: string; // designated auto-eat food (mco): a food defId. When set, autoRefill eats ONLY units of this food, waste-free, after each spend. Absent/undefined = auto-eat OFF (nothing auto-eats). Supersedes the old autoEat boolean + least-dense-first (D48). Set via set-auto-eat-food.
@@ -115,6 +116,7 @@ export type Action =
   | { type: "ink"; mapSeed: string; inkId: string } // apply a crafted ink to a held map (cxq): rolls + writes an affix from the ink's domain
   | { type: "move"; to: { x: number; y: number } } // steps ONE tile toward target
   | { type: "gather" }
+  | { type: "fish" } // cast a fishing-rod (si7.6.2) into the deepest unfished water tile on or beside you
   | { type: "fight"; at?: { x: number; y: number } } // engage the monster on your tile, or run ONE exchange when engaged (si7.1); `at` = an ADJACENT live monster tile to engage at range with a wielded bow + ≥1 arrow (D45)
   | { type: "flee" } // disengage at the cost of one parting hit (si7.1)
   | { type: "quaff" } // drink one potion: mid-engagement (no exchange, si7.1) or on the map for QUAFF_ENERGY (82r)
@@ -166,6 +168,8 @@ export type RejectionReason =
   | "not-engaged"
   | "not-worn" // doff of a defId that isn't currently equipped (82r)
   | "not-food" // set-auto-eat-food with a defId that isn't a food (mco)
+  | "no-water" // fish: no water tile on or beside you (si7.6.2)
+  | "fished-out" // fish: every water tile on or beside you was already fished this run (si7.6.2)
   | "already-resolved"; // survey of a POI whose detail is already in focus (54f)
 
 // Events are a render byproduct emitted by reduce. Named GameEvent (not Event)
@@ -196,6 +200,7 @@ export type GameEvent =
       cost: number;
       energy: number; // remaining after the gather
     }
+  | { type: "fished"; at: { x: number; y: number }; water: FishWater; catch: string; contents: ItemStack[]; cost: number; energy: number } // si7.6.2: one cast. `contents` = what an opened lockbox held ([] otherwise); a sodden map follows as a map-dropped event
   | { type: "dropped"; defId: string; qty: number }
   | { type: "ate"; defId: string; restored: number; energy: number; campMeal?: boolean } // ate one food unit (dtv): restored energy, new current. campMeal (7lr) = a tent camp meal (over-max, +50%).
   | { type: "auto-eat-set"; defId: string | null } // designated (or cleared, null) the auto-eat food (mco)
@@ -226,7 +231,7 @@ export type GameEvent =
     }
   | { type: "crafted"; recipeId: string; output: ItemStack; where?: "field" | "town" } // where (ke3.4): field crafts read distinctly in the log. Optional/absent = town.
   | { type: "inked"; mapSeed: string; affix: string } // an ink rolled + wrote this affix onto a held map (cxq)
-  | { type: "map-dropped"; at: { x: number; y: number }; mapSeed: string; biomeId: BiomeId; hints: string[]; carried: boolean; tier: number } // humanoid kill minted a map (8ec); carried=false → pack full, left behind
+  | { type: "map-dropped"; at: { x: number; y: number }; mapSeed: string; biomeId: BiomeId; hints: string[]; carried: boolean; tier: number; source?: "fished" } // source (si7.6.2): absent = a humanoid kill // humanoid kill minted a map (8ec); carried=false → pack full, left behind
   | { type: "map-discarded"; mapSeed: string } // drop-map (8ec): carried map thrown away mid-run
   | { type: "packed"; slot: LoadoutSlot; defId: string }
   | { type: "run-ended"; reason: string; flavor?: string } // flavor (xwp): a cosmetic return beat, present only on voluntary "returned"; absent on defeat

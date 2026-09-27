@@ -70,6 +70,7 @@ export function expeditionActions(state: GameState): Action[] {
   }
   // tile-contextual actions
   candidates.push({ type: "gather" });
+  candidates.push({ type: "fish" }); // si7.6.2: reduce filters no-rod / no-water / fished-out (D29)
   candidates.push({ type: "fight" });
   candidates.push({ type: "flee" });
   candidates.push({ type: "quaff" });

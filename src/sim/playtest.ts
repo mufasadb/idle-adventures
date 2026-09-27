@@ -30,7 +30,7 @@ import {
   poiGlyph,
   PLAYER_CHAR,
 } from "../render/render";
-import { RECIPE, MAP_WIDTH, MAP_HEIGHT, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, TOOL_PURPOSE, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS } from "../data/constants";
+import { RECIPE, MAP_WIDTH, MAP_HEIGHT, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, FISH_CAST_ENERGY, TOOL_CAPABILITY, TOOL_PURPOSE, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 import { moveCostBreakdown } from "../engine/move";
 import { usedSlots, carryCap, mapCarryCap } from "../engine/carry";
@@ -194,6 +194,13 @@ function printExpedition(st: GameState): void {
     rows.push(row);
   }
   console.log(rows.join("\n"));
+  // si7.6.5/si7.6.2 (append-only): water legend + a fishing line when a cast is legal here.
+  if (grid.terrain.some((r) => r.some((t) => t === "shallows" || t === "lake" || t === "sea"))) {
+    console.log("Water: ~ river / - shallows (wade on foot) / = lake (a raft crosses it) / # sea (needs a sea boat)");
+  }
+  if (legalActions(st).some((a) => a.type === "fish")) {
+    console.log(`\n🎣 Water within reach — cast {"type":"fish"} (−${FISH_CAST_ENERGY}e): catches the deepest unfished water tile on or beside you; each tile yields once. Deeper water (out on a raft) holds bigger fish and sunken things.`);
+  }
   // ke3.4: field-craft candidates you can make right here (reduce-filtered).
   const fieldCrafts = legalActions(st).filter((a) => a.type === "craft") as Extract<Action, { type: "craft" }>[];
   const pool = [...exp.loadout.equipment.tools, ...exp.carry.map((s) => s.defId)];

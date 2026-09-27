@@ -1,4 +1,4 @@
-import type { GameState, GameEvent, ItemStack, Expedition, Loadout } from "./types";
+import type { GameState, GameEvent, ItemStack, Expedition, Loadout, MapItem } from "./types";
 import { expeditionGrid, rollBiome } from "./grid";
 import { addToCarry, freeLootStacks, mapCarryCap, consumeOne } from "./carry";
 import { strikeExchange, rollLoot, explainMatchup, damageTaken, wieldsRanged, hasAmmo } from "./combat";
@@ -143,6 +143,26 @@ function fightRound(state: GameState): { state: GameState; events: GameEvent[] }
   return applyVictory(state, round, loadout, loot, mapDrops, [exchanged, fought(true)]);
 }
 
+// Mint a found map into the carried-map pool (8ec; shared with fishing's sodden map,
+// si7.6.2): one tier deeper than the map you're on, capped at MAP_TIER_MAX, and left
+// behind (carried: false) when the dedicated map pool is full (zpm.2).
+export function mintMap(
+  state: GameState,
+  mapSeed: string,
+  at: { x: number; y: number },
+  source?: "fished",
+): { carriedMaps: MapItem[]; event: GameEvent } {
+  const expedition = state.expedition!;
+  const carriedMaps = expedition.carriedMaps ?? [];
+  const biomeId = rollBiome(mapSeed);
+  const tier = Math.min((expedition.mapTier ?? 1) + 1, MAP_TIER_MAX);
+  const carried = carriedMaps.length < mapCarryCap(state.bank); // zpm.2: maps have their own dedicated pool, not a loot slot
+  return {
+    carriedMaps: carried ? [...carriedMaps, { mapSeed, biomeId, vintage: state.runs ?? 0, tier }] : carriedMaps,
+    event: { type: "map-dropped", at: { x: at.x, y: at.y }, mapSeed, biomeId, hints: previewHints(mapSeed, biomeId), carried, tier, ...(source ? { source } : {}) },
+  };
+}
+
 // Apply a won exchange (xkz, extracted from fightRound): route the kill's loot into
 // carry, mint any map drop into the carried-map pool, clear the tile, relocate on a
 // walk-in win, and end the engagement. `precedingEvents` are the exchange/fought
@@ -167,17 +187,12 @@ function applyVictory(
     if (next === null) throw new Error(`victory loot overflow at ${combat.at.x},${combat.at.y}: mid-fight carry mutation escaped the pending-loot fit-check (xe4)`);
     carryWithLoot = next;
   }
-  const carriedMaps = expedition.carriedMaps ?? [];
-  let mapsAfter = carriedMaps;
+  let mapsAfter = expedition.carriedMaps ?? [];
   const mapEvents: GameEvent[] = [];
   if (mapDrops.length > 0) {
-    const mapSeed = `${expedition.mapSeed}:drop:${combat.at.x},${combat.at.y}`;
-    const biomeId = rollBiome(mapSeed);
-    const sourceTier = expedition.mapTier ?? 1;
-    const tier = Math.min(sourceTier + 1, MAP_TIER_MAX);
-    const carried = carriedMaps.length < mapCarryCap(state.bank); // zpm.2: maps have their own dedicated pool, not a loot slot
-    if (carried) mapsAfter = [...carriedMaps, { mapSeed, biomeId, vintage: state.runs ?? 0, tier }];
-    mapEvents.push({ type: "map-dropped", at: { x: combat.at.x, y: combat.at.y }, mapSeed, biomeId, hints: previewHints(mapSeed, biomeId), carried, tier });
+    const minted = mintMap(state, `${expedition.mapSeed}:drop:${combat.at.x},${combat.at.y}`, combat.at);
+    mapsAfter = minted.carriedMaps;
+    mapEvents.push(minted.event);
   }
   return {
     state: {

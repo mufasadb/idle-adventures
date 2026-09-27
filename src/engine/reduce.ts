@@ -1,6 +1,6 @@
 import type { GameState, Action, GameEvent } from "./types";
 import { embark, inkMap, craftAction, packAction } from "./reduce-town";
-import { move, gather, drop, dropMap, eat, setAutoEatFood, survey, returnHome, don, doff, toggleAutoQuaff, toggleAutoGather } from "./reduce-expedition";
+import { move, gather, fish, drop, dropMap, eat, setAutoEatFood, survey, returnHome, don, doff, toggleAutoQuaff, toggleAutoGather } from "./reduce-expedition";
 import { fight, flee, quaff, useItem, enhance, toggleAutoFinish } from "./reduce-combat";
 
 // Pure reducer. All rules live in the domain handler modules (reduce-town /
@@ -20,6 +20,8 @@ export function reduce(
       return move(state, action.to);
     case "gather":
       return gather(state);
+    case "fish":
+      return fish(state);
     case "eat":
       return eat(state, action);
     case "set-auto-eat-food":

@@ -1,5 +1,6 @@
 import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot, Expedition, Loadout } from "./types";
-import { expeditionGrid } from "./grid";
+import { expeditionGrid, fishWaterOf } from "./grid";
+import { rand } from "./rng";
 import { stepToward, moveCost, isDiagonalStep } from "./move";
 import { addToCarry, freeLootStacks, usedSlots, carryCap, consumeExpeditionInputs, consumeOne } from "./carry";
 import { toolSpeedFor, gatherCost, gateSatisfied, secondaryToolSatisfied } from "./tools";
@@ -10,10 +11,10 @@ import { recipeOutputQty } from "./craft";
 import { EQUIP_SLOTS } from "./pack";
 import type { EquipSlot } from "./pack";
 import { slotOf, isGear } from "./catalog";
-import { MAX_ENERGY, MAP_WIDTH, MAP_HEIGHT, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, FOOD, POTION, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, RECIPE } from "../data/constants";
+import { MAX_ENERGY, MAP_WIDTH, MAP_HEIGHT, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, FOOD, POTION, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, RECIPE, FISH_CAST_ENERGY, CATCH_EFFECT, LOCKBOX_LOOT } from "../data/constants";
 import { visionRadius } from "./perceive";
 import { rejected, autoRefill, livePoiAt, isCleared } from "./reduce-shared";
-import { engage, maybeAutoFinish, provokeTurn, pendingLootFits } from "./reduce-combat";
+import { engage, maybeAutoFinish, provokeTurn, pendingLootFits, mintMap } from "./reduce-combat";
 
 export function move(
   state: GameState,
@@ -113,6 +114,87 @@ export function gather(state: GameState): { state: GameState; events: GameEvent[
     },
     events: [
       { type: "gathered", at: { x: pos.x, y: pos.y }, kind: poi.kind, material: poi.material, qty, cost, energy },
+    ],
+  };
+}
+
+// Fishing (si7.6.2): with a rod, cast into the water tile you stand on or one of its
+// 8 neighbours — the DEEPEST one not yet fished this run (ties → row-major), so where
+// you stand (the bank, the shallows, out on the raft) is the decision. Equal depth
+// prefers a lake/sea tile over shallows over river. Each water tile
+// yields its generation-rolled catch once. Pay energy, auto-eat, then place the catch:
+// a fish is fresh food (front of the queue, like forage), a lockbox opens into carry,
+// a sodden map joins the carried maps.
+export function fish(state: GameState): { state: GameState; events: GameEvent[] } {
+  const expedition = state.expedition;
+  if (state.phase !== "expedition" || !expedition) return rejected(state, "fish", "not-on-expedition");
+  if (expedition.combat) return rejected(state, "fish", "engaged");
+  if (!expedition.loadout.equipment.tools.some((t) => TOOL_CAPABILITY[t] === "fish")) {
+    return rejected(state, "fish", "missing-tool");
+  }
+  const grid = expeditionGrid(expedition);
+  const fished = expedition.fished ?? [];
+  let anyWater = false;
+  let spot: { x: number; y: number; catch: string; depth: number; score: number } | null = null;
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    const x = expedition.pos.x + dx, y = expedition.pos.y + dy;
+    const caught = grid.catches?.[y]?.[x];
+    if (!caught) continue;
+    anyWater = true;
+    if (fished.some((f) => f.x === x && f.y === y)) continue;
+    const depth = grid.depth?.[y]?.[x] ?? 1;
+    // Deepest first; at equal depth a standing body beats shallows beats river (the
+    // richer table), then row-major.
+    const t = grid.terrain[y]![x]!;
+    const score = depth * 10 + (t === "lake" || t === "sea" ? 2 : t === "shallows" ? 1 : 0);
+    if (!spot || score > spot.score) spot = { x, y, catch: caught, depth, score };
+  }
+  if (!anyWater) return rejected(state, "fish", "no-water");
+  if (!spot) return rejected(state, "fish", "fished-out");
+  const cost = FISH_CAST_ENERGY;
+  if (cost > expedition.energy) return rejected(state, "fish", "exhausted");
+  const fed = autoRefill(expedition, expedition.energy - cost);
+  let loadout: Loadout = { ...expedition.loadout, food: fed.food };
+  let carry = expedition.carry;
+  let carriedMaps = expedition.carriedMaps;
+  const contents: ItemStack[] = [];
+  const extra: GameEvent[] = [];
+  const effect = CATCH_EFFECT[spot.catch];
+  if (effect === "lockbox") {
+    for (const entry of LOCKBOX_LOOT) {
+      if (rand(expedition.mapSeed, "lockbox", spot.x, spot.y, entry.defId) >= entry.chance) continue;
+      const placed = placeYield(loadout, carry, entry.defId, entry.qty, "back");
+      if (placed === null) return rejected(state, "fish", "carry-full");
+      loadout = placed.loadout;
+      carry = placed.carry;
+      contents.push({ defId: entry.defId, qty: entry.qty });
+    }
+  } else if (effect === "map") {
+    const minted = mintMap(state, `${expedition.mapSeed}:fish:${spot.x},${spot.y}`, spot, "fished");
+    carriedMaps = minted.carriedMaps;
+    extra.push(minted.event);
+  } else {
+    const placed = placeYield(loadout, carry, spot.catch, 1, "front");
+    if (placed === null) return rejected(state, "fish", "carry-full");
+    loadout = placed.loadout;
+    carry = placed.carry;
+  }
+  const water = fishWaterOf(grid.terrain[spot.y]![spot.x]!, spot.depth)!;
+  return {
+    state: {
+      ...state,
+      expedition: {
+        ...expedition,
+        energy: fed.energy,
+        loadout,
+        carry,
+        ...(carriedMaps ? { carriedMaps } : {}),
+        fished: [...fished, { x: spot.x, y: spot.y }],
+      },
+    },
+    events: [
+      { type: "fished", at: { x: spot.x, y: spot.y }, water, catch: spot.catch, contents, cost, energy: fed.energy },
+      ...extra,
     ],
   };
 }
