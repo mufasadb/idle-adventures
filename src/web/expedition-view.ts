@@ -233,7 +233,7 @@ export function expeditionView(state: GameState, route: Pos[]): string {
     // glyph path below; a creature must never borrow another creature's sprite.
     let tileAssetStyle = "";
     let overlay = "";
-    const terrainStyle = tileStyle(grid.terrain[y]![x]!);
+    const terrainStyle = tileStyle(grid.terrain[y]![x]!, grid.biomeId);
     if (terrainStyle) tileAssetStyle = ` style="${terrainStyle}"`;
     if (poi && !isCleared) {
       if (poi.kind === "monster" && poi.creature) {

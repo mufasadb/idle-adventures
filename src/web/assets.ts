@@ -30,8 +30,10 @@ export function frameStyle(kind: keyof typeof manifests, defId: string): string 
   return `background-image:url('${atlasUrls[kind]}');background-position:-${frame.x}px -${frame.y}px;width:${frame.w}px;height:${frame.h}px`;
 }
 
-export function tileStyle(terrain: string): string | null {
-  return frameStyle("tile", terrain);
+// 48l.12: a biome may have its own frame for a terrain (`desert:plains`); fall back to
+// the shared terrain frame (woodland's) when it doesn't.
+export function tileStyle(terrain: string, biomeId?: string): string | null {
+  return (biomeId ? frameStyle("tile", `${biomeId}:${terrain}`) : null) ?? frameStyle("tile", terrain);
 }
 
 export function monsterStyle(creature: string): string | null {
