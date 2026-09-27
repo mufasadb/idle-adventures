@@ -286,6 +286,8 @@ const PRODUCIBLE: Set<string> = (() => {
     for (const kind of ["mining", "wood", "herb", "animal"] as const) {
       for (const defId of Object.keys(BIOMES[id].materialTable[kind] ?? {})) s.add(defId);
     }
+    // si7.6.2: fishing catches (per water kind) are a source too.
+    for (const row of Object.values(BIOMES[id].fishTable ?? {})) for (const defId of Object.keys(row)) s.add(defId);
   }
   for (const table of Object.values(LOOT_TABLE)) for (const stack of table) s.add(stack.defId);
   for (const table of Object.values(CATEGORY_LOOT_TABLE)) for (const stack of table) s.add(stack.defId);

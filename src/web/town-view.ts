@@ -7,7 +7,7 @@ import { recipeOutputQty } from "../engine/craft";
 import { carryCap } from "../engine/carry";
 import { ARMOUR_SLOTS } from "../engine/pack";
 import { heldFoodEnergy } from "../engine/food";
-import { wieldsRanged } from "../engine/combat";
+import { wieldsRanged, hasAmmo } from "../engine/combat";
 import { RECIPE, MAX_ENERGY, TENT_FOOD_MULTIPLIER, INKS } from "../data/constants";
 import type { BiomeId } from "../data/constants";
 import { weaponHint, logisticsEffect, enhancementHint, describe, recipeGateHint, name, heldMapTitle, townRecipeIds } from "../render/render";
@@ -104,7 +104,7 @@ function prepBar(state: GameState, mapSeed: string, local: ReturnType<typeof loc
     ? `<span class="muted small">free local run — the map is not used up</span>`
     : `<span class="warn small">⚠ embarking SPENDS this map</span>`;
   const lo = state.loadout;
-  const warns = `${lo.food.length === 0 ? `<div class="warn">⚠ no food packed → you embark at full ${MAX_ENERGY} energy but nothing to eat mid-run — no way to refill stamina</div>` : ""}${wieldsRanged(lo) && !(lo.ammo ?? []).length ? `<div class="warn">⚠ bow packed with NO ARROWS → it will swing like a club (1 dmg). Pack arrows to shoot.</div>` : ""}`;
+  const warns = `${lo.food.length === 0 ? `<div class="warn">⚠ no food packed → you embark at full ${MAX_ENERGY} energy but nothing to eat mid-run — no way to refill stamina</div>` : ""}${wieldsRanged(lo) && !hasAmmo(lo) ? `<div class="warn">⚠ ${name(lo.equipment.weapon!)} packed with no ammo it can shoot → it will swing like a club (1 dmg). Pack its ammo to shoot.</div>` : ""}`;
   return `
   <div class="prepbar">
     <button class="link" data-back>← back to maps</button>

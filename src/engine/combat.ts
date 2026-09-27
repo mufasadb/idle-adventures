@@ -21,6 +21,8 @@ import {
   CHIP_DAMAGE_MIN,
   MITIGATION_K,
   WEAPON_ENHANCEMENT,
+  AMMO_FOR,
+  AMMO_POISON,
 } from "../data/constants";
 import type { DmgType } from "../data/constants";
 import type { Loadout, ItemStack } from "./types";
@@ -74,8 +76,18 @@ export function wieldsRanged(loadout: Loadout): boolean {
   const w = loadout.equipment.weapon;
   return w !== null && WEAPONS[w]?.dmgType === "ranged";
 }
+// The ammo defIds the wielded weapon shoots (si7.6.6): AMMO_FOR, else arrows.
+function ammoFor(weaponId: string | null): string[] {
+  return (weaponId !== null && AMMO_FOR[weaponId]) || ["arrows"];
+}
+// Index of the first ammo stack the wielded weapon can shoot, or -1 (si7.6.6).
+// Fights spend from THIS stack, so a mixed quiver never burns the wrong ammo.
+export function loadedAmmoIndex(loadout: Loadout): number {
+  const usable = ammoFor(loadout.equipment.weapon);
+  return (loadout.ammo ?? []).findIndex((s) => s.qty > 0 && usable.includes(s.defId));
+}
 export function hasAmmo(loadout: Loadout): boolean {
-  return (loadout.ammo ?? []).some((s) => s.qty > 0);
+  return loadedAmmoIndex(loadout) !== -1;
 }
 
 // D45 arrows-out: a ranged weapon with no ammo held swings as a club (no matrix, no tags).
@@ -246,7 +258,11 @@ export function strikeExchange(
   const enh = weaponBuff ? WEAPON_ENHANCEMENT[weaponBuff.id] : undefined;
   const weaponBuffAfter =
     weaponBuff && weaponBuff.charges - 1 > 0 ? { id: weaponBuff.id, charges: weaponBuff.charges - 1 } : undefined;
-  const poisonState = enh?.poison ? { ...enh.poison } : poison ? { ...poison } : undefined;
+  // si7.6.6: a poisoned dart (the loaded ammo of a wielded ranged weapon) sets/refreshes
+  // poison too — unless what's already ticking hits harder. A coating's poison wins.
+  const dart = wieldsRanged(loadout) && hasAmmo(loadout) ? AMMO_POISON[loadout.ammo![loadedAmmoIndex(loadout)]!.defId] : undefined;
+  const carried = dart && (!poison || dart.dmg >= poison.dmg) ? dart : poison;
+  const poisonState = enh?.poison ? { ...enh.poison } : carried ? { ...carried } : undefined;
   // Round-end poison tick: the monster loses poison.dmg (dealt with the strike so
   // it can land the kill), rounds decrements, clears at 0. INDEPENDENT of charges.
   let poisonDmg = 0;
