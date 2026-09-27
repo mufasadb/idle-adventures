@@ -24,14 +24,14 @@ export function loadLog(key: string): LogEntry[] {
 // silent reset, and hand-repacking the same kit cost 10+ clicks per run. We keep
 // the engine untouched: serialize the JUST-CONSUMED plan as an ordered list of
 // ordinary pack actions and replay them through reduce (D29 intact). Equipment
-// that changes carry capacity (backpack/transport/panniers) is packed FIRST so
+// that changes carry capacity (backpack/transport/panniers/quiver) is packed FIRST so
 // later consumable slot checks see the real cap.
 export type PackStep = { slot: LoadoutSlot; itemId: string };
 export function planActions(lo: Loadout): PackStep[] {
   const eq = lo.equipment;
   const acts: PackStep[] = [];
   const equip: [LoadoutSlot, string | null][] = [
-    ["backpack", eq.backpack], ["transport", eq.transport], ["panniers", eq.panniers],
+    ["backpack", eq.backpack], ["transport", eq.transport], ["panniers", eq.panniers], ["quiver", eq.quiver ?? null],
     ["weapon", eq.weapon], ["helmet", eq.helmet], ["chest", eq.chest], ["legs", eq.legs], ["boots", eq.boots], ["gloves", eq.gloves],
   ];
   for (const [slot, id] of equip) if (id) acts.push({ slot, itemId: id });

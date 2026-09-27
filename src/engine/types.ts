@@ -16,6 +16,7 @@ export type Equipment = {
   transport: string | null;
   backpack: string | null;
   panniers: string | null; // saddlebags (zhn): extra carry, only works with a beast transport
+  quiver?: string | null; // ke3.7.1 (D92): holds QUIVER_AMMO_CAP ammo outside carry. Optional/absent = null (old saves)
 };
 
 export type Loadout = {
@@ -102,6 +103,7 @@ export type LoadoutSlot =
   | "transport"
   | "backpack"
   | "panniers"
+  | "quiver" // ke3.7.1 (D92)
   | "food"
   | "potion"
   | "battle-item"

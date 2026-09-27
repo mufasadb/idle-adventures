@@ -46,7 +46,11 @@ export const UNARMED_DAMAGE = 1; // damage when wielding no weapon — ALSO a bo
 // ≈ 20 shots — a real slot cost with light bookkeeping. Every combat exchange
 // while wielding a bow with ammo spends 1 arrow (front stack, FIFO).
 // ⚠ balance surface: arrow supply gates bow damage — changing this requires `bun run sim:tables` if kits carry ammo (test/balance-tables.test.ts enforces)
-export const ARROW_STACK_CAP = 20; // arrows per inventory slot; raise = cheaper ammo logistics, lower = tighter ammo-vs-food-vs-loot squeeze
+export const ARROW_STACK_CAP = 10; // ammo per inventory slot (D92: 20 → 10, user 2026-07-21 — tightens ammo carry so the quiver has something to relieve); raise = cheaper ammo logistics, lower = tighter ammo-vs-food-vs-loot squeeze
+// Quiver (ke3.7.1, D92): an anvil-forged equipment piece holding this many units of ammo
+// (any kind) OUTSIDE the general carry. It relieves only AMMO slots — never loot (the
+// F2 guard): ammo slots = max(0, Σ ceil(stack/ARROW_STACK_CAP) − cap/ARROW_STACK_CAP).
+export const QUIVER_AMMO_CAP: Record<string, number> = { quiver: 100 };
 export const ARROWS_PER_CRAFT = 10; // arrows per craft batch — "three different things to grab, so it should give you quite a lot of them" (user, 2026-07-07)
 // ke3.3: the arrow-shaft recipe's outputScale multiplier — shafts per oak-log =
 // ARROW_SHAFTS_PER_LOG × the fletch tool's TOOL_SPEED. At q1 (fletchers-knife) one

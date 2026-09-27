@@ -184,6 +184,7 @@ export const RECIPE: Record<
   "plate-helmet": { inputs: [{ defId: "iron-ore", qty: 2 }], output: { defId: "plate-helmet", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
   "plate-chest": { inputs: [{ defId: "iron-ore", qty: 3 }], output: { defId: "plate-chest", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
   "plate-legs": { inputs: [{ defId: "iron-ore", qty: 2 }], output: { defId: "plate-legs", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
+  quiver: { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "deer-hide", qty: 2 }], output: { defId: "quiver", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } }, // ke3.7.1 (D92): riveted leather — 100 ammo off your back
   "plate-boots": { inputs: [{ defId: "iron-ore", qty: 1 }], output: { defId: "plate-boots", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
   "plate-gloves": { inputs: [{ defId: "iron-ore", qty: 1 }], output: { defId: "plate-gloves", qty: 1 }, requires: { station: "anvil", tools: ["blacksmiths-hammer"] } },
   "light-chest": { inputs: [{ defId: "deer-hide", qty: 2 }], output: { defId: "light-chest", qty: 1 } },
