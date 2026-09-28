@@ -248,6 +248,7 @@ function wire(): void {
   const shoot = app.querySelector<HTMLElement>("[data-shoot]"); if (shoot) shoot.onclick = () => { const at = route[route.length - 1]; if (at) { route = []; apply({ type: "fight", at }); } };
   // Survey (54f): resolve the last waypoint's detail at range, stay put
   const surveyBtn = app.querySelector<HTMLElement>("[data-survey-x]"); if (surveyBtn) surveyBtn.onclick = () => { const at = { x: Number(surveyBtn.dataset.surveyX), y: Number(surveyBtn.dataset.surveyY) }; route = []; apply({ type: "survey", at }); };
+  app.querySelectorAll<HTMLElement>("[data-study]").forEach((el) => el.onclick = () => apply({ type: "study", mapSeed: el.dataset.study! })); // D95
   app.querySelectorAll<HTMLElement>("[data-ink-map]").forEach((el) => el.onclick = () => apply({ type: "ink", mapSeed: el.dataset.inkMap!, inkId: el.dataset.inkId! }));
   app.querySelectorAll<HTMLElement>("[data-newgame]").forEach((el) => el.onclick = () => { if (confirm("Start a new game? This wipes the current run.")) newRun(); });
   app.querySelectorAll<HTMLElement>(".tile[data-x]").forEach((el) => {

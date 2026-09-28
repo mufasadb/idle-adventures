@@ -1,6 +1,7 @@
 // Town screens (zpm.3 two-step flow): the map overview (where to?) and the prep
 // screen (loadout plan + embark), plus the bank and the recipe book.
-import { localMap, mapEpithet } from "../engine/town";
+import { localMap, mapEpithet, mapHintIds } from "../engine/town";
+import { hintLabel, hintFamily } from "../engine/hints";
 import { legalActions, whyNot } from "../sim/legal";
 import { slotOf } from "../engine/catalog";
 import { recipeOutputQty } from "../engine/craft";
@@ -8,12 +9,38 @@ import { carryCap } from "../engine/carry";
 import { ARMOUR_SLOTS } from "../engine/pack";
 import { heldFoodEnergy } from "../engine/food";
 import { wieldsRanged, hasAmmo } from "../engine/combat";
-import { RECIPE, MAX_ENERGY, TENT_FOOD_MULTIPLIER, INKS, QUIVER_AMMO_CAP } from "../data/constants";
+import { RECIPE, MAX_ENERGY, TENT_FOOD_MULTIPLIER, INKS, QUIVER_AMMO_CAP, STUDY_COST } from "../data/constants";
 import type { BiomeId } from "../data/constants";
-import { weaponHint, logisticsEffect, enhancementHint, describe, recipeGateHint, name, heldMapTitle, townRecipeIds } from "../render/render";
+import { weaponHint, logisticsEffect, enhancementHint, describe, recipeGateHint, name, heldMapTitle, townRecipeIds, rejectCopy } from "../render/render";
 import type { GameState, Action, MapItem } from "../engine/types";
 import { inventoryGrid } from "./inventory";
 import { planActions } from "./persist";
+
+// Map hints (D95, Muse brief C option 1 — chips): one chip per hint, "G: boggy ground";
+// a sealed hint shows only its family. `studied` = how many of `ids` are revealed.
+const FAMILY_LETTER: Record<string, string> = { ground: "G", threat: "T", bounty: "B" };
+function hintChips(ids: string[], studied: number): string {
+  return `<div class="hintchips">${ids.map((id, i) => {
+    const fam = hintFamily(id) ?? "";
+    return i < studied
+      ? `<span class="hintchip" title="${fam} hint">${FAMILY_LETTER[fam] ?? "?"}: ${hintLabel(id)}</span>`
+      : `<span class="hintchip sealed" title="study the map to read this">[sealed ${fam}]</span>`;
+  }).join("")}</div>`;
+}
+// The local map is known country (D95): all its hints show, same chips as a held map.
+const localHintIds = (local: ReturnType<typeof localMap>) => mapHintIds({ mapSeed: local.mapSeed, biomeId: local.biomeId, vintage: 0 });
+
+// The study control for a held map: the button (with its cost), a red unaffordable
+// state, or "fully studied" once every hint is read.
+function studyControl(state: GameState, m: MapItem): string {
+  const total = mapHintIds(m).length, studied = m.studied ?? 0;
+  if (studied >= total) return `<span class="studied-done">fully studied</span>`;
+  const cost = STUDY_COST.map((c) => `${c.qty} ${name(c.defId)}`).join(" + ");
+  const why = whyNot(state, { type: "study", mapSeed: m.mapSeed });
+  return why
+    ? `<button class="study unaffordable" disabled title="${rejectCopy(why)}">Study (${cost})</button>`
+    : `<button class="study" data-study="${m.mapSeed}" title="reveal one more hint">Study (${cost})</button>`;
+}
 
 // Transport role hints (web copy only — mirrors TRANSPORT_MULTIPLIER intent).
 const TRANSPORT_ROLE: Record<string, string> = {
@@ -76,6 +103,7 @@ function mapSelectSection(state: GameState, local: ReturnType<typeof localMap>, 
           <span class="maptag free">FREE · always here</span>
           <b>${local.preview.headline}${epithetSuffix(local.mapSeed, local.biomeId)}</b>
           <div class="muted small">over the hill — a fresh T1 map every visit, never used up. Where food &amp; your first maps come from.</div>
+          ${hintChips(localHintIds(local), 3)}
           <button data-prepare="${local.mapSeed}">Prepare ▶</button>
         </div>
       </div>
@@ -86,7 +114,9 @@ function mapSelectSection(state: GameState, local: ReturnType<typeof localMap>, 
             <span class="maptag tier">T${m.tier ?? 1}</span>
             <b>${name(m.biomeId)} map${heldMapSuffix(m)}</b>
             <span class="muted small">${(state.runs ?? 0) - m.vintage} runs old</span>
+            ${hintChips(mapHintIds(m), m.studied ?? 0)}
             <button data-prepare="${m.mapSeed}">Prepare ▶</button>
+            ${studyControl(state, m)}
             ${Object.keys(INKS).filter((inkId) => legal.some((a) => a.type === "ink" && a.mapSeed === m.mapSeed && a.inkId === inkId)).map((inkId) => `<button data-ink-map="${m.mapSeed}" data-ink-id="${inkId}" title="apply ${name(inkId)} — rolls an affix from its domain onto this map">${name(inkId)}</button>`).join("")}
           </div>`).join("")}
       </div>` : `<div class="muted small">(none yet — kill a humanoid to loot a map)</div>`}
@@ -110,7 +140,8 @@ function prepBar(state: GameState, mapSeed: string, local: ReturnType<typeof loc
   return `
   <div class="prepbar">
     <button class="link" data-back>← back to maps</button>
-    <div class="prephead"><span class="muted small">Preparing</span> ${label} · ${spendNote}</div>
+    <div class="prephead"><span class="muted small">Preparing</span> ${label} · ${spendNote}${
+      isLocal ? hintChips(localHintIds(local), 3) : held && (held.studied ?? 0) > 0 ? hintChips(mapHintIds(held).slice(0, held.studied), held.studied!) : ""}</div>
     <button class="embark-final" data-embark="${mapSeed}">Embark ▶${isLocal ? "" : " — spends this map"}</button>
   </div>
   ${warns}`;

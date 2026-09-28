@@ -58,7 +58,7 @@ export const MAP_HINTS: HintTrait[] = [
   { id: "ancients", family: "threat", label: "something old lairs here", metric: "maxTier", test: { atLeast: 3 } },
   { id: "swarming", family: "threat", label: "crawling with monsters", metric: "monster", test: { dir: "high" } },
   { id: "quiet", family: "threat", label: "quiet country", metric: "monster", test: { dir: "low" } },
-  { id: "steel", family: "threat", label: "they come at you with claws and steel", metric: "melee", test: { dir: "high", minAbs: 0.5 } },
+  { id: "steel", family: "threat", label: "claws and steel", metric: "melee", test: { dir: "high", minAbs: 0.5 } },
   { id: "archers", family: "threat", label: "archers about", metric: "ranged", test: { dir: "high", minAbs: 0.3 } },
   { id: "spells", family: "threat", label: "the locals strike with magic", metric: "magic", test: { dir: "high", minAbs: 0.3 } },
   { id: "shells", family: "threat", label: "hard-shelled beasts", metric: "plate", test: { dir: "high", minAbs: 0.3 } },
