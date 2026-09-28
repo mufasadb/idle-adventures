@@ -10,7 +10,7 @@ import { carryCap, mapCarryCap } from "../engine/carry";
 import { deriveRoute } from "./route";
 import type { Pos } from "./route";
 import { wieldsRanged, loadedAmmoIndex } from "../engine/combat";
-import { PLAYER_BASE_HP, RECIPE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_CAMP_MEALS, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, FISH_CAST_ENERGY, FISH_DEEP_DEPTH } from "../data/constants";
+import { PLAYER_BASE_HP, RECIPE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_CAMP_MEALS, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, FISH_CAST_ENERGY, FISH_DEEP_DEPTH, ANTIDOTE, TERRAIN_HP_COST } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, combatForecast, GATHER_VERB, round1, engagementForecast, enhancementHint, battleItemEffect } from "../render/render";
 import { perceive } from "../engine/perceive";
@@ -115,6 +115,28 @@ function enhanceButtons(exp: NonNullable<GameState["expedition"]>): string {
   }).join("");
 }
 
+// si7.6.9.6 (Muse option 1): flasks the reducer would let you throw — at your engaged
+// target, or at `at` from range. Legality from reduce (D29).
+function throwLegal(legal: Action[], at?: { x: number; y: number }): string[] {
+  return [...new Set(legal.filter((a): a is Extract<Action, { type: "throw" }> => a.type === "throw" && (at ? a.at !== undefined && a.at.x === at.x && a.at.y === at.y : a.at === undefined)).map((a) => a.itemId))];
+}
+// A Throw button per held flask; before anything has struck, it wears the glowing
+// FREE OPENER badge — the throw draws no retaliation.
+function throwButtons(exp: NonNullable<GameState["expedition"]>, legal: Action[]): string[] {
+  const free = !(exp.combat?.struck ?? false);
+  return throwLegal(legal).map((id) => {
+    const qty = (exp.loadout.flasks ?? []).filter((s) => s.defId === id).reduce((n, s) => n + s.qty, 0);
+    return `<button class="throw" data-throw="${id}" title="${describe(id)}">💥 Throw ${name(id).toLowerCase()} ×${qty}${free ? ` <span class="free-opener">FREE OPENER</span>` : ""}</button>`;
+  });
+}
+// si7.6.9.6: the poison chip beside the HP bar (a green skull + ticks left) and, when an
+// antidote is held, its one-tap cure right next to it.
+function poisonChip(exp: NonNullable<GameState["expedition"]>, legal: Action[]): string {
+  if (!exp.poisoned) return "";
+  const cure = legal.some((a) => a.type === "use-item" && ANTIDOTE.includes(a.itemId));
+  return ` <span class="poison-chip" title="poisoned: −${exp.poisoned.dmg} HP per step or fight round for ${exp.poisoned.ticks} more — it can't take you below 1 HP">☠ ${exp.poisoned.ticks}</span>${cure ? `<button class="antidote" data-use-item="antidote" title="antidote — cure the poison (no turn, no energy)">🧪<span class="lbl"> Antidote</span></button>` : ""}`;
+}
+
 // The engagement panel replaces herePanel while a live fight is in progress
 // (exp.combat set): monster HP bar, per-round forecast (the honest race —
 // toKill vs toDie, no potion double-count), and Fight/Flee/Potion/auto-quaff.
@@ -142,11 +164,12 @@ function engagementPanel(state: GameState, exp: NonNullable<GameState["expeditio
     <div class="forecast">you hit for <b>${round1(dmgOut)}</b>${dmgWas} · it hits for <b>${round1(dmgIn)}</b> · <b class="${winning ? "good" : "over"}">${winning ? `kill in ${toKill}` : `it kills you first (~${toDie} rounds)`}</b>${killWas}${exp.loadout.potions.length ? ` · ${exp.loadout.potions.reduce((n, p) => n + p.qty, 0)} potion(s) extend that` : ""}${quiver}${coatingLine(exp)}${c.poison ? ` · ☠ poisoned (${round1(c.poison.dmg)}/rd, ${c.poison.rounds} left)` : ""}</div>
     <div class="actions">
       <button data-act="fight">⚔ Fight (1 round)</button>
+      ${throwButtons(exp, legal).join("")}
       <button data-act="flee" title="disengage — take one parting hit (${round1(dmgIn)}); unused battle items keep for later">🏃 Flee (−${round1(dmgIn)} HP)</button>
       ${canQuaff ? `<button data-act="quaff" title="drink a potion — costs a turn (the ${name(c.creature)} strikes)">🧪 Potion</button>` : `<button disabled title="${rejectCopy(whyNot(state, { type: "quaff" }) ?? "insufficient")}">🧪 Potion</button>`}
       <button data-act="toggle-auto-quaff">Auto-potion: <b>${(exp.autoQuaff ?? true) ? "on" : "off"}</b></button>
       <button data-act="toggle-auto-finish" title="fast-forward whole fights to victory or defeat in one click">Auto-finish: <b>${(exp.autoFinish ?? false) ? "on" : "off"}</b></button>
-      ${exp.loadout.battleItems.map((s) => { const eff = battleItemEffect(s.defId) ?? ""; return `<button data-use-item="${s.defId}" title="use it this fight only (${eff})">⚗ ${name(s.defId)} (${eff})${s.qty > 1 ? ` ×${s.qty}` : ""}</button>`; }).join("")}
+      ${exp.loadout.battleItems.filter((s) => !ANTIDOTE.includes(s.defId)).map((s) => { const eff = battleItemEffect(s.defId) ?? ""; return `<button data-use-item="${s.defId}" title="use it this fight only (${eff})">⚗ ${name(s.defId)} (${eff})${s.qty > 1 ? ` ×${s.qty}` : ""}</button>`; }).join("")}
       ${enhanceButtons(exp)}
       ${swapGearButtons(exp, legal)}
     </div>
@@ -211,6 +234,7 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
       else if (stepBd.discounts.length) cls.push("path-tool");
       else if (stepBd.transport) cls.push("path-transport");
     }
+    if (rt.hazardKeys.has(k)) cls.push("path-hazard"); // si7.6.9.6: this step costs HP (spores, no mask)
     if (rt.waypointKeys.has(k)) cls.push("path-waypoint");
     if (route.length && k === goalK) cls.push("path-goal");
     // D78: loadout-aware lock — a gated material whose any-of tool list is
@@ -240,6 +264,8 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
       ? (per && per.detail
           ? `${kindLabel(poi.kind)} · ${flavorDetail(per.detail, poi.kind)}${tierNote ? ` · ${tierNote}` : ""}`
           : poi.kind === "monster" ? "a monster" : `a ${kindLabel(poi.kind)} node`)
+      : grid.terrain[y]![x]! === "spore-thicket"
+      ? `spore-thicket — −${TERRAIN_HP_COST["spore-thicket"]} HP a step unless you carry a filter-mask`
       : grid.terrain[y]![x]!;
     // 48l.10: paint approved atlas frames. Missing defIds deliberately keep the
     // glyph path below; a creature must never borrow another creature's sprite.
@@ -290,7 +316,7 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   // kml: compact HUD bars that float over the map (landscape-first layout).
   const bars = `
     <div class="bar"><span>Energy</span><div class="track">${energyFill}</div><b>${energyLabel}</b></div>
-    <div class="bar"><span>HP</span><div class="track"><div class="fill hp" style="width:${Math.min(100, (exp.hp / PLAYER_BASE_HP) * 100)}%"></div></div><b>${round1(exp.hp)}</b></div>`;
+    <div class="bar"><span>HP</span><div class="track"><div class="fill hp" style="width:${Math.min(100, (exp.hp / PLAYER_BASE_HP) * 100)}%"></div></div><b>${round1(exp.hp)}</b>${poisonChip(exp, legal)}</div>`;
 
   // End-of-route affordances (eot): the LAST waypoint drives Fight/Shoot/Survey.
   const endPoi = route.length ? poiAt.get(goalK) : undefined;
@@ -304,6 +330,9 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
       })()
     : "";
   const surveyAtEnd = legal.some((a) => a.type === "survey" && a.at.x === rt.end.x && a.at.y === rt.end.y);
+  // si7.6.9.6: an adjacent monster at the route's end can take a thrown opener from here.
+  const throwables = fight ? throwLegal(legal, rt.end) : [];
+  const hpClause = rt.hpCost > 0 ? ` · <b class="over hp-tag" title="spore-thickets on this route — a filter-mask breathes free">−${round1(rt.hpCost)} HP</b>` : "";
   // Ambush warning (2i8, playtest F5): the walk auto-engages the FIRST monster on the
   // line — warn prominently when that fight is a forecast LOSS.
   const cm = rt.crossedMonster;
@@ -314,7 +343,7 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   const routeBar = exp.combat
     ? `<div class="routebar engaged">⚔ <b>Engaged — ${name(exp.combat.creature)}</b> <button data-open-tab="here">fight / flee ▸</button></div>`
     : hasRoute
-    ? `<div class="routebar${rt.blocked ? " blocked" : ""}">${crossWarn}${rt.blocked ? `<div class="over">✗ a leg crosses terrain you can't pass — tap the line to unwind.</div>` : ""}<div class="routeline">${fight ? `⚔ ${name(fight)} · ` : ""}${rt.walkable.length} tile${rt.walkable.length !== 1 ? "s" : ""} · ${costClause}${forecastClause}</div><div class="routebtns"><button class="primary" data-walk${rt.blocked ? " disabled" : ""}>${fight ? "Fight ▶" : "Walk ▶"}</button>${shoot ? `<button data-shoot title="engage from here — your opener lands first">🏹 Shoot</button>` : ""}${surveyAtEnd ? `<button data-survey-x="${rt.end.x}" data-survey-y="${rt.end.y}" title="resolve its detail from here">🔭 −${SURVEY_ENERGY}e</button>` : ""}<button data-cancelpath title="clear the route">✕</button></div></div>`
+    ? `<div class="routebar${rt.blocked ? " blocked" : ""}">${crossWarn}${rt.blocked ? `<div class="over">✗ a leg crosses terrain you can't pass — tap the line to unwind.</div>` : ""}<div class="routeline">${fight ? `⚔ ${name(fight)} · ` : ""}${rt.walkable.length} tile${rt.walkable.length !== 1 ? "s" : ""} · ${costClause}${hpClause}${forecastClause}</div><div class="routebtns"><button class="primary" data-walk${rt.blocked ? " disabled" : ""}>${fight ? "Fight ▶" : "Walk ▶"}</button>${shoot ? `<button data-shoot title="engage from here — your opener lands first">🏹 Shoot</button>` : ""}${throwables.map((id) => `<button class="throw" data-throw="${id}" data-throw-x="${rt.end.x}" data-throw-y="${rt.end.y}" title="throw from here — ${describe(id)}">💥 Throw ${name(id).toLowerCase()} <span class="free-opener">FREE OPENER</span></button>`).join("")}${surveyAtEnd ? `<button data-survey-x="${rt.end.x}" data-survey-y="${rt.end.y}" title="resolve its detail from here">🔭 −${SURVEY_ENERGY}e</button>` : ""}<button data-cancelpath title="clear the route">✕</button></div></div>`
     : "";
 
   // kml: contextual quick actions on the map itself (so the common verbs never need
@@ -323,7 +352,7 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   const quick: string[] = [];
   if (!exp.combat && here && legal.some((a) => a.type === "gather")) quick.push(`<button data-act="gather">${GATHER_VERB[here.kind]?.label ?? "Gather"}</button>`);
   if (canFish) quick.push(`<button data-act="fish" title="cast into the deepest water beside you (−${FISH_CAST_ENERGY}e)">🎣 Fish</button>`);
-  if (exp.combat) quick.push(`<button data-act="fight">⚔ Fight</button>`, `<button data-act="flee">🏃 Flee</button>`);
+  if (exp.combat) quick.push(`<button data-act="fight">⚔ Fight</button>`, ...throwButtons(exp, legal), `<button data-act="flee">🏃 Flee</button>`);
 
   const cap = carryCap(exp.loadout.equipment);
   // 7lr: which foods can actually be eaten right now (speculative-reduce filtered), and

@@ -6,7 +6,7 @@
 // over its inputs; recomputed each render, never stored.
 import type { Grid } from "../engine/grid";
 import type { Expedition } from "../engine/types";
-import { moveCost } from "../engine/move";
+import { moveCost, terrainHpCost } from "../engine/move";
 import { lineTiles } from "../engine/line";
 import { gatherCost } from "../engine/tools";
 import { eatToRefill } from "../engine/food";
@@ -27,6 +27,8 @@ export type DerivedRoute = {
   endEnergy: number; // simulated CURRENT energy after the walk, mirroring the reducer's pay-then-auto-eat per tile (df3)
   strands: boolean; // the walk would truly run energy ≤ 0 before completing, EVEN WITH designated auto-eat (df3)
   blocked: boolean; // any leg hits a wall → Walk disabled
+  hpCost: number; // si7.6.9.6 (D99): HP the walkable prefix's hazardous terrain (spore-thicket, no mask) costs
+  hazardKeys: Set<string>; // walkable tiles that cost HP — tinted red on the map
   crossedMonster: { pos: Pos; creature: string } | null; // first UNCLEARED monster on the walkable prefix — the walk auto-engages it (2i8: warn before you commit the route into a fight)
   end: Pos; // last waypoint (or the player, if the route is empty)
 };
@@ -40,6 +42,8 @@ export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: S
   const blockKeys = new Set<string>();
   let walkCost = 0;
   let actionCost = 0;
+  let hpCost = 0;
+  const hazardKeys = new Set<string>();
   // df3: simulate CURRENT energy tile-by-tile in the SAME order the reducer walks
   // (pay a cost, THEN waste-free auto-eat the DESIGNATED food) so the "strands you"
   // verdict + projected end-energy reflect what the walk ACTUALLY does — never the
@@ -86,6 +90,8 @@ export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: S
         const mc = moveCost(grid.terrain[t.y]![t.x]!, eq.transport, eq.tools, diagonal);
         prevWalk = t;
         walkCost += mc;
+        const hz = terrainHpCost(grid.terrain[t.y]![t.x]!, eq.tools);
+        if (hz > 0) { hpCost += hz; hazardKeys.add(kk(t)); }
         // The reducer rejects a step as "exhausted" when its cost exceeds current
         // energy (auto-eat already ran at the prior tile) — so the walk halts here
         // and doesn't finish. Flag strand once, but keep summing the raw cost
@@ -110,7 +116,7 @@ export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: S
     legs.push({ tiles, blockedAt });
     legStart = wp;
   }
-  return { legs, drawn, walkable, waypointKeys, blockKeys, walkCost, actionCost, endEnergy: simEnergy, strands, crossedMonster, blocked: legs.some((l) => l.blockedAt !== null), end: wps.length ? wps[wps.length - 1]! : exp.pos };
+  return { legs, drawn, walkable, waypointKeys, blockKeys, walkCost, actionCost, hpCost, hazardKeys, endEnergy: simEnergy, strands, crossedMonster, blocked: legs.some((l) => l.blockedAt !== null), end: wps.length ? wps[wps.length - 1]! : exp.pos };
 }
 
 // --- click → waypoint list (eot) --------------------------------------------

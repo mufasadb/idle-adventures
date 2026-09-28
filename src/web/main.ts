@@ -227,6 +227,12 @@ function wire(): void {
   app.querySelectorAll<HTMLElement>("[data-don]").forEach((el) => el.onclick = () => apply({ type: "don", itemId: el.dataset.don! }));
   app.querySelectorAll<HTMLElement>("[data-doff]").forEach((el) => el.onclick = () => apply({ type: "doff", itemId: el.dataset.doff! }));
   app.querySelectorAll<HTMLElement>("[data-drop-map]").forEach((el) => el.onclick = () => apply({ type: "drop-map", mapSeed: el.dataset.dropMap! }));
+  // si7.6.9.6: throw a flask — at the engaged monster, or from range at the route's end.
+  app.querySelectorAll<HTMLElement>("[data-throw]").forEach((el) => el.onclick = () => {
+    const x = el.dataset.throwX, y = el.dataset.throwY;
+    route = [];
+    apply(x !== undefined && y !== undefined ? { type: "throw", itemId: el.dataset.throw!, at: { x: Number(x), y: Number(y) } } : { type: "throw", itemId: el.dataset.throw! });
+  });
   app.querySelectorAll<HTMLElement>("[data-use-item]").forEach((el) => el.onclick = () => apply({ type: "use-item", itemId: el.dataset.useItem! }));
   app.querySelectorAll<HTMLElement>("[data-enhance]").forEach((el) => el.onclick = () => apply({ type: "enhance", id: el.dataset.enhance! }));
   app.querySelectorAll<HTMLElement>("[data-act]").forEach((el) => el.onclick = () => { route = []; apply({ type: el.dataset.act! } as Action); });

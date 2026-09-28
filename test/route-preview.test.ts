@@ -113,3 +113,20 @@ test("deriveRoute surfaces the first uncleared monster crossed; a cleared one is
   }
   throw new Error("no monster-on-line fixture found in scan range");
 });
+
+test("deriveRoute prices spore-thickets in HP, and a filter-mask zeroes it (si7.6.9.6, D99)", () => {
+  // a hand-built strip: plains → 3 thickets → plains
+  const grid = generateGrid("route-hp", "woodland");
+  const terrain = grid.terrain.map((row) => [...row]);
+  for (let x = 0; x < 6; x++) terrain[0]![x] = x >= 1 && x <= 3 ? "spore-thicket" : "plains";
+  const g = { ...grid, terrain, pois: [] };
+  const exp = (tools: string[]): Expedition => {
+    const loadout = emptyLoadout(); loadout.equipment.tools = tools;
+    return { mapSeed: "route-hp", pos: { x: 0, y: 0 }, energy: 300, hp: 30, loadout, carry: [], cleared: [] };
+  };
+  const bare = deriveRoute(g, exp([]), [{ x: 5, y: 0 }], new Set(), new Set());
+  expect(bare.hpCost).toBe(6);
+  expect(bare.hazardKeys.size).toBe(3);
+  const masked = deriveRoute(g, exp(["filter-mask"]), [{ x: 5, y: 0 }], new Set(), new Set());
+  expect(masked.hpCost).toBe(0);
+});
