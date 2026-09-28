@@ -208,6 +208,31 @@
       "category": "humanoid",
       "tags": []
     },
+    "tide-crab": {
+      "tier": 1,
+      "dmgType": "melee",
+      "armourType": "plate",
+      "category": "beast",
+      "tags": [
+        "beast"
+      ]
+    },
+    "wrecker": {
+      "tier": 2,
+      "dmgType": "ranged",
+      "armourType": "light",
+      "category": "humanoid",
+      "tags": []
+    },
+    "siren": {
+      "tier": 2,
+      "dmgType": "magic",
+      "armourType": "robe",
+      "category": "fae",
+      "tags": [
+        "fae"
+      ]
+    },
     "ancient-wyrm": {
       "tier": 4,
       "dmgType": "magic",
@@ -489,6 +514,32 @@
         "rounds": 2
       }
     },
+    "tide-crab": {
+      "bare": {
+        "victory": true,
+        "hpLost": 8,
+        "hpLostPct": 26.7,
+        "rounds": 3
+      },
+      "iron": {
+        "victory": true,
+        "hpLost": 4,
+        "hpLostPct": 13.3,
+        "rounds": 3
+      },
+      "steel": {
+        "victory": true,
+        "hpLost": 1.5,
+        "hpLostPct": 5,
+        "rounds": 2
+      },
+      "mithril": {
+        "victory": true,
+        "hpLost": 1.1,
+        "hpLostPct": 3.8,
+        "rounds": 2
+      }
+    },
     "bog-lurker": {
       "bare": {
         "victory": false,
@@ -697,6 +748,32 @@
         "rounds": 2
       }
     },
+    "siren": {
+      "bare": {
+        "victory": true,
+        "hpLost": 24,
+        "hpLostPct": 80,
+        "rounds": 4
+      },
+      "iron": {
+        "victory": true,
+        "hpLost": 4.8,
+        "hpLostPct": 16,
+        "rounds": 2
+      },
+      "steel": {
+        "victory": true,
+        "hpLost": 7.6,
+        "hpLostPct": 25.3,
+        "rounds": 3
+      },
+      "mithril": {
+        "victory": true,
+        "hpLost": 3,
+        "hpLostPct": 10,
+        "rounds": 2
+      }
+    },
     "snow-marauder": {
       "bare": {
         "victory": false,
@@ -746,6 +823,32 @@
         "victory": true,
         "hpLost": 4.6,
         "hpLostPct": 15.2,
+        "rounds": 3
+      }
+    },
+    "wrecker": {
+      "bare": {
+        "victory": false,
+        "hpLost": 30,
+        "hpLostPct": 100,
+        "rounds": 4
+      },
+      "iron": {
+        "victory": true,
+        "hpLost": 10.7,
+        "hpLostPct": 35.6,
+        "rounds": 5
+      },
+      "steel": {
+        "victory": true,
+        "hpLost": 5.5,
+        "hpLostPct": 18.5,
+        "rounds": 4
+      },
+      "mithril": {
+        "victory": true,
+        "hpLost": 2.7,
+        "hpLostPct": 8.9,
         "rounds": 3
       }
     },

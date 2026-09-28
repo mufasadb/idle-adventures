@@ -91,9 +91,11 @@ function waterDepth(terrain: Terrain[][]): number[][] {
 // D91: rare biomes (RARE_BIOMES) sit OUT of the uniform base roll and roll in on their
 // own chance at/above their minTier — so the base pick for any seed is unchanged and a
 // T1 map can never be a rare biome. `mapTier` defaults to 1 (the town's local map).
+// D94: rare biomes are tried in BIOME_IDS (append-only) order, so adding one never
+// changes a seed an earlier rare biome already won.
 const BASE_BIOMES = BIOME_IDS.filter((id) => !RARE_BIOMES[id]);
 export function rollBiome(mapSeed: string, mapTier = 1): BiomeId {
-  for (const id of [...BIOME_IDS].sort()) {
+  for (const id of BIOME_IDS) {
     const rare = RARE_BIOMES[id];
     if (rare && mapTier >= rare.minTier && rand(mapSeed, "biome-rare", id) < rare.chance) return id;
   }
@@ -288,8 +290,19 @@ export function generateGrid(mapSeed: string, biomeId: BiomeId, mapTier = 1, aff
   return grid;
 }
 
+// Coastline (D94): a 0..1 gradient that is 1 at one seeded map edge and falls to 0 at
+// the far edge. Blended into the water field it piles the sea up against that side.
+function coastGradient(mapSeed: string): (x: number, y: number) => number {
+  const edge = Math.floor(rand(mapSeed, "coast-edge") * 4); // 0 N, 1 E, 2 S, 3 W
+  return (x, y) => {
+    const along = edge === 0 ? y : edge === 1 ? MAP_WIDTH - 1 - x : edge === 2 ? MAP_HEIGHT - 1 - y : x;
+    return 1 - (along + 0.5) / (edge % 2 === 0 ? MAP_HEIGHT : MAP_WIDTH);
+  };
+}
+
 function buildGrid(mapSeed: string, biomeId: BiomeId, mapTier: number, affixes: string[]): Grid {
   const biome = affixProfile(tierProfile(BIOMES[biomeId], biomeId, mapTier), affixes);
+  const coast = biome.water?.coast ? coastGradient(mapSeed) : null;
   const terrain: Terrain[][] = [];
   for (let y = 0; y < MAP_HEIGHT; y++) {
     const row: Terrain[] = [];
@@ -308,7 +321,8 @@ function buildGrid(mapSeed: string, biomeId: BiomeId, mapTier: number, affixes: 
       // The body floods everything; the shallows ring spares mountains (a shore wall
       // stays a wall).
       if (biome.water) {
-        const w = perlin2(`${mapSeed}:water`, (x + 0.5) * WATER_NOISE_FREQUENCY, (y + 0.5) * WATER_NOISE_FREQUENCY);
+        let w = perlin2(`${mapSeed}:water`, (x + 0.5) * WATER_NOISE_FREQUENCY, (y + 0.5) * WATER_NOISE_FREQUENCY);
+        if (coast) w = w * (1 - biome.water.coast!) + coast(x, y) * biome.water.coast!;
         if (w > biome.water.lakeThreshold) t = biome.water.body;
         else if (w > biome.water.lakeThreshold - biome.water.shallowsBand && t !== "mountain") t = "shallows";
       }

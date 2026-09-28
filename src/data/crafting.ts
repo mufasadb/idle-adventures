@@ -8,7 +8,7 @@ import { ARROWS_PER_CRAFT, ARROW_SHAFTS_PER_LOG, DARTS_PER_CRAFT } from "./comba
 // --- Consumable item catalogs (M5) ---
 // ENERGY_PER_FOOD / POTION_HEAL are flat, so these are single-item catalogs for
 // the POC; the list is what `pack`/`slotOf` validate a food/potion defId against.
-export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican", "apple", "smoked-venison", "blubber-stew", "cooked-venison", "cooked-berries", "stew", "crayfish", "trout", "perch", "pike", "grilled-pike", "crayfish-boil", "smoked-fish", "eel"];
+export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican", "apple", "smoked-venison", "blubber-stew", "cooked-venison", "cooked-berries", "stew", "crayfish", "trout", "perch", "pike", "grilled-pike", "crayfish-boil", "smoked-fish", "eel", "samphire", "mackerel", "tuna", "grilled-tuna"];
 export const POTION: string[] = ["potion", "greater-potion", "draught", "greater-draught"];
 export const BATTLE_ITEM: string[] = ["elixir-of-power", "warding-draught"]; // combat consumables (bzd); COMBAT_BUFF keys
 
@@ -84,9 +84,12 @@ export const RECIPE: Record<
   "steel-pick": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "coal", qty: 2 }], output: { defId: "steel-pick", qty: 1 } },
   "steel-axe": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "steel-axe", qty: 1 } },
   spyglass: { inputs: [{ defId: "copper-ore", qty: 2 }, { defId: "ice-moss", qty: 1 }], output: { defId: "spyglass", qty: 1 } }, // cross-biome: desert copper + tundra moss
+  "pearl-spyglass": { inputs: [{ defId: "spyglass", qty: 1 }, { defId: "pearl", qty: 2 }], output: { defId: "pearl-spyglass", qty: 1 } }, // D94: pearl lenses ground into your spyglass — detail radius 5 → 7
   // Terrain-gating tools (boo): each a tool slot, so bringing one is a real loadout tradeoff
   "climbing-pick": { inputs: [{ defId: "iron-ore", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "climbing-pick", qty: 1 } }, // enables mountains (∞ → 40)
   raft: { inputs: [{ defId: "pine-log", qty: 2 }, { defId: "deer-hide", qty: 1 }], output: { defId: "raft", qty: 1 } }, // discounts rivers (30 → 10)
+  longboat: { inputs: [{ defId: "driftwood", qty: 4 }, { defId: "pine-log", qty: 2 }, { defId: "stringybark", qty: 2 }], output: { defId: "longboat", qty: 1 } }, // D94: the sea-going boat — enables sea + lake (∞ → 15); driftwood means a first coastal run on foot
+  "raft-driftwood": { inputs: [{ defId: "driftwood", qty: 2 }, { defId: "deer-hide", qty: 1 }], output: { defId: "raft", qty: 1 } }, // D94: beachcombed raft (driftwood for pine)
   waders: { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "pine-log", qty: 1 }], output: { defId: "waders", qty: 1 } }, // discounts mud (15 → 10)
   "ice-cleats": { inputs: [{ defId: "iron-ore", qty: 1 }, { defId: "wolf-pelt", qty: 1 }], output: { defId: "ice-cleats", qty: 1 } }, // glide on ice (20 → 5)
   tent: { inputs: [{ defId: "deer-hide", qty: 2 }, { defId: "pine-log", qty: 2 }], output: { defId: "tent", qty: 1 } }, // camp gear (dtv; 7lr): once-per-run camp meal restores ×TENT_FOOD_MULTIPLIER
@@ -131,6 +134,7 @@ export const RECIPE: Record<
   // Fishing (si7.6.2): the rod is a stone-age-ish craft (wood + bark line); the catches
   // cook in the field or smoke at home once they've gone stale.
   "fishing-rod": { inputs: [{ defId: "oak-log", qty: 1 }, { defId: "stringybark", qty: 1 }], output: { defId: "fishing-rod", qty: 1 } },
+  "grilled-tuna": { inputs: [{ defId: "tuna", qty: 1 }, { defId: "driftwood", qty: 1 }], output: { defId: "grilled-tuna", qty: 1 }, requires: { tools: ["fire-kit"] }, field: true }, // D94: deep-sea payoff: 100 raw → 240 grilled, driftwood fire on the beach
   "grilled-pike": { inputs: [{ defId: "pike", qty: 1 }, { defId: "deadwood", qty: 1 }], output: { defId: "grilled-pike", qty: 1 }, requires: { tools: ["fire-kit"] }, field: true }, // deep-lake payoff: 90 raw → 220 grilled
   "crayfish-boil": { inputs: [{ defId: "crayfish", qty: 3 }, { defId: "deadwood", qty: 1 }], output: { defId: "crayfish-boil", qty: 1 }, requires: { tools: ["fire-kit", "cooking-pot"] }, field: true }, // 3×30 raw → 170 boiled
   "smoked-fish": { inputs: [{ defId: "stale-fish", qty: 2 }], output: { defId: "smoked-fish", qty: 1 }, requires: { station: "smokehouse" } }, // the stale-fish payoff (mirrors stale-berries → jam)
@@ -149,6 +153,7 @@ export const RECIPE: Record<
   draught: { inputs: [{ defId: "forest-herb", qty: 2 }], output: { defId: "draught", qty: 1 }, requires: { tools: ["glassware"] } }, // HOME brew: glassware + herbs, water omitted (user)
   "field-draught": { inputs: [{ defId: "water-vial", qty: 1 }, { defId: "forest-herb", qty: 2 }, { defId: "oak-log", qty: 1 }], output: { defId: "draught", qty: 1 }, requires: { tools: ["glassware", "fire-kit"] }, field: true }, // FIELD brew: same basic draught, needs a filled vial + heat; lands in loadout.potions so it's quaffable right away
   "alchemical-desk": { inputs: [{ defId: "glass-vial", qty: 3 }, { defId: "iron-ore", qty: 2 }], output: { defId: "alchemical-desk", qty: 1 }, buildsStation: "alchemical-desk" }, // the deep home alchemy station
+  "draught-kelp": { inputs: [{ defId: "kelp", qty: 2 }], output: { defId: "draught", qty: 1 }, requires: { tools: ["glassware"] } }, // D94: kelp brews the basic draught — the herb-free heal
   "greater-draught": { inputs: [{ defId: "forest-herb", qty: 2 }, { defId: "silver-ore", qty: 1 }], output: { defId: "greater-draught", qty: 1 }, requires: { station: "alchemical-desk" } }, // strong heal the field kit CAN'T make — station-gated, town-only
   // Forge (ke3.7) — the anvil station + blacksmith's hammer gate ALL metal plate.
   // Adds NO new armour (F1-safe); it makes "heavy armour = forge work" a real
@@ -206,6 +211,7 @@ export const RECIPE: Record<
   // Armour — light/robe T2 samples (gated by a T2 material so they sit mid-climb)
   "studded-chest": { inputs: [{ defId: "drake-hide", qty: 1 }, { defId: "deer-hide", qty: 1 }], output: { defId: "studded-chest", qty: 1 } }, // drake-hide now a combat drop (D83)
   "studded-legs": { inputs: [{ defId: "drake-hide", qty: 1 }], output: { defId: "studded-legs", qty: 1 } },
+  "turtle-shell-helm": { inputs: [{ defId: "turtle-shell", qty: 2 }, { defId: "deer-hide", qty: 1 }], output: { defId: "turtle-shell-helm", qty: 1 } }, // D94: deep-sea shell → T2 light helm, no forge
   "enchanted-chest": { inputs: [{ defId: "ice-moss", qty: 2 }, { defId: "silver-ore", qty: 1 }], output: { defId: "enchanted-chest", qty: 1 } }, // silver T2 → iron-pick
   "enchanted-hood": { inputs: [{ defId: "ice-moss", qty: 1 }, { defId: "silver-ore", qty: 1 }], output: { defId: "enchanted-hood", qty: 1 } },
   // --- Combat-drop crafts (2026-07-05, peu): the ONLY source of the combat

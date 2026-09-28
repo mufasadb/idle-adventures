@@ -38,7 +38,7 @@ export const FOOD_REACH_MIN = 2; // min forageable (herb/animal) nodes on finite
 // within this Chebyshev radius of the player. Tools in VISION_RANGE_BONUS widen it
 // (data-driven like TERRAIN_GATE; future glasses/cartography/scent items slot in).
 export const DETAIL_RADIUS = 2;
-export const VISION_RANGE_BONUS: Record<string, number> = { spyglass: 3 }; // spyglass → radius 5
+export const VISION_RANGE_BONUS: Record<string, number> = { spyglass: 3, "pearl-spyglass": 5 }; // spyglass → radius 5; pearl-spyglass (D94) → radius 7
 export const PREVIEW_FIDELITY = 0; // how much a preview reveals (placeholder — M5)
 
 // Fresh-game starter bank (e96): the kit a new game begins with — a tunable lever,
@@ -72,14 +72,17 @@ export type GatherableNodeType = Exclude<NodeType, "monster">;
 
 // --- Biomes (D21): generation profiles ONLY, consumed by generateGrid and
 // never consulted after generation. Adding a biome = adding one entry here.
-export const BIOME_IDS = ["woodland", "desert", "tundra", "swamp"] as const;
+export const BIOME_IDS = ["woodland", "desert", "tundra", "swamp", "coastal"] as const; // APPEND-only: rollBiome walks rare biomes in this order
 export type BiomeId = (typeof BIOME_IDS)[number];
 // Rare biomes (si7.6.3 / r51, D91): excluded from the base uniform roll, then rolled in
 // on their own namespaced chance once the map tier reaches minTier. A base biome's roll
 // is untouched, so every T1 map (and every map below a rare biome's minTier) keeps the
 // biome it always had. Drop-maps and the in-run grid both roll with the map's tier.
+// Rare biomes roll in BIOME_IDS order, first hit wins — so a new one appended at the end
+// never steals a seed an earlier rare biome already claimed (coastal after swamp, D94).
 export const RARE_BIOMES: Partial<Record<BiomeId, { minTier: number; chance: number }>> = {
   swamp: { minTier: 2, chance: 0.3 }, // ~30% of T2+ found maps are swamp
+  coastal: { minTier: 2, chance: 0.3 }, // D94: rolls after swamp → ~21% of T2+ maps (0.7 × 0.3)
 };
 
 export type Biome = {
@@ -92,7 +95,9 @@ export type Biome = {
   // above `lakeThreshold` become `body` (lake/sea — boat-only), a band `shallowsBand`
   // below that becomes wadeable shallows ringing it. Absent = no standing water
   // (the biome's maps are byte-identical to before water existed).
-  water?: { body: Terrain; lakeThreshold: number; shallowsBand: number };
+  // `coast` (D94): blend weight 0..1 of an edge gradient into the water field — the sea
+  // piles up against ONE seeded map edge (a shoreline), not scattered lakes.
+  water?: { body: Terrain; lakeThreshold: number; shallowsBand: number; coast?: number };
   // Fishing (si7.6.2): what each KIND of water yields here, rolled per water tile
   // at generation (D21 — gather-time never consults the biome). Absent kind =
   // that water can't be fished in this biome.
@@ -170,6 +175,28 @@ export const BIOMES: Record<BiomeId, Biome> = {
       shallows: { crayfish: 5, reed: 5, eel: 3 },
       lake: { eel: 6, perch: 3, amber: 2, "sunken-lockbox": 1 },
       "deep-lake": { pike: 5, eel: 3, "sunken-lockbox": 3, "sodden-map": 1, amber: 2 },
+    },
+  },
+  // Coastal (si7.6.8.2 + si7.6.8.1, D94): a RARE T2+ biome — the fishing home. The sea
+  // fills one side of the map behind a wadeable beach; its deep water (out past the
+  // shallows) needs the longboat and holds the second catch wave (pearl, turtle shell).
+  coastal: {
+    terrainWeights: { plains: 0.4, mud: 0.2, mountain: 0.2, river: 0.2 }, // dunes, tidal flats, sea cliffs
+    nodeTypeWeights: { herb: 0.25, monster: 0.25, animal: 0.2, wood: 0.15, mining: 0.15 },
+    creatureTable: { "tide-crab": 5, wrecker: 4, siren: 3 },
+    materialTable: {
+      mining: { salt: 5, "copper-ore": 4, "iron-ore": 2 }, // salt pans (iron-pick) — the coast is the salt country
+      wood: { driftwood: 6, "pine-log": 3, "oak-log": 1 }, // driftwood = the longboat's timber
+      herb: { samphire: 6, flint: 4, deadwood: 3, "forest-herb": 2, berries: 1 }, // samphire: salt-marsh greens, fresh food
+      animal: { seal: 5, feather: 4, "deer-hide": 1 }, // seal colonies + seabirds
+    },
+    barrierTerrain: "mountain",
+    water: { body: "sea", lakeThreshold: 0.58, shallowsBand: 0.06, coast: 0.4 },
+    fishTable: {
+      river: { trout: 4, crayfish: 4, reed: 3 },
+      shallows: { kelp: 5, crayfish: 4, reed: 2 },
+      sea: { mackerel: 6, kelp: 4, "turtle-shell": 1, "sunken-lockbox": 1 },
+      "deep-sea": { tuna: 5, pearl: 2, "turtle-shell": 2, "sunken-lockbox": 3, "sodden-map": 1 },
     },
   },
 };
@@ -289,6 +316,10 @@ export const FOOD_ENERGY: Record<string, number> = {
   perch: 60, // si7.6.2: lake-edge catch, fresh
   eel: 70, // si7.6.3: swamp catch, fresh
   pike: 90, // si7.6.2: deep-lake catch (raft) — grill it for a camp-meal-grade food
+  samphire: 40, // D94: coastal forage greens — weak-but-immediate; not in FRESH_TO_STALE, so it simply keeps
+  mackerel: 60, // D94: sea catch, fresh
+  tuna: 100, // D94: deep-sea catch (longboat) — grill it
+  "grilled-tuna": 240, // D94: field-cooked tuna (fire-kit) — the best field food, for going out past the shallows
   "grilled-pike": 220, // si7.6.2: field-cooked pike (fire-kit)
   "crayfish-boil": 170, // si7.6.2: 3 crayfish in a pot (fire-kit + cooking-pot)
   "smoked-fish": 150, // si7.6.2: the stale-fish payoff at the smokehouse
@@ -305,7 +336,7 @@ export const FOOD_ENERGY: Record<string, number> = {
 export const FRESH_TO_STALE: Record<string, string> = {
   berries: "stale-berries",
   apple: "bruised-apple",
-  trout: "stale-fish", perch: "stale-fish", pike: "stale-fish", crayfish: "stale-fish", eel: "stale-fish", // si7.6.2: fish spoils on the way home — the smokehouse turns it into smoked-fish
+  trout: "stale-fish", perch: "stale-fish", pike: "stale-fish", crayfish: "stale-fish", eel: "stale-fish", mackerel: "stale-fish", tuna: "stale-fish", // si7.6.2 (+ D94 sea fish): fish spoils on the way home — the smokehouse turns it into smoked-fish
 };
 export const MIN_STEP = 5; // a discounted step never costs less than this (svz)
 // Diagonal steps cover √2 tiles of distance, so they cost √2× the orthogonal step,
@@ -332,9 +363,10 @@ export const TERRAIN_COST: Record<Terrain, number> = {
 // tool costs a tool slot, so bringing it is a real loadout tradeoff.
 export const TERRAIN_GATE: Partial<Record<Terrain, Record<string, { enable?: number; discount?: number }>>> = {
   mountain: { "climbing-pick": { enable: 40 } }, // ∞ → 40 (crossable at 4× plains)
-  river: { raft: { discount: 20 } }, // 30 → 10 (≈ plains)
-  shallows: { raft: { discount: 15 }, waders: { discount: 10 } }, // 25 → 10 / 15 (si7.6.5)
-  lake: { raft: { enable: 15 } }, // si7.6.5: ∞ → 15 — the raft is the lake boat
+  river: { raft: { discount: 20 }, longboat: { discount: 20 } }, // 30 → 10 (≈ plains)
+  shallows: { raft: { discount: 15 }, longboat: { discount: 15 }, waders: { discount: 10 } }, // 25 → 10 / 15 (si7.6.5)
+  lake: { raft: { enable: 15 }, longboat: { enable: 15 } }, // si7.6.5: ∞ → 15 — the raft is the lake boat (the longboat does lakes too)
+  sea: { longboat: { enable: 15 } }, // D94: ∞ → 15 — only the sea-going longboat; a raft still can't
   mud: { waders: { discount: 5 } }, // 15 → 10
   ice: { "ice-cleats": { discount: 15 } }, // 20 → 5 (faster than plains — a tundra highway)
 };
@@ -405,6 +437,8 @@ export const TOOL_CAPABILITY: Record<string, string> = {
   spyglass: "vision", // perception-range capability (9u9.2); NODE_TOOL never asks for it, so no gather impact
   "climbing-pick": "climb", // gating capability (boo); NODE_TOOL never asks for "climb", so no gather impact
   raft: "ford", // gating capability for rivers (boo); D88: also the lake boat
+  longboat: "sail", // D94: the sea-going boat — enables sea AND lake; NODE_TOOL never asks for "sail"
+  "pearl-spyglass": "vision", // D94: spyglass + pearls — a longer glass (VISION_RANGE_BONUS)
   "fishing-rod": "fish", // si7.6.2: fish any water tile you stand on or next to; NODE_TOOL never asks for "fish"
   waders: "wade", // graded-movement gear (svz); NODE_TOOL never asks for it
   "ice-cleats": "trek",
@@ -569,6 +603,10 @@ export const CREATURE_MAP_TIER_WEIGHT: Record<string, Record<number, number>> = 
   "snow-marauder":   { 2: 1.5, 3: 2, 4: 2.5, 5: 3 },
   "frost-fae":       { 2: 1.5, 3: 2, 4: 2.5, 5: 3 },
   "frost-hatchling": { 2: 1.5, 3: 2, 4: 2.5, 5: 3 },
+  // D94 coastal: the crab thins out, the wrecker + siren scale in
+  "tide-crab":       { 3: 0.6, 4: 0.4, 5: 0.3 },
+  wrecker:           { 3: 1.5, 4: 2, 5: 2.5 },
+  siren:             { 3: 1.5, 4: 2, 5: 2.5 },
 };
 
 // Node-variant magnitude distribution by map tier. Weighted over class {1,2,3}.
@@ -593,6 +631,7 @@ export const NODE_MAGNITUDE_YIELD: Record<number, number> = { 1: 1, 2: 2, 3: 3 }
 export const MAP_TIER_CREATURE_ADD: Record<BiomeId, Record<number, Record<string, number>>> = {
   woodland: {}, // no gated bosses native to woodland in the POC
   swamp: {}, // si7.6.3: no swamp boss yet
+  coastal: {}, // D94: no coastal boss yet
   desert: {
     2: { "dust-vampire": 1 },
     3: { "dust-vampire": 2 },

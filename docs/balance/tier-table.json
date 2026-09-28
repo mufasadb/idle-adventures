@@ -15,7 +15,7 @@
     },
     {
       "tier": 3,
-      "poiCount": 64,
+      "poiCount": 63,
       "bosses": [
         "ancient-wyrm",
         "dust-vampire",
@@ -24,7 +24,7 @@
     },
     {
       "tier": 4,
-      "poiCount": 66,
+      "poiCount": 65,
       "bosses": [
         "ancient-wyrm",
         "dust-vampire",
@@ -33,7 +33,7 @@
     },
     {
       "tier": 5,
-      "poiCount": 68,
+      "poiCount": 67,
       "bosses": [
         "ancient-wyrm",
         "dust-vampire",
