@@ -67,6 +67,7 @@ const s = summarize(state);
 console.log("\n=== YOU ===");
 console.log(`phase: ${s.phase} · runs completed: ${state.runs ?? 0}`);
 if (s.expedition) console.log(`energy: ${s.expedition.energy}/${s.expedition.maxEnergy} · auto-eat: ${s.expedition.autoEatFood ?? "off"}${state.expedition && toolSpeedFor(state.expedition.loadout.equipment.tools, "camp") !== null ? ` · 🏕 camp meal ${(state.expedition.campMealsUsed ?? 0) < TENT_CAMP_MEALS ? `READY (eat a food to over-eat past max at +${Math.round((TENT_FOOD_MULTIPLIER - 1) * 100)}%)` : "spent this run"}` : ""} · hp: ${s.expedition.hp} · pos (${s.expedition.pos.x},${s.expedition.pos.y}) · nodes cleared: ${s.expedition.cleared} · auto-potion-in-fights: ${(state.expedition?.autoQuaff ?? true) ? "on" : "off"} · auto-finish-fights: ${(state.expedition?.autoFinish ?? false) ? "on" : "off"}`);
+if (state.expedition?.poisoned) console.log(`☠ POISONED: −${state.expedition.poisoned.dmg}hp per step or fight round, ${state.expedition.poisoned.ticks} more ticks (never below 1hp) · an antidote cures it (use-item itemId="antidote", on the map or mid-fight)`); // si7.6.9.2
 if (state.expedition) {
   // Carry + carried maps (8ec; zpm.2: maps live in a DEDICATED map-carry pool now,
   // not a loot slot — mapCarryCap over the owned bank).

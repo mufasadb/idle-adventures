@@ -14,7 +14,8 @@ import { slotOf, isGear } from "./catalog";
 import { MAX_ENERGY, MAP_WIDTH, MAP_HEIGHT, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, FOOD, POTION, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, RECIPE, FISH_CAST_ENERGY, CATCH_EFFECT, LOCKBOX_LOOT } from "../data/constants";
 import { visionRadius } from "./perceive";
 import { rejected, autoRefill, livePoiAt, isCleared } from "./reduce-shared";
-import { engage, maybeAutoFinish, provokeTurn, pendingLootFits, mintMap } from "./reduce-combat";
+import { engage, maybeAutoFinish, provokeTurn, pendingLootFits, mintMap, withPoison } from "./reduce-combat";
+import { poisonTick } from "./combat";
 
 export function move(
   state: GameState,
@@ -46,12 +47,12 @@ export function move(
   if (!Number.isFinite(cost)) return rejected(state, "move", "impassable");
   if (cost > expedition.energy) return rejected(state, "move", "exhausted");
   const fed = autoRefill(expedition, expedition.energy - cost); // drain, then waste-free auto-eat (dtv)
+  // si7.6.9.2: your poison ticks once per step (never below PLAYER_POISON_FLOOR).
+  const tick = expedition.poisoned ? poisonTick(expedition.hp, expedition.poisoned) : undefined;
+  const stepped = { ...withPoison(expedition, tick?.after ?? (tick ? undefined : expedition.poisoned)), pos: step, energy: fed.energy, hp: tick?.hp ?? expedition.hp, loadout: { ...expedition.loadout, food: fed.food } };
   return {
-    state: {
-      ...state,
-      expedition: { ...expedition, pos: step, energy: fed.energy, loadout: { ...expedition.loadout, food: fed.food } },
-    },
-    events: [{ type: "moved", from, to: step, terrain, cost, energy: fed.energy }],
+    state: { ...state, expedition: stepped },
+    events: [{ type: "moved", from, to: step, terrain, cost, energy: fed.energy, ...(tick && tick.taken > 0 ? { poisonTaken: tick.taken, hp: tick.hp } : {}) }],
   };
 }
 

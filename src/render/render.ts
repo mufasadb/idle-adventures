@@ -32,7 +32,8 @@ export function rejectCopy(reason: RejectionReason, recipeId?: string, action?: 
     case "exhausted": return "out of energy";
     case "engaged": return "you're engaged — fight or flee below";
     case "insufficient": return "nothing to use for that (or it'd have no effect)"; // no potion/material/charge, or already at full HP/max
-    case "no-monster": return "nothing to fight here";
+    case "no-monster": return action === "throw" ? "no monster on or next to you to throw at" : "nothing to fight here";
+    case "not-poisoned": return "you're not poisoned — save the antidote";
     case "missing-station": return gate ? `can't craft — ${gate} (build the station first)` : "needs a station you haven't built";
     case "missing-tool": return gate ? `can't craft — ${gate}` : action === "fish" ? "needs a fishing-rod" : "needs a tool you don't have";
     case "no-water": return "no water on or beside you to fish";
@@ -81,7 +82,7 @@ export const round1 = (n: number) => Math.round(n * 10) / 10;
 export function formatEvent(e: GameEvent, name: (defId: string) => string): string {
   switch (e.type) {
     case "embarked": return `▶ embarked on a ${e.biomeId} map — ${e.energy} energy`;
-    case "moved": return `walked to (${e.to.x},${e.to.y}) on ${e.terrain} · −${round1(e.cost)}e → ${round1(e.energy)}e`;
+    case "moved": return `walked to (${e.to.x},${e.to.y}) on ${e.terrain} · −${round1(e.cost)}e → ${round1(e.energy)}e${e.poisonTaken ? ` · ☠ poison −${round1(e.poisonTaken)}hp → ${round1(e.hp ?? 0)}hp` : ""}`;
     case "gathered": return `${GATHER_VERB[e.kind]?.past ?? "gathered"} ${e.qty}× ${name(e.material)} · −${round1(e.cost)}e → ${round1(e.energy)}e`;
     case "fished": return `🎣 fished the ${FISH_WATER_WORDS[e.water]} — ${catchWords(e.catch, e.contents, name)} · −${round1(e.cost)}e → ${round1(e.energy)}e`;
     case "dropped": return `dropped ${e.qty}× ${name(e.defId)}`;
@@ -108,10 +109,11 @@ export function formatEvent(e: GameEvent, name: (defId: string) => string): stri
     case "engaged": return e.ranged
       ? `🏹 engaged the ${name(e.creature)} from a tile away — your opener lands before it can answer`
       : `⚔ engaged the ${name(e.creature)}`;
-    case "exchanged": return `${e.thrown ? `💥 threw a ${name(e.thrown)} at the ${name(e.creature)}${e.dmgTaken === 0 && e.monsterHp > 0 ? " (it can't answer yet)" : ""} —` : `⚔ traded blows with the ${name(e.creature)} —`} dealt ${round1(e.dmgDealt)}, took ${round1(e.dmgTaken)} · ${round1(e.hp)}hp left${e.arrowSpent ? (e.ammoSpent ? ` · 🎯 −1 ${name(e.ammoSpent)}` : " · 🏹 −1 arrow") : ""}${e.poisonDmg ? ` · ☠ poison ${round1(e.poisonDmg)}` : ""}`;
+    case "exchanged": return `${e.thrown ? `💥 threw a ${name(e.thrown)} at the ${name(e.creature)}${e.dmgTaken === 0 && e.monsterHp > 0 ? " (it can't answer yet)" : ""} —` : `⚔ traded blows with the ${name(e.creature)} —`} dealt ${round1(e.dmgDealt)}, took ${round1(e.dmgTaken)} · ${round1(e.hp)}hp left${e.arrowSpent ? (e.ammoSpent ? ` · 🎯 −1 ${name(e.ammoSpent)}` : " · 🏹 −1 arrow") : ""}${e.poisonDmg ? ` · ☠ poison ${round1(e.poisonDmg)}` : ""}${e.poisonTaken ? ` · ☠ your poison −${round1(e.poisonTaken)}hp` : ""}${e.envenomed ? " · ☠ its bite POISONED you (antidote cures)" : ""}`;
     case "fled": return `🏃 fled the ${name(e.creature)} · −${round1(e.partingHit)}hp → ${round1(e.hp)}hp`;
     case "quaffed": return `🧪 quaffed ${name(e.defId)} · +${round1(e.healed)}hp → ${round1(e.hp)}hp${e.energy !== undefined ? ` · −${QUAFF_ENERGY}e → ${round1(e.energy)}e` : ""}`;
-    case "item-used": return `⚗ used ${name(e.defId)} this fight${e.damageAdd ? ` · +${round1(e.damageAdd)} dmg` : ""}${e.mitigationAdd ? ` · +${round1(e.mitigationAdd)} mitigation` : ""}`;
+    case "item-used": if (e.cured) return `🧪 drank the ${name(e.defId)} — the poison is gone`;
+      return `⚗ used ${name(e.defId)} this fight${e.damageAdd ? ` · +${round1(e.damageAdd)} dmg` : ""}${e.mitigationAdd ? ` · +${round1(e.mitigationAdd)} mitigation` : ""}`;
     case "enhanced": return `🗡️ coated your weapon with ${name(e.id)} · ${e.charges} charge${e.charges === 1 ? "" : "s"}`;
     case "surveyed": return `🔭 surveyed the ${e.kind} at (${e.at.x},${e.at.y}) — its detail is now in focus`;
     case "map-studied": return `📜 you study the map: "${hintLabel(e.hint)}"${e.remaining ? ` (${e.remaining} more to read)` : " (fully read)"}`;

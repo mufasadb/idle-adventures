@@ -10,7 +10,7 @@ import { ARROWS_PER_CRAFT, ARROW_SHAFTS_PER_LOG, DARTS_PER_CRAFT } from "./comba
 // the POC; the list is what `pack`/`slotOf` validate a food/potion defId against.
 export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican", "apple", "smoked-venison", "blubber-stew", "cooked-venison", "cooked-berries", "stew", "crayfish", "trout", "perch", "pike", "grilled-pike", "crayfish-boil", "smoked-fish", "eel", "samphire", "mackerel", "tuna", "grilled-tuna"];
 export const POTION: string[] = ["potion", "greater-potion", "draught", "greater-draught"];
-export const BATTLE_ITEM: string[] = ["elixir-of-power", "warding-draught"]; // combat consumables (bzd); COMBAT_BUFF keys
+export const BATTLE_ITEM: string[] = ["elixir-of-power", "warding-draught", "antidote"]; // antidote (si7.6.9.2): cures your poison, engaged or not // combat consumables (bzd); COMBAT_BUFF keys
 
 // --- Crafting (M5): direct & instant, materials → item (D10). One shared tree
 // so hauls from different biomes feed each other. Weighted materials (D27) make

@@ -6,8 +6,9 @@ import type { ExchangeResult } from "./combat";
 import { endExpedition } from "./bank";
 import { rollMapHints } from "./hints";
 import { slotOf } from "./catalog";
-import { MAP_SCROLL_ID, MONSTERS, MONSTER_TIER_HP_CURVE, MAP_TIER_MAX, PLAYER_BASE_HP, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, COMBAT_BUFF, WEAPON_ENHANCEMENT, FLASK_EFFECT } from "../data/constants";
+import { MAP_SCROLL_ID, MONSTERS, MONSTER_TIER_HP_CURVE, MAP_TIER_MAX, PLAYER_BASE_HP, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, COMBAT_BUFF, WEAPON_ENHANCEMENT, FLASK_EFFECT, ANTIDOTE } from "../data/constants";
 import { rejected, autoRefill, livePoiAt } from "./reduce-shared";
+import { rand } from "./rng";
 
 // Start an engagement (si7.1, replaces atomic fightAt): the fit-check still
 // runs BEFORE any blood (rejecting is free). Battle items are NOT consumed here
@@ -96,6 +97,7 @@ function fightRound(state: GameState, flaskIdx?: number): { state: GameState; ev
   // Arrow economy (D45): a wielded bow with ammo shoots — and spends — one arrow
   // per exchange, walk-in fights included (the bow always shoots if it can).
   // Arrows-out: playerDamage degrades the bow to UNARMED_DAMAGE (a club).
+  const venom = MONSTERS[combat.creature]!.venom; // si7.6.9.2: a venomous monster's landed hit may poison you
   const spendsArrow = !thrown && wieldsRanged(expedition.loadout) && hasAmmo(expedition.loadout);
   const round = strikeExchange(
     expedition.loadout, expedition.hp, combat.monsterHp, combat.creature,
@@ -107,6 +109,8 @@ function fightRound(state: GameState, flaskIdx?: number): { state: GameState; ev
       weaponBuff: expedition.weaponBuff, // D60: coating charges spent per strike
       poison: combat.poison, // poison ticks per round (same math as resolveCombat)
       ...(thrown ? { thrown: FLASK_EFFECT[thrown]! } : {}),
+      ...(expedition.poisoned ? { playerPoison: expedition.poisoned } : {}), // si7.6.9.2
+      ...(venom ? { venom: { ...venom, roll: rand(state.seed, "venom", combat.at.x, combat.at.y, combat.round ?? 0) } } : {}),
     },
   );
   let ammo = expedition.loadout.ammo ?? [];
@@ -120,6 +124,8 @@ function fightRound(state: GameState, flaskIdx?: number): { state: GameState; ev
     ...(shot && shot !== "arrows" ? { ammoSpent: shot } : {}),
     ...(round.poisonDmg > 0 ? { poisonDmg: round.poisonDmg } : {}), // D60: poison DoT this round
     ...(thrown ? { thrown } : {}),
+    ...(round.poisonTaken > 0 ? { poisonTaken: round.poisonTaken } : {}),
+    ...(round.envenomed ? { envenomed: true } : {}),
   };
   const loadout = { ...expedition.loadout, potions: round.potionsAfter, ammo, ...(thrown ? { flasks: consumeOne(flasks, flaskIdx) } : {}) };
   // One roll, shared by the event and the carry apply (c5l): rollLoot is
@@ -142,13 +148,19 @@ function fightRound(state: GameState, flaskIdx?: number): { state: GameState; ev
   if (!round.victory) {
     return {
       // D60: charges spent this strike ride the expedition; poison ticks on the engagement.
-      state: { ...state, expedition: { ...expedition, hp: round.hp, loadout, weaponBuff: round.weaponBuffAfter, combat: { ...combat, monsterHp: round.monsterHp, potionsUsed, opener: false, struck: true, poison: round.poisonAfter } } }, // opener spent after the first exchange (D45)
+      state: { ...state, expedition: { ...withPoison(expedition, round.playerPoisonAfter), hp: round.hp, loadout, weaponBuff: round.weaponBuffAfter, combat: { ...combat, monsterHp: round.monsterHp, potionsUsed, opener: false, struck: true, round: (combat.round ?? 0) + 1, poison: round.poisonAfter } } }, // opener spent after the first exchange (D45)
       events: [exchanged],
     };
   }
   // Victory: loot/maps/cleared/relocation all applied in applyVictory (the clean seam
   // the deferred positional-combat work will want, D69).
   return applyVictory(state, round, loadout, loot, mapDrops, [exchanged, fought(true)]);
+}
+
+// Set or clear Expedition.poisoned (si7.6.9.2) without leaving an undefined key behind.
+export function withPoison(exp: Expedition, p: { dmg: number; ticks: number } | undefined): Expedition {
+  const { poisoned: _drop, ...rest } = exp;
+  return p ? { ...rest, poisoned: p } : rest;
 }
 
 // Mint a found map into the carried-map pool (8ec; shared with fishing's sodden map,
@@ -207,7 +219,7 @@ function applyVictory(
     state: {
       ...state,
       expedition: {
-        ...expedition,
+        ...withPoison(expedition, round.playerPoisonAfter), // si7.6.9.2: your poison outlives the fight
         pos: combat.moveOnWin ? { x: combat.at.x, y: combat.at.y } : expedition.pos,
         hp: round.hp, loadout, carry: carryWithLoot,
         weaponBuff: round.weaponBuffAfter, // D60: charges spent on the killing strike
@@ -340,10 +352,19 @@ export function useItem(state: GameState, itemId: string): { state: GameState; e
   const expedition = state.expedition;
   if (state.phase !== "expedition" || !expedition) return rejected(state, "use-item", "not-on-expedition");
   const combat = expedition.combat;
-  if (!combat) return rejected(state, "use-item", "not-engaged");
   if (slotOf(itemId) !== "battle-item") return rejected(state, "use-item", "wrong-slot");
   const items = expedition.loadout.battleItems;
   const idx = items.findIndex((s) => s.defId === itemId);
+  // si7.6.9.2: an antidote cures your poison, engaged or not — no exchange, no energy.
+  if (ANTIDOTE.includes(itemId)) {
+    if (!expedition.poisoned) return rejected(state, "use-item", "not-poisoned");
+    if (idx === -1) return rejected(state, "use-item", "insufficient");
+    return {
+      state: { ...state, expedition: { ...withPoison(expedition, undefined), loadout: { ...expedition.loadout, battleItems: consumeOne(items, idx) } } },
+      events: [{ type: "item-used", defId: itemId, damageAdd: 0, mitigationAdd: 0, cured: true }],
+    };
+  }
+  if (!combat) return rejected(state, "use-item", "not-engaged");
   if (idx === -1) return rejected(state, "use-item", "insufficient");
   const buff = COMBAT_BUFF[itemId] ?? {};
   const damageAdd = buff.damageAdd ?? 0;

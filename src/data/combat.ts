@@ -158,7 +158,14 @@ export const AFFINITIES: Affinity[] = [
 // CATEGORY_LOOT_TABLE. Pure classification, no combat effect; affinity pairings
 // stay in `tags`.
 export type MonsterCategory = "beast" | "humanoid" | "fae" | "undead" | "giant" | "dragon";
-export type Monster = { tier: number; dmgType: DmgType; armourType: ArmourType; category: MonsterCategory; tags: string[] };
+// Venom (si7.6.9.2, D98): a venomous monster's LANDED retaliation poisons you on a
+// `chance` roll — `dmg` HP per tick for `ticks` ticks (a combat round or a map step),
+// refreshed not stacked. Poison never takes you below PLAYER_POISON_FLOOR, so it wears
+// you down but can't kill you by itself (user: "not insanely punishing").
+export type Venom = { chance: number; dmg: number; ticks: number };
+export type Monster = { tier: number; dmgType: DmgType; armourType: ArmourType; category: MonsterCategory; tags: string[]; venom?: Venom };
+export const PLAYER_POISON_FLOOR = 1; // poison alone never drops you below this HP
+export const ANTIDOTE: string[] = ["antidote"]; // battle items that CURE your poison (usable on the map too)
 // ⚠ balance surface: changing this requires `bun run sim:tables` (test/balance-tables.test.ts enforces)
 export const MONSTERS: Record<string, Monster> = {
   werewolf: { tier: 2, dmgType: "melee", armourType: "light", category: "beast", tags: ["werewolf", "beast"] },

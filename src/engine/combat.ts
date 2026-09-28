@@ -3,6 +3,7 @@
 // outcome" by literally calling this.
 // ⚠ balance surface: changing this requires `bun run sim:tables` (test/balance-tables.test.ts enforces)
 import {
+  PLAYER_POISON_FLOOR,
   DMG_ARMOUR_MATRIX,
   PLAYER_BASE_HP,
   MONSTERS,
@@ -24,7 +25,7 @@ import {
   AMMO_FOR,
   AMMO_POISON,
 } from "../data/constants";
-import type { DmgType } from "../data/constants";
+import type { DmgType, Venom } from "../data/constants";
 import type { Loadout, ItemStack } from "./types";
 import { rand } from "./rng";
 import { ARMOUR_SLOTS } from "./pack";
@@ -225,6 +226,9 @@ export type ExchangeResult = {
   weaponBuffAfter?: { id: string; charges: number }; // D60: charges after this strike (undefined = cleared/none)
   poisonAfter?: { dmg: number; rounds: number }; // D60: engagement poison after this round's tick (undefined = none)
   poisonDmg: number; // D60: poison damage dealt to the monster this round (0 = none)
+  playerPoisonAfter?: { dmg: number; ticks: number }; // si7.6.9.2: your poison after this round
+  poisonTaken: number; // si7.6.9.2: HP your poison cost you this round
+  envenomed: boolean; // si7.6.9.2: a venomous hit poisoned you this round
 };
 
 // One combat round (si7.1): player strike → weapon-enhancement bookkeeping (D60:
@@ -249,9 +253,11 @@ export function strikeExchange(
     weaponBuff?: { id: string; charges: number };
     poison?: { dmg: number; rounds: number };
     thrown?: { dmg: number; poison?: { dmg: number; rounds: number } }; // si7.6.9.1: a flask replaces the swing
+    playerPoison?: { dmg: number; ticks: number }; // si7.6.9.2: your poison, ticks at round end
+    venom?: Venom & { roll: number }; // si7.6.9.2: the monster's venom + this round's [0,1) roll
   } = {},
 ): ExchangeResult {
-  const { damageAdd = 0, mitigationAdd = 0, autoQuaff = true, skipRetaliation = false, weaponBuff, poison, thrown } = opts;
+  const { damageAdd = 0, mitigationAdd = 0, autoQuaff = true, skipRetaliation = false, weaponBuff, poison, thrown, playerPoison, venom } = opts;
   // si7.6.9.1: a thrown flask IS the strike — flat dmg, no weapon/elixir/coating, no charge spent, no dart.
   const dmgDealt = thrown ? thrown.dmg : playerDamage(loadout, monsterId, weaponBuff) + damageAdd;
   // Weapon-enhancement bookkeeping (D60). The strike always spends one charge; at
@@ -278,11 +284,26 @@ export function strikeExchange(
   let current = hp;
   const monsterAfter = monsterHp - dmgDealt - poisonDmg;
   let dmgTaken = 0;
+  let playerPoisonAfter = playerPoison;
+  let poisonTaken = 0;
+  let envenomed = false;
   if (monsterAfter > 0) {
     if (!skipRetaliation) dmgTaken = damageTaken(loadout, monsterId, mitigationAdd);
     current -= dmgTaken;
     if (current <= 0) current = 0; // soft-fail floor
-    else if (autoQuaff && current <= AUTO_POTION_THRESHOLD * PLAYER_BASE_HP && potions.length > 0) {
+    else {
+      // si7.6.9.2: poison already in you ticks at round end (never below the floor); a
+      // landed venomous hit then (re)poisons you — refreshed to the stronger, not stacked.
+      if (playerPoison) {
+        const t = poisonTick(current, playerPoison);
+        poisonTaken = t.taken; current = t.hp; playerPoisonAfter = t.after;
+      }
+      if (venom && dmgTaken > 0 && venom.roll < venom.chance) {
+        envenomed = true;
+        playerPoisonAfter = { dmg: Math.max(venom.dmg, playerPoisonAfter?.dmg ?? 0), ticks: Math.max(venom.ticks, playerPoisonAfter?.ticks ?? 0) };
+      }
+    }
+    if (current > 0 && autoQuaff && current <= AUTO_POTION_THRESHOLD * PLAYER_BASE_HP && potions.length > 0) {
       const heal = POTION_HEAL_BY[potions[0]!.defId] ?? POTION_HEAL;
       current = Math.min(PLAYER_BASE_HP, current + heal);
       potions = consumeOne(potions);
@@ -301,7 +322,17 @@ export function strikeExchange(
     weaponBuffAfter,
     poisonAfter,
     poisonDmg,
+    playerPoisonAfter,
+    poisonTaken,
+    envenomed,
   };
+}
+
+// One tick of YOUR poison (si7.6.9.2): lose `dmg`, but never below PLAYER_POISON_FLOOR
+// (already below it = no loss). Shared by the combat round and the map step.
+export function poisonTick(hp: number, p: { dmg: number; ticks: number }): { hp: number; taken: number; after?: { dmg: number; ticks: number } } {
+  const next = Math.max(Math.min(hp, PLAYER_POISON_FLOOR), hp - p.dmg);
+  return { hp: next, taken: hp - next, ...(p.ticks - 1 > 0 ? { after: { dmg: p.dmg, ticks: p.ticks - 1 } } : {}) };
 }
 
 // Atomic combat (sim/harness API). Reads Expedition.weaponBuff at fight start (D60)
