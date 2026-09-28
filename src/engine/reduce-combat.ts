@@ -1,10 +1,10 @@
 import type { GameState, GameEvent, ItemStack, Expedition, Loadout, MapItem } from "./types";
-import { expeditionGrid, rollBiome } from "./grid";
+import { expeditionGrid, rollBiome, generateGrid } from "./grid";
 import { addToCarry, freeLootStacks, mapCarryCap, consumeOne } from "./carry";
 import { strikeExchange, rollLoot, explainMatchup, damageTaken, wieldsRanged, hasAmmo, loadedAmmoIndex } from "./combat";
 import type { ExchangeResult } from "./combat";
 import { endExpedition } from "./bank";
-import { previewHints } from "./town";
+import { rollMapHints } from "./hints";
 import { slotOf } from "./catalog";
 import { MAP_SCROLL_ID, MONSTERS, MONSTER_TIER_HP_CURVE, MAP_TIER_MAX, PLAYER_BASE_HP, POTION_HEAL, POTION_HEAL_BY, QUAFF_ENERGY, COMBAT_BUFF, WEAPON_ENHANCEMENT } from "../data/constants";
 import { rejected, autoRefill, livePoiAt } from "./reduce-shared";
@@ -160,8 +160,9 @@ export function mintMap(
   const biomeId = rollBiome(mapSeed, tier); // D91: a T2+ drop can be a rare biome (swamp)
   const carried = carriedMaps.length < mapCarryCap(state.bank); // zpm.2: maps have their own dedicated pool, not a loot slot
   return {
-    carriedMaps: carried ? [...carriedMaps, { mapSeed, biomeId, vintage: state.runs ?? 0, tier }] : carriedMaps,
-    event: { type: "map-dropped", at: { x: at.x, y: at.y }, mapSeed, biomeId, hints: previewHints(mapSeed, biomeId), carried, tier, ...(source ? { source } : {}) },
+    // D95: the map's hints are rolled NOW, from the map as generated, and ride it sealed.
+    carriedMaps: carried ? [...carriedMaps, { mapSeed, biomeId, vintage: state.runs ?? 0, tier, hints: rollMapHints(generateGrid(mapSeed, biomeId, tier), mapSeed), studied: 0 }] : carriedMaps,
+    event: { type: "map-dropped", at: { x: at.x, y: at.y }, mapSeed, biomeId, carried, tier, ...(source ? { source } : {}) },
   };
 }
 

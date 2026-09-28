@@ -2,12 +2,13 @@
 // localMap is a pure helper (like legalActions) that feeds both the web view and
 // the AI harness — it is NOT a reducer action; embark carries only the chosen
 // mapSeed.
-import type { GameState } from "./types";
+import type { GameState, MapItem } from "./types";
 import type { BiomeId } from "../data/constants";
 import type { Grid } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { rollBiome, generateGrid } from "./grid";
-import { PREVIEW_FIDELITY, EPITHETS, MONSTERS, STARTER_BANK } from "../data/constants";
+import { EPITHETS, MONSTERS, STARTER_BANK } from "../data/constants";
+import { rollMapHints, hintLabel } from "./hints";
 
 // Modest, functional starter kit: enough to run a real first expedition. You
 // start with NO backpack (bare BASE_CARRY_SLOTS) — the small-backpack is your
@@ -23,13 +24,14 @@ export function newGame(seed: string): GameState {
   };
 }
 
-// PREVIEW_FIDELITY (0 for the POC) scales hints beyond the biome-name headline.
-// Structured so higher tiers — and a later cartography system (craftable/editable
-// maps) — plug in here without reshaping the return type. Exported for the
-// map-dropped event (8ec): a dropped map previews exactly like an offered one.
-export function previewHints(_mapSeed: string, _biomeId: BiomeId): string[] {
-  if (PREVIEW_FIDELITY <= 0) return [];
-  return []; // higher-fidelity whispers land here when the lever is raised
+// Map hints (3iq, D95): a held map's hint ids in reveal order — rolled at mint and
+// frozen on the MapItem; an old-save map without them re-derives (deterministic).
+// Only the first `studied` are known; `study` in town reveals the next.
+export function mapHintIds(m: MapItem): string[] {
+  return m.hints ?? rollMapHints(generateGrid(m.mapSeed, m.biomeId, m.tier ?? 1), m.mapSeed);
+}
+export function revealedHints(m: MapItem): string[] {
+  return mapHintIds(m).slice(0, m.studied ?? 0).map(hintLabel);
 }
 
 // Map epithet (q2k): the highest-priority EPITHETS label a map's generated
@@ -77,5 +79,7 @@ export function localMap(
 ): { mapSeed: string; biomeId: BiomeId; preview: { headline: string; hints: string[] } } {
   const mapSeed = `${seed}:local:${runs}`;
   const biomeId = rollBiome(mapSeed);
-  return { mapSeed, biomeId, preview: { headline: biomeId, hints: previewHints(mapSeed, biomeId) } };
+  // D95: the local map is the country over the hill — you know it, so every hint shows
+  // free (study is for EARNED maps).
+  return { mapSeed, biomeId, preview: { headline: biomeId, hints: rollMapHints(generateGrid(mapSeed, biomeId), mapSeed).map(hintLabel) } };
 }

@@ -49,6 +49,7 @@ export function townActions(state: GameState): Action[] {
   // ink (cxq): each held map × each ink defId you hold; reduce filters the rest (D29)
   const inkIds = state.bank.filter((s) => s.defId in INKS).map((s) => s.defId);
   for (const m of state.maps ?? []) for (const inkId of inkIds) candidates.push({ type: "ink", mapSeed: m.mapSeed, inkId });
+  for (const m of state.maps ?? []) candidates.push({ type: "study", mapSeed: m.mapSeed }); // D95
   return candidates.filter((a) => accepts(state, a));
 }
 

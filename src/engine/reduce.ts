@@ -1,5 +1,5 @@
 import type { GameState, Action, GameEvent } from "./types";
-import { embark, inkMap, craftAction, packAction } from "./reduce-town";
+import { embark, inkMap, studyMap, craftAction, packAction } from "./reduce-town";
 import { move, gather, fish, drop, dropMap, eat, setAutoEatFood, survey, returnHome, don, doff, toggleAutoQuaff, toggleAutoGather } from "./reduce-expedition";
 import { fight, flee, quaff, useItem, enhance, toggleAutoFinish } from "./reduce-combat";
 
@@ -16,6 +16,8 @@ export function reduce(
       return embark(state, action.mapSeed);
     case "ink":
       return inkMap(state, action.mapSeed, action.inkId);
+    case "study":
+      return studyMap(state, action.mapSeed);
     case "move":
       return move(state, action.to);
     case "gather":

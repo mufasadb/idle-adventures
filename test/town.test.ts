@@ -17,12 +17,12 @@ test("newGame: deterministic", () => {
   expect(newGame("s1")).toEqual(newGame("s1"));
 });
 
-test("localMap: a single deterministic map, biome-name headline, no hints at fidelity 0 (zpm.1)", () => {
+test("localMap: a single deterministic map, biome-name headline, all hints known (zpm.1, D95)", () => {
   const m = localMap("town-seed");
   expect(localMap("town-seed")).toEqual(m); // deterministic per (seed, runs)
   expect(m.biomeId).toBe(rollBiome(m.mapSeed)); // anyone with the seed re-derives the biome (D21)
   expect(m.preview.headline).toBe(m.biomeId); // headline IS the biome name
-  expect(m.preview.hints).toEqual([]); // PREVIEW_FIDELITY === 0
+  expect(m.preview.hints).toHaveLength(3); // D95: the local map is known country — one hint per family, free
 });
 
 test("localMap: rotates per run-count — distinct seeds across visits (D80)", () => {

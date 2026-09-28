@@ -8,6 +8,7 @@ import { emptyLoadout } from "../src/engine/loadout";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import type { Poi } from "../src/engine/grid";
 import { rand } from "../src/engine/rng";
+import { rollMapHints } from "../src/engine/hints";
 import {
   MAP_DROP_CHANCE,
   MAP_SCROLL_ID,
@@ -78,14 +79,15 @@ test("humanoid victory mints a carried map: deterministic seed, biome from rollB
   const { state, events } = fightToEnd(atMonster(seed, poi));
   const expectedSeed = `${seed}:drop:${poi.x},${poi.y}`;
   expect(state.expedition!.carriedMaps ?? []).toEqual([
-    { mapSeed: expectedSeed, biomeId: rollBiome(expectedSeed), vintage: 3, tier: 2 },
+    // D95: the map's hints are rolled at mint and ride it sealed (studied 0)
+    { mapSeed: expectedSeed, biomeId: rollBiome(expectedSeed), vintage: 3, tier: 2,
+      hints: rollMapHints(generateGrid(expectedSeed, rollBiome(expectedSeed), 2), expectedSeed), studied: 0 },
   ]);
   expect(events).toContainEqual({
     type: "map-dropped",
     at: { x: poi.x, y: poi.y },
     mapSeed: expectedSeed,
     biomeId: rollBiome(expectedSeed),
-    hints: [],
     carried: true,
     tier: 2,
   });

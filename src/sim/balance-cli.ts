@@ -3,6 +3,7 @@
 // the import.meta.main block is the only side-effectful line. --write (tables)
 // regenerates docs/balance/tables.{json,md} — see test/balance-tables.test.ts.
 import { mkdirSync, writeFileSync } from "node:fs";
+import { computeHintBaseline, renderHintBaseline } from "./hint-baseline";
 import { KIT_PRESETS, resolveKit, simFight, simReach, simTables, mapTierReport } from "./balance";
 import type { FightReport, ReachReport, TableData, MapTierReport, KitSpec } from "./balance";
 import { harvestFractionReport } from "./harvest";
@@ -171,7 +172,8 @@ function writeTables(data: TableData, tierData: MapTierReport): { code: number; 
   writeFileSync("docs/balance/tables.json", JSON.stringify(data, null, 2) + "\n");
   writeFileSync("docs/balance/tables.md", renderTablesMd(data));
   writeFileSync("docs/balance/tier-table.json", JSON.stringify(tierData, null, 2) + "\n");
-  return { code: 0, output: "wrote docs/balance/tables.json + docs/balance/tables.md + docs/balance/tier-table.json" };
+  writeFileSync("src/data/hint-baseline.ts", renderHintBaseline(computeHintBaseline())); // 3iq (D95)
+  return { code: 0, output: "wrote docs/balance/tables.json + docs/balance/tables.md + docs/balance/tier-table.json + src/data/hint-baseline.ts" };
 }
 
 if (import.meta.main) {

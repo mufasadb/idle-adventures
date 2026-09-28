@@ -7,7 +7,8 @@ import { rand } from "./rng";
 import { craft as applyRecipe } from "./craft";
 import { packItem, reserveLoadout } from "./pack";
 import { localMap } from "./town";
-import { MAX_ENERGY, PLAYER_BASE_HP, INKS, RECIPE } from "../data/constants";
+import { MAX_ENERGY, PLAYER_BASE_HP, INKS, RECIPE, STUDY_COST } from "../data/constants";
+import { mapHintIds } from "./town";
 import { rejected } from "./reduce-shared";
 import { fieldCraftAction } from "./reduce-expedition";
 
@@ -76,6 +77,27 @@ export function embark(
     events: [
       { type: "embarked", mapSeed, biomeId: grid.biomeId, pos: grid.entry, energy },
     ],
+  };
+}
+
+// Study a held map (3iq, D95): pay STUDY_COST from the bank to reveal its next sealed
+// hint. Town-only; a fully-read map rejects (nothing left to learn).
+export function studyMap(state: GameState, mapSeed: string): { state: GameState; events: GameEvent[] } {
+  if (state.phase !== "town") return rejected(state, "study", "not-in-town");
+  const maps = state.maps ?? [];
+  const idx = maps.findIndex((m) => m.mapSeed === mapSeed);
+  if (idx === -1) return rejected(state, "study", "map-not-carried");
+  const map = maps[idx]!;
+  const hints = mapHintIds(map);
+  const studied = map.studied ?? 0;
+  if (studied >= hints.length) return rejected(state, "study", "fully-read");
+  const bank = subtractStacks(state.bank, STUDY_COST);
+  if (bank === null) return rejected(state, "study", "unaffordable");
+  const next = [...maps];
+  next[idx] = { ...map, hints, studied: studied + 1 };
+  return {
+    state: { ...state, bank, maps: next },
+    events: [{ type: "map-studied", mapSeed, hint: hints[studied]!, remaining: hints.length - studied - 1 }],
   };
 }
 
