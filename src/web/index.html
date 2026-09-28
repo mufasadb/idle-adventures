@@ -70,6 +70,15 @@
       .tile.path-blocked { box-shadow: inset 0 0 0 2px #ff3b3b; background-image: radial-gradient(#ff3b3b88 45%, transparent 47%); }
       .tile.path-blocked::after { content: "✗"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #ff5b5b; font-weight: bold; pointer-events: none; }
       /* eot: a player-placed waypoint (a leg endpoint) */
+      .tile.path-hazard { box-shadow: inset 0 0 0 2px #c0392b; background-image: radial-gradient(#c0392b77 40%, transparent 42%); } /* si7.6.9.6: this step costs HP */
+      .hp-tag { background: #4a1612; border: 1px solid #c0392b; border-radius: 3px; padding: 0 0.3rem; }
+      .poison-chip { background: #1d2e16; color: #7fd35a; border: 1px solid #4f8a33; border-radius: 3px; padding: 0 0.3rem; font-size: 0.8rem; white-space: nowrap; }
+      button.antidote { padding: 0.05rem 0.4rem; font-size: 0.8rem; border-color: var(--gold); color: var(--gold); }
+      button.throw { border-color: #8e2a22; }
+      .free-opener { margin-left: 0.3rem; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; color: #1a1408; background: var(--gold); border-radius: 2px; padding: 0 0.3rem; box-shadow: 0 0 6px var(--gold), 0 0 12px #c9a55a88; animation: opener-glow 1.6s ease-in-out infinite; }
+      @keyframes opener-glow { 50% { box-shadow: 0 0 2px var(--gold), 0 0 5px #c9a55a55; } }
+      @media (prefers-reduced-motion: reduce) { .free-opener { animation: none; } }
+      @media (max-width: 480px) { button.antidote .lbl { display: none; } .hud .track { width: 100px; } }
       .tile.path-waypoint { outline: 2px dashed #8ab4ff; outline-offset: -2px; }
       .pathbanner.blocked { color: #ff9b9b; }
       .pathbanner { font-size: 0.82rem; margin: 0.4rem 0; min-height: 1.2rem; }
@@ -78,7 +87,7 @@
       .grid.atlas-assets .tile .sprite { position: absolute; left: 50%; bottom: 1px; transform: translateX(-50%); image-rendering: pixelated; background-repeat: no-repeat; pointer-events: none; z-index: 2; }
       .grid.atlas-assets .tile .nodeicon { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); image-rendering: pixelated; background-repeat: no-repeat; pointer-events: none; z-index: 2; filter: drop-shadow(0 1px 1px #000a); }
       .grid.atlas-assets .tile.player { font-size: 20px; color: var(--gold); text-shadow: 0 0 3px #000, 0 0 3px #000; z-index: 3; }
-      .grid.atlas-assets .tile.poi { color: var(--gold); text-shadow: 0 0 3px #000; }
+      .grid.atlas-assets .tile.poi { color: var(--gold); text-shadow: 0 0 3px #000; font-size: 18px; font-weight: 700; } /* a POI with no atlas frame keeps its glyph (tiles with a sprite/icon render no glyph text) */
       /* cww: in sprite mode a resolved forage material shows its LETTER (no material icon exists yet) — the generic herb icon is suppressed, so make the f/d/b visible + material-coloured (beats the .poi gold above by source order at equal specificity). */
       .grid.atlas-assets .tile.poi.mat-flint,
       .grid.atlas-assets .tile.poi.mat-deadwood,
