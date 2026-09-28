@@ -22,6 +22,7 @@ export function mapMetrics(grid: Grid): Record<HintMetric, number> {
     river: share((t) => t === "river"),
     ice: share((t) => t === "ice"),
     water: share((t) => t === "lake" || t === "sea" || t === "shallows"),
+    spores: share((t) => t === "spore-thicket"),
     monster: kind("monster"),
     melee: mons.filter((m) => m.dmgType === "melee").length / M,
     ranged: mons.filter((m) => m.dmgType === "ranged").length / M,

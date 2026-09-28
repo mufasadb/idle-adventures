@@ -72,3 +72,12 @@ test("hint and epithet vocabularies don't collide (different jobs, different wor
   const epi = new Set(EPITHETS.map((e) => e.label));
   for (const t of MAP_HINTS) expect(epi.has(t.label)).toBe(false);
 });
+
+test("spore hints (si7.6.9.7): some fungal maps are choked or clear, no other biome ever is", () => {
+  const seen = new Set<string>();
+  for (let i = 0; i < 60; i++) seen.add(familyHints(generateGrid(`spore-h-${i}`, "fungal", 3)).ground);
+  expect(seen.has("choked") || seen.has("clear-air")).toBe(true);
+  for (const b of BIOME_IDS) if (b !== "fungal") for (let i = 0; i < 15; i++) {
+    expect(["choked", "clear-air"]).not.toContain(familyHints(generateGrid(`spore-h-${i}`, b, 2)).ground);
+  }
+});

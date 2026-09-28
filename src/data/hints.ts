@@ -19,11 +19,11 @@ export const HINT_FAMILIES: HintFamily[] = ["ground", "threat", "bounty"];
 // What a hint can measure on a generated grid. Terrain metrics are shares of ALL
 // tiles; node metrics shares of all POIs; dmg/armour metrics shares of MONSTER POIs.
 export type HintMetric =
-  | "mountain" | "mud" | "river" | "ice" | "water" // ground (water = lake + sea + shallows)
+  | "mountain" | "mud" | "river" | "ice" | "water" | "spores" // ground (water = lake + sea + shallows; spores = spore-thicket, si7.6.9.7)
   | "monster" | "melee" | "ranged" | "magic" | "plate" | "maxTier" // threat
   | "mining" | "wood" | "herb" | "animal" | "food"; // bounty (food = herb + animal)
 export const HINT_METRICS: HintMetric[] = [
-  "mountain", "mud", "river", "ice", "water",
+  "mountain", "mud", "river", "ice", "water", "spores",
   "monster", "melee", "ranged", "magic", "plate", "maxTier",
   "mining", "wood", "herb", "animal", "food",
 ];
@@ -54,6 +54,9 @@ export const MAP_HINTS: HintTrait[] = [
   { id: "wet", family: "ground", label: "much open water", metric: "water", test: { dir: "high", minAbs: 0.1 } },
   { id: "dry", family: "ground", label: "little water", metric: "water", test: { dir: "low", minBase: 0.05 } },
   { id: "iced", family: "ground", label: "iced over", metric: "ice", test: { dir: "high", minAbs: 0.1 } },
+  // si7.6.9.7 (D99): spore-thickets — is the filter-mask worth its slot? Only spore biomes can fire these.
+  { id: "choked", family: "ground", label: "choked with spores", metric: "spores", test: { dir: "high", minAbs: 0.1, ratio: 1.15 } }, // the spore field varies less than terrain bands
+  { id: "clear-air", family: "ground", label: "clear air under the caps", metric: "spores", test: { dir: "low", minBase: 0.05, ratio: 0.8 } },
   // threat — what to wear and wield
   { id: "ancients", family: "threat", label: "something old lairs here", metric: "maxTier", test: { atLeast: 3 } },
   { id: "swarming", family: "threat", label: "crawling with monsters", metric: "monster", test: { dir: "high" } },
