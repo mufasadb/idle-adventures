@@ -5,6 +5,7 @@ import type { Matchup } from "../engine/combat";
 import { playerDamage, damageTaken } from "../engine/combat";
 import type { Action, Expedition, Loadout, MapItem, RejectionReason, GameEvent, ItemStack } from "../engine/types";
 import { mapEpithet } from "../engine/town";
+import { hintLabel } from "../engine/hints";
 
 // --- Shared presentation selectors (eho): pure defId→text + data-shaped derivations
 // that BOTH surfaces (the web UI and the blind-playtest console) format, so their
@@ -35,6 +36,7 @@ export function rejectCopy(reason: RejectionReason, recipeId?: string, action?: 
     case "missing-station": return gate ? `can't craft — ${gate} (build the station first)` : "needs a station you haven't built";
     case "missing-tool": return gate ? `can't craft — ${gate}` : action === "fish" ? "needs a fishing-rod" : "needs a tool you don't have";
     case "no-water": return "no water on or beside you to fish";
+    case "fully-read": return "you've read everything this map has to tell";
     case "fished-out": return "you've fished all the water within reach — move along the bank (or out on a raft)";
     case "tool-too-weak": return "your tool is too weak for this material's tier";
     case "not-field-craftable": return "that recipe is town-only — it can't be made in the field";
@@ -112,6 +114,7 @@ export function formatEvent(e: GameEvent, name: (defId: string) => string): stri
     case "item-used": return `⚗ used ${name(e.defId)} this fight${e.damageAdd ? ` · +${round1(e.damageAdd)} dmg` : ""}${e.mitigationAdd ? ` · +${round1(e.mitigationAdd)} mitigation` : ""}`;
     case "enhanced": return `🗡️ coated your weapon with ${name(e.id)} · ${e.charges} charge${e.charges === 1 ? "" : "s"}`;
     case "surveyed": return `🔭 surveyed the ${e.kind} at (${e.at.x},${e.at.y}) — its detail is now in focus`;
+    case "map-studied": return `📜 you study the map: "${hintLabel(e.hint)}"${e.remaining ? ` (${e.remaining} more to read)` : " (fully read)"}`;
     case "inked": { const mat = affixMaterialHint(e.affix); return `🖋 inked — this map now favours ${mat ? name(mat) : "its domain"} (of ${AFFIX_EFFECTS[e.affix]?.label ?? e.affix})`; }
     case "auto-quaff-toggled": return `auto-quaff ${e.on ? "on" : "off"}`;
     case "auto-finish-toggled": return `auto-finish fights ${e.on ? "on" : "off"}`;

@@ -18,7 +18,7 @@ One pure engine, one shared presentation layer, two thin surfaces. The reducer i
 - `food.ts` — stamina refills: `eatToRefill` eats whole units off the FRONT, waste-free (fresh forage inserts at the front so it's eaten before rations).
 - `pack.ts` — town-side loadout planning validated against `bank − reservations`; bank debits only at embark.
 - `bank.ts` — run-end banking (`endExpedition`, shared by return + combat soft-fail); applies `FRESH_TO_STALE` defId transforms.
-- `craft.ts` / `catalog.ts` (`slotOf` derives slots from the catalog lists) / `town.ts` (`newGame`, `localMap`, `mapEpithet`/`epithetForGrid`, `previewHints`; `candidateMaps` retired in D80) / `loadout.ts`.
+- `craft.ts` / `catalog.ts` (`slotOf` derives slots from the catalog lists) / `town.ts` (`newGame`, `localMap`, `mapEpithet`/`epithetForGrid`, `mapHintIds`/`revealedHints`; `candidateMaps` retired in D80) / `hints.ts` (D95 map hints: `mapMetrics`, `familyHints`, `rollMapHints`, `hintLabel`) / `loadout.ts`.
 - `tools.ts` — gather tool gating: `gatherCost`, `materialGate`/`gateSatisfied`, `toolSpeedFor` (capabilities via `TOOL_CAPABILITY`).
 - `perceive.ts` — passive range-gated perception (`perceive`, `visionRadius`): structured facts only, never fight outcomes or hidden affinity.
 - `flavor.ts` — cosmetic return-flavor line selection (`pickReturnFlavor`, `RETURN_FLAVOR` levers).

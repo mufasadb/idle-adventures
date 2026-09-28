@@ -8,6 +8,7 @@
 export * from "./spec";
 export * from "./combat";
 export * from "./crafting";
+export * from "./hints";
 
 // --- Map & perception (filled in M1) ---
 // D84: a 35×35 SQUARE you drill into the CENTER (was a 20×60 portrait strip with a
@@ -39,7 +40,6 @@ export const FOOD_REACH_MIN = 2; // min forageable (herb/animal) nodes on finite
 // (data-driven like TERRAIN_GATE; future glasses/cartography/scent items slot in).
 export const DETAIL_RADIUS = 2;
 export const VISION_RANGE_BONUS: Record<string, number> = { spyglass: 3, "pearl-spyglass": 5 }; // spyglass → radius 5; pearl-spyglass (D94) → radius 7
-export const PREVIEW_FIDELITY = 0; // how much a preview reveals (placeholder — M5)
 
 // Fresh-game starter bank (e96): the kit a new game begins with — a tunable lever,
 // not a literal buried in town.ts. Modest + functional: enough to run a real first

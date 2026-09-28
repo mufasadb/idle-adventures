@@ -31,12 +31,14 @@ export type Loadout = {
 
 // A pocketed map (xzx): a single-use snapshot of an offered map you chose to keep.
 // vintage = `runs` when pocketed — flavour only ("N runs old"), no mechanic.
-export type MapItem = { mapSeed: string; biomeId: BiomeId; vintage: number; tier?: number; affixes?: string[]; inkCount?: number };
+export type MapItem = { mapSeed: string; biomeId: BiomeId; vintage: number; tier?: number; affixes?: string[]; inkCount?: number; hints?: string[]; studied?: number };
 // tier: map tier (2yn), drives generation scaling. Optional/absent = 1; read with `?? 1`.
 // affixes: cartography affixes applied by inking (cxq), read as generateGrid weight
 //   multipliers. Optional/absent = [] (old saves, un-inked maps); read with `?? []`.
 // inkCount: how many times this map has been inked (cxq) — seeds the affix roll so
 //   re-inking a domain can land a different affix. Optional/absent = 0; read with `?? 0`.
+// hints: hint ids in reveal order, rolled at mint (3iq, D95). Optional/absent = re-derive
+//   via town.mapHintIds (old saves). studied: how many are revealed. Absent = 0; `?? 0`.
 
 // A live combat engagement (si7.1): combat is no longer atomic — `fight` runs
 // one exchange per action, `flee`/`quaff` are the mid-fight decisions. Battle-
@@ -116,6 +118,7 @@ export type Action =
   | { type: "craft"; recipeId: string }
   | { type: "pack"; slot: LoadoutSlot; itemId: string }
   | { type: "embark"; mapSeed: string }
+  | { type: "study"; mapSeed: string } // spend STUDY_COST to reveal a held map's next hint (3iq, D95)
   | { type: "ink"; mapSeed: string; inkId: string } // apply a crafted ink to a held map (cxq): rolls + writes an affix from the ink's domain
   | { type: "move"; to: { x: number; y: number } } // steps ONE tile toward target
   | { type: "gather" }
@@ -155,6 +158,7 @@ export type RejectionReason =
   | "carry-full"
   | "not-carried"
   | "map-not-carried"
+  | "fully-read" // study: every hint on this map is already revealed (D95)
   | "no-monster"
   | "unaffordable"
   | "no-recipe"
@@ -233,8 +237,9 @@ export type GameEvent =
       rounds?: number; // 67e: set when auto-finish resolved the fight in one action (the N rounds it collapsed); absent for a single manual round
     }
   | { type: "crafted"; recipeId: string; output: ItemStack; where?: "field" | "town" } // where (ke3.4): field crafts read distinctly in the log. Optional/absent = town.
+  | { type: "map-studied"; mapSeed: string; hint: string; remaining: number } // study revealed this hint id; `remaining` still sealed (D95)
   | { type: "inked"; mapSeed: string; affix: string } // an ink rolled + wrote this affix onto a held map (cxq)
-  | { type: "map-dropped"; at: { x: number; y: number }; mapSeed: string; biomeId: BiomeId; hints: string[]; carried: boolean; tier: number; source?: "fished" } // source (si7.6.2): absent = a humanoid kill // humanoid kill minted a map (8ec); carried=false → pack full, left behind
+  | { type: "map-dropped"; at: { x: number; y: number }; mapSeed: string; biomeId: BiomeId; carried: boolean; tier: number; source?: "fished" } // source (si7.6.2): absent = a humanoid kill // humanoid kill minted a map (8ec); carried=false → pack full, left behind
   | { type: "map-discarded"; mapSeed: string } // drop-map (8ec): carried map thrown away mid-run
   | { type: "packed"; slot: LoadoutSlot; defId: string }
   | { type: "run-ended"; reason: string; flavor?: string } // flavor (xwp): a cosmetic return beat, present only on voluntary "returned"; absent on defeat

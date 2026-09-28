@@ -8,7 +8,7 @@
 import { play } from "./play";
 import { legalActions, whyNot } from "./legal";
 import { summarize } from "./report";
-import { localMap, mapEpithet } from "../engine/town";
+import { localMap, mapEpithet, mapHintIds, revealedHints } from "../engine/town";
 import { expeditionGrid } from "../engine/grid";
 import { recipeOutputQty } from "../engine/craft";
 import { wornPieces } from "../engine/pack";
@@ -30,7 +30,7 @@ import {
   poiGlyph,
   PLAYER_CHAR,
 } from "../render/render";
-import { RECIPE, MAP_WIDTH, MAP_HEIGHT, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, FISH_CAST_ENERGY, TOOL_CAPABILITY, TOOL_PURPOSE, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS } from "../data/constants";
+import { RECIPE, MAP_WIDTH, MAP_HEIGHT, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, FISH_CAST_ENERGY, TOOL_CAPABILITY, TOOL_PURPOSE, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS, STUDY_COST } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 import { moveCostBreakdown } from "../engine/move";
 import { usedSlots, carryCap, mapCarryCap } from "../engine/carry";
@@ -112,6 +112,7 @@ function printTown(st: GameState): void {
   const local = localMap(st.seed, st.runs ?? 0);
   console.log("Local map (embark = free 'go nearby', never consumed; rotates each visit):");
   { const e = mapEpithet(local.mapSeed, local.biomeId); console.log(`  • ${local.preview.headline}${e ? ` of ${e}` : ""}  →  embark mapSeed="${local.mapSeed}"`); }
+  console.log(`      hints: ${local.preview.hints.map((h) => `"${h}"`).join(", ")}`); // D95: known country, free
   // Held maps (zpm.1): earned from humanoid drops (zpm.2), survive across visits —
   // embark spends one. The local map is the free run instead (nothing to spend).
   const held = st.maps ?? [];
@@ -125,6 +126,9 @@ function printTown(st: GameState): void {
     const inkActions = legalActions(st).filter((a) => a.type === "ink" && a.mapSeed === m.mapSeed) as Extract<Action, { type: "ink" }>[];
     const inkHint = inkActions.length ? `  ·  ink: ${inkActions.map((a) => `ink mapSeed="${m.mapSeed}" inkId="${a.inkId}"`).join(" | ")}` : "";
     console.log(`  • T${m.tier ?? 1} ${m.biomeId} map${nameSuffix} · ${(st.runs ?? 0) - m.vintage} runs old  →  embark mapSeed="${m.mapSeed}" (spends it)${inkHint}`);
+    // D95 (3iq): the map's hints — revealed ones read out, the rest sealed until studied.
+    const known = revealedHints(m), sealed = mapHintIds(m).length - known.length;
+    console.log(`      hints: ${known.length ? known.map((h) => `"${h}"`).join(", ") : "(none read yet)"}${sealed ? `  ·  ${sealed} sealed — study mapSeed="${m.mapSeed}" (costs ${STUDY_COST.map((c) => `${c.qty} ${c.defId}`).join(" + ")})` : ""}`);
   }
   const affordable = new Set(
     legalActions(st).filter((a) => a.type === "craft").map((a) => (a as { recipeId: string }).recipeId),
