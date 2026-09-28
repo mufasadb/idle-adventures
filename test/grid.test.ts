@@ -1,6 +1,7 @@
 import { test, expect } from "bun:test";
 import { generateGrid, rollBiome } from "../src/engine/grid";
-import { MAP_WIDTH, MAP_HEIGHT, BIOME_IDS, TERRAINS, POI_DENSITY, POI_MIN_SPACING, NODE_TYPES, BIOMES, FOOD_REACH_MIN } from "../src/data/constants";
+import { MAP_WIDTH, MAP_HEIGHT, BIOME_IDS, TERRAINS, POI_DENSITY, POI_MIN_SPACING, NODE_TYPES, BIOMES, FOOD_REACH_MIN, RARE_BIOMES } from "../src/data/constants";
+import { rand } from "../src/engine/rng";
 import type { Terrain } from "../src/data/constants";
 import { costToReach } from "../src/engine/reach";
 
@@ -68,22 +69,33 @@ test("rollBiome: different seeds can roll different biomes", () => {
   const rolled = new Set(
     Array.from({ length: 30 }, (_, i) => rollBiome(`candidate-${i}`)),
   );
-  expect(rolled.size).toBe(BIOME_IDS.length - 1); // 30 seeds hit all 3 BASE biomes (swamp is rare, T2+ only — D91)
+  expect(rolled.size).toBe(3); // 30 seeds hit all 3 BASE biomes (swamp + coastal are rare, T2+ only — D91/D94)
   expect(rolled.has("swamp")).toBe(false);
+  expect(rolled.has("coastal")).toBe(false);
 });
 
-test("rollBiome (D91): a rare biome never rolls below its minTier, and a base roll is unchanged by tier", () => {
-  let swampAtT2 = 0;
-  for (let i = 0; i < 200; i++) {
+test("rollBiome (D91/D94): a rare biome never rolls below its minTier, and a base roll is unchanged by tier", () => {
+  const atT2 = { swamp: 0, coastal: 0 };
+  for (let i = 0; i < 400; i++) {
     const seed = `rare-${i}`;
     const t1 = rollBiome(seed, 1);
-    expect(t1).not.toBe("swamp");
+    expect(["swamp", "coastal"]).not.toContain(t1);
     const t2 = rollBiome(seed, 2);
-    if (t2 === "swamp") swampAtT2++;
-    else expect(t2 as string).toBe(t1); // not swamp ⇒ same base biome as T1
+    if (t2 === "swamp" || t2 === "coastal") atT2[t2]++;
+    else expect(t2 as string).toBe(t1); // not rare ⇒ same base biome as T1
   }
-  expect(swampAtT2).toBeGreaterThan(30); // RARE_BIOMES.swamp.chance 0.3 over 200 seeds
-  expect(swampAtT2).toBeLessThan(90);
+  expect(atT2.swamp).toBeGreaterThan(80); // swamp 0.3 over 400 seeds (~120)
+  expect(atT2.swamp).toBeLessThan(160);
+  expect(atT2.coastal).toBeGreaterThan(50); // coastal rolls after swamp: 0.7 × 0.3 (~84)
+  expect(atT2.coastal).toBeLessThan(120);
+});
+
+test("rollBiome (D94): adding coastal never moves a seed that already rolled swamp", () => {
+  // swamp is tried first (BIOME_IDS order), so its hits are exactly its own chance roll.
+  for (let i = 0; i < 400; i++) {
+    const seed = `rare-${i}`;
+    if (rand(seed, "biome-rare", "swamp") < RARE_BIOMES.swamp!.chance) expect(rollBiome(seed, 2)).toBe("swamp");
+  }
 });
 
 test("generateGrid: places POI_DENSITY POIs, in bounds, with valid kinds", () => {

@@ -14,6 +14,7 @@ Raw fight tolls (no potions) per kit — cell = hpLost (of 30 base HP). ✗ = de
 | sand-raider (1) | 8 (26.7%) | 2.7 (8.9%) | 1 (3.3%) | 1 (3.3%) |
 | shell-beetle (1) | 8 (26.7%) | 4 (13.3%) | 1.5 (5%) | 1.1 (3.8%) |
 | snow-wolf (1) | 8 (26.7%) | 4 (13.3%) | 1.5 (5%) | 1.1 (3.8%) |
+| tide-crab (1) | 8 (26.7%) | 4 (13.3%) | 1.5 (5%) | 1.1 (3.8%) |
 | bog-lurker (2) | ✗ dead r4 | 20 (66.7%) | 9 (30%) | 4.6 (15.2%) |
 | drake (2) | ✗ dead r4 | 16 (53.3%) | 9 (30%) | 4.6 (15.2%) |
 | dust-djinn (2) | 24 (80%) | 4.8 (16%) | 7.6 (25.3%) | 3 (10%) |
@@ -22,8 +23,10 @@ Raw fight tolls (no potions) per kit — cell = hpLost (of 30 base HP). ✗ = de
 | giant-elk (2) | ✗ dead r4 | 16 (53.3%) | 9 (30%) | 4.6 (15.2%) |
 | giant-scorpion (2) | ✗ dead r4 | 20 (66.7%) | 9 (30%) | 4.6 (15.2%) |
 | marsh-hag (2) | 24 (80%) | 8 (26.7%) | 3.7 (12.3%) | 1.3 (4.4%) |
+| siren (2) | 24 (80%) | 4.8 (16%) | 7.6 (25.3%) | 3 (10%) |
 | snow-marauder (2) | ✗ dead r4 | 10.7 (35.6%) | 5.5 (18.5%) | 2.7 (8.9%) |
 | werewolf (2) | ✗ dead r4 | 16 (53.3%) | 9 (30%) | 4.6 (15.2%) |
+| wrecker (2) | ✗ dead r4 | 10.7 (35.6%) | 5.5 (18.5%) | 2.7 (8.9%) |
 | dust-vampire (3) | ✗ dead r3 | ✗ dead r4 | 26.5 (88.4%) | 15.8 (52.5%) |
 | ice-troll (3) | ✗ dead r3 | ✗ dead r5 | ✗ dead r6 | 16 (53.3%) |
 | ancient-wyrm (4) | ✗ dead r2 | ✗ dead r3 | ✗ dead r3 | ✗ dead r4 |

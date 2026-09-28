@@ -67,7 +67,7 @@ test("constants: M1 map levers are filled", () => {
 });
 
 test("constants: every biome is a complete generation profile", () => {
-  expect(BIOME_IDS).toEqual(["woodland", "desert", "tundra", "swamp"]);
+  expect(BIOME_IDS).toEqual(["woodland", "desert", "tundra", "swamp", "coastal"]);
   for (const id of BIOME_IDS) {
     const biome = BIOMES[id];
     const terrainTotal = TERRAINS.reduce(

@@ -165,6 +165,7 @@ test("drop ladder: T1 humanoid drop mints T2, and T2 mints T3 (wyrm reachable)",
       expedition: {
         mapSeed: seed,
         mapTier,
+        biomeId: rollBiome(seed), // D93: the map keeps its T1 biome (a T2 re-roll could turn rare)
         pos: { x: poi.x, y: poi.y },
         energy: 50,
         hp: PLAYER_BASE_HP,

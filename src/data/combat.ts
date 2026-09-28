@@ -171,6 +171,11 @@ export const MONSTERS: Record<string, Monster> = {
   "giant-leech": { tier: 1, dmgType: "melee", armourType: "light", category: "beast", tags: ["beast"] },
   "bog-lurker": { tier: 2, dmgType: "melee", armourType: "plate", category: "beast", tags: ["beast"] },
   "marsh-hag": { tier: 2, dmgType: "ranged", armourType: "robe", category: "humanoid", tags: [] }, // hurls hexed bog-stones: the swamp's ranged incoming
+  // Coastal (D94): crab (T1 plated melee), wrecker (T2 humanoid — the coast's map-dropper,
+  // crossbow from the rocks), siren (T2 fae — magic into robe). Full incoming/hide spread.
+  "tide-crab": { tier: 1, dmgType: "melee", armourType: "plate", category: "beast", tags: ["beast"] },
+  wrecker: { tier: 2, dmgType: "ranged", armourType: "light", category: "humanoid", tags: [] },
+  siren: { tier: 2, dmgType: "magic", armourType: "robe", category: "fae", tags: ["fae"] },
   // Tier-4 boss (D34): magic damage into a plate hide — punishes the plate
   // strategy that carried the whole game (plate weak to magic, ÷1.5). The
   // dragon tag pairs with the wyrmbane affinity so wyrmfang farms it (§4.1).
@@ -252,6 +257,7 @@ export const ARMOUR: Record<string, { armourType: ArmourType; defense: number; s
   "warg-jerkin": { armourType: "light", defense: 3, slot: "chest" }, // werewolf-pelt → light chest def 3, no drake needed
   "scorpion-plate-chest": { armourType: "plate", defense: 3, slot: "chest" }, // scorpion-carapace → steel-grade plate chest, NO coal
   "dragonscale-cuirass": { armourType: "plate", defense: 5, slot: "chest" }, // boss drop — best chest in the game (D34)
+  "turtle-shell-helm": { armourType: "light", defense: 2, slot: "helmet" }, // D94: deep-sea turtle shell → the first T2 light helm (light-helmet +1)
 }; // armour pieces by type, defense contribution, and body slot (slot: M5 pack validation)
 
 export const LOOT_TABLE: Record<string, ItemStackSpec[]> = {
@@ -272,6 +278,9 @@ export const LOOT_TABLE: Record<string, ItemStackSpec[]> = {
   "giant-leech": [{ defId: "leech", qty: 2 }], // → potion-leech
   "bog-lurker": [{ defId: "lurker-scale", qty: 2 }], // → plate-legs-lurker
   "marsh-hag": [{ defId: "raider-supplies", qty: 1 }], // + the humanoid map-scroll chance
+  "tide-crab": [{ defId: "crab-shell", qty: 2 }], // D94: same shell as the ice-crab → ration-crab
+  wrecker: [{ defId: "raider-supplies", qty: 1 }], // D94: + the humanoid map-scroll chance
+  siren: [{ defId: "fae-dust", qty: 2 }], // D94: fae dust (staffs, oils)
   // Boss (D34): wyrm-scale always → dragonscale-cuirass; dragonheart @0.2 (the
   // 1/5 rare) → wyrmfang. `chance` is rolled per-encounter by rollLoot (§4.5).
   "ancient-wyrm": [{ defId: "wyrm-scale", qty: 3 }, { defId: "dragonheart", qty: 1, chance: 0.2 }],
