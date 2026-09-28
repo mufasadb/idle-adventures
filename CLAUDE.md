@@ -1,16 +1,14 @@
 # Project Instructions for AI Agents
 
-This file provides instructions and context for AI coding agents working on this project.
-
 ## This project — Idle Adventure (POC)
 
 A turn-based exploration RPG built as a "logistics puzzle on a grid": pack a loadout, drop onto a procedural 35×35 map (D84: square, entry at the centre), make routing/gather/fight calls to **extract as much value as you can before fatigue forces you home** (return is free — the tension is depth-vs-haul under an **energy + HP budget**, not turn-back timing; see D62), craft upgrades, go again. The POC validates exactly one thing — **is that loop fun?**
 
 **Read first (in `docs/`):**
 - `superpowers/specs/2026-06-30-idle-adventure-poc-core-loop-design.md` — the design (what + why), including the engine contract.
-- `superpowers/plans/2026-06-30-poc-core-loop-plan.md` — milestone plan M0→M7 (completed milestone/feature plans are archived under `archive/plans/`; old playtest write-ups under `archive/playtests/`).
+- `superpowers/plans/2026-06-30-poc-core-loop-plan.md` — milestone plan M0→M7 (finished plans/playtests: `archive/`).
 - `superpowers/specs/2026-07-31-breadth-charter-biomes-verticals.md` — **the current roadmap**: biomes × verticals ordered into buildable sets (epic `si7.6`).
-- `decisions.md` — decision history (D1–D87 as of 2026-09, with rationale — check the highest D-number before adding one).
+- `decisions.md` — decision history (with rationale — check the highest D-number before adding one).
 - `balance-levers.md` — every tunable is a named lever; tuning happens here.
 - Full vision/notes: the user's Obsidian vault, `Project Ideas/idle adventures/`.
 
@@ -23,7 +21,7 @@ Work is tracked in **beads** — run `bd ready` for the next unblocked task befo
 
 ## Git & Sync Policy (ACTIVE — overrides the beads block below)
 
-The user has granted standing push authority and wants the remote kept current (set 2026-07-06). This **overrides** the "Conservative (default)" profile in the Beads Integration block — treat the repo as **Team-maintainer**:
+Standing push authority (user, 2026-07-06) — this **overrides** the "Conservative (default)" profile in the beads block below; treat the repo as **Team-maintainer**:
 
 - **Keep git and Dolt up to date.** After landing a coherent unit of work (a feature/fix merged to `main`, or closed beads), commit, `git push`, and `bd dolt push` without asking.
 - You **have permission to push** — do not stop and ask for a landing decision each time. Push `main` and sync beads as part of normal session close.
@@ -88,7 +86,7 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 
 ## Build & Test
 
-Toolchain settled in **D20**: **bun** (package manager + runtime), **`bun test`** (native runner, jest-compatible snapshots), **ESLint flat config** for the engine-purity boundary. These scripts are established by **M0** (`idle-adventure-868.1`); they won't exist until M0 lands.
+bun (runtime + package manager), `bun test`, ESLint flat config (D20).
 
 ```bash
 bun install        # install deps
@@ -97,49 +95,27 @@ bun run typecheck  # tsc --noEmit
 bun run lint       # eslint . — enforces the engine-purity boundary
 ```
 
-The engine-purity boundary (no `render`/`sim`/`web` imports, no `Math.random`/`Date.now`/DOM under `src/engine/**`) is lint-enforced and verified by `test/boundary.test.ts` via the ESLint Node API.
+The engine-purity boundary is lint-enforced and checked by `test/boundary.test.ts`.
 
-## Architecture Overview
+## Architecture (full module map: `docs/architecture.md`)
 
-One pure engine, one shared presentation layer, two thin surfaces. The reducer is the single source of truth for every rule; UI and sim never decide legality themselves, and both render through the same presentation helpers so their text can't drift.
+One pure engine (`src/engine/`), one shared presentation layer (`src/render/render.ts`), two thin surfaces (web `src/web/`, headless console `src/sim/`). The reducer is the single source of truth; surfaces never decide legality.
 
-**`src/engine/`** (pure — lint-enforced boundary):
-- `types.ts` — the contract: `GameState`/`Expedition`/`Engagement`, `Action`, `GameEvent`, `RejectionReason` (closed unions; adding an Action without a reducer case is a compile error).
-- `reduce.ts` — the reducer's **dispatch switch only** (ehr): one exhaustive `switch (action.type)` + `assertNever`. The drift guarantee lives HERE, not in file colocation — adding an Action without a case is a compile error. The rules themselves live in domain handler modules: **`reduce-town.ts`** (embark, ink, town-craft, pack), **`reduce-expedition.ts`** (move, gather, drop, eat, survey, don/doff, field-craft, return, toggles + `placeYield`/`donDoffChecks`), **`reduce-combat.ts`** (fight/engage/fightRound/applyVictory, flee, quaff, use-item, enhance, provokeTurn, auto-finish), and **`reduce-shared.ts`** (`rejected()`, `autoRefill()`). Import chain is acyclic: `shared ← combat ← expedition ← town ← reduce`. To add an action: add a case in `reduce.ts` + a handler in the matching domain module. A rejected action returns the ORIGINAL state plus an `action-rejected` event (`rejected()` in reduce-shared).
-- `grid.ts` — deterministic map generation: base Perlin terrain + low-frequency barrier layer, connectivity carve (all walkable tiles = one component), centre entry (D84: walkable tile nearest the geometric centre), value-agnostic POI rejection-sampling on walkable tiles (D57r retired the value-vs-reach pairing). Memoized per `(mapSeed, biomeId, mapTier, affixes)`.
-- `noise.ts` / `rng.ts` — seeded primitives: `perlin2`, `rand` (stateless hash — namespace seeds like `` `${seed}:barrier` ``), `weightedPick` (always over sorted keys for determinism).
-- `reach.ts` — `costToReach` (Dijkstra) + `reachableTiles` (flood); honours gear/transport via `moveCost`.
-- `line.ts` — `lineTiles(a,b)`: pure Bresenham direct-line stepper for player-planned routing (eot); one 8-neighbour grid step per tile.
-- `move.ts` — `moveCost` = absolute terrain cost − gear discounts (floor `MIN_STEP`) ÷ per-terrain transport multiplier; mountain is ∞ unless enabled.
-- `combat.ts` — pure fight math: `playerDamage` (weapon × matrix × affinity), `damageTaken` (% mitigation `K/(K+D)`), `strikeExchange` (one round), `resolveCombat` (atomic loop over exchanges), `rollLoot` (seeded), `explainMatchup`.
-- `carry.ts` — all slot accounting: `carryCap`, `consumableSlots`, `freeLootStacks`, `usedSlots`, `addToCarry`. Consumables/tools = 1 slot per unit; only loot stacks (`STACK_CAP`).
-- `food.ts` — stamina refills: `eatToRefill` eats whole units off the FRONT, waste-free (fresh forage inserts at the front so it's eaten before rations).
-- `pack.ts` — town-side loadout planning validated against `bank − reservations`; bank debits only at embark.
-- `bank.ts` — run-end banking (`endExpedition`, shared by return + combat soft-fail); applies `FRESH_TO_STALE` defId transforms.
-- `craft.ts` / `catalog.ts` (`slotOf` derives slots from the catalog lists) / `town.ts` (`newGame`, `localMap`, `mapEpithet`/`epithetForGrid`, `previewHints`; `candidateMaps` retired in D80) / `loadout.ts`.
-- `tools.ts` — gather tool gating: `gatherCost`, `materialGate`/`gateSatisfied`, `toolSpeedFor` (capabilities via `TOOL_CAPABILITY`).
-- `perceive.ts` — passive range-gated perception (`perceive`, `visionRadius`): structured facts only, never fight outcomes or hidden affinity.
-- `flavor.ts` — cosmetic return-flavor line selection (`pickReturnFlavor`, `RETURN_FLAVOR` levers).
-
-**`src/data/`** — every lever and catalog; the only place numbers live. `constants.ts` is the entry point and re-exports the domain splits `combat.ts` (damage matrix, monsters/weapons/armour, loot, ammo, enhancements), `crafting.ts` (food/potion/battle-item catalogs, stations, `RECIPE`) and `spec.ts` (shared `ItemStackSpec`) — import from `constants` so consumers stay unchanged.
-
-**`src/render/`** — `render.ts`: the **shared presentation layer** (extracted under `eho`). Pure `state`/`defId` → text + data-shaped derivations that BOTH surfaces format, so the web and the blind-playtest console can't drift. Key exports: `name` (display names), `rejectCopy` (`RejectionReason` → player copy), `formatEvent` (the ONE exhaustive `GameEvent` → text switch — `exm`; web passes display `name`, playtest passes identity for raw defIds), `combatForecast`/`engagementForecast`, `heldMapTitle`, `townRecipeIds`, `battleItemEffect`, `round1`, the node/gate hints (`nodeToolHint`, `nodeGateNote`, `materialGated`, `materialLocked`), `describe`, `GATHER_VERB`, terrain/POI glyph maps. **Rule:** presentation logic both surfaces need lives here; web-only HTML builders stay in `src/web/`. For legality-with-reason in a surface, use `whyNot(state, action)` (sim/legal.ts) → `rejectCopy` — never re-derive "why not" from the catalog (`ciq`, D29 one level up).
-
-**`src/sim/`** — `legal.ts` (candidate actions filtered through speculative `reduce` — D29: legality can never drift; `whyNot` hands back the reducer's own `RejectionReason`), `playtest.ts` + `cli.ts` (the headless console; the blind-playtest surface — append to its output, never reshape existing lines), `play.ts` (pure headless driver: seed + actions → state + event log, incl. the straight-line `route` directive) + `report.ts` (`summarize`: JSON snapshot for the CLI), `balance.ts` + `balance-cli.ts` (balance sim composing the pure engine; `bun run sim`, `bun run sim:tables` regenerates `docs/balance/`), `harvest.ts` (harvest-fraction reference player), `route.ts` (monster-aware Dijkstra auto-router — parked; serves only `harvest.ts`).
-
-**`src/web/`** — string templates re-rendered from state on every action. `main.ts` owns the mutable UI state (`state`/`route`/`prep`/`log`), the one `apply()` → `reduce` funnel, `draw()`, and the click wiring (`wire()`: `data-*` attribute handlers; Walk drives the sim's `route()` so web and console walk identically). Pure HTML-builder views take `state` explicitly: `town-view.ts` (map overview, prep/loadout, bank, recipe book), `expedition-view.ts` (bars, map grid + route overlay, here/engagement panel, actions, field craft, bag; `currentDerived`), `inventory.ts` (slot boxes), `log.ts` (`LogEntry` + formatting). `persist.ts` = localStorage save/log/repack-last. `route.ts` = pure, DOM-free `deriveRoute` (waypoint preview + energy estimate) + `routeAfterClick`. `index.html` = all CSS. The event log is stored as structured `LogEntry[]` (`exm`) formatted at draw time, not pre-rendered HTML. **Before verifying any web change, read `docs/working-on-this-codebase.md` — and always start a FRESH server + append `?cb=$RANDOM` to every `agent-browser open` (stale-bundle cache is the #1 web-verification footgun; symptoms read as game-breaking bugs but are pure caching).**
-
-## Pixel-art assets (epic idle-adventure-48l)
-
-Art is produced by a **separate pipeline repo** at `../idle-adventure-assets` (bun/TS + `py/`, Retro Diffusion) — it imports this repo's `src/data` as pure data and delivers game-ready sprites keyed by `defId`. As of 2026-07-13: **162 assets approved** (all terrains/monsters/icons), reviewed over two user rounds. Art direction (see `bd memories`): **pixel art, Diablo-2 mood, top-down floor + ¾ billboard monster sprites, per-creature size classes**; palette coercion deferred (ship raw). Full state + commands: `bd memories asset-pipeline-state`, and that repo's `README.md` / `review/round-1.md`.
-
-In THIS repo the delivered art is `src/web/assets/atlas-{tile,monster,icon}.{png,json}` (packed in the assets repo, manifest keyed by defId), read by `src/web/assets.ts` (`tileStyle`/`monsterStyle`/`iconStyle` → CSS background frames) and painted in `expedition-view.ts` (48l.10). A defId with no frame falls back to its glyph — a creature never borrows another's sprite. To refresh art after picking winners: `bun run refresh` in `../idle-adventure-assets` (promote → pack → copy the six atlas files here), then commit.
+- `reduce.ts` is the dispatch switch only (exhaustive, `assertNever`). To add an action: a case there + a handler in `reduce-town|expedition|combat.ts`. Rejections return the ORIGINAL state + an `action-rejected` event (`rejected()` in `reduce-shared.ts`). Import chain: `shared ← combat ← expedition ← town ← reduce`.
+- `src/data/` holds every number; import from `constants.ts` (it re-exports `combat.ts`/`crafting.ts`/`spec.ts`).
+- Randomness is `rand(seed, …namespace)` (stateless) and `weightedPick` over SORTED keys; a new generation roll gets its own namespace so existing maps don't shift.
+- Presentation both surfaces need lives in `render.ts` (`formatEvent` is the one exhaustive `GameEvent` → text switch). For "why can't I?", use `whyNot(state, action)` (`sim/legal.ts`) → `rejectCopy` — never re-derive from the catalog.
+- The console (`sim/playtest.ts`) is the blind-playtest surface: append new lines, never reshape existing ones.
+- **Web verification:** read `docs/working-on-this-codebase.md` first; always start a FRESH server and add `?cb=$RANDOM` to every `agent-browser open` (a stale bundle looks like a game-breaking bug).
+- **Art:** separate repo `../idle-adventure-assets`; `bun run refresh` there copies approved atlases into `src/web/assets/`, then commit them here. A defId with no frame falls back to its glyph — a creature never borrows another's sprite. The user picks every asset from rendered sheets before it ships.
 
 ## Conventions & Patterns
 
 - Grids are `[y][x]`; `x ∈ [0, MAP_WIDTH)`, `y ∈ [0, MAP_HEIGHT)` (35×35 square since D84).
-- Optional `Expedition`/`GameState` fields exist for old saves + terse test states — always read with the documented `??` default (`autoQuaff ?? true`, `autoGather ?? true`, `maps ?? []`, …; note `autoEat` the boolean is gone — D48 replaced it with the `autoEatFood` defId). New optional fields follow this pattern and document their default in `types.ts`.
-- `GameEvent` is a closed union and the web `fmt()` switch is exhaustive — adding an event without a log line breaks typecheck (by design).
+- Optional `Expedition`/`GameState` fields exist for old saves + terse test states — always read with the documented `??` default (`autoQuaff ?? true`, `autoGather ?? true`, `maps ?? []`, …). New optional fields follow this pattern and document their default in `types.ts`.
+- `GameEvent` is a closed union and `formatEvent` (render.ts) is exhaustive — adding an event without a log line breaks typecheck (by design).
+- The web UI is landscape-phone-first (map fills the screen, everything else in the drawer/sidebar); check layout changes at ~844×390 as well as desktop. The user picks visual directions from mockups before a UI build.
+- A map's biome is frozen when it's minted/offered (`MapItem.biomeId` → `Expedition.biomeId`, D93) — never re-derive a held map's identity from its seed.
 - Every lever change lands with its docs: a `decisions.md` D-row (dense single-row style, cite the spec) and a `balance-levers.md` update. Check the highest D-number before writing.
 - Deeper working rules (gates, test idioms, harness invariants, browser verification): **`docs/working-on-this-codebase.md`** — hand this to any subagent touching code.
 - Beads state lives in Dolt and syncs via `bd dolt push` — nothing under `.beads/` should churn in git (machine-local files are ignored). If a tracked `.beads/` file (hooks, `identity.toml`) does change, commit it on its own, not folded into a feature commit.

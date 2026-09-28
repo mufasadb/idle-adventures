@@ -1,0 +1,43 @@
+# Architecture — module map
+
+What lives where. The rules that change how you work are summarised in `CLAUDE.md`;
+this is the reference detail. Keep it current when you add or move a module.
+
+One pure engine, one shared presentation layer, two thin surfaces. The reducer is the single source of truth for every rule; UI and sim never decide legality themselves, and both render through the same presentation helpers so their text can't drift.
+
+**`src/engine/`** (pure — lint-enforced boundary):
+- `types.ts` — the contract: `GameState`/`Expedition`/`Engagement`, `Action`, `GameEvent`, `RejectionReason` (closed unions; adding an Action without a reducer case is a compile error).
+- `reduce.ts` — the reducer's **dispatch switch only** (ehr): one exhaustive `switch (action.type)` + `assertNever`. The drift guarantee lives HERE, not in file colocation — adding an Action without a case is a compile error. The rules themselves live in domain handler modules: **`reduce-town.ts`** (embark, ink, town-craft, pack), **`reduce-expedition.ts`** (move, gather, drop, eat, survey, don/doff, field-craft, return, toggles + `placeYield`/`donDoffChecks`), **`reduce-combat.ts`** (fight/engage/fightRound/applyVictory, flee, quaff, use-item, enhance, provokeTurn, auto-finish), and **`reduce-shared.ts`** (`rejected()`, `autoRefill()`). Import chain is acyclic: `shared ← combat ← expedition ← town ← reduce`. To add an action: add a case in `reduce.ts` + a handler in the matching domain module. A rejected action returns the ORIGINAL state plus an `action-rejected` event (`rejected()` in reduce-shared).
+- `grid.ts` — deterministic map generation: base Perlin terrain + low-frequency barrier layer + optional per-biome standing-water layer (D88) with pre-rolled fishing catches/depth (D89), connectivity carve (all walkable tiles = one component), centre entry (D84: walkable tile nearest the geometric centre), value-agnostic POI rejection-sampling on walkable tiles (D57r retired the value-vs-reach pairing). Memoized per `(mapSeed, biomeId, mapTier, affixes)`. `rollBiome(mapSeed, tier)` handles rare biomes (D91); `expeditionGrid` prefers the run's frozen `biomeId` (D93).
+- `noise.ts` / `rng.ts` — seeded primitives: `perlin2`, `rand` (stateless hash — namespace seeds like `` `${seed}:barrier` ``), `weightedPick` (always over sorted keys for determinism).
+- `reach.ts` — `costToReach` (Dijkstra) + `reachableTiles` (flood); honours gear/transport via `moveCost`.
+- `line.ts` — `lineTiles(a,b)`: pure Bresenham direct-line stepper for player-planned routing (eot); one 8-neighbour grid step per tile.
+- `move.ts` — `moveCost` = absolute terrain cost − gear discounts (floor `MIN_STEP`) ÷ per-terrain transport multiplier; mountain is ∞ unless enabled.
+- `combat.ts` — pure fight math: `playerDamage` (weapon × matrix × affinity), `damageTaken` (% mitigation `K/(K+D)`), `strikeExchange` (one round), `resolveCombat` (atomic loop over exchanges), `rollLoot` (seeded), `explainMatchup`.
+- `carry.ts` — all slot accounting: `carryCap`, `consumableSlots`, `freeLootStacks`, `usedSlots`, `addToCarry`. Consumables/tools = 1 slot per unit; only loot stacks (`STACK_CAP`).
+- `food.ts` — stamina refills: `eatToRefill` eats whole units off the FRONT, waste-free (fresh forage inserts at the front so it's eaten before rations).
+- `pack.ts` — town-side loadout planning validated against `bank − reservations`; bank debits only at embark.
+- `bank.ts` — run-end banking (`endExpedition`, shared by return + combat soft-fail); applies `FRESH_TO_STALE` defId transforms.
+- `craft.ts` / `catalog.ts` (`slotOf` derives slots from the catalog lists) / `town.ts` (`newGame`, `localMap`, `mapEpithet`/`epithetForGrid`, `previewHints`; `candidateMaps` retired in D80) / `loadout.ts`.
+- `tools.ts` — gather tool gating: `gatherCost`, `materialGate`/`gateSatisfied`, `toolSpeedFor` (capabilities via `TOOL_CAPABILITY`).
+- `perceive.ts` — passive range-gated perception (`perceive`, `visionRadius`): structured facts only, never fight outcomes or hidden affinity.
+- `flavor.ts` — cosmetic return-flavor line selection (`pickReturnFlavor`, `RETURN_FLAVOR` levers).
+
+**`src/data/`** — every lever and catalog; the only place numbers live. `constants.ts` is the entry point and re-exports the domain splits `combat.ts` (damage matrix, monsters/weapons/armour, loot, ammo, enhancements), `crafting.ts` (food/potion/battle-item catalogs, stations, `RECIPE`) and `spec.ts` (shared `ItemStackSpec`) — import from `constants` so consumers stay unchanged.
+
+**`src/render/`** — `render.ts`: the **shared presentation layer** (extracted under `eho`). Pure `state`/`defId` → text + data-shaped derivations that BOTH surfaces format, so the web and the blind-playtest console can't drift. Key exports: `name` (display names), `rejectCopy` (`RejectionReason` → player copy), `formatEvent` (the ONE exhaustive `GameEvent` → text switch — `exm`; web passes display `name`, playtest passes identity for raw defIds), `combatForecast`/`engagementForecast`, `heldMapTitle`, `townRecipeIds`, `battleItemEffect`, `round1`, the node/gate hints (`nodeToolHint`, `nodeGateNote`, `materialGated`, `materialLocked`), `describe`, `GATHER_VERB`, terrain/POI glyph maps. **Rule:** presentation logic both surfaces need lives here; web-only HTML builders stay in `src/web/`. For legality-with-reason in a surface, use `whyNot(state, action)` (sim/legal.ts) → `rejectCopy` — never re-derive "why not" from the catalog (`ciq`, D29 one level up).
+
+**`src/sim/`** — `legal.ts` (candidate actions filtered through speculative `reduce` — D29: legality can never drift; `whyNot` hands back the reducer's own `RejectionReason`), `playtest.ts` + `cli.ts` (the headless console; the blind-playtest surface — append to its output, never reshape existing lines), `play.ts` (pure headless driver: seed + actions → state + event log, incl. the straight-line `route` directive) + `report.ts` (`summarize`: JSON snapshot for the CLI), `balance.ts` + `balance-cli.ts` (balance sim composing the pure engine; `bun run sim`, `bun run sim:tables` regenerates `docs/balance/`), `harvest.ts` (harvest-fraction reference player), `route.ts` (monster-aware Dijkstra auto-router — parked; serves only `harvest.ts`).
+
+**`src/web/`** — string templates re-rendered from state on every action. `main.ts` owns the mutable UI state (`state`/`route`/`prep`/`log`, plus the map camera and drawer/tab state — kml landscape layout), the one `apply()` → `reduce` funnel, `draw()`, and the click wiring (`wire()`: `data-*` attribute handlers; Walk drives the sim's `route()` so web and console walk identically). Pure HTML-builder views take `state` explicitly: `town-view.ts` (map overview, prep/loadout, bank, recipe book), `expedition-view.ts` (bars, map grid + route overlay, here/engagement panel, actions, field craft, bag; `currentDerived`), `inventory.ts` (slot boxes), `log.ts` (`LogEntry` + formatting). `persist.ts` = localStorage save/log/repack-last. `route.ts` = pure, DOM-free `deriveRoute` (waypoint preview + energy estimate) + `routeAfterClick`. `index.html` = all CSS. The event log is stored as structured `LogEntry[]` (`exm`) formatted at draw time, not pre-rendered HTML. **Before verifying any web change, read `docs/working-on-this-codebase.md` — and always start a FRESH server + append `?cb=$RANDOM` to every `agent-browser open` (stale-bundle cache is the #1 web-verification footgun; symptoms read as game-breaking bugs but are pure caching).**
+
+
+## Pixel-art assets
+
+Art comes from the separate pipeline repo `../idle-adventure-assets` (bun/TS + `py/`,
+Retro Diffusion), which imports this repo's `src/data` and delivers sprites keyed by
+defId. Here they are `src/web/assets/atlas-{tile,monster,icon}.{png,json}` plus
+`atlas-monster-anim.*` (idle loops), read by `src/web/assets.ts`
+(`tileStyle(terrain, biomeId)` tries `biome:terrain` first; `monsterStyle` plays the
+idle loop when one exists; `iconStyle`). Pipeline state: `bd memories
+asset-pipeline-state` and that repo's `README.md` / `review/`.
