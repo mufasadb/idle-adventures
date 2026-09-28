@@ -104,6 +104,9 @@
       .slots { display: flex; flex-wrap: wrap; gap: 3px; margin: 0.3rem 0; }
       .slot { min-width: 3.2rem; height: 2rem; border: 1px solid var(--line); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.62rem; line-height: 1.1; text-align: center; padding: 0 0.2rem; }
       .slot .q { color: #b8b8c0; font-size: 0.6rem; }
+      .slot .slot-icon { display: block; image-rendering: pixelated; background-repeat: no-repeat; transform: scale(1.25); transform-origin: center; }
+      .slot:has(.slot-icon) { min-width: 2.4rem; height: 2.4rem; position: relative; }
+      .slot:has(.slot-icon) .q { position: absolute; right: 2px; bottom: 1px; font-size: 0.7rem; color: var(--text); text-shadow: 0 0 2px #000; }
       .slot.empty { color: #45454f; border-style: dashed; }
       .slot.food { background: #2c3320; border-color: #4a5a2e; color: #b9d08a; }
       .slot[data-eatfood] { cursor: context-menu; } /* mco: right-click to designate auto-eat food */
