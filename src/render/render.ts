@@ -1,4 +1,4 @@
-import { WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE, QUAFF_ENERGY, DON_DOFF_ENERGY } from "../data/constants";
+import { WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE, QUAFF_ENERGY, DON_DOFF_ENERGY, FLASK_EFFECT, ANTIDOTE } from "../data/constants";
 import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType, FishWater } from "../data/constants";
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
@@ -82,7 +82,7 @@ export const round1 = (n: number) => Math.round(n * 10) / 10;
 export function formatEvent(e: GameEvent, name: (defId: string) => string): string {
   switch (e.type) {
     case "embarked": return `▶ embarked on a ${e.biomeId} map — ${e.energy} energy`;
-    case "moved": return `walked to (${e.to.x},${e.to.y}) on ${e.terrain} · −${round1(e.cost)}e → ${round1(e.energy)}e${e.poisonTaken ? ` · ☠ poison −${round1(e.poisonTaken)}hp → ${round1(e.hp ?? 0)}hp` : ""}`;
+    case "moved": return `walked to (${e.to.x},${e.to.y}) on ${e.terrain} · −${round1(e.cost)}e → ${round1(e.energy)}e${e.hazardTaken ? ` · 🍄 spores −${round1(e.hazardTaken)}hp` : ""}${e.poisonTaken ? ` · ☠ poison −${round1(e.poisonTaken)}hp` : ""}${e.hp !== undefined ? ` → ${round1(e.hp)}hp` : ""}`;
     case "gathered": return `${GATHER_VERB[e.kind]?.past ?? "gathered"} ${e.qty}× ${name(e.material)} · −${round1(e.cost)}e → ${round1(e.energy)}e`;
     case "fished": return `🎣 fished the ${FISH_WATER_WORDS[e.water]} — ${catchWords(e.catch, e.contents, name)} · −${round1(e.cost)}e → ${round1(e.energy)}e`;
     case "dropped": return `dropped ${e.qty}× ${name(e.defId)}`;
@@ -300,6 +300,8 @@ export function describe(defId: string): string {
   if (a) return `${a.slot} armour · ${a.defense} defense · ${a.armourType}`;
   if (FOOD.includes(defId)) return `food · restores ${FOOD_ENERGY[defId] ?? ENERGY_PER_FOOD} energy per unit`;
   if (POTION.includes(defId)) return `potion · heals ${POTION_HEAL_BY[defId] ?? POTION_HEAL} HP`;
+  if (FLASK_EFFECT[defId]) { const f = FLASK_EFFECT[defId]!; return `flask · thrown for ${f.dmg} damage that ignores armour${f.poison ? `, then ${f.poison.dmg} poison a round for ${f.poison.rounds} rounds` : ""} — a fight's first strike, if thrown, is free`; }
+  if (ANTIDOTE.includes(defId)) return "battle item · cures your poison — on the map or mid-fight, without costing a turn";
   const buff = battleItemEffect(defId);
   if (buff) return `battle item · ${buff} for one fight`;
   if (ENERGY_CAP_BONUS[defId]) return `gear · +${ENERGY_CAP_BONUS[defId]} max energy`;
@@ -453,6 +455,7 @@ export const TERRAIN_CHAR: Record<Terrain, string> = {
   shallows: "-",
   lake: "=",
   sea: "#",
+  "spore-thicket": "%",
 };
 
 export const POI_CHAR: Record<NodeType, string> = {

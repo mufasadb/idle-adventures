@@ -34,7 +34,8 @@ export const BARRIER_THRESHOLD = 0.68; // the "how walled is the world" dial: lo
 // rivers wind across the map instead of pooling as blobs. Rivers used to be the lowest
 // terrainWeights band, which Perlin (clustered around 0.5) almost never reached.
 export const RIVER_NOISE_FREQUENCY = 0.05; // low → a few long, gently winding rivers per map
-export const WATER_NOISE_FREQUENCY = 0.07; // si7.6.5: standing-water field (a biome's `water` layer) — low, so lakes are blobs, not puddles
+export const WATER_NOISE_FREQUENCY = 0.07;
+export const SPORE_NOISE_FREQUENCY = 0.12; // si7.6.9.4: spore-thicket field — patchy clumps you route through or around // si7.6.5: standing-water field (a biome's `water` layer) — low, so lakes are blobs, not puddles
 export const POI_DENSITY = 60; // POIs per 35×35 map (D84): a geared+provisioned run should harvest ~half and CHOOSE which half (now: which DIRECTION). Area 1225 ≈ the old 20×60 = 1200, so the count/value budget carries over.
 export const POI_MIN_SPACING = 3; // min Chebyshev distance between POIs (spec: 3–4 tiles apart)
 export const POI_PLACEMENT_ATTEMPTS = 2000; // seeded rejection-sampling budget per map (scaled with density, e3j)
@@ -64,7 +65,8 @@ export const STARTER_BANK: { defId: string; qty: number }[] = [
 // Water terrains (si7.6.5) are APPENDED so the noise→terrain bands above are
 // untouched; they never come from terrainWeights — only a biome's `water` layer
 // (below) places them, so a biome without one generates byte-identically.
-export const TERRAINS = ["river", "mud", "plains", "ice", "mountain", "shallows", "lake", "sea"] as const;
+// spore-thicket (si7.6.9.4) is appended the same way: only a biome's `spores` layer places it.
+export const TERRAINS = ["river", "mud", "plains", "ice", "mountain", "shallows", "lake", "sea", "spore-thicket"] as const;
 export const WATER_TERRAINS: Terrain[] = ["river", "shallows", "lake", "sea"]; // fishable water (si7.6.2)
 export type Terrain = (typeof TERRAINS)[number];
 
@@ -77,7 +79,7 @@ export type GatherableNodeType = Exclude<NodeType, "monster">;
 
 // --- Biomes (D21): generation profiles ONLY, consumed by generateGrid and
 // never consulted after generation. Adding a biome = adding one entry here.
-export const BIOME_IDS = ["woodland", "desert", "tundra", "swamp", "coastal"] as const; // APPEND-only: rollBiome walks rare biomes in this order
+export const BIOME_IDS = ["woodland", "desert", "tundra", "swamp", "coastal", "jungle", "fungal"] as const; // APPEND-only: rollBiome walks rare biomes in this order
 export type BiomeId = (typeof BIOME_IDS)[number];
 // Rare biomes (si7.6.3 / r51, D91): excluded from the base uniform roll, then rolled in
 // on their own namespaced chance once the map tier reaches minTier. A base biome's roll
@@ -88,6 +90,8 @@ export type BiomeId = (typeof BIOME_IDS)[number];
 export const RARE_BIOMES: Partial<Record<BiomeId, { minTier: number; chance: number }>> = {
   swamp: { minTier: 2, chance: 0.3 }, // ~30% of T2+ found maps are swamp
   coastal: { minTier: 2, chance: 0.3 }, // D94: rolls after swamp → ~21% of T2+ maps (0.7 × 0.3)
+  jungle: { minTier: 2, chance: 0.25 }, // D100: after coastal → ~12% of T2+ maps (0.7 × 0.7 × 0.25)
+  fungal: { minTier: 3, chance: 0.3 }, // D100: T3+ only, after jungle → ~8% of T3+ maps
 };
 
 export type Biome = {
@@ -108,6 +112,12 @@ export type Biome = {
   // drowns them where they meet it. Absent = no rivers. Scaled by map tier via
   // TERRAIN_WEIGHT_TIER_SHIFT[tier].river.
   river?: number;
+  // Spore thickets (si7.6.9.4, D99): its own namespaced noise field; dry land (plains/mud/
+  // ice) whose sample exceeds this threshold becomes spore-thicket. Absent = none.
+  spores?: number;
+  // Richness (D100): multiplies the map tier's magnitude-2 and -3 node weights, so more
+  // of this biome's nodes are rich veins/stands. Absent = 1 (the tier's own mix).
+  magnitudeBoost?: number;
   // Fishing (si7.6.2): what each KIND of water yields here, rolled per water tile
   // at generation (D21 — gather-time never consults the biome). Absent kind =
   // that water can't be fished in this biome.
@@ -213,6 +223,48 @@ export const BIOMES: Record<BiomeId, Biome> = {
       sea: { mackerel: 6, kelp: 4, "turtle-shell": 1, "sunken-lockbox": 1 },
       "deep-sea": { tuna: 5, pearl: 2, "turtle-shell": 2, "sunken-lockbox": 3, "sodden-map": 1 },
     },
+  },
+  // Jungle (si7.6.9.3, D100): a RARE T2+ biome — venom country. Two of its four
+  // creatures are venomous (D98: they poison you, gently); in return it is the richest
+  // land in the game — deep ores on a T2 map, boosted node magnitudes, fruit that keeps.
+  jungle: {
+    terrainWeights: { plains: 0.35, mud: 0.45, mountain: 0.2 }, // dense undergrowth reads as mud
+    river: 0.035, // big jungle rivers
+    nodeTypeWeights: { wood: 0.25, herb: 0.25, mining: 0.2, animal: 0.15, monster: 0.15 },
+    creatureTable: { "jungle-viper": 5, "vine-horror": 4, headhunter: 3, "fae-sprite": 2 },
+    materialTable: {
+      mining: { "mithril-ore": 4, "silver-ore": 3, "iron-ore": 3, coal: 2 }, // the mithril country, on a T2 map — the reward for the venom (steel-pick)
+      wood: { "ironwood-log": 4, stringybark: 3, "jungle-fruit": 3, "oak-log": 2 }, // jungle-fruit: material = food defId (gather routes to food)
+      herb: { "jungle-fruit": 5, thistle: 4, "forest-herb": 4, "desert-sage": 2, flint: 2 }, // fruit + thistle — antidotes + venom oil
+      animal: { "venom-sac": 5, feather: 4, "deer-hide": 2 }, // snakes: trap + knife
+    },
+    barrierTerrain: "mountain",
+    magnitudeBoost: 2, // twice the rich nodes of any other map at its tier
+    water: { body: "lake", lakeThreshold: 0.74, shallowsBand: 0.05 },
+    fishTable: {
+      river: { eel: 3, crayfish: 3, reed: 4 },
+      shallows: { reed: 5, crayfish: 4 },
+      lake: { perch: 4, eel: 4, amber: 3 },
+      "deep-lake": { pike: 4, amber: 3, "sunken-lockbox": 2, "sodden-map": 1 },
+    },
+  },
+  // Fungal forest (si7.6.9.5, D100): a RARE T3+ biome — spore-thickets (D99) cost HP to
+  // cross without a filter-mask; spores are the spore-bomb's reagent; deep ores + glowcaps.
+  fungal: {
+    terrainWeights: { plains: 0.35, mud: 0.45, mountain: 0.2 },
+    river: 0.02,
+    spores: 0.6,
+    nodeTypeWeights: { herb: 0.35, mining: 0.25, monster: 0.25, wood: 0.1, animal: 0.05 },
+    creatureTable: { myconid: 5, "cave-spider": 4, "spore-shambler": 3, "spore-cultist": 3 },
+    materialTable: {
+      mining: { coal: 4, "mithril-ore": 3, "silver-ore": 3, "iron-ore": 1 }, // coal seams under the rot — spore-bomb + fire-flask fuel
+      wood: { glowcap: 5, deadwood: 3, "ironwood-log": 2 }, // giant caps are the "timber" — glowcap: material = food defId, food that keeps
+      herb: { spores: 6, glowcap: 2, thistle: 2, "forest-herb": 2 },
+      animal: { feather: 3, "venom-sac": 2, "deer-hide": 1 }, // cave bats + spiders
+    },
+    barrierTerrain: "mountain",
+    magnitudeBoost: 1.5,
+    fishTable: { river: { crayfish: 4, eel: 2 } },
   },
 };
 
@@ -331,6 +383,8 @@ export const FOOD_ENERGY: Record<string, number> = {
   perch: 60, // si7.6.2: lake-edge catch, fresh
   eel: 70, // si7.6.3: swamp catch, fresh
   pike: 90, // si7.6.2: deep-lake catch (raft) — grill it for a camp-meal-grade food
+  "jungle-fruit": 60, // D100: jungle fruit — fresh, keeps (not in FRESH_TO_STALE)
+  glowcap: 70, // D100: fungal glowcaps — keeps
   samphire: 40, // D94: coastal forage greens — weak-but-immediate; not in FRESH_TO_STALE, so it simply keeps
   mackerel: 60, // D94: sea catch, fresh
   tuna: 100, // D94: deep-sea catch (longboat) — grill it
@@ -371,6 +425,7 @@ export const TERRAIN_COST: Record<Terrain, number> = {
   mountain: Infinity, // impassable — climbing-pick enables it (TERRAIN_GATE)
   shallows: 25, // si7.6.5: wadeable lake/sea margin — slow, not a wall
   lake: Infinity, // si7.6.5: boat-only — a raft enables it (TERRAIN_GATE)
+  "spore-thicket": 15, // si7.6.9.4: slow like mud — its real price is HP (TERRAIN_HP_COST), not energy
   sea: Infinity, // si7.6.5: boat-only — needs a sea-going boat (coastal biome, later); a raft can't
 }; // absolute energy per tile stepped ONTO, on foot, before gear/transport
 // Equipped tools that modify gated terrain (svz). `enable` makes an impassable
@@ -385,6 +440,11 @@ export const TERRAIN_GATE: Partial<Record<Terrain, Record<string, { enable?: num
   mud: { waders: { discount: 5 } }, // 15 → 10
   ice: { "ice-cleats": { discount: 15 } }, // 20 → 5 (faster than plains — a tundra highway)
 };
+// HP a step ONTO this terrain costs (si7.6.9.4, D99) unless you carry one of its ward
+// tools. Never drops you below TERRAIN_HP_FLOOR — spores wear you down, they don't kill.
+export const TERRAIN_HP_COST: Partial<Record<Terrain, number>> = { "spore-thicket": 2 };
+export const TERRAIN_HP_WARD: Partial<Record<Terrain, string[]>> = { "spore-thicket": ["filter-mask"] };
+export const TERRAIN_HP_FLOOR = 1;
 export const TRANSPORT_MULTIPLIER: Record<string, Partial<Record<Terrain, number>>> = {
   horse: { plains: 2, mud: 1.2 }, // open-ground speed; ice/river/mountain default ÷1
   wagon: { ice: 2, plains: 1.5, mud: 1.2 }, // the ice answer + general hauler
@@ -456,6 +516,7 @@ export const TOOL_CAPABILITY: Record<string, string> = {
   "pearl-spyglass": "vision", // D94: spyglass + pearls — a longer glass (VISION_RANGE_BONUS)
   "fishing-rod": "fish", // si7.6.2: fish any water tile you stand on or next to; NODE_TOOL never asks for "fish"
   waders: "wade", // graded-movement gear (svz); NODE_TOOL never asks for it
+  "filter-mask": "filter", // si7.6.9.4: spore-thickets cost no HP (TERRAIN_HP_WARD); NODE_TOOL never asks for it
   "ice-cleats": "trek",
   tent: "camp", // stamina gear (dtv; 7lr): powers the once-per-run camp meal (×TENT_FOOD_MULTIPLIER); NODE_TOOL never asks for "camp", so no gather impact
   canteen: "provision", // stamina gear (si7.2): raises maxEnergy; NODE_TOOL never asks for "provision", so no gather impact
@@ -479,6 +540,7 @@ export const TOOL_PURPOSE: Record<string, string> = {
   vision: "reveals a far node's material and gate when you survey it",
   smith: "forges metal plate at an anvil",
   fish: "fishes the water you stand on or beside",
+  filter: "breathe freely in spore-thickets (no HP lost crossing them)",
 };
 // Tool SPEED (D78): the gather-cost divisor ONLY (cost = NODE_HARDNESS ÷ speed).
 // Absent = speed 1 (a tool contributes no speedup — the base kind tool, or a tool
@@ -647,6 +709,8 @@ export const MAP_TIER_CREATURE_ADD: Record<BiomeId, Record<number, Record<string
   woodland: {}, // no gated bosses native to woodland in the POC
   swamp: {}, // si7.6.3: no swamp boss yet
   coastal: {}, // D94: no coastal boss yet
+  jungle: {}, // D100: no jungle boss yet
+  fungal: {}, // D100: no fungal boss yet
   desert: {
     2: { "dust-vampire": 1 },
     3: { "dust-vampire": 2 },

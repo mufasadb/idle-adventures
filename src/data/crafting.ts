@@ -8,7 +8,7 @@ import { ARROWS_PER_CRAFT, ARROW_SHAFTS_PER_LOG, DARTS_PER_CRAFT } from "./comba
 // --- Consumable item catalogs (M5) ---
 // ENERGY_PER_FOOD / POTION_HEAL are flat, so these are single-item catalogs for
 // the POC; the list is what `pack`/`slotOf` validate a food/potion defId against.
-export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican", "apple", "smoked-venison", "blubber-stew", "cooked-venison", "cooked-berries", "stew", "crayfish", "trout", "perch", "pike", "grilled-pike", "crayfish-boil", "smoked-fish", "eel", "samphire", "mackerel", "tuna", "grilled-tuna"];
+export const FOOD: string[] = ["ration", "trail-ration", "berries", "jam", "pemmican", "apple", "smoked-venison", "blubber-stew", "cooked-venison", "cooked-berries", "stew", "crayfish", "trout", "perch", "pike", "grilled-pike", "crayfish-boil", "smoked-fish", "eel", "samphire", "mackerel", "tuna", "grilled-tuna", "jungle-fruit", "glowcap"];
 export const POTION: string[] = ["potion", "greater-potion", "draught", "greater-draught"];
 export const BATTLE_ITEM: string[] = ["elixir-of-power", "warding-draught", "antidote"]; // antidote (si7.6.9.2): cures your poison, engaged or not // combat consumables (bzd); COMBAT_BUFF keys
 
@@ -245,6 +245,11 @@ export const RECIPE: Record<
   // WHETSTONE (flat-damage grindstone — sharpening is smith work, reuses the forge).
   still: { inputs: [{ defId: "glass-vial", qty: 3 }, { defId: "copper-ore", qty: 2 }], output: { defId: "still", qty: 1 }, buildsStation: "still" }, // a copper sink; reuses alchemy glass
   "fire-flask": { inputs: [{ defId: "glass-vial", qty: 1 }, { defId: "coal", qty: 1 }, { defId: "salt", qty: 1 }], output: { defId: "fire-flask", qty: 1 }, requires: { station: "still" } }, // si7.6.9.1 (D97): coal + salt in glass — two T2 minerals per throw, the alchemist's price
+  "venom-flask": { inputs: [{ defId: "glass-vial", qty: 1 }, { defId: "venom-sac", qty: 1 }, { defId: "thistle", qty: 1 }], output: { defId: "venom-flask", qty: 1 }, requires: { station: "still" } }, // D100
+  "spore-bomb": { inputs: [{ defId: "glass-vial", qty: 1 }, { defId: "spores", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "spore-bomb", qty: 1 }, requires: { station: "still" } }, // D100
+  antidote: { inputs: [{ defId: "thistle", qty: 2 }, { defId: "forest-herb", qty: 1 }], output: { defId: "antidote", qty: 1 }, requires: { tools: ["glassware"] }, field: true }, // D98: brewable before you ever meet venom — at home or in the field
+  "antidote-venom": { inputs: [{ defId: "venom-sac", qty: 1 }, { defId: "forest-herb", qty: 1 }], output: { defId: "antidote", qty: 2 }, requires: { tools: ["glassware"] }, field: true }, // D100: the venom is its own cure — two per sac
+  "filter-mask": { inputs: [{ defId: "deer-hide", qty: 1 }, { defId: "reed", qty: 2 }, { defId: "coal", qty: 1 }], output: { defId: "filter-mask", qty: 1 } }, // D99: charcoal-and-reed mask — spore-thickets cost no HP
   "silver-oil": { inputs: [{ defId: "silver-ore", qty: 1 }, { defId: "forest-herb", qty: 1 }], output: { defId: "silver-oil", qty: 1 }, requires: { station: "still" } }, // affinity vs werewolf
   "drake-oil": { inputs: [{ defId: "drake-hide", qty: 1 }, { defId: "fae-dust", qty: 1 }], output: { defId: "drake-oil", qty: 1 }, requires: { station: "still" } }, // affinity vs dragon — the Wyrm answer without full mithril
   "venom-oil": { inputs: [{ defId: "thistle", qty: 1 }, { defId: "fae-dust", qty: 1 }], output: { defId: "venom-oil", qty: 1 }, requires: { station: "still" } }, // poison DoT

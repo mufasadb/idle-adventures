@@ -205,6 +205,7 @@ export type GameEvent =
       cost: number;
       energy: number; // remaining after the step
       poisonTaken?: number; // si7.6.9.2: HP your poison cost on this step (present when >0)
+      hazardTaken?: number; // si7.6.9.4: HP the terrain itself cost (spore-thicket without a filter-mask), present when >0
       hp?: number; // HP after the step, present when the step cost HP
     }
   | {

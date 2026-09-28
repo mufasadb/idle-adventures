@@ -139,6 +139,8 @@ export const ENHANCEMENT: string[] = ["whetstone", "silver-oil", "drake-oil", "v
 // ⚠ balance surface: changing this requires `bun run sim:tables` (test/balance-tables.test.ts enforces)
 export const FLASK_EFFECT: Record<string, { dmg: number; poison?: { dmg: number; rounds: number } }> = {
   "fire-flask": { dmg: 8 }, // one-shots T1 (8hp), halves a T2
+  "venom-flask": { dmg: 2, poison: { dmg: 4, rounds: 4 } }, // D100: 18 over the fight — patient damage from jungle venom
+  "spore-bomb": { dmg: 16 }, // D100: fungal spores — one-shots a T2, two take a T3
 };
 export const FLASK: string[] = Object.keys(FLASK_EFFECT); // flask catalog (slotOf → "flask")
 export const FLASK_STACK_CAP = 3; // flasks per carry slot — a bandolier; the alchemist's whole arsenal competes with haul
@@ -196,6 +198,14 @@ export const MONSTERS: Record<string, Monster> = {
   // crossbow from the rocks), siren (T2 fae — magic into robe). Full incoming/hide spread.
   "tide-crab": { tier: 1, dmgType: "melee", armourType: "plate", category: "beast", tags: ["beast"] },
   wrecker: { tier: 2, dmgType: "ranged", armourType: "light", category: "humanoid", tags: [] },
+  // D100 jungle (venom, D98) + fungal forest. Venom is uncommon per landed hit and gentle.
+  "jungle-viper": { tier: 2, dmgType: "melee", armourType: "light", category: "beast", tags: ["beast"], venom: { chance: 0.2, dmg: 1, ticks: 5 } },
+  "vine-horror": { tier: 2, dmgType: "melee", armourType: "plate", category: "giant", tags: [] },
+  headhunter: { tier: 2, dmgType: "ranged", armourType: "light", category: "humanoid", tags: [], venom: { chance: 0.15, dmg: 1, ticks: 4 } }, // poisoned blowdarts
+  myconid: { tier: 2, dmgType: "magic", armourType: "robe", category: "fae", tags: ["fae"] },
+  "cave-spider": { tier: 2, dmgType: "melee", armourType: "light", category: "beast", tags: ["beast"], venom: { chance: 0.2, dmg: 1, ticks: 5 } },
+  "spore-shambler": { tier: 2, dmgType: "melee", armourType: "plate", category: "giant", tags: [] },
+  "spore-cultist": { tier: 2, dmgType: "ranged", armourType: "plate", category: "humanoid", tags: [] }, // chitin-clad, spits spore darts — fungal's map-carrier
   siren: { tier: 2, dmgType: "magic", armourType: "robe", category: "fae", tags: ["fae"] },
   // Tier-4 boss (D34): magic damage into a plate hide — punishes the plate
   // strategy that carried the whole game (plate weak to magic, ÷1.5). The
@@ -301,6 +311,13 @@ export const LOOT_TABLE: Record<string, ItemStackSpec[]> = {
   "marsh-hag": [{ defId: "raider-supplies", qty: 1 }], // + the humanoid map-scroll chance
   "tide-crab": [{ defId: "crab-shell", qty: 2 }], // D94: same shell as the ice-crab → ration-crab
   wrecker: [{ defId: "raider-supplies", qty: 1 }], // D94: + the humanoid map-scroll chance
+  "jungle-viper": [{ defId: "venom-sac", qty: 2 }], // D100 → antidote, venom-flask
+  "vine-horror": [{ defId: "ironwood-log", qty: 2 }, { defId: "stringybark", qty: 1 }],
+  headhunter: [{ defId: "raider-supplies", qty: 1 }, { defId: "venom-sac", qty: 1 }], // + the humanoid map-scroll chance
+  myconid: [{ defId: "fae-dust", qty: 1 }, { defId: "spores", qty: 2 }],
+  "cave-spider": [{ defId: "venom-sac", qty: 2 }],
+  "spore-shambler": [{ defId: "spores", qty: 3 }, { defId: "mithril-ore", qty: 1 }],
+  "spore-cultist": [{ defId: "raider-supplies", qty: 1 }, { defId: "spores", qty: 1 }], // + the humanoid map-scroll chance
   siren: [{ defId: "fae-dust", qty: 2 }], // D94: fae dust (staffs, oils)
   // Boss (D34): wyrm-scale always → dragonscale-cuirass; dragonheart @0.2 (the
   // 1/5 rare) → wyrmfang. `chance` is rolled per-encounter by rollLoot (§4.5).

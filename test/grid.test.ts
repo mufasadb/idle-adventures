@@ -79,10 +79,11 @@ test("rollBiome (D91/D94): a rare biome never rolls below its minTier, and a bas
   for (let i = 0; i < 400; i++) {
     const seed = `rare-${i}`;
     const t1 = rollBiome(seed, 1);
-    expect(["swamp", "coastal"]).not.toContain(t1);
+    expect(["swamp", "coastal", "jungle", "fungal"]).not.toContain(t1);
     const t2 = rollBiome(seed, 2);
+    expect(t2).not.toBe("fungal"); // D100: fungal is T3+
     if (t2 === "swamp" || t2 === "coastal") atT2[t2]++;
-    else expect(t2 as string).toBe(t1); // not rare ⇒ same base biome as T1
+    else if (t2 !== "jungle") expect(t2 as string).toBe(t1); // not rare ⇒ same base biome as T1
   }
   expect(atT2.swamp).toBeGreaterThan(80); // swamp 0.3 over 400 seeds (~120)
   expect(atT2.swamp).toBeLessThan(160);

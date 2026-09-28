@@ -8,6 +8,7 @@ import {
   BARRIER_THRESHOLD,
   WATER_NOISE_FREQUENCY,
   RIVER_NOISE_FREQUENCY,
+  SPORE_NOISE_FREQUENCY,
   BIOMES,
   BIOME_IDS,
   RARE_BIOMES,
@@ -109,6 +110,15 @@ export function rollBiome(mapSeed: string, mapTier = 1): BiomeId {
 function rollMagnitude(table: Record<number, number>, roll: number): number {
   const order = Object.keys(table).map(Number).sort((a, b) => a - b).map(String);
   return Number(weightedPick(table as unknown as Record<string, number>, order, roll));
+}
+
+// D100: a rich biome multiplies the magnitude-2/3 weights (identity at boost 1, and a
+// T1 table {1:1} has nothing to boost).
+function boostMagnitudes(table: Record<number, number>, boost: number): Record<number, number> {
+  if (boost === 1) return table;
+  const out: Record<number, number> = {};
+  for (const [k, w] of Object.entries(table)) out[Number(k)] = Number(k) >= 2 ? w * boost : w;
+  return out;
 }
 
 // Roll a POI's material from the biome's weighted table (D27). Keys are sorted
@@ -345,6 +355,11 @@ function buildGrid(mapSeed: string, biomeId: BiomeId, mapTier: number, affixes: 
         const r = perlin2(`${mapSeed}:river`, (x + 0.5) * RIVER_NOISE_FREQUENCY, (y + 0.5) * RIVER_NOISE_FREQUENCY);
         if (Math.abs(r - 0.5) < biome.river) t = "river";
       }
+      // Spore thickets (si7.6.9.4): clumps on dry land from their own namespaced field.
+      if (biome.spores !== undefined && (t === "plains" || t === "mud" || t === "ice")) {
+        const sp = perlin2(`${mapSeed}:spores`, (x + 0.5) * SPORE_NOISE_FREQUENCY, (y + 0.5) * SPORE_NOISE_FREQUENCY);
+        if (sp > biome.spores) t = "spore-thicket";
+      }
       // Standing water (si7.6.5): its own namespaced field, so it never shifts the
       // terrain/barrier samples above — a biome without `water` is byte-identical.
       // The body floods everything; the shallows ring spares mountains (a shore wall
@@ -428,7 +443,7 @@ function buildGrid(mapSeed: string, biomeId: BiomeId, mapTier: number, affixes: 
     const magnitude =
       kind === "monster"
         ? undefined
-        : rollMagnitude(NODE_MAGNITUDE_WEIGHTS[mapTier] ?? { 1: 1 }, rand(mapSeed, "poi-magnitude", i));
+        : rollMagnitude(boostMagnitudes(NODE_MAGNITUDE_WEIGHTS[mapTier] ?? { 1: 1 }, biome.magnitudeBoost ?? 1), rand(mapSeed, "poi-magnitude", i));
     return { kind, material, creature, magnitude };
   });
   // (c) 57r/D73: POI placement is value-AGNOSTIC — each spec keeps the position it

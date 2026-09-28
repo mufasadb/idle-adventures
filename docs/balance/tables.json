@@ -224,6 +224,76 @@
       "category": "humanoid",
       "tags": []
     },
+    "jungle-viper": {
+      "tier": 2,
+      "dmgType": "melee",
+      "armourType": "light",
+      "category": "beast",
+      "tags": [
+        "beast"
+      ],
+      "venom": {
+        "chance": 0.2,
+        "dmg": 1,
+        "ticks": 5
+      }
+    },
+    "vine-horror": {
+      "tier": 2,
+      "dmgType": "melee",
+      "armourType": "plate",
+      "category": "giant",
+      "tags": []
+    },
+    "headhunter": {
+      "tier": 2,
+      "dmgType": "ranged",
+      "armourType": "light",
+      "category": "humanoid",
+      "tags": [],
+      "venom": {
+        "chance": 0.15,
+        "dmg": 1,
+        "ticks": 4
+      }
+    },
+    "myconid": {
+      "tier": 2,
+      "dmgType": "magic",
+      "armourType": "robe",
+      "category": "fae",
+      "tags": [
+        "fae"
+      ]
+    },
+    "cave-spider": {
+      "tier": 2,
+      "dmgType": "melee",
+      "armourType": "light",
+      "category": "beast",
+      "tags": [
+        "beast"
+      ],
+      "venom": {
+        "chance": 0.2,
+        "dmg": 1,
+        "ticks": 5
+      }
+    },
+    "spore-shambler": {
+      "tier": 2,
+      "dmgType": "melee",
+      "armourType": "plate",
+      "category": "giant",
+      "tags": []
+    },
+    "spore-cultist": {
+      "tier": 2,
+      "dmgType": "ranged",
+      "armourType": "plate",
+      "category": "humanoid",
+      "tags": []
+    },
     "siren": {
       "tier": 2,
       "dmgType": "magic",
@@ -566,6 +636,32 @@
         "rounds": 3
       }
     },
+    "cave-spider": {
+      "bare": {
+        "victory": false,
+        "hpLost": 30,
+        "hpLostPct": 100,
+        "rounds": 4
+      },
+      "iron": {
+        "victory": true,
+        "hpLost": 16,
+        "hpLostPct": 53.3,
+        "rounds": 5
+      },
+      "steel": {
+        "victory": true,
+        "hpLost": 9,
+        "hpLostPct": 30,
+        "rounds": 4
+      },
+      "mithril": {
+        "victory": true,
+        "hpLost": 4.6,
+        "hpLostPct": 15.2,
+        "rounds": 3
+      }
+    },
     "drake": {
       "bare": {
         "victory": false,
@@ -722,6 +818,58 @@
         "rounds": 3
       }
     },
+    "headhunter": {
+      "bare": {
+        "victory": false,
+        "hpLost": 30,
+        "hpLostPct": 100,
+        "rounds": 4
+      },
+      "iron": {
+        "victory": true,
+        "hpLost": 10.7,
+        "hpLostPct": 35.6,
+        "rounds": 5
+      },
+      "steel": {
+        "victory": true,
+        "hpLost": 5.5,
+        "hpLostPct": 18.5,
+        "rounds": 4
+      },
+      "mithril": {
+        "victory": true,
+        "hpLost": 2.7,
+        "hpLostPct": 8.9,
+        "rounds": 3
+      }
+    },
+    "jungle-viper": {
+      "bare": {
+        "victory": false,
+        "hpLost": 30,
+        "hpLostPct": 100,
+        "rounds": 4
+      },
+      "iron": {
+        "victory": true,
+        "hpLost": 16,
+        "hpLostPct": 53.3,
+        "rounds": 5
+      },
+      "steel": {
+        "victory": true,
+        "hpLost": 9,
+        "hpLostPct": 30,
+        "rounds": 4
+      },
+      "mithril": {
+        "victory": true,
+        "hpLost": 4.6,
+        "hpLostPct": 15.2,
+        "rounds": 3
+      }
+    },
     "marsh-hag": {
       "bare": {
         "victory": true,
@@ -745,6 +893,32 @@
         "victory": true,
         "hpLost": 1.3,
         "hpLostPct": 4.4,
+        "rounds": 2
+      }
+    },
+    "myconid": {
+      "bare": {
+        "victory": true,
+        "hpLost": 24,
+        "hpLostPct": 80,
+        "rounds": 4
+      },
+      "iron": {
+        "victory": true,
+        "hpLost": 4.8,
+        "hpLostPct": 16,
+        "rounds": 2
+      },
+      "steel": {
+        "victory": true,
+        "hpLost": 7.6,
+        "hpLostPct": 25.3,
+        "rounds": 3
+      },
+      "mithril": {
+        "victory": true,
+        "hpLost": 3,
+        "hpLostPct": 10,
         "rounds": 2
       }
     },
@@ -797,6 +971,84 @@
         "victory": true,
         "hpLost": 2.7,
         "hpLostPct": 8.9,
+        "rounds": 3
+      }
+    },
+    "spore-cultist": {
+      "bare": {
+        "victory": false,
+        "hpLost": 30,
+        "hpLostPct": 100,
+        "rounds": 4
+      },
+      "iron": {
+        "victory": true,
+        "hpLost": 13.3,
+        "hpLostPct": 44.4,
+        "rounds": 6
+      },
+      "steel": {
+        "victory": true,
+        "hpLost": 5.5,
+        "hpLostPct": 18.5,
+        "rounds": 4
+      },
+      "mithril": {
+        "victory": true,
+        "hpLost": 2.7,
+        "hpLostPct": 8.9,
+        "rounds": 3
+      }
+    },
+    "spore-shambler": {
+      "bare": {
+        "victory": false,
+        "hpLost": 30,
+        "hpLostPct": 100,
+        "rounds": 4
+      },
+      "iron": {
+        "victory": true,
+        "hpLost": 20,
+        "hpLostPct": 66.7,
+        "rounds": 6
+      },
+      "steel": {
+        "victory": true,
+        "hpLost": 9,
+        "hpLostPct": 30,
+        "rounds": 4
+      },
+      "mithril": {
+        "victory": true,
+        "hpLost": 4.6,
+        "hpLostPct": 15.2,
+        "rounds": 3
+      }
+    },
+    "vine-horror": {
+      "bare": {
+        "victory": false,
+        "hpLost": 30,
+        "hpLostPct": 100,
+        "rounds": 4
+      },
+      "iron": {
+        "victory": true,
+        "hpLost": 20,
+        "hpLostPct": 66.7,
+        "rounds": 6
+      },
+      "steel": {
+        "victory": true,
+        "hpLost": 9,
+        "hpLostPct": 30,
+        "rounds": 4
+      },
+      "mithril": {
+        "victory": true,
+        "hpLost": 4.6,
+        "hpLostPct": 15.2,
         "rounds": 3
       }
     },

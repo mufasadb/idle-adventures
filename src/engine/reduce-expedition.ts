@@ -1,7 +1,7 @@
 import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot, Expedition, Loadout } from "./types";
 import { expeditionGrid, fishWaterOf } from "./grid";
 import { rand } from "./rng";
-import { stepToward, moveCost, isDiagonalStep } from "./move";
+import { stepToward, moveCost, isDiagonalStep, terrainHpCost } from "./move";
 import { addToCarry, freeLootStacks, usedSlots, carryCap, consumeExpeditionInputs, consumeOne } from "./carry";
 import { toolSpeedFor, gatherCost, gateSatisfied, secondaryToolSatisfied } from "./tools";
 import { foodEnergyOf } from "./food";
@@ -11,7 +11,7 @@ import { recipeOutputQty } from "./craft";
 import { EQUIP_SLOTS } from "./pack";
 import type { EquipSlot } from "./pack";
 import { slotOf, isGear } from "./catalog";
-import { MAX_ENERGY, MAP_WIDTH, MAP_HEIGHT, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, FOOD, POTION, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, RECIPE, FISH_CAST_ENERGY, CATCH_EFFECT, LOCKBOX_LOOT } from "../data/constants";
+import { MAX_ENERGY, MAP_WIDTH, MAP_HEIGHT, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, FOOD, POTION, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, RECIPE, FISH_CAST_ENERGY, CATCH_EFFECT, LOCKBOX_LOOT, TERRAIN_HP_FLOOR } from "../data/constants";
 import { visionRadius } from "./perceive";
 import { rejected, autoRefill, livePoiAt, isCleared } from "./reduce-shared";
 import { engage, maybeAutoFinish, provokeTurn, pendingLootFits, mintMap, withPoison } from "./reduce-combat";
@@ -47,12 +47,19 @@ export function move(
   if (!Number.isFinite(cost)) return rejected(state, "move", "impassable");
   if (cost > expedition.energy) return rejected(state, "move", "exhausted");
   const fed = autoRefill(expedition, expedition.energy - cost); // drain, then waste-free auto-eat (dtv)
+  // si7.6.9.4: a hazardous terrain (spore-thicket) costs HP unless a ward tool is carried.
+  const hazard = terrainHpCost(terrain, expedition.loadout.equipment.tools);
+  const afterHazard = Math.max(Math.min(expedition.hp, TERRAIN_HP_FLOOR), expedition.hp - hazard);
   // si7.6.9.2: your poison ticks once per step (never below PLAYER_POISON_FLOOR).
-  const tick = expedition.poisoned ? poisonTick(expedition.hp, expedition.poisoned) : undefined;
-  const stepped = { ...withPoison(expedition, tick?.after ?? (tick ? undefined : expedition.poisoned)), pos: step, energy: fed.energy, hp: tick?.hp ?? expedition.hp, loadout: { ...expedition.loadout, food: fed.food } };
+  const tick = expedition.poisoned ? poisonTick(afterHazard, expedition.poisoned) : undefined;
+  const hp = tick?.hp ?? afterHazard;
+  const stepped = { ...withPoison(expedition, tick?.after ?? (tick ? undefined : expedition.poisoned)), pos: step, energy: fed.energy, hp, loadout: { ...expedition.loadout, food: fed.food } };
   return {
     state: { ...state, expedition: stepped },
-    events: [{ type: "moved", from, to: step, terrain, cost, energy: fed.energy, ...(tick && tick.taken > 0 ? { poisonTaken: tick.taken, hp: tick.hp } : {}) }],
+    events: [{ type: "moved", from, to: step, terrain, cost, energy: fed.energy,
+      ...(expedition.hp - afterHazard > 0 ? { hazardTaken: expedition.hp - afterHazard } : {}),
+      ...(tick && tick.taken > 0 ? { poisonTaken: tick.taken } : {}),
+      ...(hp !== expedition.hp ? { hp } : {}) }],
   };
 }
 

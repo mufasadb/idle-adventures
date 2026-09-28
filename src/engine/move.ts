@@ -8,6 +8,8 @@ import {
   TRANSPORT_MULTIPLIER,
   MIN_STEP,
   DIAGONAL_MULTIPLIER,
+  TERRAIN_HP_COST,
+  TERRAIN_HP_WARD,
 } from "../data/constants";
 import type { Terrain } from "../data/constants";
 
@@ -97,4 +99,12 @@ export function moveCost(
   diagonal = false,
 ): number {
   return moveCostBreakdown(terrain, transport, tools, diagonal).final;
+}
+
+// HP a step onto `terrain` costs (si7.6.9.4, D99): TERRAIN_HP_COST unless one of the
+// terrain's ward tools (TERRAIN_HP_WARD — the filter-mask for spores) is carried.
+export function terrainHpCost(terrain: Terrain, tools: string[]): number {
+  const cost = TERRAIN_HP_COST[terrain] ?? 0;
+  if (cost === 0) return 0;
+  return (TERRAIN_HP_WARD[terrain] ?? []).some((t) => tools.includes(t)) ? 0 : cost;
 }
