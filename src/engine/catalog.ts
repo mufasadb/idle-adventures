@@ -1,6 +1,6 @@
 // Item classification (M5): maps a defId to the loadout slot it belongs to, so
 // `pack` can reject items in the wrong slot. Reads the code-side catalog only.
-import { WEAPONS, ARMOUR, TOOL_CAPABILITY, TRANSPORT_MULTIPLIER, BACKPACK_SLOTS, FOOD, POTION, BATTLE_ITEM, PANNIERS, AMMO, ENHANCEMENT, ARROW_STACK_CAP, QUIVER_AMMO_CAP } from "../data/constants";
+import { WEAPONS, ARMOUR, TOOL_CAPABILITY, TRANSPORT_MULTIPLIER, BACKPACK_SLOTS, FOOD, POTION, BATTLE_ITEM, PANNIERS, AMMO, ENHANCEMENT, FLASK, FLASK_STACK_CAP, ARROW_STACK_CAP, QUIVER_AMMO_CAP } from "../data/constants";
 import type { LoadoutSlot, Loadout, ItemStack } from "./types";
 
 export function slotOf(defId: string): LoadoutSlot | null {
@@ -58,6 +58,7 @@ export const CONSUMABLE_KINDS: Record<ConsumableKey, {
   battleItems: { slot: "battle-item", member: (d) => BATTLE_ITEM.includes(d), stackCapPerSlot: 1 }, // used mid-fight by use-item (90j)
   spares: { slot: "spare", member: isGear, stackCapPerSlot: 1 }, // any gear (82r); expanded into carry at embark, so [] during expeditions
   ammo: { slot: "ammo", member: (d) => AMMO.includes(d), stackCapPerSlot: ARROW_STACK_CAP }, // front stack FIFO (D45); the one deep-stacking kind
+  flasks: { slot: "flask", member: (d) => FLASK.includes(d), stackCapPerSlot: FLASK_STACK_CAP }, // thrown by `throw` (si7.6.9.1)
   enhancements: { slot: "enhancement", member: (d) => ENHANCEMENT.includes(d), stackCapPerSlot: 1 }, // applied by enhance (D60)
 };
 

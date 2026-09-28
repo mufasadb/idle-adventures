@@ -108,7 +108,7 @@ export function formatEvent(e: GameEvent, name: (defId: string) => string): stri
     case "engaged": return e.ranged
       ? `🏹 engaged the ${name(e.creature)} from a tile away — your opener lands before it can answer`
       : `⚔ engaged the ${name(e.creature)}`;
-    case "exchanged": return `⚔ traded blows with the ${name(e.creature)} — dealt ${round1(e.dmgDealt)}, took ${round1(e.dmgTaken)} · ${round1(e.hp)}hp left${e.arrowSpent ? (e.ammoSpent ? ` · 🎯 −1 ${name(e.ammoSpent)}` : " · 🏹 −1 arrow") : ""}${e.poisonDmg ? ` · ☠ poison ${round1(e.poisonDmg)}` : ""}`;
+    case "exchanged": return `${e.thrown ? `💥 threw a ${name(e.thrown)} at the ${name(e.creature)}${e.dmgTaken === 0 && e.monsterHp > 0 ? " (it can't answer yet)" : ""} —` : `⚔ traded blows with the ${name(e.creature)} —`} dealt ${round1(e.dmgDealt)}, took ${round1(e.dmgTaken)} · ${round1(e.hp)}hp left${e.arrowSpent ? (e.ammoSpent ? ` · 🎯 −1 ${name(e.ammoSpent)}` : " · 🏹 −1 arrow") : ""}${e.poisonDmg ? ` · ☠ poison ${round1(e.poisonDmg)}` : ""}`;
     case "fled": return `🏃 fled the ${name(e.creature)} · −${round1(e.partingHit)}hp → ${round1(e.hp)}hp`;
     case "quaffed": return `🧪 quaffed ${name(e.defId)} · +${round1(e.healed)}hp → ${round1(e.hp)}hp${e.energy !== undefined ? ` · −${QUAFF_ENERGY}e → ${round1(e.energy)}e` : ""}`;
     case "item-used": return `⚗ used ${name(e.defId)} this fight${e.damageAdd ? ` · +${round1(e.damageAdd)} dmg` : ""}${e.mitigationAdd ? ` · +${round1(e.mitigationAdd)} mitigation` : ""}`;

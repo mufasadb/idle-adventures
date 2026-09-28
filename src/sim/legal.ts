@@ -79,6 +79,13 @@ export function expeditionActions(state: GameState): Action[] {
   candidates.push({ type: "toggle-auto-finish" }); // 67e
   // use-item (90j): each held battle item; reduce keeps it only while engaged (D29)
   for (const stack of state.expedition.loadout.battleItems ?? []) candidates.push({ type: "use-item", itemId: stack.defId });
+  // throw (si7.6.9.1): each held flask, at your tile / each neighbour (reduce filters no-monster / engaged, D29)
+  for (const stack of state.expedition.loadout.flasks ?? []) {
+    candidates.push({ type: "throw", itemId: stack.defId });
+    if (!engaged) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (dx !== 0 || dy !== 0) candidates.push({ type: "throw", itemId: stack.defId, at: { x: pos.x + dx, y: pos.y + dy } });
+    }
+  }
   // enhance (D60): each held weapon enhancement; usable engaged or not (reduce filters, D29)
   for (const stack of state.expedition.loadout.enhancements ?? []) candidates.push({ type: "enhance", id: stack.defId });
   // survey (54f): each POI whose detail is NOT yet resolved from here; reduce

@@ -248,19 +248,21 @@ export function strikeExchange(
     skipRetaliation?: boolean;
     weaponBuff?: { id: string; charges: number };
     poison?: { dmg: number; rounds: number };
+    thrown?: { dmg: number; poison?: { dmg: number; rounds: number } }; // si7.6.9.1: a flask replaces the swing
   } = {},
 ): ExchangeResult {
-  const { damageAdd = 0, mitigationAdd = 0, autoQuaff = true, skipRetaliation = false, weaponBuff, poison } = opts;
-  const dmgDealt = playerDamage(loadout, monsterId, weaponBuff) + damageAdd;
+  const { damageAdd = 0, mitigationAdd = 0, autoQuaff = true, skipRetaliation = false, weaponBuff, poison, thrown } = opts;
+  // si7.6.9.1: a thrown flask IS the strike — flat dmg, no weapon/elixir/coating, no charge spent, no dart.
+  const dmgDealt = thrown ? thrown.dmg : playerDamage(loadout, monsterId, weaponBuff) + damageAdd;
   // Weapon-enhancement bookkeeping (D60). The strike always spends one charge; at
   // 0 the coating clears. A poison coating set/refreshes the engagement's poison on
   // this hit (before it wears off), so a fresh coat also ticks this same round.
-  const enh = weaponBuff ? WEAPON_ENHANCEMENT[weaponBuff.id] : undefined;
-  const weaponBuffAfter =
+  const enh = weaponBuff && !thrown ? WEAPON_ENHANCEMENT[weaponBuff.id] : undefined;
+  const weaponBuffAfter = thrown ? weaponBuff :
     weaponBuff && weaponBuff.charges - 1 > 0 ? { id: weaponBuff.id, charges: weaponBuff.charges - 1 } : undefined;
   // si7.6.6: a poisoned dart (the loaded ammo of a wielded ranged weapon) sets/refreshes
   // poison too — unless what's already ticking hits harder. A coating's poison wins.
-  const dart = wieldsRanged(loadout) && hasAmmo(loadout) ? AMMO_POISON[loadout.ammo![loadedAmmoIndex(loadout)]!.defId] : undefined;
+  const dart = thrown ? thrown.poison : wieldsRanged(loadout) && hasAmmo(loadout) ? AMMO_POISON[loadout.ammo![loadedAmmoIndex(loadout)]!.defId] : undefined;
   const carried = dart && (!poison || dart.dmg >= poison.dmg) ? dart : poison;
   const poisonState = enh?.poison ? { ...enh.poison } : carried ? { ...carried } : undefined;
   // Round-end poison tick: the monster loses poison.dmg (dealt with the strike so

@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { craft } from "../src/engine/craft";
-import { RECIPE, ARMOUR, WEAPONS, TOOL_CAPABILITY, BACKPACK_SLOTS, TRANSPORT_MULTIPLIER, FOOD, POTION, BATTLE_ITEM, PANNIERS, AMMO, INKS, ENHANCEMENT, MAP_HOLDER_CAP, QUIVER_AMMO_CAP } from "../src/data/constants";
+import { RECIPE, ARMOUR, WEAPONS, TOOL_CAPABILITY, BACKPACK_SLOTS, TRANSPORT_MULTIPLIER, FOOD, POTION, BATTLE_ITEM, PANNIERS, AMMO, INKS, ENHANCEMENT, FLASK, MAP_HOLDER_CAP, QUIVER_AMMO_CAP } from "../src/data/constants";
 import { slotOf } from "../src/engine/catalog";
 
 // ke3.1 recipe-gate tests inject a throwaway recipe into the RECIPE catalog so the
@@ -158,6 +158,7 @@ test("recipes: every output is a real equippable/consumable defId — or a craft
   const known = (d: string) =>
     d in WEAPONS || d in ARMOUR || d in TOOL_CAPABILITY || d in BACKPACK_SLOTS ||
     d in TRANSPORT_MULTIPLIER || FOOD.includes(d) || POTION.includes(d) || BATTLE_ITEM.includes(d) || PANNIERS.includes(d) || AMMO.includes(d) ||
+    FLASK.includes(d) || // alchemist flasks (si7.6.9.1): packed as `flask`, thrown by the `throw` action
     ENHANCEMENT.includes(d) || // weapon enhancements (D60): whetstone/oils packed as `enhancement`, applied by the `enhance` action
     d in INKS || // cartography inks (cxq): bank materials consumed by the `ink` action, not a recipe
     d in QUIVER_AMMO_CAP || // quiver (ke3.7.1, D92): its own equipment slot

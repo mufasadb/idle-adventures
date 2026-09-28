@@ -129,6 +129,20 @@ export const WEAPON_ENHANCEMENT: Record<string, { charges: number; flatDamage?: 
 // stacking, like a battle-item) and are recognised by slotOf. WEAPON_ENHANCEMENT keys.
 export const ENHANCEMENT: string[] = ["whetstone", "silver-oil", "drake-oil", "venom-oil"];
 
+// Alchemist flasks (si7.6.9.1, D97): thrown by the `throw` action — the flask IS your
+// strike that round (weapon, coating, elixir and armour matrix all ignored; the flask
+// hits for its own flat dmg). The FIRST strike of any fight, if it's a throw, is a free
+// opener (no retaliation); later throws trade blows like a swing. Big impact, high cost:
+// enough flasks and you need no weapon at all (user, 2026-09-29).
+//   dmg     — flat damage on impact, ignores armour.
+//   poison? — sets/refreshes the engagement's poison (a stronger DoT already ticking wins).
+// ⚠ balance surface: changing this requires `bun run sim:tables` (test/balance-tables.test.ts enforces)
+export const FLASK_EFFECT: Record<string, { dmg: number; poison?: { dmg: number; rounds: number } }> = {
+  "fire-flask": { dmg: 8 }, // one-shots T1 (8hp), halves a T2
+};
+export const FLASK: string[] = Object.keys(FLASK_EFFECT); // flask catalog (slotOf → "flask")
+export const FLASK_STACK_CAP = 3; // flasks per carry slot — a bandolier; the alchemist's whole arsenal competes with haul
+
 export const AFFINITY_MULTIPLIER = 2; // hidden affinity effect, e.g. silver↔werewolf
 export type Affinity = { monsterTag: string; itemTag: string };
 // ⚠ balance surface: changing this requires `bun run sim:tables` (test/balance-tables.test.ts enforces)
