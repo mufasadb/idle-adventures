@@ -29,9 +29,9 @@ test("calibrated harvest proof: tier food ≈2× base rations on a high-tier map
   // measures the biome mix, not the food ladder this test exists for.
   const maps = Array.from({ length: 12 }, (_, i) => localMap("hf", i).mapSeed).filter((m) => !RARE_BIOMES[rollBiome(m, PROOF_TIER)]).slice(0, 5);
   // Tier-matched loadout: dense pemmican + capacity gear + full reach kit.
-  const tierPack = { tools: ["pick", "knife", "trap", "canteen", "tent", "ice-cleats", "climbing-pick"], backpack: "large-pack", transport: "horse", food: [{ defId: "pemmican", qty: 6 }] }; // D83: trap to hunt
+  const tierPack = { tools: ["pick", "knife", "trap", "canteen", "tent", "ice-cleats", "climbing-pick", "raft"], backpack: "large-pack", transport: "horse", food: [{ defId: "pemmican", qty: 6 }] }; // D83: trap to hunt; 1u6: raft once rivers really generate
   // Base loadout: the SAME reach gear but CHEAP food (base rations only).
-  const basePack = { tools: ["pick", "knife", "trap", "tent", "ice-cleats", "climbing-pick"], backpack: "large-pack", transport: "horse", food: [{ defId: "ration", qty: 6 }] }; // D83: trap to hunt
+  const basePack = { tools: ["pick", "knife", "trap", "tent", "ice-cleats", "climbing-pick", "raft"], backpack: "large-pack", transport: "horse", food: [{ defId: "ration", qty: 6 }] }; // D83: trap to hunt
   const tier = harvestFractionReport(tierPack, PROOF_TIER, maps).avg;
   const base = harvestFractionReport(basePack, PROOF_TIER, maps).avg;
   console.log(`[si7.2] tier=${(100 * tier).toFixed(0)}% base=${(100 * base).toFixed(0)}% ratio=${(tier / base).toFixed(2)} (targets ${100 * HARVEST_FRACTION_TIER_TARGET}/${100 * HARVEST_FRACTION_BASE_TARGET})`);

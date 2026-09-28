@@ -29,6 +29,11 @@ export const NOISE_FREQUENCY = 0.15; // Perlin sample step per tile; lower = lar
 // literally unreachable barefoot — mountains are cost-walls, not prisons).
 export const BARRIER_NOISE_FREQUENCY = 0.06; // ≪ NOISE_FREQUENCY → chunky ridges, not speckle
 export const BARRIER_THRESHOLD = 0.68; // the "how walled is the world" dial: lower = more maze
+// River layer (1u6, D96): its own namespaced noise field; a tile is river where that
+// field sits within a biome's `river` band of its midline (0.5) — a contour LINE, so
+// rivers wind across the map instead of pooling as blobs. Rivers used to be the lowest
+// terrainWeights band, which Perlin (clustered around 0.5) almost never reached.
+export const RIVER_NOISE_FREQUENCY = 0.05; // low → a few long, gently winding rivers per map
 export const WATER_NOISE_FREQUENCY = 0.07; // si7.6.5: standing-water field (a biome's `water` layer) — low, so lakes are blobs, not puddles
 export const POI_DENSITY = 60; // POIs per 35×35 map (D84): a geared+provisioned run should harvest ~half and CHOOSE which half (now: which DIRECTION). Area 1225 ≈ the old 20×60 = 1200, so the count/value budget carries over.
 export const POI_MIN_SPACING = 3; // min Chebyshev distance between POIs (spec: 3–4 tiles apart)
@@ -98,6 +103,11 @@ export type Biome = {
   // `coast` (D94): blend weight 0..1 of an edge gradient into the water field — the sea
   // piles up against ONE seeded map edge (a shoreline), not scattered lakes.
   water?: { body: Terrain; lakeThreshold: number; shallowsBand: number; coast?: number };
+  // Rivers (1u6, D96): half-width of the river band around the river field's midline —
+  // wider = more/thicker river. Rivers never overwrite a wall, and standing water
+  // drowns them where they meet it. Absent = no rivers. Scaled by map tier via
+  // TERRAIN_WEIGHT_TIER_SHIFT[tier].river.
+  river?: number;
   // Fishing (si7.6.2): what each KIND of water yields here, rolled per water tile
   // at generation (D21 — gather-time never consults the biome). Absent kind =
   // that water can't be fished in this biome.
@@ -111,7 +121,8 @@ export type FishWater = "river" | "shallows" | "lake" | "deep-lake" | "sea" | "d
 
 export const BIOMES: Record<BiomeId, Biome> = {
   woodland: {
-    terrainWeights: { plains: 0.4, mud: 0.25, river: 0.15, mountain: 0.2 },
+    terrainWeights: { plains: 0.4, mud: 0.4, mountain: 0.2 }, // 1u6: river's old 0.15 folded into mud (its upper noise neighbour) so no other band moves
+    river: 0.03,
     nodeTypeWeights: { wood: 0.3, herb: 0.25, animal: 0.2, monster: 0.15, mining: 0.1 }, // p8b: mining 0.05→0.1 (avg ~3→~6 nodes/map) — still the rarest, but reliably present so woodland reads as a mineable biome
     creatureTable: { "forest-boar": 5, "forest-bandit": 4, "shell-beetle": 4, "fae-sprite": 3, werewolf: 2, "giant-elk": 3 }, // m0a: giant-elk mid-tier
     materialTable: {
@@ -130,7 +141,8 @@ export const BIOMES: Record<BiomeId, Biome> = {
     },
   },
   desert: {
-    terrainWeights: { plains: 0.55, mountain: 0.3, river: 0.15 },
+    terrainWeights: { plains: 0.7, mountain: 0.3 }, // 1u6: river's old 0.15 folded into plains (its upper noise neighbour) so no other band moves
+    river: 0.015, // thin desert creeks
     nodeTypeWeights: { mining: 0.4, monster: 0.25, herb: 0.15, wood: 0.1, animal: 0.1 },
     creatureTable: { "sand-raider": 5, "mirage-wisp": 4, "giant-scorpion": 3, "dust-djinn": 3, drake: 3 }, // m0a: dust-djinn mid-tier bow-bait; D83: drake (T2) drops drake-hide — the hide is now a fight, not a hunt
     materialTable: {
@@ -143,7 +155,8 @@ export const BIOMES: Record<BiomeId, Biome> = {
     fishTable: { river: { crayfish: 5, trout: 2, reed: 2 } }, // si7.6.2: thin desert creeks — crayfish in the mud
   },
   tundra: {
-    terrainWeights: { ice: 0.5, mountain: 0.25, plains: 0.15, river: 0.1 },
+    terrainWeights: { ice: 0.5, mountain: 0.25, plains: 0.25 }, // 1u6: river's old 0.1 folded into plains (its upper noise neighbour) so no other band moves
+    river: 0.02,
     nodeTypeWeights: { animal: 0.35, monster: 0.25, mining: 0.2, wood: 0.1, herb: 0.1 },
     creatureTable: { "snow-wolf": 5, "ice-crab": 4, "snow-marauder": 3, "frost-fae": 2, "frost-hatchling": 3, drake: 3 }, // m0a: frost-hatchling wyrm herald bow-bait; D83: drake (T2) drops drake-hide (now a fight, not a hunt)
     materialTable: {
@@ -159,7 +172,8 @@ export const BIOMES: Record<BiomeId, Biome> = {
   // dropped maps (RARE_BIOMES). Mud + water heavy (waders and the raft finally star),
   // plated/armoured monsters (blowgun country), toad venom for a middle dart tier.
   swamp: {
-    terrainWeights: { mud: 0.45, plains: 0.2, river: 0.2, mountain: 0.15 },
+    terrainWeights: { mud: 0.65, plains: 0.2, mountain: 0.15 }, // 1u6: river's old 0.2 folded into mud (its upper noise neighbour) so no other band moves
+    river: 0.04,
     nodeTypeWeights: { herb: 0.3, monster: 0.25, animal: 0.2, wood: 0.15, mining: 0.1 },
     creatureTable: { "giant-leech": 5, "bog-lurker": 4, "marsh-hag": 3, "fae-sprite": 2, werewolf: 1 },
     materialTable: {
@@ -181,7 +195,8 @@ export const BIOMES: Record<BiomeId, Biome> = {
   // fills one side of the map behind a wadeable beach; its deep water (out past the
   // shallows) needs the longboat and holds the second catch wave (pearl, turtle shell).
   coastal: {
-    terrainWeights: { plains: 0.4, mud: 0.2, mountain: 0.2, river: 0.2 }, // dunes, tidal flats, sea cliffs
+    terrainWeights: { plains: 0.4, mud: 0.4, mountain: 0.2 }, // dunes, tidal flats, sea cliffs. 1u6: river's old 0.2 folded into mud (its upper noise neighbour) so no other band moves
+    river: 0.03,
     nodeTypeWeights: { herb: 0.25, monster: 0.25, animal: 0.2, wood: 0.15, mining: 0.15 },
     creatureTable: { "tide-crab": 5, wrecker: 4, siren: 3 },
     materialTable: {

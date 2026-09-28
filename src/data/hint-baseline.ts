@@ -4,8 +4,8 @@ import type { HintBaseline } from "./hints";
 export const HINT_BASELINE: HintBaseline = {
   "woodland": {
     "mountain": 0.114,
-    "mud": 0.198,
-    "river": 0.002,
+    "mud": 0.166,
+    "river": 0.108,
     "ice": 0,
     "water": 0.131,
     "monster": 0.133,
@@ -23,7 +23,7 @@ export const HINT_BASELINE: HintBaseline = {
   "desert": {
     "mountain": 0.193,
     "mud": 0,
-    "river": 0.002,
+    "river": 0.064,
     "ice": 0,
     "water": 0,
     "monster": 0.25,
@@ -41,8 +41,8 @@ export const HINT_BASELINE: HintBaseline = {
   "tundra": {
     "mountain": 0.167,
     "mud": 0,
-    "river": 0,
-    "ice": 0.795,
+    "river": 0.095,
+    "ice": 0.71,
     "water": 0,
     "monster": 0.25,
     "melee": 0.58,
@@ -58,8 +58,8 @@ export const HINT_BASELINE: HintBaseline = {
   },
   "swamp": {
     "mountain": 0.085,
-    "mud": 0.473,
-    "river": 0.011,
+    "mud": 0.391,
+    "river": 0.113,
     "ice": 0,
     "water": 0.329,
     "monster": 0.25,
@@ -76,8 +76,8 @@ export const HINT_BASELINE: HintBaseline = {
   },
   "coastal": {
     "mountain": 0.091,
-    "mud": 0.12,
-    "river": 0.009,
+    "mud": 0.112,
+    "river": 0.069,
     "ice": 0,
     "water": 0.42,
     "monster": 0.25,

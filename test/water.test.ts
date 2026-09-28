@@ -17,10 +17,11 @@ const fingerprint = (biome: BiomeId): string => {
 test("biomes without a water layer generate byte-identically to before water existed", () => {
   // Pinned from the pre-si7.6.5 generator: desert/tundra have no `water`, so the
   // appended terrains and the namespaced water field must not move a single tile.
+  // Re-pinned for 1u6 (D96): the river layer deliberately reshaped every biome.
   expect(BIOMES.desert.water).toBeUndefined();
   expect(BIOMES.tundra.water).toBeUndefined();
-  expect(fingerprint("desert")).toBe("cd50eb10e4e9a235");
-  expect(fingerprint("tundra")).toBe("a52382432fd3e1de");
+  expect(fingerprint("desert")).toBe("f51b91877bf6f301");
+  expect(fingerprint("tundra")).toBe("31819fb8b691e7f");
 });
 
 test("woodland generates lakes ringed by shallows on most maps", () => {

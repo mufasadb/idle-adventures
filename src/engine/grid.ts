@@ -7,6 +7,7 @@ import {
   BARRIER_NOISE_FREQUENCY,
   BARRIER_THRESHOLD,
   WATER_NOISE_FREQUENCY,
+  RIVER_NOISE_FREQUENCY,
   BIOMES,
   BIOME_IDS,
   RARE_BIOMES,
@@ -178,6 +179,26 @@ function walkableRegions(terrain: Terrain[][]): { x: number; y: number }[][] {
   return regions;
 }
 
+// A one-tile river running diagonally touches only at corners, and a diagonal step
+// would slip between them without ever wading (1u6). Fill one orthogonal corner of
+// each such pair so every river is edge-connected — crossing it always costs a step.
+// Only dry, walkable land fills (a wall or standing water already blocks the gap).
+function sealRiverCorners(terrain: Terrain[][]): void {
+  const isRiver = (x: number, y: number) => terrain[y]?.[x] === "river";
+  const fillable = (x: number, y: number) => {
+    const t = terrain[y]?.[x];
+    return t !== undefined && walkableTerrain(t) && !WATER_TERRAINS.includes(t);
+  };
+  for (let y = 0; y < MAP_HEIGHT - 1; y++) for (let x = 0; x < MAP_WIDTH; x++) {
+    if (!isRiver(x, y)) continue;
+    for (const dx of [-1, 1]) {
+      if (!isRiver(x + dx, y + 1) || isRiver(x + dx, y) || isRiver(x, y + 1)) continue;
+      if (fillable(x + dx, y)) terrain[y]![x + dx] = "river";
+      else if (fillable(x, y + 1)) terrain[y + 1]![x] = "river";
+    }
+  }
+}
+
 function carveConnectivity(terrain: Terrain[][], biome: Biome): void {
   const carve = carveTerrainOf(biome);
   // Each pass merges the second-largest region into the largest, so the
@@ -235,7 +256,8 @@ export function tierProfile(biome: Biome, biomeId: BiomeId, mapTier: number): Bi
   for (const t of Object.keys(terrainWeights) as Terrain[]) {
     terrainWeights[t] = terrainWeights[t]! * (shift[t] ?? 1);
   }
-  return { ...biome, materialTable, creatureTable, terrainWeights };
+  const river = biome.river === undefined ? undefined : biome.river * (shift.river ?? 1);
+  return { ...biome, materialTable, creatureTable, terrainWeights, ...(river === undefined ? {} : { river }) };
 }
 
 // Transform a biome's generation profile for cartography affixes (cxq). IDENTITY
@@ -316,6 +338,13 @@ function buildGrid(mapSeed: string, biomeId: BiomeId, mapTier: number, affixes: 
       let t: Terrain = barrier > BARRIER_THRESHOLD
         ? biome.barrierTerrain
         : weightedPick(biome.terrainWeights, TERRAINS, noise);
+      // Rivers (1u6, D96): a thin band around the midline of their own namespaced
+      // field — winding lines, not the old (almost never reached) lowest noise band.
+      // A wall stays a wall; standing water below drowns a river where they meet.
+      if (biome.river !== undefined && walkableTerrain(t)) {
+        const r = perlin2(`${mapSeed}:river`, (x + 0.5) * RIVER_NOISE_FREQUENCY, (y + 0.5) * RIVER_NOISE_FREQUENCY);
+        if (Math.abs(r - 0.5) < biome.river) t = "river";
+      }
       // Standing water (si7.6.5): its own namespaced field, so it never shifts the
       // terrain/barrier samples above — a biome without `water` is byte-identical.
       // The body floods everything; the shallows ring spares mountains (a shore wall
@@ -330,6 +359,7 @@ function buildGrid(mapSeed: string, biomeId: BiomeId, mapTier: number, affixes: 
     }
     terrain.push(row);
   }
+  sealRiverCorners(terrain);
   carveConnectivity(terrain, biome);
   // Entry (D84): embark lands at the CENTRE of the square (was the b91 south-edge
   // search). carveConnectivity guarantees ONE walkable component, so every walkable

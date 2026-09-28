@@ -165,6 +165,37 @@ test("generateGrid: desert maps contain terrain variety, not monoterrain (M1 rev
   expect(river).toBeGreaterThan(0);
 });
 
+test("generateGrid: rivers are a real share of every biome's land (1u6)", () => {
+  // Rivers used to be the lowest terrainWeights band, which Perlin almost never
+  // reached (~0.2% of tiles). Their own layer must make them a feature of every map.
+  for (const biome of BIOME_IDS) {
+    let river = 0, n = 0;
+    for (let i = 0; i < 20; i++) {
+      for (const t of generateGrid(`river-share-${i}`, biome).terrain.flat()) { n++; if (t === "river") river++; }
+    }
+    expect(river / n).toBeGreaterThan(0.04);
+    expect(river / n).toBeLessThan(0.15);
+  }
+});
+
+test("generateGrid: a river can't be crossed by a diagonal step between its corners (1u6)", () => {
+  for (const biome of BIOME_IDS) {
+    for (let i = 0; i < 10; i++) {
+      const t = generateGrid(`river-corner-${i}`, biome).terrain;
+      for (let y = 0; y < MAP_HEIGHT - 1; y++) for (let x = 0; x < MAP_WIDTH; x++) {
+        if (t[y]![x] !== "river") continue;
+        for (const dx of [-1, 1]) {
+          if (t[y + 1]?.[x + dx] !== "river") continue;
+          // the two orthogonal corners: at least one is river, or one is not walkable dry land
+          const a = t[y]![x + dx]!, b = t[y + 1]![x]!;
+          const blocked = (c: Terrain) => c !== "plains" && c !== "mud" && c !== "ice";
+          expect(a === "river" || b === "river" || blocked(a) || blocked(b)).toBe(true);
+        }
+      }
+    }
+  }
+});
+
 test("generateGrid: POIs carry a material rolled from the biome's weighted table (D25/D27)", () => {
   for (const biome of BIOME_IDS) {
     const grid = generateGrid(`material-stamp-${biome}`, biome);
