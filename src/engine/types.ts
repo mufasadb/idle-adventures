@@ -26,6 +26,7 @@ export type Loadout = {
   battleItems: ItemStack[]; // combat consumables (bzd): used mid-fight via use-item (90j), buff that one fight
   spares?: ItemStack[]; // spare gear packed into carry slots (82r): 1 slot per piece; expanded into expedition.carry at embark. Optional/absent = [] (old saves, terse test states); reads guard with `?? []`.
   ammo?: ItemStack[]; // arrows (D45): spent 1/exchange while a bow is wielded; stacks ARROW_STACK_CAP per slot (consumableSlots counts ceil); unspent ammo banks back at run end. Optional/absent = []; reads guard with `?? []`.
+  flasks?: ItemStack[]; // alchemist flasks (si7.6.9.1, D97): thrown by `throw`, FLASK_STACK_CAP per slot; unthrown ones bank back. Optional/absent = []; reads guard with `?? []`.
   enhancements?: ItemStack[]; // weapon enhancements (D60): whetstone/oils packed like battle-items (1 slot/unit, no stacking); applied mid-run by the `enhance` action, unused ones bank back. Optional/absent = []; reads guard with `?? []`.
 };
 
@@ -54,6 +55,8 @@ export type Engagement = {
   potionsUsed: number; // accumulated across rounds + manual quaffs
   ranged?: boolean; // engaged from an adjacent tile with a bow (D45). Optional/absent = false; reads guard with `?? false`.
   opener?: boolean; // ranged opener pending (D45): the FIRST exchange skips the monster's retaliation, then this clears. Optional/absent = false; reads guard with `?? false`.
+  round?: number; // strikes landed so far this fight (si7.6.9.2): keys the venom roll. Optional/absent = 0.
+  struck?: boolean; // any strike (swing or throw) has landed this fight (si7.6.9.1): a throw before it is the free opener. Optional/absent = false.
   poison?: { dmg: number; rounds: number }; // weapon-enhancement poison DoT (D60): set/refreshed when a poison-coated strike lands; the monster loses `dmg` each round end, `rounds` decrements, clears at 0. INDEPENDENT of weaponBuff.charges — already-delivered poison keeps ticking after the coating wears off or you flee. Optional/absent = not poisoned. This is the state si7.6.6's blowdart reuses.
 };
 
@@ -80,6 +83,7 @@ export type Expedition = {
                     // (offered map = 1, held MapItem = its tier). Optional/absent = 1.
   surveyed?: { x: number; y: number }[]; // POIs resolved at range by the survey action (54f): perceive treats these as always-in-radius. Optional/absent = [] (old saves, terse test states); reads guard with `?? []`.
   affixes?: string[]; // cartography affixes carried from the embarked map (cxq): fed to expeditionGrid so the in-run grid matches what was inked. Optional/absent = []; reads guard with `?? []`.
+  poisoned?: { dmg: number; ticks: number }; // YOUR poison (si7.6.9.2, D98): a venomous monster's hit sets it; loses `dmg` HP per combat round or map step (never below PLAYER_POISON_FLOOR), `ticks` counts down, an antidote clears it. Optional/absent = not poisoned.
   weaponBuff?: { id: string; charges: number }; // active weapon enhancement (D60): a whetstone/oil coating applied mid-run via `enhance`. `id` is a WEAPON_ENHANCEMENT key; `charges` = remaining player strikes before it clears. Rides the EXPEDITION, not the weapon (no per-instance item state). Applying a new one REPLACES this (charges lost). Optional/absent = no enhancement; reads guard with `?? undefined`.
 };
 
@@ -112,6 +116,7 @@ export type LoadoutSlot =
   | "battle-item"
   | "spare" // spare gear into carry slots (82r): any gear defId, 1 slot per piece
   | "ammo" // arrows (D45): packed like potions, but slots count ceil(units/ARROW_STACK_CAP)
+  | "flask" // alchemist flasks (si7.6.9.1): FLASK_STACK_CAP per slot
   | "enhancement"; // weapon enhancements (D60): whetstone/oils, packed like a battle-item (1 slot/unit, no stacking)
 
 export type Action =
@@ -127,6 +132,7 @@ export type Action =
   | { type: "flee" } // disengage at the cost of one parting hit (si7.1)
   | { type: "quaff" } // drink one potion: mid-engagement (no exchange, si7.1) or on the map for QUAFF_ENERGY (82r)
   | { type: "use-item"; itemId: string } // use a packed battle item mid-fight (90j): manual-only, no auto-consume; adds its COMBAT_BUFF for THIS engagement, no exchange (mirrors quaff)
+  | { type: "throw"; itemId: string; at?: { x: number; y: number } } // throw a flask (si7.6.9.1, D97): engages the monster on your tile or an ADJACENT one (no step), or throws as this round's strike when engaged. The fight's first strike, if thrown, draws no retaliation
   | { type: "enhance"; id: string } // apply a weapon enhancement (D60): sets Expedition.weaponBuff from a held enhancement stack; usable engaged or unengaged, no exchange, no energy (mirrors use-item/quaff)
   | { type: "survey"; at: { x: number; y: number } } // spend SURVEY_ENERGY to resolve one far POI's detail at range with a vision tool (54f)
   | { type: "don"; itemId: string } // equip a carried gear piece into its slot, displacing the worn one to carry (82r)
@@ -168,6 +174,7 @@ export type RejectionReason =
   | "not-near-terrain" // field-craft: recipe.requires.terrain isn't the current tile or a 4-neighbour (ke3.4)
   | "insufficient-materials"
   | "wrong-slot"
+  | "not-poisoned" // use-item: an antidote with no poison to cure (si7.6.9.2)
   | "insufficient"
   | "already-packed"
   | "no-slot"
@@ -197,6 +204,9 @@ export type GameEvent =
       terrain: Terrain;
       cost: number;
       energy: number; // remaining after the step
+      poisonTaken?: number; // si7.6.9.2: HP your poison cost on this step (present when >0)
+      hazardTaken?: number; // si7.6.9.4: HP the terrain itself cost (spore-thicket without a filter-mask), present when >0
+      hp?: number; // HP after the step, present when the step cost HP
     }
   | {
       type: "gathered";
@@ -212,10 +222,10 @@ export type GameEvent =
   | { type: "ate"; defId: string; restored: number; energy: number; campMeal?: boolean } // ate one food unit (dtv): restored energy, new current. campMeal (7lr) = a tent camp meal (over-max, +50%).
   | { type: "auto-eat-set"; defId: string | null } // designated (or cleared, null) the auto-eat food (mco)
   | { type: "engaged"; at: { x: number; y: number }; creature: string; monsterHp: number; ranged?: boolean } // ranged (D45): engaged from an adjacent tile with a bow — the first exchange skips its retaliation
-  | { type: "exchanged"; creature: string; dmgDealt: number; dmgTaken: number; monsterHp: number; hp: number; potionsUsed: number; arrowSpent?: boolean; ammoSpent?: string; poisonDmg?: number } // arrowSpent (D45): present when this exchange shot an arrow. ammoSpent (si7.6.6): the defId shot, present when it isn't arrows. poisonDmg (D60): poison DoT dealt to the monster this round, present when >0
+  | { type: "exchanged"; creature: string; dmgDealt: number; dmgTaken: number; monsterHp: number; hp: number; potionsUsed: number; arrowSpent?: boolean; ammoSpent?: string; poisonDmg?: number; thrown?: string; poisonTaken?: number; envenomed?: boolean } // poisonTaken/envenomed (si7.6.9.2): your poison tick this round / a venomous hit poisoned you. thrown (si7.6.9.1): the flask defId thrown this round in place of a swing. arrowSpent (D45): present when this exchange shot an arrow. ammoSpent (si7.6.6): the defId shot, present when it isn't arrows. poisonDmg (D60): poison DoT dealt to the monster this round, present when >0
   | { type: "fled"; creature: string; partingHit: number; hp: number }
   | { type: "quaffed"; defId: string; healed: number; hp: number; energy?: number } // energy present only when spent (out-of-combat quaff, 82r)
-  | { type: "item-used"; defId: string; damageAdd: number; mitigationAdd: number } // battle item used mid-fight (90j); buff added to this engagement (also vb8's missing consumption log line)
+  | { type: "item-used"; defId: string; damageAdd: number; mitigationAdd: number; cured?: boolean } // battle item used mid-fight (90j); buff added to this engagement (also vb8's missing consumption log line)
   | { type: "enhanced"; id: string; charges: number } // weapon enhancement applied (D60): the coating `id` now rides the expedition with `charges` strikes left
   | { type: "surveyed"; at: { x: number; y: number }; kind: NodeType } // spyglass survey resolved a far POI's detail (54f); qualitative only
   | { type: "auto-quaff-toggled"; on: boolean }

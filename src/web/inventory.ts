@@ -1,7 +1,7 @@
 // Inventory slot boxes — shared by the town loadout plan and the expedition bag.
 import type { Equipment, ItemStack, Loadout } from "../engine/types";
 import { wornPieces } from "../engine/pack";
-import { ARROW_STACK_CAP } from "../data/constants";
+import { ARROW_STACK_CAP, FLASK_STACK_CAP } from "../data/constants";
 import { describe, name } from "../render/render";
 import { iconStyle } from "./assets";
 
@@ -54,6 +54,12 @@ function realSlots(loadout: Loadout, carry: ItemStack[], eatFood?: string | null
   units(loadout.potions, "potion");
   units(loadout.battleItems ?? [], "battle");
   units(loadout.enhancements ?? [], "battle"); // weapon enhancements (D60): 1 slot/unit, styled like battle items
+  // flasks (si7.6.9.1): FLASK_STACK_CAP per slot — one box per bandolier slot, shown ×qty
+  for (const it of loadout.flasks ?? []) {
+    for (let rest = it.qty; rest > 0; rest -= FLASK_STACK_CAP) {
+      boxes.push(slotBox("battle", it.defId, `×${Math.min(rest, FLASK_STACK_CAP)}`, describe(it.defId)));
+    }
+  }
   units(loadout.spares ?? [], "tool"); // spare gear (82r): 1 slot per piece, grey like tools; expands into carry at embark
   // ammo (D45): the one deep-stacking consumable — one box per ARROW_STACK_CAP slot, shown ×qty like loot
   for (const it of loadout.ammo ?? []) {

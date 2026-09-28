@@ -41,6 +41,7 @@ export function planActions(lo: Loadout): PackStep[] {
   units(lo.potions, "potion");
   units(lo.battleItems ?? [], "battle-item");
   units(lo.enhancements ?? [], "enhancement"); // weapon enhancements (D60)
+  units(lo.flasks ?? [], "flask"); // alchemist flasks (si7.6.9.1)
   units(lo.spares ?? [], "spare");
   units(lo.ammo ?? [], "ammo");
   return acts;

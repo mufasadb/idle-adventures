@@ -91,5 +91,41 @@ export const HINT_BASELINE: HintBaseline = {
     "herb": 0.25,
     "animal": 0.183,
     "food": 0.433
+  },
+  "jungle": {
+    "mountain": 0.12,
+    "mud": 0.246,
+    "river": 0.123,
+    "ice": 0,
+    "water": 0.103,
+    "monster": 0.133,
+    "melee": 0.625,
+    "ranged": 0.211,
+    "magic": 0.125,
+    "plate": 0.25,
+    "maxTier": 2,
+    "mining": 0.217,
+    "wood": 0.25,
+    "herb": 0.217,
+    "animal": 0.15,
+    "food": 0.383
+  },
+  "fungal": {
+    "mountain": 0.146,
+    "mud": 0.212,
+    "river": 0.098,
+    "ice": 0,
+    "water": 0,
+    "monster": 0.25,
+    "melee": 0.461,
+    "ranged": 0.214,
+    "magic": 0.323,
+    "plate": 0.4,
+    "maxTier": 2,
+    "mining": 0.267,
+    "wood": 0.1,
+    "herb": 0.325,
+    "animal": 0.05,
+    "food": 0.375
   }
 };

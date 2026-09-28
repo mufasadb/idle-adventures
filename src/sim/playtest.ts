@@ -30,7 +30,7 @@ import {
   poiGlyph,
   PLAYER_CHAR,
 } from "../render/render";
-import { RECIPE, MAP_WIDTH, MAP_HEIGHT, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, FISH_CAST_ENERGY, TOOL_CAPABILITY, TOOL_PURPOSE, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS, STUDY_COST } from "../data/constants";
+import { RECIPE, MAP_WIDTH, MAP_HEIGHT, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, FISH_CAST_ENERGY, TOOL_CAPABILITY, TOOL_PURPOSE, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS, STUDY_COST, FLASK_EFFECT, FLASK_STACK_CAP } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 import { moveCostBreakdown } from "../engine/move";
 import { usedSlots, carryCap, mapCarryCap } from "../engine/carry";
@@ -67,6 +67,7 @@ const s = summarize(state);
 console.log("\n=== YOU ===");
 console.log(`phase: ${s.phase} · runs completed: ${state.runs ?? 0}`);
 if (s.expedition) console.log(`energy: ${s.expedition.energy}/${s.expedition.maxEnergy} · auto-eat: ${s.expedition.autoEatFood ?? "off"}${state.expedition && toolSpeedFor(state.expedition.loadout.equipment.tools, "camp") !== null ? ` · 🏕 camp meal ${(state.expedition.campMealsUsed ?? 0) < TENT_CAMP_MEALS ? `READY (eat a food to over-eat past max at +${Math.round((TENT_FOOD_MULTIPLIER - 1) * 100)}%)` : "spent this run"}` : ""} · hp: ${s.expedition.hp} · pos (${s.expedition.pos.x},${s.expedition.pos.y}) · nodes cleared: ${s.expedition.cleared} · auto-potion-in-fights: ${(state.expedition?.autoQuaff ?? true) ? "on" : "off"} · auto-finish-fights: ${(state.expedition?.autoFinish ?? false) ? "on" : "off"}`);
+if (state.expedition?.poisoned) console.log(`☠ POISONED: −${state.expedition.poisoned.dmg}hp per step or fight round, ${state.expedition.poisoned.ticks} more ticks (never below 1hp) · an antidote cures it (use-item itemId="antidote", on the map or mid-fight)`); // si7.6.9.2
 if (state.expedition) {
   // Carry + carried maps (8ec; zpm.2: maps live in a DEDICATED map-carry pool now,
   // not a loot slot — mapCarryCap over the owned bank).
@@ -83,6 +84,7 @@ const active = state.expedition?.loadout ?? s.loadout;
 const eq = active.equipment;
 const worn = [...wornPieces(eq), ...eq.tools].filter(Boolean);
 console.log(`equipped: ${worn.join(", ") || "(nothing)"} · food: ${active.food.map((f) => `${f.qty}× ${f.defId}`).join(", ") || "none"} · potions: ${active.potions.map((p) => `${p.qty}× ${p.defId}`).join(", ") || "none"}${active.battleItems?.length ? ` · battle: ${active.battleItems.map((b) => `${b.qty}× ${b.defId}`).join(", ")}` : ""}${active.spares?.length ? ` · spare gear (1 slot each, don mid-run to swap): ${active.spares.map((sp) => `${sp.qty}× ${sp.defId}`).join(", ")}` : ""}${active.ammo?.length ? ` · arrows: ${active.ammo.reduce((n, a) => n + a.qty, 0)} (a wielded bow shoots one per combat exchange; empty quiver = the bow swings like a club)` : wieldsRanged(active) ? " · arrows: 0 — ⚠ NO ARROWS: your bow swings like a CLUB (1 dmg). Craft arrows to shoot." : ""}${active.enhancements?.length ? ` · enhancements (1 slot each; enhance id="…" to coat your weapon — engaged or not; mid-fight it costs a turn, 67e): ${active.enhancements.map((en) => `${en.qty}× ${en.defId} (${enhancementHint(en.defId)})`).join(", ")}` : ""}${state.expedition?.weaponBuff ? ` · 🗡️ active coating: ${state.expedition.weaponBuff.id} (${state.expedition.weaponBuff.charges} strikes left)` : ""}`);
+if (active.flasks?.length) console.log(`flasks (${FLASK_STACK_CAP} per slot; throw itemId="…" [at={x,y} for an ADJACENT monster] — a fight's first strike, if thrown, is free): ${active.flasks.map((fl) => `${fl.qty}× ${fl.defId} (${FLASK_EFFECT[fl.defId]!.dmg} dmg)`).join(", ")}`); // si7.6.9.1
 // Make transport/gating gear legible: what it does to a step's cost (mirrors the web).
 {
   const notes: string[] = [];
@@ -183,6 +185,8 @@ function printExpedition(st: GameState): void {
       ? ` · enhancements: ${(exp.loadout.enhancements ?? []).map((en) => `${en.qty}× ${en.defId} (${enhancementHint(en.defId)})`).join(", ")} (enhance id="…" — coat now; costs a turn, 67e)`
       : "";
     console.log(`\n=== ENGAGED: ${c.creature} — ${c.monsterHp} HP · you hit ${dmgOut}, it hits ${dmgIn}${quiver}${coating}${poisonHdr}${battle}${enh} · actions: fight | flee | quaff${battle ? " | use-item" : ""}${enh ? " | enhance" : ""} | toggle-auto-quaff | toggle-auto-finish | don/doff (costs a turn) ===`);
+    // si7.6.9.1 (D97): flasks — appended line, the header above stays as it was.
+    if ((exp.loadout.flasks ?? []).length) console.log(`flasks: ${(exp.loadout.flasks ?? []).map((fl) => `${fl.qty}× ${fl.defId} (${FLASK_EFFECT[fl.defId]!.dmg} flat dmg, ignores armour)`).join(", ")} · throw itemId="…" replaces your swing this round${c.struck ? "" : " — FREE OPENER: nothing has struck yet, so a throw now draws no retaliation"}`);
   }
   console.log("\n=== MAP (▲ you · letters = node kinds · detail only resolves near you · near a forage 'H' its material shows: f=flint d=deadwood b=berries · C=humanoid camp, kill it for a MAP — visible from afar) ===");
   const rows: string[] = [];
