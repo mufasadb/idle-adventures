@@ -206,6 +206,7 @@ function printExpedition(st: GameState): void {
   if (grid.terrain.some((r) => r.some((t) => t === "shallows" || t === "lake" || t === "sea"))) {
     console.log("Water: ~ river / - shallows (wade on foot) / = lake (a raft crosses it) / # sea (needs a sea boat)");
   }
+  if (grid.terrain.some((r) => r.some((t) => t === "spore-thicket"))) console.log("Spores: % spore-thicket (costs HP to walk through)"); // si7.6.9.4, append-only
   if (legalActions(st).some((a) => a.type === "fish")) {
     console.log(`\n🎣 Water within reach — cast {"type":"fish"} (−${FISH_CAST_ENERGY}e): catches the deepest unfished water tile on or beside you; each tile yields once. Deeper water (out on a raft) holds bigger fish and sunken things.`);
   }

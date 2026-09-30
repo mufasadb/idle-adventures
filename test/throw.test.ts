@@ -99,3 +99,10 @@ test("throw: unengaged, it engages an ADJACENT monster from range (no step) and 
   }
   throw new Error("no T2 monster found in scan range");
 });
+
+test("throw: a flask kill teaches no weapon-vs-hide lesson", () => {
+  const s0 = state({ combat: engagedOn("forest-boar"), mutate: (l) => { l.equipment.weapon = null; } });
+  const f = reduce(s0, { type: "throw", itemId: "fire-flask" }).events.find((e) => e.type === "fought") as Extract<GameEvent, { type: "fought" }>;
+  expect(f.matchup.weaponVsHide).toBeNull();
+  expect(f.matchup.affinityFired).toBe(false);
+});

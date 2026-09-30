@@ -138,7 +138,9 @@ function fightRound(state: GameState, flaskIdx?: number): { state: GameState; ev
     // quaffing above startHp reads as 0 lost, not negative
     victory, hpLost: Math.max(0, combat.startHp - round.hp), potionsUsed,
     loot: victory ? loot : [],
-    hp: round.hp, matchup: explainMatchup(expedition.loadout, combat.creature, expedition.weaponBuff), // the coating on THIS strike
+    hp: round.hp, matchup: thrown // si7.6.9.1: a flask strike teaches nothing about your weapon vs its hide
+      ? { ...explainMatchup(expedition.loadout, combat.creature, expedition.weaponBuff), weaponVsHide: null, affinityFired: false }
+      : explainMatchup(expedition.loadout, combat.creature, expedition.weaponBuff), // the coating on THIS strike
   });
   if (round.defeated) {
     // D60: the coating clears with the run; endExpedition doesn't read weaponBuff, but drop it cleanly.
