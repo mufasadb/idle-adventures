@@ -11,7 +11,7 @@ import { heldFoodEnergy } from "../engine/food";
 import { wieldsRanged, hasAmmo } from "../engine/combat";
 import { RECIPE, MAX_ENERGY, TENT_FOOD_MULTIPLIER, INKS, QUIVER_AMMO_CAP, STUDY_COST } from "../data/constants";
 import type { BiomeId } from "../data/constants";
-import { weaponHint, logisticsEffect, enhancementHint, describe, recipeGateHint, name, heldMapTitle, townRecipeIds, rejectCopy } from "../render/render";
+import { weaponHint, logisticsEffect, enhancementHint, describe, recipeGateHint, name, heldMapTitle, townRecipeIds, rejectCopy, fieldRecipeIds, fieldRecipeNote } from "../render/render";
 import type { GameState, Action, MapItem } from "../engine/types";
 import { inventoryGrid } from "./inventory";
 import { planActions } from "./persist";
@@ -239,6 +239,16 @@ function recipeSection(state: GameState): string {
             </div>`;
           }).join("");
         })()}
+      </div>
+      <h2>Field recipes <span class="muted small">made out on an expedition, not in town</span></h2>
+      <div class="craftlist">
+        ${fieldRecipeIds().map((id) => {
+          const r = RECIPE[id]!;
+          return `<div class="craftgroup locked">
+            <div class="craftname" title="${describe(r.output.defId)}">${r.output.qty}× ${name(r.output.defId)}</div>
+            <div class="craftpath locked">← ${r.inputs.map((i) => `${i.qty}× ${name(i.defId)}`).join(" + ")} <span class="muted small">· ${fieldRecipeNote(id)}</span></div>
+          </div>`;
+        }).join("")}
       </div>
     </section>`;
 }

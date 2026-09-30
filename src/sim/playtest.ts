@@ -24,6 +24,8 @@ import {
   nodeToolHint,
   heldMapTitle,
   townRecipeIds,
+  fieldRecipeIds,
+  fieldRecipeNote,
   engagementForecast,
   round1,
   TERRAIN_CHAR,
@@ -158,6 +160,12 @@ function printTown(st: GameState): void {
     console.log(`  ${affordable.has(id) ? "✓" : "·"} ${recipeOutputQty(r, townTools)}× ${r.output.defId}  ←  ${ing}  ·  craft recipeId="${id}"${hint ? `  ·  ${hint}` : ""}${gateNote}`);
   }
   console.log("\nTip: tools each take one bag slot — you can pack several (pick + axe + knife + …).");
+  // Playtest 2026-09-30 (append-only): field-only recipes, which the town can't craft.
+  console.log("\nField recipes (craft these OUT on an expedition, not in town):");
+  for (const id of fieldRecipeIds()) {
+    const r = RECIPE[id]!;
+    console.log(`  · ${r.output.qty}× ${r.output.defId}  ←  ${r.inputs.map((i) => `${i.qty}× ${i.defId}`).join(" + ")}  ·  craft recipeId="${id}"  ·  ${fieldRecipeNote(id)}`);
+  }
 }
 
 function printExpedition(st: GameState): void {

@@ -28,7 +28,7 @@ export function rejectCopy(reason: RejectionReason, recipeId?: string, action?: 
   const gate = recipeId ? recipeGateHint(recipeId) : null; // "needs anvil + blacksmiths-hammer"
   switch (reason) {
     case "impassable": return "blocked by terrain";
-    case "carry-full": return action === "fight" ? "bag full — a monster fight needs a free loot slot" : "bag full — no free slot for that";
+    case "carry-full": return action === "fight" || action === "throw" ? "bag full — a fight needs a free bag slot for each kind of loot the monster drops" : "bag full — no free slot for that";
     case "exhausted": return "out of energy";
     case "engaged": return "you're engaged — fight or flee below";
     case "insufficient": return "nothing to use for that (or it'd have no effect)"; // no potion/material/charge, or already at full HP/max
@@ -280,6 +280,21 @@ export function townRecipeIds(stations: readonly string[]): string[] {
     const r = RECIPE[id]!;
     return !r.field && !(r.buildsStation && built.has(r.buildsStation));
   });
+}
+
+// Playtest 2026-09-30: field-only recipes (antidote, field-draught, cooked meals, the
+// water-vial) were invisible from town — a blind player was told "an antidote cures it"
+// with no way to learn the recipe. Town books list them in their own section: what it
+// makes, from what, and what the field needs (kit tools, terrain).
+export function fieldRecipeIds(): string[] {
+  return Object.keys(RECIPE).filter((id) => RECIPE[id]!.field);
+}
+export function fieldRecipeNote(recipeId: string): string {
+  const req = RECIPE[recipeId]?.requires;
+  const parts: string[] = [];
+  if (req?.tools?.length) parts.push(`carry ${req.tools.join(" + ")}`);
+  if (req?.terrain) parts.push(`stand on or next to ${req.terrain}`);
+  return `made on an expedition${parts.length ? ` — ${parts.join(", ")}` : ""}`;
 }
 
 // egd: the material an affix favours, for the ink confirmation. Material-specific
