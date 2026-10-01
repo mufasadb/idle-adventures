@@ -21,6 +21,7 @@ import {
   UNARMED_DAMAGE,
   CHIP_DAMAGE_MIN,
   MITIGATION_K,
+  CAMP_DMG_BY_MAP_TIER,
   WEAPON_ENHANCEMENT,
   AMMO_FOR,
   AMMO_POISON,
@@ -169,13 +170,16 @@ export function mitigation(loadout: Loadout, dmgType: DmgType): number {
 // Incoming damage per hit (si7.1, % model): the monster's tier damage scaled by
 // K/(K + D), floored at chip. D is the matrix-adjusted defense sum (mitigation)
 // plus any battle-item mitigationAdd — temporary armour under the same curve.
-export function damageTaken(loadout: Loadout, monsterId: string, mitigationAdd = 0): number {
+// D102: humanoid camps hit harder on deeper maps (CAMP_DMG_BY_MAP_TIER) — mapTier is
+// the run's map tier (absent = 1, unscaled).
+export function damageTaken(loadout: Loadout, monsterId: string, mitigationAdd = 0, mapTier = 1): number {
   const monster = MONSTERS[monsterId];
   if (!monster) throw new Error(`unknown monster: ${monsterId}`);
   const d = mitigation(loadout, monster.dmgType) + mitigationAdd;
+  const camp = monster.category === "humanoid" ? CAMP_DMG_BY_MAP_TIER[mapTier] ?? 1 : 1;
   return Math.max(
     CHIP_DAMAGE_MIN,
-    MONSTER_TIER_DMG_CURVE[monster.tier]! * (MITIGATION_K / (MITIGATION_K + d)),
+    MONSTER_TIER_DMG_CURVE[monster.tier]! * camp * (MITIGATION_K / (MITIGATION_K + d)),
   );
 }
 
@@ -255,6 +259,7 @@ export function strikeExchange(
     thrown?: { dmg: number; poison?: { dmg: number; rounds: number } }; // si7.6.9.1: a flask replaces the swing
     playerPoison?: { dmg: number; ticks: number }; // si7.6.9.2: your poison, ticks at round end
     venom?: Venom & { roll: number }; // si7.6.9.2: the monster's venom + this round's [0,1) roll
+    mapTier?: number; // D102: the run's map tier — scales humanoid camp damage (absent = 1)
   } = {},
 ): ExchangeResult {
   const { damageAdd = 0, mitigationAdd = 0, autoQuaff = true, skipRetaliation = false, weaponBuff, poison, thrown, playerPoison, venom } = opts;
@@ -288,7 +293,7 @@ export function strikeExchange(
   let poisonTaken = 0;
   let envenomed = false;
   if (monsterAfter > 0) {
-    if (!skipRetaliation) dmgTaken = damageTaken(loadout, monsterId, mitigationAdd);
+    if (!skipRetaliation) dmgTaken = damageTaken(loadout, monsterId, mitigationAdd, opts.mapTier);
     current -= dmgTaken;
     if (current <= 0) current = 0; // soft-fail floor
     else {

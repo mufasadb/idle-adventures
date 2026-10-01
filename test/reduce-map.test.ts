@@ -37,8 +37,8 @@ test("embark: the local map is a single T1 map", () => {
 });
 
 test("localMap: rotates per run-count, deterministic per (seed, runs)", () => {
-  expect(localMap("r", 0).mapSeed).toBe("r:local:0");
-  expect(localMap("r", 1).mapSeed).toBe("r:local:1");
+  expect(localMap("r", 0).mapSeed.startsWith("r:local:0")).toBe(true); // D102: may be a plain candidate "r:local:0:k"
+  expect(localMap("r", 1).mapSeed.startsWith("r:local:1")).toBe(true);
   expect(localMap("r", 0)).toEqual(localMap("r", 0)); // deterministic
   expect(localMap("r", 0).mapSeed).not.toBe(localMap("r", 1).mapSeed); // rotates
 });

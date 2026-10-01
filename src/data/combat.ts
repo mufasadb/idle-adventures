@@ -94,6 +94,14 @@ export const MONSTER_TIER_DMG_CURVE: Record<number, number> = {
    // Steepened at tier 1 (si7.1) so a bare-kit fight costs matchup-scaled real HP:
    // good ≈ 13% of base HP, neutral ≈ 27%, bad ≥ 40% — HP is a second run-budget.
 
+// D102 (cv8, user 2026-10-02): humanoid camps hit harder on deeper maps — late plate
+// had made "walk to camp, press fight" free. Kept modest on purpose: a fighter with
+// good armour and supplies should still be able to clear every camp they can reach
+// (power fantasy, but it costs HP now). Multiplies MONSTER_TIER_DMG_CURVE for
+// category "humanoid" by the RUN's map tier; tiers absent here = ×1.
+// ⚠ balance surface: changing this requires `bun run sim:tables` (test/balance-tables.test.ts enforces)
+export const CAMP_DMG_BY_MAP_TIER: Record<number, number> = { 1: 1, 2: 1, 3: 1.25, 4: 1.5, 5: 1.75 };
+
 // Combat consumables (bzd, spec §4.3): a "battle item" packed into the loadout
 // buffs a SINGLE fight and is consumed at fight start. Gated only behind fighting
 // T3 monsters (vampire→elixir, troll→warding), so a player who FOUGHT their way

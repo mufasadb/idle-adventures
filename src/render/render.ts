@@ -136,9 +136,10 @@ export function combatForecast(
   creature: string,
   hp: number,
   weaponBuff?: { id: string },
+  mapTier = 1, // D102: humanoid camps hit harder on deeper maps
 ): { dmgOut: number; dmgIn: number; toKill: number; toDie: number; winning: boolean } {
   const dmgOut = playerDamage(loadout, creature, weaponBuff);
-  const dmgIn = damageTaken(loadout, creature, 0);
+  const dmgIn = damageTaken(loadout, creature, 0, mapTier);
   const toKill = Math.ceil(MONSTER_TIER_HP_CURVE[MONSTERS[creature]!.tier]! / dmgOut);
   const toDie = Math.ceil(hp / dmgIn);
   return { dmgOut, dmgIn, toKill, toDie, winning: toKill <= toDie };
@@ -150,7 +151,7 @@ export function combatForecast(
 export function engagementForecast(exp: Expedition): { dmgOut: number; dmgIn: number; toKill: number; toDie: number; winning: boolean } {
   const c = exp.combat!;
   const dmgOut = playerDamage(exp.loadout, c.creature, exp.weaponBuff) + c.damageAdd;
-  const dmgIn = damageTaken(exp.loadout, c.creature, c.mitigationAdd);
+  const dmgIn = damageTaken(exp.loadout, c.creature, c.mitigationAdd, exp.mapTier ?? 1);
   const toKill = Math.ceil(c.monsterHp / dmgOut);
   const toDie = Math.ceil(exp.hp / dmgIn); // raw race — potions extend it
   return { dmgOut, dmgIn, toKill, toDie, winning: toKill <= toDie };

@@ -27,8 +27,6 @@ function hintChips(ids: string[], studied: number): string {
       : `<span class="hintchip sealed" title="study the map to read this">[sealed ${fam}]</span>`;
   }).join("")}</div>`;
 }
-// The local map is known country (D95): all its hints show, same chips as a held map.
-const localHintIds = (local: ReturnType<typeof localMap>) => mapHintIds({ mapSeed: local.mapSeed, biomeId: local.biomeId, vintage: 0 });
 
 // The study control for a held map: the button (with its cost), a red unaffordable
 // state, or "fully studied" once every hint is read.
@@ -103,7 +101,7 @@ function mapSelectSection(state: GameState, local: ReturnType<typeof localMap>, 
           <span class="maptag free">FREE · always here</span>
           <b>${local.preview.headline}${epithetSuffix(local.mapSeed, local.biomeId)}</b>
           <div class="muted small">over the hill — a fresh T1 map every visit, never used up. Where food &amp; your first maps come from.</div>
-          ${hintChips(localHintIds(local), 3)}
+          <div class="muted small">plain country — nothing remarkable. Hinted maps come from drops.</div>
           <button data-prepare="${local.mapSeed}">Prepare ▶</button>
         </div>
       </div>
@@ -141,7 +139,7 @@ function prepBar(state: GameState, mapSeed: string, local: ReturnType<typeof loc
   <div class="prepbar">
     <button class="link" data-back>← back to maps</button>
     <div class="prephead"><span class="muted small">Preparing</span> ${label} · ${spendNote}${
-      isLocal ? hintChips(localHintIds(local), 3) : held && (held.studied ?? 0) > 0 ? hintChips(mapHintIds(held).slice(0, held.studied), held.studied!) : ""}</div>
+      isLocal ? "" : held && (held.studied ?? 0) > 0 ? hintChips(mapHintIds(held).slice(0, held.studied), held.studied!) : ""}</div>
     <button class="embark-final" data-embark="${mapSeed}">Embark ▶${isLocal ? "" : " — spends this map"}</button>
   </div>
   ${warns}`;

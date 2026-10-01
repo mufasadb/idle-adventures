@@ -329,7 +329,7 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   const costClause = `<b class="${overBudget ? "over" : ""}">−${round1(total)}e</b>${rt.actionCost > 0 ? ` <span class="muted">(${round1(rt.walkCost)} walk + ${round1(rt.actionCost)} gather)</span>` : ""}`;
   const forecastClause = fight
     ? (() => {
-        const f = combatForecast(exp.loadout, fight, exp.hp, exp.weaponBuff); // D60: reflects an active coating
+        const f = combatForecast(exp.loadout, fight, exp.hp, exp.weaponBuff, exp.mapTier ?? 1); // D60: reflects an active coating
         return ` · <span class="forecast" title="bare-kit forecast — battle items apply when the fight starts">you ${round1(f.dmgOut)} / it ${round1(f.dmgIn)} — <b class="${f.winning ? "good" : "over"}">${f.winning ? `kill in ${f.toKill}` : "it wins"}</b></span>`;
       })()
     : "";
@@ -340,7 +340,7 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   // Ambush warning (2i8, playtest F5): the walk auto-engages the FIRST monster on the
   // line — warn prominently when that fight is a forecast LOSS.
   const cm = rt.crossedMonster;
-  const crossWarn = cm && !combatForecast(exp.loadout, cm.creature, exp.hp, exp.weaponBuff).winning
+  const crossWarn = cm && !combatForecast(exp.loadout, cm.creature, exp.hp, exp.weaponBuff, exp.mapTier ?? 1).winning
     ? `<div class="over">⚠ runs into a ${name(cm.creature)} at (${cm.pos.x},${cm.pos.y}) you'd LOSE to — reroute.</div>`
     : "";
   // kml: the route bar floats at the bottom of the map — only when there's something to say.

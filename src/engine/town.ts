@@ -7,8 +7,8 @@ import type { BiomeId } from "../data/constants";
 import type { Grid } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { rollBiome, generateGrid } from "./grid";
-import { EPITHETS, MONSTERS, STARTER_BANK } from "../data/constants";
-import { rollMapHints, hintLabel } from "./hints";
+import { EPITHETS, HINT_FALLBACK, HINT_FAMILIES, LOCAL_MAP_PLAIN_TRIES, MONSTERS, STARTER_BANK } from "../data/constants";
+import { familyHints, hintLabel, rollMapHints } from "./hints";
 
 // Modest, functional starter kit: enough to run a real first expedition. You
 // start with NO backpack (bare BASE_CARRY_SLOTS) — the small-backpack is your
@@ -77,9 +77,27 @@ export function localMap(
   seed: string,
   runs = 0,
 ): { mapSeed: string; biomeId: BiomeId; preview: { headline: string; hints: string[] } } {
-  const mapSeed = `${seed}:local:${runs}`;
-  const biomeId = rollBiome(mapSeed);
-  // D95: the local map is the country over the hill — you know it, so every hint shows
-  // free (study is for EARNED maps).
-  return { mapSeed, biomeId, preview: { headline: biomeId, hints: rollMapHints(generateGrid(mapSeed, biomeId), mapSeed).map(hintLabel) } };
+  const key = `${seed}:local:${runs}`;
+  const cached = localCache.get(key);
+  if (cached) return cached;
+  // D102: the free map is PLAIN — the first candidate seed whose every hint family is
+  // the fallback ("nothing remarkable"), so rerolling it (free return, D62) can't fish
+  // for a good map. Remarkable (hinted) maps only come from drops. No plain candidate
+  // within the cap → the least remarkable one. Candidate 0 keeps the old seed shape.
+  let best = { mapSeed: key, biomeId: rollBiome(key), remarkable: Infinity };
+  for (let k = 0; k < LOCAL_MAP_PLAIN_TRIES && best.remarkable > 0; k++) {
+    const mapSeed = k === 0 ? key : `${key}:${k}`;
+    const biomeId = rollBiome(mapSeed);
+    const fam = familyHints(generateGrid(mapSeed, biomeId));
+    const remarkable = HINT_FAMILIES.filter((f) => fam[f] !== HINT_FALLBACK[f].id).length;
+    if (remarkable < best.remarkable) best = { mapSeed, biomeId, remarkable };
+  }
+  // A plain map has nothing to whisper: no hints on the offer (they'd all read "ordinary").
+  const out = { mapSeed: best.mapSeed, biomeId: best.biomeId, preview: { headline: best.biomeId, hints: [] as string[] } };
+  if (localCache.size >= LOCAL_CACHE_CAP) localCache.clear();
+  localCache.set(key, out);
+  return out;
 }
+// Memo (pure in (seed, runs)): every town render and embark check asks for the local map.
+const localCache = new Map<string, ReturnType<typeof localMap>>();
+const LOCAL_CACHE_CAP = 64;

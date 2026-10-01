@@ -81,6 +81,12 @@ export const HINT_FALLBACK: Record<HintFamily, { id: string; label: string }> = 
 
 // Studying a held map in town reveals its next hint (D95). A copper sink (copper was
 // the playtest's "trap" material; ore-ink is its other sink). Flat across tiers.
+// D102: the town's free local map is always PLAIN (every family = its fallback), so the
+// free reroll can't fish for a remarkable map — hinted maps are earned drops. localMap
+// tries this many candidate seeds for a plain one (~8% of T1 maps are; P(miss) ≈ 0.5%),
+// else takes the least remarkable. Raise = fewer near-plain fallbacks, slower first render.
+export const LOCAL_MAP_PLAIN_TRIES = 64;
+
 export const STUDY_COST: ItemStackSpec[] = [{ defId: "copper-ore", qty: 1 }];
 
 // The generated baseline's shape: each biome's typical (median, T1) value per metric.

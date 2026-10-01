@@ -116,7 +116,7 @@ function printTown(st: GameState): void {
   const local = localMap(st.seed, st.runs ?? 0);
   console.log("Local map (embark = free 'go nearby', never consumed; rotates each visit):");
   { const e = mapEpithet(local.mapSeed, local.biomeId); console.log(`  • ${local.preview.headline}${e ? ` of ${e}` : ""}  →  embark mapSeed="${local.mapSeed}"`); }
-  console.log(`      hints: ${local.preview.hints.map((h) => `"${h}"`).join(", ")}`); // D95: known country, free
+  console.log(`      hints: ${local.preview.hints.length ? local.preview.hints.map((h) => `"${h}"`).join(", ") : "none — plain country (hinted maps come from drops)"}`); // D102: the free map is plain
   // Held maps (zpm.1): earned from humanoid drops (zpm.2), survive across visits —
   // embark spends one. The local map is the free run instead (nothing to spend).
   const held = st.maps ?? [];

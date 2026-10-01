@@ -111,6 +111,7 @@ function fightRound(state: GameState, flaskIdx?: number): { state: GameState; ev
       ...(thrown ? { thrown: FLASK_EFFECT[thrown]! } : {}),
       ...(expedition.poisoned ? { playerPoison: expedition.poisoned } : {}), // si7.6.9.2
       ...(venom ? { venom: { ...venom, roll: rand(state.seed, "venom", combat.at.x, combat.at.y, combat.round ?? 0) } } : {}),
+      mapTier: expedition.mapTier ?? 1, // D102: deeper camps hit harder
     },
   );
   let ammo = expedition.loadout.ammo ?? [];
@@ -299,7 +300,7 @@ export function flee(state: GameState): { state: GameState; events: GameEvent[] 
   if (!combat) return rejected(state, "flee", "not-engaged");
   // The standing price of bailing (si7.1): one parting hit BEFORE you're clear —
   // always affordable before the exchange that would kill you, never free.
-  const partingHit = damageTaken(expedition.loadout, combat.creature, combat.mitigationAdd);
+  const partingHit = damageTaken(expedition.loadout, combat.creature, combat.mitigationAdd, expedition.mapTier ?? 1);
   const hp = Math.max(0, expedition.hp - partingHit);
   const fled: GameEvent = { type: "fled", creature: combat.creature, partingHit, hp };
   if (hp <= 0) {
@@ -431,7 +432,7 @@ export function provokeTurn(
   events: GameEvent[],
 ): { state: GameState; events: GameEvent[] } {
   const combat = exp.combat!;
-  const hit = damageTaken(exp.loadout, combat.creature, combat.mitigationAdd);
+  const hit = damageTaken(exp.loadout, combat.creature, combat.mitigationAdd, exp.mapTier ?? 1);
   const hp = Math.max(0, exp.hp - hit);
   const provoked: GameEvent = { type: "provoked", creature: combat.creature, hit, hp };
   if (hp <= 0) {

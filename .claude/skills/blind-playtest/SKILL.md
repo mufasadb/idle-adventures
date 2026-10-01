@@ -23,7 +23,7 @@ It prints exactly what a real player sees and nothing more: current state (energ
 
 ## The goal you give agents (don't over-specify)
 
-Tell them: *"There is an ultimate, rare end-game artifact to obtain. Figure out how to get it. Play as many expeditions as you think reasonable."* Do NOT name it, describe it, or hint at the path. Let them find (or fail to find) it.
+Tell them: *"Your end goal is to slay the ancient-wyrm (the end-game boss) and claim its rare end-game artifact. Figure out how to get there. Play as many expeditions as you think reasonable."* Name the wyrm as the target (user, 2026-10-02, D102: the game has no in-world rumour of it yet, so an unnamed goal tested discovery of the target rather than the climb) — but do NOT describe where it lives, what beats it, or the path. Let them find (or fail to find) the way.
 
 ## Protocol
 
