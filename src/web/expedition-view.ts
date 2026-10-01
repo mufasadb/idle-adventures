@@ -5,7 +5,7 @@ import { expeditionGrid } from "../engine/grid";
 import type { Grid } from "../engine/grid";
 import { recipeOutputQty } from "../engine/craft";
 import { moveCostBreakdown, moveCost } from "../engine/move";
-import { iconStyle, monsterStyle, nodeIconId, tileStyle } from "./assets";
+import { frameStyle, iconStyle, monsterStyle, nodeIconId, tileStyle } from "./assets";
 import { carryCap, mapCarryCap } from "../engine/carry";
 import { deriveRoute } from "./route";
 import type { Pos } from "./route";
@@ -282,11 +282,15 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
         if (iconStyleValue) overlay = `<span class="nodeicon" style="${iconStyleValue}" aria-hidden="true"></span>`;
       }
     }
-    if (isPlayer && cls.includes("on-raft")) {
-      const raft = iconStyle("player-raft");
-      if (raft) overlay = `<span class="nodeicon" style="${raft}" aria-hidden="true"></span>`;
+    // Round-5 raft sprite (monster atlas) has no rider, so the player glyph is drawn on top of it.
+    const raft = isPlayer && cls.includes("on-raft") ? frameStyle("monster", "player-raft") : null;
+    if (raft) {
+      cls.push("raft-sprite");
+      overlay = `<span class="nodeicon" style="${raft}" aria-hidden="true"></span>`;
+      // keep the water under the raft: `.player`'s !important background would wipe the inline tile
+      if (terrainStyle) tileAssetStyle = ` style="${terrainStyle.replace(/;/g, " !important;")} !important"`;
     }
-    const glyph = !isPlayer && (overlay !== "" || !poi) ? "" : isPlayer && overlay ? "" : ch;
+    const glyph = raft ? `<span class="rider">${ch}</span>` : !isPlayer && (overlay !== "" || !poi) ? "" : isPlayer && overlay ? "" : ch;
     cells += `<div class="${cls.join(" ")}"${tileAssetStyle} data-x="${x}" data-y="${y}" title="${title}">${overlay}${glyph}</div>`;
   }
 
