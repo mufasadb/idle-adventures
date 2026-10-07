@@ -2,6 +2,9 @@ import iconManifest from "./assets/atlas-icon.json" with { type: "json" };
 import monsterManifest from "./assets/atlas-monster.json" with { type: "json" };
 import tileManifest from "./assets/atlas-tile.json" with { type: "json" };
 import animManifest from "./assets/atlas-monster-anim.json" with { type: "json" };
+import celIconManifest from "./assets/cel/atlas-icon.json" with { type: "json" };
+import celMonsterManifest from "./assets/cel/atlas-monster.json" with { type: "json" };
+import celTileManifest from "./assets/cel/atlas-tile.json" with { type: "json" };
 // Bun's HTML bundler rewrites these imports to served asset URLs.
 // @ts-expect-error Bun asset import
 import iconAtlas from "./assets/atlas-icon.png";
@@ -11,23 +14,72 @@ import monsterAtlas from "./assets/atlas-monster.png";
 import tileAtlas from "./assets/atlas-tile.png";
 // @ts-expect-error Bun asset import
 import animAtlas from "./assets/atlas-monster-anim.png";
+// @ts-expect-error Bun asset import
+import celIconAtlas from "./assets/cel/atlas-icon.png";
+// @ts-expect-error Bun asset import
+import celMonsterAtlas from "./assets/cel/atlas-monster.png";
+// @ts-expect-error Bun asset import
+import celTileAtlas from "./assets/cel/atlas-tile.png";
 
 type Frame = { x: number; y: number; w: number; h: number };
 type Manifest = { atlas: string; frames: Record<string, Frame> };
+// Cel restyle (2026-10-07): hi-res frames drawn at the pixel frames' CSS size, so
+// `scale` device px per CSS px; `size` is the whole atlas (for background-size).
+type CelManifest = Manifest & { scale: number; size: { w: number; h: number } };
+type Kind = "tile" | "monster" | "icon";
 
-const manifests: Record<"tile" | "monster" | "icon", Manifest> = {
+const manifests: Record<Kind, Manifest> = {
   tile: tileManifest,
   monster: monsterManifest,
   icon: iconManifest,
 };
 
-const atlasUrls: Record<keyof typeof manifests, string> = {
+const atlasUrls: Record<Kind, string> = {
   tile: tileAtlas,
   monster: monsterAtlas,
   icon: iconAtlas,
 };
 
-export function frameStyle(kind: keyof typeof manifests, defId: string): string | null {
+const celManifests: Record<Kind, CelManifest> = {
+  tile: celTileManifest as CelManifest,
+  monster: celMonsterManifest as CelManifest,
+  icon: celIconManifest as CelManifest,
+};
+
+const celUrls: Record<Kind, string> = {
+  tile: celTileAtlas,
+  monster: celMonsterAtlas,
+  icon: celIconAtlas,
+};
+
+// Which art set wins. Cel frames are preferred wherever one exists and the pixel atlas
+// fills the gaps; `?art=pixel` (remembered) shows the old set for comparison, `?art=cel` restores.
+export type ArtSet = "cel" | "pixel";
+function readArtSet(): ArtSet {
+  try {
+    const q = new URLSearchParams(globalThis.location?.search ?? "").get("art");
+    if (q === "cel" || q === "pixel") globalThis.localStorage?.setItem("ia-art", q);
+    return globalThis.localStorage?.getItem("ia-art") === "pixel" ? "pixel" : "cel";
+  } catch {
+    return "cel";
+  }
+}
+let artSet: ArtSet = readArtSet();
+export function setArtSet(set: ArtSet): void {
+  artSet = set;
+}
+
+/** The cel frame for a key, when the cel set is active and has one. */
+function celFrame(kind: Kind, defId: string): CelManifest["frames"][string] | null {
+  return artSet === "cel" ? celManifests[kind].frames[defId] ?? null : null;
+}
+
+export function frameStyle(kind: Kind, defId: string): string | null {
+  const cel = celFrame(kind, defId);
+  if (cel) {
+    const m = celManifests[kind], k = m.scale;
+    return `background-image:url('${celUrls[kind]}');background-position:-${cel.x / k}px -${cel.y / k}px;background-size:${m.size.w / k}px ${m.size.h / k}px;width:${cel.w / k}px;height:${cel.h / k}px;image-rendering:auto`;
+  }
   const frame = manifests[kind].frames[defId];
   if (!frame) return null;
   return `background-image:url('${atlasUrls[kind]}');background-position:-${frame.x}px -${frame.y}px;width:${frame.w}px;height:${frame.h}px`;
@@ -53,11 +105,13 @@ if (typeof document !== "undefined") {
     return `@keyframes idle-${id} { from { background-position: -${first.x}px -${first.y}px; } to { background-position: -${endX}px -${first.y}px; } }`;
   }).join("\n");
   const el = document.createElement("style");
-  el.textContent = `${css}\n@media (prefers-reduced-motion: reduce) { .sprite { animation: none !important; } }`;
+  el.textContent = `${css}\n@keyframes cel-breathe { 0%, 100% { transform: translateX(-50%) scaleY(1); } 50% { transform: translateX(-50%) scaleY(1.035); } }\n.sprite { transform-origin: 50% 100%; }\n@media (prefers-reduced-motion: reduce) { .sprite { animation: none !important; } }`;
   document.head.appendChild(el);
 }
 
 export function monsterStyle(creature: string): string | null {
+  // a cel creature has no frame loop: it breathes (a CSS squash on the feet, see index.html)
+  if (celFrame("monster", creature)) return `${frameStyle("monster", creature)};animation:cel-breathe 2400ms ease-in-out infinite`;
   const a = anims[creature]?.idle;
   if (!a) return frameStyle("monster", creature);
   const f = a.frames[0]!, n = a.frames.length;
@@ -69,7 +123,7 @@ export function monsterStyle(creature: string): string | null {
 }
 
 export function nodeIconId(kind: string, material?: string): string {
-  if (material && manifests.icon.frames[material]) return material;
+  if (material && (manifests.icon.frames[material] || celManifests.icon.frames[material])) return material;
   const defaults: Record<string, string> = {
     wood: "oak-log",
     herb: "forest-herb",

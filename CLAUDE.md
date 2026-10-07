@@ -107,7 +107,8 @@ One pure engine (`src/engine/`), one shared presentation layer (`src/render/rend
 - Presentation both surfaces need lives in `render.ts` (`formatEvent` is the one exhaustive `GameEvent` → text switch). For "why can't I?", use `whyNot(state, action)` (`sim/legal.ts`) → `rejectCopy` — never re-derive from the catalog.
 - The console (`sim/playtest.ts`) is the blind-playtest surface: append new lines, never reshape existing ones.
 - **Web verification:** read `docs/working-on-this-codebase.md` first; always start a FRESH server and add `?cb=$RANDOM` to every `agent-browser open` (a stale bundle looks like a game-breaking bug).
-- **Art:** separate repo `../idle-adventure-assets`; `bun run refresh` there copies approved atlases into `src/web/assets/`, then commit them here. A defId with no frame falls back to its glyph — a creature never borrows another's sprite. The user picks every asset from rendered sheets before it ships.
+- **Art:** separate repo `../idle-adventure-assets`; `bun run refresh` there copies approved atlases into `src/web/assets/`, then commit them here. A defId with no frame falls back to its glyph — a creature never borrows another's sprite. The user picks every asset from rendered sheets before it ships (exception: the 2026-10-07 woodcut restyle, where the user delegated the picks).
+- **Two art sets (2026-10-07):** hi-res woodcut-style frames in `src/web/assets/cel/` (rendered locally via `imagegen`, packed by `py/cel_pack.py` in the assets repo at 3× the pixel frame size) win wherever they have a key; the pixel atlases fill gaps. `?art=pixel` / `?art=cel` switches (remembered in localStorage). A cel creature breathes via CSS instead of the pixel idle loop.
 
 ## Conventions & Patterns
 
