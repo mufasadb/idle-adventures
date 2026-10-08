@@ -33,7 +33,7 @@ export function pruneFx(fx: Fx, now: number): void {
 // Where a picked-up item flies: the visible Bag tab (sidebar / open drawer), else the
 // drawer handle's bag count (phone, drawer closed). Null = nothing on screen.
 function bagTarget(root: HTMLElement): { x: number; y: number } | null {
-  for (const q of ['[data-tab="bag"]', ".drawer-handle .summary"]) {
+  for (const q of ['[data-tab="bag"]', ".drawer-handle .bagcount"]) {
     const e = root.querySelector(q);
     const r = e?.getBoundingClientRect();
     if (r && r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight) return { x: r.left + Math.min(r.width / 2, 60), y: r.top + r.height / 2 };
@@ -93,7 +93,7 @@ export function paintFx(root: HTMLElement, fx: Fx, now: number): void {
       node.style.animationDelay = `${-age}ms`;
       node.setAttribute("aria-hidden", "true");
       root.appendChild(node);
-      if (cue.reason === "carry-full") root.querySelectorAll('[data-tab="bag"], .drawer-handle .summary').forEach((e) => pulse(e, "fx-shake", age));
+      if (cue.reason === "carry-full") root.querySelectorAll('[data-tab="bag"], .drawer-handle .bagcount').forEach((e) => pulse(e, "fx-shake", age));
     }
   }
   // beh: the bank row you pressed and the loadout slot/chip the item landed in glow.

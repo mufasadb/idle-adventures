@@ -182,7 +182,7 @@ function walkRoute(wps: Pos[]): void {
 function draw(): void {
   if (state.phase !== "town") prep = null; // leaving town drops the prep selection (zpm.3)
   const engaged = !!state.expedition?.combat;
-  if (engaged && !wasEngaged) { drawerOpen = true; drawerTab = "here"; } // a fight just started: show its panel
+  if (engaged && !wasEngaged) { drawerOpen = false; drawerTab = "here"; } // eor: a fight just started — its sheet sits over the map, so get the drawer out of the way
   wasEngaged = engaged;
   document.body.classList.toggle("in-expedition", state.phase !== "town");
   app.innerHTML = state.phase === "town"

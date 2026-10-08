@@ -1,9 +1,12 @@
-import { WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE, QUAFF_ENERGY, DON_DOFF_ENERGY, FLASK_EFFECT, ANTIDOTE } from "../data/constants";
+import { LOOT_TABLE, CATEGORY_LOOT_TABLE, MAP_SCROLL_ID, WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE, QUAFF_ENERGY, DON_DOFF_ENERGY, FLASK_EFFECT, ANTIDOTE } from "../data/constants";
 import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType, FishWater } from "../data/constants";
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
-import { playerDamage, damageTaken } from "../engine/combat";
-import type { Action, Expedition, Loadout, MapItem, RejectionReason, GameEvent, ItemStack } from "../engine/types";
+import { playerDamage, damageTaken, strikeExchange, wieldsRanged, hasAmmo, loadedAmmoIndex, rollLoot } from "../engine/combat";
+import { consumeOne, addToCarry, freeLootStacks } from "../engine/carry";
+import { moveCost } from "../engine/move";
+import { ARMOUR_SLOTS } from "../engine/pack";
+import type { Action, Equipment, Expedition, Loadout, MapItem, RejectionReason, GameEvent, ItemStack } from "../engine/types";
 import { mapEpithet } from "../engine/town";
 import { hintLabel } from "../engine/hints";
 
@@ -128,7 +131,7 @@ export function formatEvent(e: GameEvent, name: (defId: string) => string): stri
 }
 
 // Fight forecast as DATA (eho): the "can I win the race?" numbers behind the web's
-// forecast line. dmgOut/dmgIn are per-strike; toKill/toDie are the round counts; the
+// verdict colour (D103 — the web no longer prints them) and the console ENGAGED line. dmgOut/dmgIn are per-strike; toKill/toDie are the round counts; the
 // player wins iff they land the kill no later than they'd fall. Formatting is the
 // surface's job. weaponBuff reflects an active coating (D60).
 export function combatForecast(
@@ -146,7 +149,7 @@ export function combatForecast(
 }
 
 // The same race mid-fight (67e): the live monster HP, this fight's battle-item
-// adds and any active coating. Shared by the web engagement panel and the console
+// adds and any active coating. Shared by the web's engagementVerdict and the console
 // ENGAGED header.
 export function engagementForecast(exp: Expedition): { dmgOut: number; dmgIn: number; toKill: number; toDie: number; winning: boolean } {
   const c = exp.combat!;
@@ -155,6 +158,186 @@ export function engagementForecast(exp: Expedition): { dmgOut: number; dmgIn: nu
   const toKill = Math.ceil(c.monsterHp / dmgOut);
   const toDie = Math.ceil(exp.hp / dmgIn); // raw race — potions extend it
   return { dmgOut, dmgIn, toKill, toDie, winning: toKill <= toDie };
+}
+
+// --- Fight verdict (eor, D103): the web shows ONE traffic-light verdict instead of
+// round counts. Derived from the forecasts above + the engine's own round function
+// (strikeExchange, auto-quaff semantics) — no new combat math here.
+//   win    — the bare race (combatForecast/engagementForecast `winning`) already wins
+//   costly — the bare race loses, but carried potions (auto-quaffed at the threshold)
+//            turn it into a win
+//   lose   — even every carried potion can't save it
+export type FightVerdict = "win" | "costly" | "lose";
+export const VERDICT_LABEL: Record<FightVerdict, string> = { win: "Clean win", costly: "Costly win", lose: "You'd lose" };
+
+type RaceStart = {
+  loadout: Loadout; hp: number; monsterHp: number; creature: string;
+  damageAdd?: number; mitigationAdd?: number; weaponBuff?: { id: string; charges: number };
+  poison?: { dmg: number; rounds: number }; playerPoison?: { dmg: number; ticks: number };
+  opener?: boolean; mapTier?: number;
+};
+// Plays the fight out with strikeExchange round by round (auto-quaff ON, ammo spent per
+// shot like fightRound) — the same loop resolveCombat runs, but from a mid-fight start.
+// Venom is a per-round roll the forecast can't know, so it's left out.
+function potionRace(r: RaceStart): { victory: boolean; potionsUsed: number } {
+  let { loadout, hp, monsterHp, weaponBuff, poison, playerPoison } = r;
+  let opener = r.opener ?? false;
+  let potionsUsed = 0;
+  for (let i = 0; i < 500; i++) {
+    const shoots = wieldsRanged(loadout) && hasAmmo(loadout);
+    const round = strikeExchange(loadout, hp, monsterHp, r.creature, {
+      damageAdd: r.damageAdd ?? 0, mitigationAdd: r.mitigationAdd ?? 0, autoQuaff: true,
+      skipRetaliation: opener, weaponBuff, poison, ...(playerPoison ? { playerPoison } : {}), mapTier: r.mapTier ?? 1,
+    });
+    potionsUsed += round.potionsUsed;
+    if (round.victory || round.defeated) return { victory: round.victory, potionsUsed };
+    loadout = { ...loadout, potions: round.potionsAfter, ...(shoots ? { ammo: consumeOne(loadout.ammo ?? [], loadedAmmoIndex(loadout)) } : {}) };
+    hp = round.hp; monsterHp = round.monsterHp; weaponBuff = round.weaponBuffAfter; poison = round.poisonAfter;
+    playerPoison = round.playerPoisonAfter; opener = false;
+  }
+  return { victory: false, potionsUsed };
+}
+// The classification itself: the bare race first, then the potion-aware play-out.
+// A play-out that wins without drinking anything (a coating's poison finishing it)
+// still counts as a clean win.
+export function fightVerdict(bareWinning: boolean, withPotions: { victory: boolean; potionsUsed: number } | null): FightVerdict {
+  if (bareWinning) return "win";
+  if (!withPotions?.victory) return "lose";
+  return withPotions.potionsUsed > 0 ? "costly" : "win";
+}
+// Before the fight (route end / standing on it): full monster HP, no battle items yet.
+export function preFightVerdict(loadout: Loadout, creature: string, hp: number, weaponBuff?: { id: string; charges: number }, mapTier = 1, playerPoison?: { dmg: number; ticks: number }): FightVerdict {
+  const bare = combatForecast(loadout, creature, hp, weaponBuff, mapTier).winning;
+  return fightVerdict(bare, bare || !loadout.potions.length ? null : potionRace({
+    loadout, hp, monsterHp: MONSTER_TIER_HP_CURVE[MONSTERS[creature]!.tier]!, creature, weaponBuff, mapTier, ...(playerPoison ? { playerPoison } : {}),
+  }));
+}
+// Mid-fight: the live engagement (its HP, battle-item adds, poison, opener).
+export function engagementVerdict(exp: Expedition): FightVerdict {
+  const c = exp.combat!;
+  const bare = engagementForecast(exp).winning;
+  return fightVerdict(bare, bare || !exp.loadout.potions.length ? null : potionRace({
+    loadout: exp.loadout, hp: exp.hp, monsterHp: c.monsterHp, creature: c.creature,
+    damageAdd: c.damageAdd, mitigationAdd: c.mitigationAdd, weaponBuff: exp.weaponBuff, poison: c.poison,
+    ...(exp.poisoned ? { playerPoison: exp.poisoned } : {}), opener: c.opener ?? false, mapTier: exp.mapTier ?? 1,
+  }));
+}
+
+// eor: each side's attack + armour TYPE (the visible matrix), in place of the numbers.
+export const DMG_TYPE_ICON: Record<DmgType, string> = { melee: "⚔", ranged: "🏹", magic: "✨" };
+export const ARMOUR_TYPE_ICON: Record<ArmourType, string> = { plate: "🛡", light: "🧥", robe: "👘" };
+// What your strike deals: the wielded weapon's type; bare hands — or a bow with an
+// empty quiver (D45, swung as a club) — hit as melee.
+export function playerAttackType(loadout: Loadout): DmgType {
+  const w = loadout.equipment.weapon;
+  if (w === null || !WEAPONS[w]) return "melee";
+  if (wieldsRanged(loadout) && !hasAmmo(loadout)) return "melee";
+  return WEAPONS[w]!.dmgType;
+}
+// The armour classes you're wearing, most pieces first (ties in plate/light/robe order).
+export function armourTypesWorn(equipment: Equipment): ArmourType[] {
+  const n: Record<ArmourType, number> = { plate: 0, light: 0, robe: 0 };
+  for (const slot of ARMOUR_SLOTS) {
+    const id = equipment[slot];
+    const a = id ? ARMOUR[id] : undefined;
+    if (a) n[a.armourType] += 1;
+  }
+  return (["plate", "light", "robe"] as ArmourType[]).filter((t) => n[t] > 0).sort((a, b) => n[b] - n[a]);
+}
+
+// eor: what a monster drops — `sure` always drops, `maybe` are chance drops (shown as
+// "?" so the fight panel never spoils a rare roll). Read off the loot tables.
+export function lootPreview(creature: string): { sure: ItemStack[]; maybe: string[] } {
+  const entries = [...(LOOT_TABLE[creature] ?? []), ...(CATEGORY_LOOT_TABLE[MONSTERS[creature]?.category ?? "beast"] ?? [])];
+  return {
+    sure: entries.filter((e) => e.chance === undefined).map((e) => ({ defId: e.defId, qty: e.qty })),
+    maybe: entries.filter((e) => e.chance !== undefined).map((e) => e.defId),
+  };
+}
+// eor: the bag check engage() runs (pendingLootFits), as counts for the warning:
+// `need` = new bag stacks the loot would open, `free` = stacks still open.
+export function lootSlots(seed: string, creature: string, at: { x: number; y: number }, loadout: Loadout, carry: ItemStack[]): { need: number; free: number } {
+  let c: ItemStack[] = carry;
+  for (const s of rollLoot(seed, creature, at).filter((s) => s.defId !== MAP_SCROLL_ID)) c = addToCarry(c, s.defId, s.qty, Infinity)!;
+  return { need: c.length - carry.length, free: Math.max(0, freeLootStacks(loadout) - carry.length) };
+}
+
+// --- Tile names, yields and route-terrain copy (ai8 / qba / 5k4) ---------------------
+const TERRAIN_PLURAL: Record<Terrain, string> = {
+  river: "river", mud: "mud", plains: "plains", ice: "ice", mountain: "mountains", shallows: "shallows",
+  lake: "lake", sea: "sea", "spore-thicket": "spore-thickets",
+};
+const capFirst = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+// "a raft", "an axe", "waders" (a pair-noun takes no article).
+function gearPhrase(defId: string): string {
+  const n = name(defId).toLowerCase();
+  return /s$/.test(n) ? n : `${/^[aeiou]/.test(n) ? "an" : "a"} ${n}`;
+}
+const orList = (xs: string[]) => xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} or ${xs[xs.length - 1]}`;
+
+// The gear that changes a terrain: `opens` = tools that make an impassable terrain
+// crossable (TERRAIN_GATE enable), `speeds` = tools that discount it + transports that
+// move faster on it (TRANSPORT_MULTIPLIER > 1). Data order; read from the levers.
+export function terrainGear(terrain: Terrain): { opens: string[]; speeds: string[] } {
+  const gate = TERRAIN_GATE[terrain] ?? {};
+  const opens = Object.keys(gate).filter((t) => gate[t]!.enable !== undefined);
+  const speeds = [
+    ...Object.keys(gate).filter((t) => (gate[t]!.discount ?? 0) > 0),
+    ...Object.keys(TRANSPORT_MULTIPLIER).filter((t) => (TRANSPORT_MULTIPLIER[t]![terrain] ?? 1) > 1),
+  ];
+  return { opens, speeds };
+}
+
+// 5k4: a route that crosses terrain dearer than a plains step (with the gear you have)
+// says it'll be slower, naming the terrain and — loosely — gear that would help.
+// `terrains` = the walkable tiles' terrain in walk order. Null = nothing slow.
+const SLOW_HINT_MAX = 3; // how many gear names the hint lists (presentation only)
+export function slowRouteNote(terrains: Terrain[], equipment: Pick<Equipment, "transport" | "tools">): string | null {
+  const counts = new Map<Terrain, number>();
+  for (const t of terrains) {
+    const step = moveCostOf(t, equipment);
+    if (Number.isFinite(step) && step > TERRAIN_COST.plains) counts.set(t, (counts.get(t) ?? 0) + 1);
+  }
+  if (!counts.size) return null;
+  const slow = [...counts].sort((a, b) => b[1] - a[1]).map(([t]) => t);
+  const held = new Set([...equipment.tools, ...(equipment.transport ? [equipment.transport] : [])]);
+  const gear = [...new Set(slow.flatMap((t) => terrainGear(t).speeds))].filter((g) => !held.has(g)).slice(0, SLOW_HINT_MAX);
+  const where = orList(slow.map((t) => TERRAIN_PLURAL[t])).replace(/ or /, " and ");
+  return `slower going through the ${where}${gear.length ? ` — ${orList(gear.map(gearPhrase))} would speed it up` : ""}`;
+}
+// 5k4: a leg that hits a wall names the wall — and, if some gear crosses it, which.
+export function blockedRouteNote(terrain: Terrain): string {
+  const plural = TERRAIN_PLURAL[terrain];
+  const verb = plural.endsWith("s") ? "block" : "blocks";
+  const { opens } = terrainGear(terrain);
+  return `the ${plural} ${verb} this path${opens.length ? ` — only ${orList(opens.map(gearPhrase))} gets you across` : ""}`;
+}
+// Orthogonal step cost with the given gear (the move engine's own function).
+function moveCostOf(t: Terrain, eq: Pick<Equipment, "transport" | "tools">): number {
+  return moveCost(t, eq.transport, eq.tools);
+}
+
+type TilePoi = { kind: NodeType; creature: string | null } | null;
+// qba: the name a tapped tile reads as — a monster's name, a node's yield (once
+// perceived), or the terrain. Honest to sight: an unresolved node names only its kind.
+export function tileName(terrain: Terrain, poi: TilePoi, detail: PoiDetail | null, cleared: boolean): string {
+  if (poi && !cleared) {
+    if (poi.kind === "monster") return poi.creature ? name(poi.creature) : "a monster";
+    const noun = capFirst(GATHER_VERB[poi.kind]?.noun ?? kindLabel(poi.kind));
+    return detail?.material ? `${noun} · ${name(detail.material)}` : noun;
+  }
+  return `${capFirst(terrain)}${cleared ? (poi?.kind === "monster" ? " · cleared" : " · worked out") : ""}`;
+}
+// ai8: what a tile GIVES, for the collapsed drawer line — "Ore vein → Copper Ore
+// (needs pick)". Tool needs from nodeToolShort; an access gate from the perceived
+// detail (nodeGateNote's source). Null for a monster/empty tile (the caller shows those).
+export function tileYield(poi: TilePoi, detail: PoiDetail | null, cleared: boolean, tools: string[]): string | null {
+  if (!poi || cleared || poi.kind === "monster") return null;
+  const noun = capFirst(GATHER_VERB[poi.kind]?.noun ?? kindLabel(poi.kind));
+  if (!detail?.material) return `${noun} → ?`;
+  const need = nodeToolShort(poi.kind as GatherableNodeType, tools)
+    ?? (detail.gatedBy?.length && !detail.gatedBy.some((t) => tools.includes(t)) ? `needs ${detail.gatedBy.join(" or ")}` : null);
+  return `${noun} → ${name(detail.material)}${need ? ` (${need})` : ""}`;
 }
 
 // --- Perception flavor (9u9.2): turn structured facts into vague, learn-the-

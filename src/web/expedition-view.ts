@@ -9,21 +9,18 @@ import { frameStyle, iconStyle, monsterStyle, nodeIconId, playerStyle, tileStyle
 import { carryCap, mapCarryCap } from "../engine/carry";
 import { deriveRoute } from "./route";
 import type { Pos } from "./route";
-import { wieldsRanged, loadedAmmoIndex } from "../engine/combat";
-import { PLAYER_BASE_HP, RECIPE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_CAMP_MEALS, MONSTER_TIER_HP_CURVE, MONSTERS, QUAFF_ENERGY, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, FISH_CAST_ENERGY, FISH_DEEP_DEPTH, ANTIDOTE, TERRAIN_HP_COST } from "../data/constants";
+import { PLAYER_BASE_HP, RECIPE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_CAMP_MEALS, QUAFF_ENERGY, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, FISH_CAST_ENERGY, FISH_DEEP_DEPTH, ANTIDOTE, TERRAIN_HP_COST } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
-import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, combatForecast, GATHER_VERB, round1, engagementForecast, enhancementHint, battleItemEffect } from "../render/render";
+import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, GATHER_VERB, round1, preFightVerdict, tileName, tileYield, slowRouteNote, blockedRouteNote } from "../render/render";
+import type { FightVerdict } from "../render/render";
+import { fightSheet, preFightCard, throwLegal, enhanceButtons, verdictDot } from "./fight-view";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action } from "../engine/types";
 import { inventoryGrid } from "./inventory";
 import { heldOnRun } from "./feedback";
 
 const kk = (p: Pos) => `${p.x},${p.y}`;
-
-// 67e: the engagement forecast from the LAST render, so the panel can show a delta
-// ("kill in 5 → 3") after a coat/swap/potion. Keyed on the engagement so a new fight
-// resets it. Purely presentational.
-let lastForecast: { key: string; dmgOut: number; toKill: number } | null = null;
+const capFirst = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 // Human breakdown of a single step's energy — surfaced as a path tile's hover
 // title so the horse/gear effect is visible: "plains 10e ÷2 (horse) = 5e".
@@ -54,16 +51,15 @@ function herePanel(state: GameState, grid: Grid, exp: NonNullable<GameState["exp
   if (poi.kind === "monster" && poi.creature) {
     // You're standing on it, so it's always within perception range.
     const per = perceive(grid, exp.pos, exp.loadout.equipment.tools, exp.surveyed ?? []).find((p) => p.x === poi.x && p.y === poi.y);
-    const desc = flavorDetail(per?.detail ?? null, "monster");
     // Standing on a live, un-engaged monster shouldn't happen in normal play
     // (move-onto-tile auto-engages, grid gen bars POIs from the entry tile,
-    // victory relocation lands only on cleared tiles) — this branch is kept
-    // defensively for hand-built/test states. No pre-fight forecast here; that
-    // lives in the walk-in path banner (§5), where the decision actually happens.
+    // victory relocation lands only on cleared tiles) — kept defensively for
+    // hand-built/test states. eor: the same pre-fight card the route end shows.
+    const verdict = preFightVerdict(exp.loadout, poi.creature, exp.hp, exp.weaponBuff, exp.mapTier ?? 1, exp.poisoned);
     return `<div class="here monster">
-      <b>Here:</b> a <b>${name(poi.creature!)}</b> — <i>${desc}</i>.
-      It's static: it won't touch you unless you Fight. You can just walk past it.
-      ${canFight ? `<button data-act="fight">⚔ Engage the ${name(poi.creature!)}</button>` : `<span class="warn">can't fight — ${rejectCopy(whyNot(state, { type: "fight" }) ?? "carry-full", undefined, "fight")}</span>`}
+      ${preFightCard(state, exp, poi.creature, pos, verdict, per?.detail ?? null)}
+      It's static: it won't touch you unless you Fight.
+      ${canFight ? `<button data-act="fight">⚔ Engage the ${name(poi.creature)}</button>` : `<span class="warn">can't fight — ${rejectCopy(whyNot(state, { type: "fight" }) ?? "carry-full", undefined, "fight")}</span>`}
     </div>`;
   }
   // gatherable node
@@ -102,91 +98,12 @@ function fishLine(state: GameState, legal: Action[]): string {
   return `<div class="here fish">🎣 <span class="warn">${rejectCopy(reason, undefined, "fish")}</span></div>`;
 }
 
-// Weapon-enhancement readout (D60): the active coating + charges left, or nothing.
-function coatingLine(exp: NonNullable<GameState["expedition"]>): string {
-  const b = exp.weaponBuff;
-  if (!b) return "";
-  return ` · 🗡️ ${name(b.id)} · ${b.charges} left`;
-}
-// An "Apply <enhancement>" button per carried enhancement (D60) — legality from
-// reduce (D29). Works engaged or unengaged; applying over an active coating replaces it.
-function enhanceButtons(exp: NonNullable<GameState["expedition"]>): string {
-  return (exp.loadout.enhancements ?? []).map((s) => {
-    return `<button data-enhance="${s.defId}" title="coat your weapon (${enhancementHint(s.defId) ?? ""})${exp.weaponBuff ? " — replaces the current coating" : ""}">🗡️ Apply ${name(s.defId)}${s.qty > 1 ? ` ×${s.qty}` : ""}</button>`;
-  }).join("");
-}
-
-// si7.6.9.6 (Muse option 1): flasks the reducer would let you throw — at your engaged
-// target, or at `at` from range. Legality from reduce (D29).
-function throwLegal(legal: Action[], at?: { x: number; y: number }): string[] {
-  return [...new Set(legal.filter((a): a is Extract<Action, { type: "throw" }> => a.type === "throw" && (at ? a.at !== undefined && a.at.x === at.x && a.at.y === at.y : a.at === undefined)).map((a) => a.itemId))];
-}
-// A Throw button per held flask; before anything has struck, it wears the glowing
-// FREE OPENER badge — the throw draws no retaliation.
-function throwButtons(exp: NonNullable<GameState["expedition"]>, legal: Action[]): string[] {
-  const free = !(exp.combat?.struck ?? false);
-  return throwLegal(legal).map((id) => {
-    const qty = (exp.loadout.flasks ?? []).filter((s) => s.defId === id).reduce((n, s) => n + s.qty, 0);
-    return `<button class="throw" data-throw="${id}" title="${describe(id)}">💥 Throw ${name(id).toLowerCase()} ×${qty}${free ? ` <span class="free-opener">FREE OPENER</span>` : ""}</button>`;
-  });
-}
 // si7.6.9.6: the poison chip beside the HP bar (a green skull + ticks left) and, when an
 // antidote is held, its one-tap cure right next to it.
 function poisonChip(exp: NonNullable<GameState["expedition"]>, legal: Action[]): string {
   if (!exp.poisoned) return "";
   const cure = legal.some((a) => a.type === "use-item" && ANTIDOTE.includes(a.itemId));
   return ` <span class="poison-chip" title="poisoned: −${exp.poisoned.dmg} HP per step or fight round for ${exp.poisoned.ticks} more — it can't take you below 1 HP">☠ ${exp.poisoned.ticks}</span>${cure ? `<button class="antidote" data-use-item="antidote" title="antidote — cure the poison (no turn, no energy)">🧪<span class="lbl"> Antidote</span></button>` : ""}`;
-}
-
-// The engagement panel replaces herePanel while a live fight is in progress
-// (exp.combat set): monster HP bar, per-round forecast (the honest race —
-// toKill vs toDie, no potion double-count), and Fight/Flee/Potion/auto-quaff.
-function engagementPanel(state: GameState, exp: NonNullable<GameState["expedition"]>, legal: Action[]): string {
-  const c = exp.combat!;
-  const maxHp = MONSTER_TIER_HP_CURVE[MONSTERS[c.creature]!.tier]!;
-  const { dmgOut, dmgIn, toKill, toDie, winning } = engagementForecast(exp); // D60: reflects the coating; potions extend it (noted in the forecast line)
-  const canQuaff = legal.some((a) => a.type === "quaff");
-  // Quiver readout (D45): a wielded bow spends an arrow per round; empty = club.
-  // si7.6.6: count only the ammo the wielded weapon can shoot, and name it.
-  const li = loadedAmmoIndex(exp.loadout);
-  const loaded = li === -1 ? null : exp.loadout.ammo![li]!;
-  const shots = loaded ? (exp.loadout.ammo ?? []).filter((s) => s.defId === loaded.defId).reduce((n, s) => n + s.qty, 0) : 0;
-  const quiver = wieldsRanged(exp.loadout) ? ` · 🏹 ${shots} ${loaded ? name(loaded.defId).toLowerCase() : "ammo"}${shots === 0 ? " — swinging it like a club!" : ""}` : "";
-  // 67e: damage-change feedback — diff this forecast against the last render's so a
-  // coat/swap/potion shows its effect ("→ kill in 3", "(was 4.5)"). Reset per fight.
-  const key = `${c.creature}@${c.at.x},${c.at.y}`;
-  const prev = lastForecast && lastForecast.key === key ? lastForecast : null;
-  const dmgWas = prev && round1(prev.dmgOut) !== round1(dmgOut) ? ` <span class="was">(was ${round1(prev.dmgOut)})</span>` : "";
-  const killWas = prev && winning && prev.toKill !== toKill ? ` <span class="was">(was ${prev.toKill})</span>` : "";
-  lastForecast = { key, dmgOut, toKill };
-  return `<div class="here monster engagement">
-    <b>⚔ Engaged: ${name(c.creature)}</b>
-    <div class="bar"><span>Its HP</span><div class="track"><div class="fill monster" style="width:${(c.monsterHp / maxHp) * 100}%"></div></div><b>${round1(c.monsterHp)}/${maxHp}</b></div>
-    <div class="forecast">you hit for <b>${round1(dmgOut)}</b>${dmgWas} · it hits for <b>${round1(dmgIn)}</b> · <b class="${winning ? "good" : "over"}">${winning ? `kill in ${toKill}` : `it kills you first (~${toDie} rounds)`}</b>${killWas}${exp.loadout.potions.length ? ` · ${exp.loadout.potions.reduce((n, p) => n + p.qty, 0)} potion(s) extend that` : ""}${quiver}${coatingLine(exp)}${c.poison ? ` · ☠ poisoned (${round1(c.poison.dmg)}/rd, ${c.poison.rounds} left)` : ""}</div>
-    <div class="actions">
-      <button data-act="fight">⚔ Fight (1 round)</button>
-      ${throwButtons(exp, legal).join("")}
-      <button data-act="flee" title="disengage — take one parting hit (${round1(dmgIn)}); unused battle items keep for later">🏃 Flee (−${round1(dmgIn)} HP)</button>
-      ${canQuaff ? `<button data-act="quaff" title="drink a potion — costs a turn (the ${name(c.creature)} strikes)">🧪 Potion</button>` : `<button disabled title="${rejectCopy(whyNot(state, { type: "quaff" }) ?? "insufficient")}">🧪 Potion</button>`}
-      <button data-act="toggle-auto-quaff">Auto-potion: <b>${(exp.autoQuaff ?? true) ? "on" : "off"}</b></button>
-      <button data-act="toggle-auto-finish" title="fast-forward whole fights to victory or defeat in one click">Auto-finish: <b>${(exp.autoFinish ?? false) ? "on" : "off"}</b></button>
-      ${exp.loadout.battleItems.filter((s) => !ANTIDOTE.includes(s.defId)).map((s) => { const eff = battleItemEffect(s.defId) ?? ""; return `<button data-use-item="${s.defId}" title="use it this fight only (${eff})">⚗ ${name(s.defId)} (${eff})${s.qty > 1 ? ` ×${s.qty}` : ""}</button>`; }).join("")}
-      ${enhanceButtons(exp)}
-      ${swapGearButtons(exp, legal)}
-    </div>
-  </div>`;
-}
-
-// 67e: mid-fight gear swaps — don from carry / doff worn, each costs a monster turn
-// (legality from reduce, D29). Prominent in the panel so "swap to the armour that
-// resists this" is a real in-fight verb.
-function swapGearButtons(exp: NonNullable<GameState["expedition"]>, legal: Action[]): string {
-  const creature = name(exp.combat!.creature);
-  const dons = legal.filter((a): a is Extract<Action, { type: "don" }> => a.type === "don")
-    .map((a) => `<button data-don="${a.itemId}" title="equip ${name(a.itemId)} — costs a turn (the ${creature} strikes)">🛡 Don ${name(a.itemId)}</button>`);
-  const doffs = legal.filter((a): a is Extract<Action, { type: "doff" }> => a.type === "doff")
-    .map((a) => `<button data-doff="${a.itemId}" title="stow ${name(a.itemId)} — costs a turn (the ${creature} strikes)">🎒 Doff ${name(a.itemId)}</button>`);
-  return [...dons, ...doffs].join("");
 }
 
 export type DrawerTab = "here" | "bag" | "craft" | "log";
@@ -335,12 +252,11 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   const fight = endPoi && endPoi.kind === "monster" && endPoi.creature && !cleared.has(goalK) ? endPoi.creature : undefined;
   const shoot = fight !== undefined && legal.some((a) => a.type === "fight" && a.at !== undefined && a.at.x === rt.end.x && a.at.y === rt.end.y);
   const costClause = `<b class="${overBudget ? "over" : ""}">−${round1(total)}e</b>${rt.actionCost > 0 ? ` <span class="muted">(${round1(rt.walkCost)} walk + ${round1(rt.actionCost)} gather)</span>` : ""}`;
-  const forecastClause = fight
-    ? (() => {
-        const f = combatForecast(exp.loadout, fight, exp.hp, exp.weaponBuff, exp.mapTier ?? 1); // D60: reflects an active coating
-        return ` · <span class="forecast" title="bare-kit forecast — battle items apply when the fight starts">you ${round1(f.dmgOut)} / it ${round1(f.dmgIn)} — <b class="${f.winning ? "good" : "over"}">${f.winning ? `kill in ${f.toKill}` : "it wins"}</b></span>`;
-      })()
-    : "";
+  // eor (D103): a monster at the route's end gets the pre-fight card — verdict colour,
+  // both sides' attack/armour types, loot, bag-slot warning. No round counts.
+  const verdictFor = (creature: string): FightVerdict => preFightVerdict(exp.loadout, creature, exp.hp, exp.weaponBuff, exp.mapTier ?? 1, exp.poisoned);
+  const endVerdict = fight ? verdictFor(fight) : null;
+  const fightCard = fight && endVerdict ? preFightCard(state, exp, fight, rt.end, endVerdict, perceived.get(goalK)?.detail ?? null) : "";
   const surveyAtEnd = legal.some((a) => a.type === "survey" && a.at.x === rt.end.x && a.at.y === rt.end.y);
   // si7.6.9.6: an adjacent monster at the route's end can take a thrown opener from here.
   const throwables = fight ? throwLegal(legal, rt.end) : [];
@@ -348,23 +264,38 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   // Ambush warning (2i8, playtest F5): the walk auto-engages the FIRST monster on the
   // line — warn prominently when that fight is a forecast LOSS.
   const cm = rt.crossedMonster;
-  const crossWarn = cm && !combatForecast(exp.loadout, cm.creature, exp.hp, exp.weaponBuff, exp.mapTier ?? 1).winning
+  const crossWarn = cm && !(fight && cm.pos.x === rt.end.x && cm.pos.y === rt.end.y) && verdictFor(cm.creature) === "lose"
     ? `<div class="over">⚠ runs into a ${name(cm.creature)} at (${cm.pos.x},${cm.pos.y}) you'd LOSE to — reroute.</div>`
     : "";
+  // 5k4: name the wall a leg hits (and the gear that crosses it, if any); a walkable
+  // route over dear terrain says it'll be slower and hints at gear that speeds it.
+  const firstBlock = rt.legs.find((l) => l.blockedAt)?.blockedAt ?? null;
+  const blockNote = firstBlock ? `<div class="over">✗ ${capFirst(blockedRouteNote(grid.terrain[firstBlock.y]![firstBlock.x]!))}. <span class="muted">Tap the line to unwind.</span></div>` : "";
+  const slow = hasRoute && !firstBlock ? slowRouteNote(rt.walkable.map((t) => grid.terrain[t.y]![t.x]!), exp.loadout.equipment) : null;
+  const slowNote = slow ? `<div class="slow">🐢 ${slow}</div>` : "";
   // kml: the route bar floats at the bottom of the map — only when there's something to say.
-  const routeBar = exp.combat
-    ? `<div class="routebar engaged">⚔ <b>Engaged — ${name(exp.combat.creature)}</b> <button data-open-tab="here">fight / flee ▸</button></div>`
-    : hasRoute
-    ? `<div class="routebar${rt.blocked ? " blocked" : ""}">${crossWarn}${rt.blocked ? `<div class="over">✗ a leg crosses terrain you can't pass — tap the line to unwind.</div>` : ""}<div class="routeline">${fight ? `⚔ ${name(fight)} · ` : ""}${rt.walkable.length} tile${rt.walkable.length !== 1 ? "s" : ""} · ${costClause}${hpClause}${forecastClause}</div><div class="routebtns"><button class="primary" data-walk${rt.blocked ? " disabled" : ""}>${fight ? "Fight ▶" : "Walk ▶"}</button>${shoot ? `<button data-shoot title="engage from here — your opener lands first">🏹 Shoot</button>` : ""}${throwables.map((id) => `<button class="throw" data-throw="${id}" data-throw-x="${rt.end.x}" data-throw-y="${rt.end.y}" title="throw from here — ${describe(id)}">💥 Throw ${name(id).toLowerCase()} <span class="free-opener">FREE OPENER</span></button>`).join("")}${surveyAtEnd ? `<button data-survey-x="${rt.end.x}" data-survey-y="${rt.end.y}" title="resolve its detail from here">🔭 −${SURVEY_ENERGY}e</button>` : ""}<button data-cancelpath title="clear the route">✕</button></div></div>`
+  // A live fight has its own sheet (eor), so no route bar then.
+  const routeBar = !exp.combat && hasRoute
+    ? `<div class="routebar${rt.blocked ? " blocked" : ""}${fight ? " has-fight" : ""}">${crossWarn}${blockNote}${fightCard}<div class="routeline">${rt.walkable.length} tile${rt.walkable.length !== 1 ? "s" : ""} · ${costClause}${hpClause}</div>${slowNote}<div class="routebtns"><button class="primary" data-walk${rt.blocked ? " disabled" : ""}>${fight ? "Fight ▶" : "Walk ▶"}</button>${shoot ? `<button data-shoot title="engage from here — your opener lands first">🏹 Shoot</button>` : ""}${throwables.map((id) => `<button class="throw" data-throw="${id}" data-throw-x="${rt.end.x}" data-throw-y="${rt.end.y}" title="throw from here — ${describe(id)}">💥 Throw ${name(id).toLowerCase()} <span class="free-opener">FREE OPENER</span></button>`).join("")}${surveyAtEnd ? `<button data-survey-x="${rt.end.x}" data-survey-y="${rt.end.y}" title="resolve its detail from here">🔭 −${SURVEY_ENERGY}e</button>` : ""}<button data-cancelpath title="clear the route">✕</button></div></div>`
+    : "";
+
+  // qba: the tapped tile (the route's end) names itself and what reaching it costs —
+  // a label pinned over the tile, riding the map camera.
+  const endTerrain = grid.terrain[rt.end.y]![rt.end.x]!;
+  const endCleared = cleared.has(goalK);
+  const endPer = perceived.get(goalK);
+  const endName = tileName(endTerrain, endPoi ?? null, endPer?.detail ?? null, endCleared);
+  const endBlocked = firstBlock !== null;
+  const tileLabel = hasRoute
+    ? `<div class="tilelabel${endBlocked ? " blocked" : ""}" style="left:${2 + rt.end.x * 33 + 16}px;top:${2 + rt.end.y * 33}px">${endVerdict ? verdictDot(endVerdict) : ""}${endName} · ${endBlocked ? "can't reach" : `−${round1(rt.walkCost)}e`}</div>`
     : "";
 
   // kml: contextual quick actions on the map itself (so the common verbs never need
-  // the drawer). Legality from reduce (D29).
+  // the drawer). Legality from reduce (D29). A fight's verbs live in its sheet (eor).
   const here = grid.pois.find((p) => p.x === exp.pos.x && p.y === exp.pos.y);
   const quick: string[] = [];
   if (!exp.combat && here && legal.some((a) => a.type === "gather")) quick.push(`<button data-act="gather">${GATHER_VERB[here.kind]?.label ?? "Gather"}</button>`);
-  if (canFish) quick.push(`<button data-act="fish" title="cast into the deepest water beside you (−${FISH_CAST_ENERGY}e)">🎣 Fish</button>`);
-  if (exp.combat) quick.push(`<button data-act="fight">⚔ Fight</button>`, ...throwButtons(exp, legal), `<button data-act="flee">🏃 Flee</button>`);
+  if (!exp.combat && canFish) quick.push(`<button data-act="fish" title="cast into the deepest water beside you (−${FISH_CAST_ENERGY}e)">🎣 Fish</button>`);
 
   const cap = carryCap(exp.loadout.equipment);
   // 7lr: which foods can actually be eaten right now (speculative-reduce filtered), and
@@ -374,11 +305,11 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   const inv = inventoryGrid(exp.loadout, exp.carry, cap, exp.autoEatFood ?? null, eatable, campMealReady);
 
   const hereTab = `
-      ${exp.combat ? engagementPanel(state, exp, legal) : herePanel(state, grid, exp, legal) + fishLine(state, legal)}
+      ${exp.combat ? `<div class="here monster">⚔ <b>Fighting the ${name(exp.combat.creature)}</b> — your moves are in the fight panel over the map.</div>` : herePanel(state, grid, exp, legal) + fishLine(state, legal)}
       <div class="actions">
         ${exp.loadout.equipment.tools.includes("tent") ? `<span class="campmeal-badge${campMealReady ? " ready" : " spent"}" title="${campMealReady ? "eat a food from your bag as a CAMP MEAL — over max at +50%, once per run" : "camp meal spent this run"}">🏕 camp meal ${campMealReady ? "ready" : "spent"}</span>` : ""}
         ${legal.some((a) => a.type === "quaff") ? `<button data-act="quaff" title="drink a potion here (−${QUAFF_ENERGY}e)">🧪 Potion (−${QUAFF_ENERGY}e)</button>` : ""}
-        ${enhanceButtons(exp)}
+        ${exp.combat ? "" : enhanceButtons(exp, legal)}
         <button data-act="return">⏎ Return to town</button>
       </div>
       ${exp.weaponBuff ? `<div class="muted small">🗡️ ${name(exp.weaponBuff.id)} · ${exp.weaponBuff.charges} strike${exp.weaponBuff.charges === 1 ? "" : "s"} left</div>` : ""}
@@ -424,12 +355,24 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
 
   const tabBody = ui.tab === "bag" ? bagTab : ui.tab === "craft" ? craftTab : ui.tab === "log" ? ui.logHtml : hereTab;
   const tabBtn = (t: DrawerTab, label: string) => `<button class="tab${ui.tab === t ? " on" : ""}" data-tab="${t}">${label}</button>`;
-  const hereSummary = exp.combat ? `⚔ ${name(exp.combat.creature)}` : here && !cleared.has(kk(here)) ? (here.kind === "monster" ? "a monster" : kindLabel(here.kind)) : grid.terrain[exp.pos.y]![exp.pos.x]!;
+  // ai8: the collapsed drawer line says what your tile gives — and, with a route
+  // planned, what the target gives (a monster with its verdict dot). One line.
+  const yieldAt = (p: Pos, k: string): string => {
+    const poi = poiAt.get(k) ?? null;
+    const isCleared = cleared.has(k);
+    const detail = perceived.get(k)?.detail ?? null;
+    if (poi && !isCleared && poi.kind === "monster" && poi.creature) return `${verdictDot(verdictFor(poi.creature))}${name(poi.creature)}`;
+    const y = tileYield(poi, detail, isCleared, exp.loadout.equipment.tools);
+    const icon = y && detail?.material ? iconStyle(detail.material) : null;
+    return y ? `${icon ? `<span class="sum-icon" style="${icon}"></span>` : ""}${y}` : tileName(grid.terrain[p.y]![p.x]!, poi, detail, isCleared);
+  };
+  const hereSummary = exp.combat ? `⚔ ${name(exp.combat.creature)}` : yieldAt(exp.pos, kk(exp.pos));
+  const targetSummary = !exp.combat && hasRoute ? ` <span class="sum-target">▸ ${yieldAt(rt.end, goalK)}</span>` : "";
 
   return `
-  <div class="exp">
+  <div class="exp${exp.combat ? " fighting" : ""}">
     <div class="viewport" data-viewport>
-      <div class="grid atlas-assets" data-grid style="grid-template-columns:repeat(${MAP_WIDTH}, 32px);">${cells}</div>
+      <div class="grid atlas-assets" data-grid style="grid-template-columns:repeat(${MAP_WIDTH}, 32px);">${cells}${tileLabel}</div>
       <div class="hud">
         <div class="hud-title">${name(grid.biomeId)}${(exp.mapTier ?? 1) > 1 ? ` <span class="muted">T${exp.mapTier}</span>` : ""}</div>
         ${bars}
@@ -441,9 +384,10 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
       <button class="recentre" data-recentre title="centre on you" aria-label="centre on you">◎</button>
       ${quick.length ? `<div class="quick">${quick.join("")}</div>` : ""}
       ${routeBar}
+      ${exp.combat ? fightSheet(exp, legal) : ""}
     </div>
     <aside class="drawer${ui.drawerOpen ? " open" : ""}">
-      <button class="drawer-handle" data-drawer-toggle><span class="grip"></span><span class="summary">${hereSummary} · ${inv.used}/${cap} bag</span><span class="chev">${ui.drawerOpen ? "▾" : "▴"}</span></button>
+      <button class="drawer-handle" data-drawer-toggle><span class="grip"></span><span class="summary"><span class="sum-here">${hereSummary}</span>${targetSummary}</span><span class="bagcount">${inv.used}/${cap} bag</span><span class="chev">${ui.drawerOpen ? "▾" : "▴"}</span></button>
       <nav class="tabs">${tabBtn("here", "Here")}${tabBtn("bag", `Bag ${inv.used}/${cap}`)}${tabBtn("craft", "Craft")}${tabBtn("log", "Log")}</nav>
       <div class="drawer-body">${tabBody}</div>
     </aside>
