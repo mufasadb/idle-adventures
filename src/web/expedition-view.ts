@@ -5,7 +5,7 @@ import { expeditionGrid } from "../engine/grid";
 import type { Grid } from "../engine/grid";
 import { recipeOutputQty } from "../engine/craft";
 import { moveCostBreakdown, moveCost } from "../engine/move";
-import { frameStyle, iconStyle, monsterStyle, nodeIconId, tileStyle } from "./assets";
+import { frameStyle, iconStyle, monsterStyle, nodeIconId, playerStyle, tileStyle } from "./assets";
 import { carryCap, mapCarryCap } from "../engine/carry";
 import { deriveRoute } from "./route";
 import type { Pos } from "./route";
@@ -290,7 +290,14 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
       // keep the water under the raft: `.player`'s !important background would wipe the inline tile
       if (terrainStyle) tileAssetStyle = ` style="${terrainStyle.replace(/;/g, " !important;")} !important"`;
     }
-    const glyph = raft ? `<span class="rider">${ch}</span>` : !isPlayer && (overlay !== "" || !poi) ? "" : isPlayer && overlay ? "" : ch;
+    // The hero sprite (cel set only) replaces the @ glyph, standing on the tile (or the raft).
+    const hero = isPlayer ? playerStyle() : null;
+    if (hero) {
+      cls.push("hero-sprite");
+      overlay = `${raft ? overlay : ""}<span class="sprite hero" style="${hero}" aria-hidden="true"></span>`;
+      if (terrainStyle && !raft) tileAssetStyle = ` style="${terrainStyle.replace(/;/g, " !important;")} !important"`;
+    }
+    const glyph = hero ? "" : raft ? `<span class="rider">${ch}</span>` : !isPlayer && (overlay !== "" || !poi) ? "" : isPlayer && overlay ? "" : ch;
     cells += `<div class="${cls.join(" ")}"${tileAssetStyle} data-x="${x}" data-y="${y}" title="${title}">${overlay}${glyph}</div>`;
   }
 

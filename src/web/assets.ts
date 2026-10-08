@@ -122,6 +122,11 @@ export function monsterStyle(creature: string): string | null {
   return `background-image:url('${animAtlas}');background-position:-${f.x}px -${f.y}px;width:${f.w}px;height:${f.h}px;margin-bottom:-${overhang}px;animation:idle-${creature} ${n * a.frameMs}ms ${timing}`;
 }
 
+// The hero has no pixel sprite (it was always the @ glyph), so only the cel set draws one.
+export function playerStyle(): string | null {
+  return celFrame("monster", "player") ? monsterStyle("player") : null;
+}
+
 export function nodeIconId(kind: string, material?: string): string {
   if (material && (manifests.icon.frames[material] || celManifests.icon.frames[material])) return material;
   const defaults: Record<string, string> = {

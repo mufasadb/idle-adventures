@@ -134,56 +134,62 @@
    "w": 144,
    "h": 144
   },
-  "player-raft": {
+  "player": {
    "x": 1200,
+   "y": 240,
+   "w": 144,
+   "h": 144
+  },
+  "player-raft": {
+   "x": 1440,
    "y": 240,
    "w": 96,
    "h": 96
   },
   "sand-raider": {
-   "x": 1440,
+   "x": 1680,
    "y": 240,
    "w": 144,
    "h": 144
   },
   "shell-beetle": {
-   "x": 1680,
+   "x": 1920,
    "y": 240,
    "w": 96,
    "h": 96
   },
   "snow-marauder": {
-   "x": 1920,
-   "y": 240,
-   "w": 144,
-   "h": 144
-  },
-  "snow-wolf": {
    "x": 2160,
    "y": 240,
    "w": 144,
    "h": 144
   },
-  "spore-cultist": {
+  "snow-wolf": {
    "x": 2400,
    "y": 240,
    "w": 144,
    "h": 144
   },
-  "spore-shambler": {
+  "spore-cultist": {
    "x": 2640,
    "y": 240,
    "w": 144,
    "h": 144
   },
-  "vine-horror": {
+  "spore-shambler": {
    "x": 2880,
    "y": 240,
    "w": 144,
    "h": 144
   },
-  "werewolf": {
+  "vine-horror": {
    "x": 3120,
+   "y": 240,
+   "w": 144,
+   "h": 144
+  },
+  "werewolf": {
+   "x": 3360,
    "y": 240,
    "w": 144,
    "h": 144

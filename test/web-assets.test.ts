@@ -1,7 +1,7 @@
 // Cel restyle (2026-10-07): the web asset lookup prefers hi-res cel frames, drawn at
 // the pixel frame's CSS size, and falls back to the pixel atlas for keys it lacks.
 import { afterEach, describe, expect, test } from "bun:test";
-import { frameStyle, iconStyle, monsterStyle, setArtSet } from "../src/web/assets";
+import { frameStyle, iconStyle, monsterStyle, playerStyle, setArtSet } from "../src/web/assets";
 import celIcon from "../src/web/assets/cel/atlas-icon.json";
 import celMonster from "../src/web/assets/cel/atlas-monster.json";
 import pixelIcon from "../src/web/assets/atlas-icon.json";
@@ -19,6 +19,7 @@ describe("cel art set", () => {
     for (const m of [celIcon, celMonster]) {
       const px = (m.kind === "icon" ? pixelIcon : pixelMonster).frames as Record<string, { w: number; h: number }>;
       for (const [k, f] of Object.entries(m.frames)) {
+        if (k === "player") continue; // the hero has no pixel frame (it was the @ glyph)
         expect(px[k]).toBeDefined();
         expect(f.w).toBe(px[k]!.w * m.scale);
         expect(f.h).toBe(px[k]!.h * m.scale);
@@ -51,5 +52,13 @@ describe("cel art set", () => {
     setArtSet("pixel");
     expect(iconStyle(celIcons[0]!)).not.toContain("background-size");
     expect(monsterStyle(celMonsters[0]!)).not.toContain("cel-breathe");
+  });
+
+  test("the hero sprite exists only in the cel set", () => {
+    const hasHero = "player" in celMonster.frames;
+    expect(playerStyle() !== null).toBe(hasHero);
+    if (hasHero) expect(playerStyle()).toContain("cel-breathe");
+    setArtSet("pixel");
+    expect(playerStyle()).toBeNull();
   });
 });
