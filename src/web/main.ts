@@ -14,7 +14,7 @@ import { route as walkWaypoints } from "../sim/play";
 import { routeAfterClick } from "./route";
 import type { Pos } from "./route";
 import { name, rejectCopy } from "../render/render";
-import type { GameState, Action, ItemStack, LoadoutSlot } from "../engine/types";
+import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot } from "../engine/types";
 import type { LogEntry } from "./log";
 import { logView } from "./log";
 import { save, load, loadLog, saveLastPlan, loadLastPlan } from "./persist";
@@ -22,6 +22,11 @@ import { townView } from "./town-view";
 import type { TownTab } from "./town-view";
 import { expeditionView, currentDerived } from "./expedition-view";
 import type { DrawerTab } from "./expedition-view";
+import { expeditionGrid } from "../engine/grid";
+import type { GatherableNodeType } from "../data/constants";
+import { pickupCues, craftNote, heldOnRun, planWithout } from "./feedback";
+import type { GatherMiss } from "./feedback";
+import { emptyFx, paintFx } from "./fx";
 
 const params = new URLSearchParams(location.search);
 const seed = params.get("seed") ?? "play";
@@ -47,6 +52,27 @@ let drawerOpen = false;
 let drawerTab: DrawerTab = "here";
 let wasEngaged = false;
 let townTab: TownTab = "main";
+// beh/rx5/mki: transient action feedback (tile cues, pack glow, craft notes) — painted
+// over each render by paintFx; purely presentational, never saved.
+const fx = emptyFx();
+const now = () => performance.now();
+
+// rx5: record the on-map cues for a batch of reducer events (+ the walk's gather
+// misses) and pulse the bag for anything that went into it.
+function recordCues(events: GameEvent[], misses: GatherMiss[]): void {
+  const exp = state.expedition;
+  if (!exp) return;
+  const pois = expeditionGrid(exp).pois;
+  const kindAt = (p: Pos) => {
+    const poi = pois.find((q) => q.x === p.x && q.y === p.y);
+    return poi && poi.kind !== "monster" ? (poi.kind as GatherableNodeType) : null;
+  };
+  const cues = pickupCues(events, misses, kindAt, exp.loadout.equipment.tools);
+  const t0 = now();
+  for (const cue of cues) fx.cues.push({ cue, t0 });
+  const defs = [...new Set(cues.filter((c) => c.kind === "gain" && c.defId).map((c) => c.defId!))];
+  if (defs.length) fx.flash = { defs, t0 };
+}
 
 function newRun(): void { state = newGame(seed); log = [{ t: "note", text: "· new game" }]; route = []; draw(); }
 
@@ -70,6 +96,23 @@ function apply(action: Action): void {
   const { state: next, events } = reduce(state, action);
   if (action.type === "embark" && !events.some((e) => e.type === "action-rejected")) saveLastPlan(SAVE_KEY, prevLoadout);
   state = next;
+  const rej = events.find((e) => e.type === "action-rejected");
+  // rx5: a manual gather that the reducer refused gets the same tile cue a walk-over does.
+  const misses: GatherMiss[] = action.type === "gather" && rej?.type === "action-rejected" && state.expedition
+    ? [{ at: { ...state.expedition.pos }, reason: rej.reason }] : [];
+  recordCues(events, misses);
+  // mki: craft result next to the button (+ toast) — off the crafted / rejected event.
+  if (action.type === "craft") {
+    const n = craftNote(action.recipeId, events, (defId, where) => where === "field" && state.expedition
+      ? heldOnRun(state.expedition, defId)
+      : state.bank.filter((b) => b.defId === defId).reduce((k, b) => k + b.qty, 0));
+    if (n) fx.note = { ok: n.ok, text: n.text, anchor: `[data-recipe="${n.recipeId}"]`, t0: now() };
+  }
+  // beh: a pack glows the bank row + the loadout slot it landed in; a refusal says why there.
+  if (action.type === "pack") {
+    if (rej?.type === "action-rejected") fx.note = { ok: false, text: `✗ can't pack ${name(action.itemId)} — ${rejectCopy(rej.reason, undefined, "pack")}`, anchor: `[data-bank="${action.itemId}"]`, t0: now() };
+    else fx.packed = { defId: action.itemId, t0: now() };
+  }
   for (const e of events) {
     // gate-legibility (playtest 2026-07-09 #1): a rejected CRAFT knows its recipeId
     // here (the event doesn't carry it) — name the exact missing station/tool/terrain.
@@ -84,6 +127,22 @@ function apply(action: Action): void {
 }
 function note(line: string): void { log.unshift({ t: "note", text: line }); trimAndDraw(); }
 function trimAndDraw(): void { log = log.slice(0, 16); draw(); }
+// beh: unpack ONE of an item — rebuild the plan without it, replaying every other pack
+// through reduce (same path as repack; the engine has no unpack action, D28 plan-only).
+function unpack(defId: string): void {
+  const steps = planWithout(state.loadout, defId);
+  if (!steps) return;
+  let lo = { ...state, loadout: newGame(seed).loadout };
+  let skipped = 0;
+  for (const step of steps) {
+    const r = reduce(lo, { type: "pack", slot: step.slot, itemId: step.itemId });
+    if (r.events.some((e) => e.type === "action-rejected")) { skipped += 1; continue; }
+    lo = r.state;
+  }
+  state = lo;
+  fx.packed = null;
+  note(`· unpacked 1× ${name(defId)}${skipped ? ` · ${skipped} other item(s) no longer fit and were dropped from the plan` : ""}`);
+}
 function planReset(): void {
   // pack is only a PLAN on state.loadout (D28: bank untouched until embark).
   state = { ...state, loadout: newGame(seed).loadout };
@@ -115,6 +174,7 @@ function walkRoute(wps: Pos[]): void {
   // Preserve the remaining route only on a bag-full pause (resume after making room);
   // a fight or an obstacle clears it so you re-plan from where you are.
   route = r.halt?.kind === "bag-full" ? r.remaining : [];
+  recordCues(r.events, r.misses); // rx5: "+2 Copper Ore" rising off each node picked up; "needs pick" on the ones walked over
   trimAndDraw();
 }
 
@@ -135,6 +195,7 @@ function draw(): void {
     const p = `${state.expedition.pos.x},${state.expedition.pos.y}`;
     if (p !== camPos) { centerOnPlayer(); camPos = p; } else applyCam();
   } else camPos = null;
+  paintFx(app, fx, now()); // after the camera: tile cues read live tile positions
 }
 
 // --- map camera (kml) ----------------------------------------------------------
@@ -223,6 +284,7 @@ function wire(): void {
   app.querySelectorAll<HTMLElement>("[data-back]").forEach((el) => el.onclick = () => { prep = null; draw(); }); // zpm.3: back to the map overview
   app.querySelectorAll<HTMLElement>("[data-craft]").forEach((el) => el.onclick = () => apply({ type: "craft", recipeId: el.dataset.craft! }));
   app.querySelectorAll<HTMLElement>("[data-pack]").forEach((el) => el.onclick = () => apply({ type: "pack", slot: el.dataset.slot as LoadoutSlot, itemId: el.dataset.pack! }));
+  app.querySelectorAll<HTMLElement>("[data-unpack]").forEach((el) => el.onclick = () => unpack(el.dataset.unpack!));
   app.querySelectorAll<HTMLElement>("[data-drop]").forEach((el) => el.onclick = () => apply({ type: "drop", itemId: el.dataset.drop! }));
   app.querySelectorAll<HTMLElement>("[data-don]").forEach((el) => el.onclick = () => apply({ type: "don", itemId: el.dataset.don! }));
   app.querySelectorAll<HTMLElement>("[data-doff]").forEach((el) => el.onclick = () => apply({ type: "doff", itemId: el.dataset.doff! }));

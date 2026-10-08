@@ -267,6 +267,65 @@
       .grid.atlas-assets .tile.player.on-raft.raft-sprite { box-shadow: inset 0 0 0 1px var(--gold); }
       .grid.atlas-assets .tile.player .rider { position: relative; z-index: 3; }
       .grid.atlas-assets .tile .sprite.hero { z-index: 4; filter: drop-shadow(0 0 2px #000c); }
+      /* beh: packed kit reads as chips (icon + name) in the loadout; the bank row says "✓ packed". */
+      .v.gearrow { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 0.25rem; }
+      .gearchip { display: inline-flex; align-items: center; gap: 0.25rem; background: #1d2418; border: 1px solid #4f6b3a; color: #cfe3b8; border-radius: 3px; padding: 0.05rem 0.4rem 0.05rem 0.2rem; font-size: 0.85rem; white-space: nowrap; }
+      .gearchip .gc-icon { display: inline-block; flex: none; background-repeat: no-repeat; zoom: 0.75; }
+      .gearchip::after { content: "✓"; color: var(--green); font-size: 0.75rem; margin-left: 0.1rem; }
+      .bankitem.packed .chip { border-color: #4f6b3a; }
+      .packed-badge { color: #a9d68a; font-size: 0.8rem; font-weight: 600; white-space: nowrap; }
+      button.unpack { font-size: 0.8rem; color: var(--muted); text-decoration: underline; }
+      @keyframes fx-glow { 0% { box-shadow: 0 0 0 2px var(--gold), 0 0 12px var(--gold); background-color: #3a3018; } 100% { box-shadow: 0 0 0 0 transparent; } }
+      .fx-packed { animation: fx-glow 1400ms ease-out forwards; border-radius: 3px; }
+      /* rx5: a gather's item icon pops off the tile and flies into the bag (--dx/--dy set
+         per cue in fx.ts); the tool that worked it bounces; a refused node shakes + says why. */
+      .fly { position: fixed; z-index: 60; pointer-events: none; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 1px; animation: fly-bag 1100ms cubic-bezier(.45, 0, .7, .4) both; filter: drop-shadow(0 0 2px #000) drop-shadow(0 0 5px #f2d98acc); }
+      .fly .fly-icon { display: block; background-repeat: no-repeat; flex: none; }
+      .fly .fly-name { font: 600 13px/1 "Crimson Pro", Georgia, serif; color: #f2d98a; background: rgba(20, 16, 8, 0.85); border: 1px solid var(--gold-dim); border-radius: 3px; padding: 2px 5px; white-space: nowrap; }
+      .fly .fly-q { font: 700 12px/1 "Crimson Pro", Georgia, serif; color: #f2d98a; text-shadow: 0 1px 2px #000, 0 0 2px #000; }
+      @keyframes fly-bag {
+        0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+        15% { opacity: 1; transform: translate(-50%, calc(-50% - 30px)) scale(1.9); }
+        35% { opacity: 1; transform: translate(-50%, calc(-50% - 34px)) scale(1.7); }
+        100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.45); }
+      }
+      .cue-miss { position: fixed; z-index: 60; pointer-events: none; transform: translate(-50%, -100%); white-space: nowrap; font: italic 600 13px/1 "Crimson Pro", Georgia, serif; color: #ffb08a; background: rgba(40, 12, 10, 0.9); border: 1px solid #8e2a22; padding: 2px 6px; border-radius: 3px; text-shadow: 0 1px 2px #000; animation: cue-miss 1700ms ease-out both; }
+      @keyframes cue-miss { 0% { opacity: 0; transform: translate(-50%, -80%); } 10% { opacity: 1; transform: translate(-50%, -100%); } 75% { opacity: 1; transform: translate(-50%, -110%); } 100% { opacity: 0; transform: translate(-50%, -125%); } }
+      @keyframes fx-shake { 0%, 100% { transform: translateX(0); } 12% { transform: translateX(-4px) rotate(-3deg); } 28% { transform: translateX(4px) rotate(3deg); } 44% { transform: translateX(-3px) rotate(-2deg); } 60% { transform: translateX(3px) rotate(2deg); } 76% { transform: translateX(-1px); } }
+      .fx-shake { animation: fx-shake 520ms ease-in-out both; outline: 2px solid #b0392f; outline-offset: -2px; }
+      .tile.fx-shake { z-index: 5; }
+      @keyframes fx-shake-x { 0%, 100% { transform: translateX(0); } 15% { transform: translateX(-5px); } 35% { transform: translateX(5px); } 55% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+      .drawer-handle .summary.fx-shake, .tab.fx-shake { animation-name: fx-shake-x; outline: none; color: #ff9a7a; }
+      @keyframes fx-bounce { 0%, 100% { transform: translateY(0); } 25% { transform: translateY(-7px); } 45% { transform: translateY(0); } 62% { transform: translateY(-3px); } 80% { transform: translateY(0); } }
+      .fx-bounce { animation: fx-bounce 650ms ease-out both; box-shadow: 0 0 0 1px var(--gold); }
+      @keyframes fx-pulse { 0% { box-shadow: 0 0 0 2px var(--gold); color: #fff; } 100% { box-shadow: 0 0 0 0 transparent; } }
+      .fx-flash { animation: fx-pulse 900ms ease-out forwards; border-radius: 3px; }
+      /* mki: only the Craft button reads as clickable; the result lands as a note under the row + a toast. */
+      .craftname, .craftpath { cursor: default; }
+      button.craftbtn { background: #2a2214; border-color: var(--gold); color: var(--gold); font-weight: 600; padding: 0.15rem 0.7rem; font-size: 0.85rem; }
+      button.craftbtn:hover { background: #3a2f18; }
+      .have { color: #a9d68a; font-weight: 400; }
+      .fxnote { margin-left: 0.9rem; font-size: 0.82rem; padding: 0.15rem 0.5rem; border-left: 3px solid; border-radius: 2px; animation: fx-note 4500ms ease-out forwards; }
+      .fxnote.ok { color: #cfe3b8; border-color: var(--green); background: #1a2215; }
+      .fxnote.err { color: #ffb08a; border-color: var(--red); background: #2a1412; }
+      @keyframes fx-note { 0%, 85% { opacity: 1; } 100% { opacity: 0.35; } }
+      @keyframes fx-row-ok { 0% { background: #2e4a22; } 100% { background: transparent; } }
+      @keyframes fx-row-err { 0% { background: #4a1e1a; } 100% { background: transparent; } }
+      .fx-row-ok { animation: fx-row-ok 1200ms ease-out forwards; border-radius: 3px; }
+      .fx-row-err { animation: fx-row-err 1200ms ease-out forwards; border-radius: 3px; }
+      .toast { position: fixed; left: 50%; top: 0.75rem; transform: translateX(-50%); z-index: 100; pointer-events: none; max-width: calc(100vw - 32px); padding: 0.4rem 0.9rem; border-radius: 4px; font-size: 0.95rem; box-shadow: 0 4px 16px #000a; animation: toast 4500ms ease-out forwards; }
+      .toast.ok { background: #1a2215; border: 1px solid var(--green); color: #e2f2d0; }
+      .toast.err { background: #2a1412; border: 1px solid var(--red); color: #ffd0b8; }
+      @keyframes toast { 0% { opacity: 0; transform: translate(-50%, -8px); } 6% { opacity: 1; transform: translate(-50%, 0); } 80% { opacity: 1; } 100% { opacity: 0; } }
+      @media (prefers-reduced-motion: reduce) {
+        /* no movement: the icon/tag sits on the tile and fades; shake/bounce become a static outline */
+        @keyframes fly-bag { 0%, 60% { opacity: 1; transform: translate(-50%, calc(-50% - 14px)); } 100% { opacity: 0; transform: translate(-50%, calc(-50% - 14px)); } }
+        @keyframes cue-miss { 0%, 80% { opacity: 1; transform: translate(-50%, -100%); } 100% { opacity: 0; transform: translate(-50%, -100%); } }
+        @keyframes fx-shake { 0%, 100% { transform: none; } }
+        @keyframes fx-bounce { 0%, 100% { transform: none; } }
+        @keyframes fx-shake-x { 0%, 100% { transform: none; } }
+        @keyframes toast { 0%, 85% { opacity: 1; } 100% { opacity: 0; } }
+      }
     </style>
   </head>
   <body>

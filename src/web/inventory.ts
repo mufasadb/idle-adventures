@@ -22,7 +22,7 @@ function face(defId: string): string {
 // constants are legible on hover without cluttering the chip.
 function slotBox(cls: string, defId: string, q: string, tip = ""): string {
   const label = name(defId);
-  return `<div class="slot ${cls}" title="${label}${q}${tip ? ` — ${tip}` : ""}">${face(defId)}${q ? `<span class="q">${q}</span>` : ""}</div>`;
+  return `<div class="slot ${cls}" data-def="${defId}" title="${label}${q}${tip ? ` — ${tip}` : ""}">${face(defId)}${q ? `<span class="q">${q}</span>` : ""}</div>`;
 }
 // eatFood (mco): on expedition, `eatFood` is the designated auto-eat food defId
 // (or null = none designated but still designatable). Food boxes then carry
@@ -48,7 +48,7 @@ function realSlots(loadout: Loadout, carry: ItemStack[], eatFood?: string | null
         : "already full — can't eat";
       const tip = `${eatTip} · ${on ? "auto-eating — right-click to stop" : "right-click: auto-eat this"} · ${describe(it.defId)}`;
       const cls = `slot food${on ? " designated" : ""}${canEat ? " eatable" : ""}${canEat && campMealReady ? " campmeal" : ""}`;
-      boxes.push(`<div class="${cls}" ${canEat ? `data-eat="${it.defId}"` : ""} data-eatfood="${it.defId}" title="${name(it.defId)} — ${tip}">${face(it.defId)}${on ? `<span class="autoeat">🍴</span>` : ""}</div>`);
+      boxes.push(`<div class="${cls}" data-def="${it.defId}" ${canEat ? `data-eat="${it.defId}"` : ""} data-eatfood="${it.defId}" title="${name(it.defId)} — ${tip}">${face(it.defId)}${on ? `<span class="autoeat">🍴</span>` : ""}</div>`);
     }
   }
   units(loadout.potions, "potion");
@@ -75,7 +75,7 @@ function realSlots(loadout: Loadout, carry: ItemStack[], eatFood?: string | null
 }
 function wornGhosts(eq: Equipment): string[] {
   const worn = wornPieces(eq).filter(Boolean) as string[];
-  return worn.map((d) => `<div class="slot ghost" title="${name(d)} — worn, no slot · ${describe(d)}">${face(d)}</div>`);
+  return worn.map((d) => `<div class="slot ghost" data-def="${d}" title="${name(d)} — worn, no slot · ${describe(d)}">${face(d)}</div>`);
 }
 // Returns { used, html }. used = real filled slots (ghosts excluded).
 export function inventoryGrid(loadout: Loadout, carry: ItemStack[], cap: number, eatFood?: string | null, eatable?: Set<string>, campMealReady = false): { used: number; html: string } {

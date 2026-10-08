@@ -16,6 +16,7 @@ import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, f
 import { perceive } from "../engine/perceive";
 import type { GameState, Action } from "../engine/types";
 import { inventoryGrid } from "./inventory";
+import { heldOnRun } from "./feedback";
 
 const kk = (p: Pos) => `${p.x},${p.y}`;
 
@@ -410,11 +411,13 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
     const readyRows = fieldCrafts.map((a) => {
       const r = RECIPE[a.recipeId]!;
       const ing = r.inputs.map((i) => `${i.qty}× ${name(i.defId)}`).join(" + ");
-      return `<div class="craftpath"><button data-craft="${a.recipeId}" title="field-craft (−${FIELD_CRAFT_ENERGY}e)">🔥 craft</button> ${recipeOutputQty(r, pool)}× ${name(r.output.defId)} <span class="muted small">← ${ing}</span></div>`;
+      // mki: the button is the one clickable thing; "have N" shows the craft land in the bag.
+      const have = heldOnRun(exp, r.output.defId);
+      return `<div class="craftpath" data-recipe="${a.recipeId}"><button class="craftbtn" data-craft="${a.recipeId}" title="field-craft (−${FIELD_CRAFT_ENERGY}e)">🔥 Craft</button> <span>${recipeOutputQty(r, pool)}× ${name(r.output.defId)}${have ? ` <span class="have small">· have ${have}</span>` : ""} <span class="muted small">← ${ing}</span></span></div>`;
     }).join("");
     const lockedRows = kitLocked.map((id) => {
       const r = RECIPE[id]!;
-      return `<div class="craftpath locked">🔒 ${name(r.output.defId)} <span class="warn small">${recipeGateHint(id)}</span></div>`;
+      return `<div class="craftpath locked" data-recipe="${id}">🔒 ${name(r.output.defId)} <span class="warn small">${recipeGateHint(id)}</span></div>`;
     }).join("");
     return `<div class="muted small">−${FIELD_CRAFT_ENERGY}e each</div><div class="craftlist">${readyRows}${lockedRows}</div>`;
   })();

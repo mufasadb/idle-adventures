@@ -401,6 +401,15 @@ export function nodeToolHint(kind: GatherableNodeType, tools: string[]): string 
   return `needs a ${prim}`; // generic single-tool nodes (mining/wood)
 }
 
+// rx5: the terse form of nodeToolHint for the on-map "walked over, didn't gather"
+// cue — "needs pick", "needs trap + knife". Same missing-tool reading; null when
+// nothing's missing.
+export function nodeToolShort(kind: GatherableNodeType, tools: string[]): string | null {
+  const has = (cap: string) => tools.some((t) => TOOL_CAPABILITY[t] === cap);
+  const missing = [NODE_TOOL[kind], NODE_SECONDARY_TOOL[kind] ?? null].filter((c): c is string => c !== null && !has(c));
+  return missing.length ? `needs ${missing.join(" + ")}` : null;
+}
+
 // gate-legibility (playtest 2026-07-09 #1, node gate/reach visibility): a surveyed /
 // in-vision node reads its ACCESS GATE at range so players can plan which veins are
 // worth the trek and WHICH tool unlocks them — an agent mined ~12 nodes fishing for

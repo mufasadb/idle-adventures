@@ -15,6 +15,15 @@ import { weaponHint, logisticsEffect, enhancementHint, describe, recipeGateHint,
 import type { GameState, Action, MapItem } from "../engine/types";
 import { inventoryGrid } from "./inventory";
 import { planActions } from "./persist";
+import { packedCounts } from "./feedback";
+import { iconStyle } from "./assets";
+
+// beh: a packed piece of kit reads as a CHIP (icon + name) in the loadout plan, so
+// "is my pick packed?" is answered at a glance; data-def lets the pack glow find it.
+function gearChip(defId: string): string {
+  const st = iconStyle(defId);
+  return `<span class="gearchip" data-def="${defId}" title="${describe(defId)}">${st ? `<span class="gc-icon" style="${st}"></span>` : ""}${name(defId)}</span>`;
+}
 
 // Map hints (D95, Muse brief C option 1 — chips): one chip per hint, "G: boggy ground";
 // a sealed hint shows only its family. `studied` = how many of `ids` are revealed.
@@ -151,17 +160,17 @@ function loadoutSection(state: GameState, hasLastPlan: boolean): string {
   const cap = carryCap(eq);
   const inv = inventoryGrid(lo, [], cap);
   const equipRow = (label: string, val: string | null) =>
-    `<div class="row"><span class="k">${label}</span><span class="v">${val ?? "<span class='muted'>—</span>"}</span></div>`;
+    `<div class="row"><span class="k">${label}</span><span class="v gearrow">${val ?? "<span class='muted'>—</span>"}</span></div>`;
   return `
-    <section>
+    <section data-loadout>
       <h2>Loadout plan <button class="link" data-reset>reset</button>${hasLastPlan && planActions(lo).length === 0 ? ` <button class="link" data-repack title="re-pack the loadout you took last run (skips anything no longer in the bank)">↻ repack last</button>` : ""}</h2>
-      ${equipRow("weapon", eq.weapon ? name(eq.weapon) : null)}
-      ${equipRow("armour", ARMOUR_SLOTS.map((s) => eq[s]).filter(Boolean).map((d) => name(d as string)).join(", ") || null)}
-      ${equipRow("transport", eq.transport ? `${name(eq.transport)}${TRANSPORT_ROLE[eq.transport] ? ` — ${TRANSPORT_ROLE[eq.transport]}` : ""}` : null)}
-      ${eq.panniers ? equipRow("panniers", name(eq.panniers)) : ""}
-      ${eq.quiver ? equipRow("quiver", `${name(eq.quiver)} — holds ${QUIVER_AMMO_CAP[eq.quiver] ?? 0} ammo off your back`) : ""}
-      ${equipRow("backpack", eq.backpack ? name(eq.backpack) : "none")}
-      ${equipRow("tools", eq.tools.map(name).join(", ") || null)}
+      ${equipRow("weapon", eq.weapon ? gearChip(eq.weapon) : null)}
+      ${equipRow("armour", ARMOUR_SLOTS.map((s) => eq[s]).filter(Boolean).map((d) => gearChip(d as string)).join("") || null)}
+      ${equipRow("transport", eq.transport ? `${gearChip(eq.transport)}${TRANSPORT_ROLE[eq.transport] ? ` <span class="muted small">${TRANSPORT_ROLE[eq.transport]}</span>` : ""}` : null)}
+      ${eq.panniers ? equipRow("panniers", gearChip(eq.panniers)) : ""}
+      ${eq.quiver ? equipRow("quiver", `${gearChip(eq.quiver)} <span class="muted small">holds ${QUIVER_AMMO_CAP[eq.quiver] ?? 0} ammo off your back</span>`) : ""}
+      ${equipRow("backpack", eq.backpack ? gearChip(eq.backpack) : "none")}
+      ${equipRow("tools", eq.tools.map(gearChip).join("") || `<span class="muted">none packed — pack a pick / axe / knife from the bank to work nodes</span>`)}
       <div class="row"><span class="k">bag</span><span class="v">${inv.used}/${cap} slots</span></div>
       ${inv.html}
       <div class="muted small">worn gear (ghosted) is free · each food / potion / battle-item / tool takes one slot — bring several tools to work different node types · you embark at ${MAX_ENERGY} energy; packed food holds ≈ ${heldFoodEnergy(lo.food)} energy of refills to eat back as you travel${eq.tools.includes("tent") ? ` · tent — food restores +${Math.round((TENT_FOOD_MULTIPLIER - 1) * 100)}%` : ""}</div>
@@ -170,6 +179,9 @@ function loadoutSection(state: GameState, hasLastPlan: boolean): string {
 
 function bankSection(state: GameState): string {
   const legal = legalActions(state);
+  // beh: the bank is untouched until embark (D28), so a packed pick still shows ×1 here —
+  // say so on the row ("✓ packed") instead of just swapping the button for a slot word.
+  const packed = packedCounts(state.loadout);
   return `
     <section>
       <h2>Bank</h2>
@@ -178,10 +190,14 @@ function bankSection(state: GameState): string {
           const slot = slotOf(s.defId);
           const canPack = slot !== null && legal.some((a) => a.type === "pack" && a.slot === slot && a.itemId === s.defId);
           const canSpare = legal.some((a) => a.type === "pack" && a.slot === "spare" && a.itemId === s.defId);
-          return `<div class="bankitem">
+          const n = packed.get(s.defId) ?? 0;
+          const badge = n ? `<span class="packed-badge" title="in your loadout plan — taken out of the bank when you embark">✓ ${n >= s.qty ? "packed" : `${n} packed`}</span>` : "";
+          return `<div class="bankitem${n ? " packed" : ""}" data-bank="${s.defId}">
             <span class="chip" title="${describe(s.defId)}">${name(s.defId)} ×${s.qty}</span>
-            ${canPack ? `<button data-pack="${s.defId}" data-slot="${slot}">pack</button>` : `<span class="muted small">${slot ?? "material"}</span>`}
+            ${badge}
+            ${canPack ? `<button data-pack="${s.defId}" data-slot="${slot}">${n ? "pack +1" : "pack"}</button>` : n ? "" : `<span class="muted small">${slot ?? "material"}</span>`}
             ${canSpare ? `<button data-pack="${s.defId}" data-slot="spare" title="a SPARE in the bag (1 slot) — don it mid-run to swap gear">+spare</button>` : ""}
+            ${n ? `<button class="link unpack" data-unpack="${s.defId}" title="take one back out of the loadout plan">unpack</button>` : ""}
           </div>`;
         }).join("")}
       </div>
@@ -226,13 +242,15 @@ function recipeSection(state: GameState): string {
               // the reason comes from whyNot, never re-derived from the catalog).
               const why = can ? null : whyNot(state, { type: "craft", recipeId: id });
               const gate = why === "missing-station" || why === "missing-tool" ? recipeGateHint(id) : null;
-              return `<div class="craftpath${can ? "" : " locked"}">← ${ing}${
-                can ? ` <button data-craft="${id}">craft ✓</button>` : gate ? ` <span class="warn small">🔒 ${gate}</span>` : ""
+              return `<div class="craftpath${can ? "" : " locked"}" data-recipe="${id}">← ${ing}${
+                can ? ` <button class="craftbtn" data-craft="${id}">Craft</button>` : gate ? ` <span class="warn small">🔒 ${gate}</span>` : ""
               }</div>`;
             }).join("");
             const hint = weaponHint(out) ?? logisticsEffect(out) ?? enhancementHint(out); // 57l weapon hint; wzk range/carry; 7ao coating effect (disjoint sets)
+            // mki: how many you already hold, so a craft visibly moves the number.
+            const have = state.bank.filter((b) => b.defId === out).reduce((n, b) => n + b.qty, 0);
             return `<div class="craftgroup${anyCan ? "" : " locked"}">
-              <div class="craftname" title="${describe(out)}">${qty}× ${name(out)}${hint ? ` <span class="muted small">· ${hint}</span>` : ""}</div>
+              <div class="craftname" title="${describe(out)}">${qty}× ${name(out)}${hint ? ` <span class="muted small">· ${hint}</span>` : ""}${have ? ` <span class="have small">· have ${have}</span>` : ""}</div>
               ${paths}
             </div>`;
           }).join("");

@@ -164,3 +164,24 @@ test("route: auto-gathers a node it crosses when autoGather is on, skips it when
   }
   throw new Error("no straight-line-clear workable node found (test setup)");
 });
+
+// rx5: the walk reports the nodes it stepped on but couldn't work (the web paints a
+// "needs pick" cue there) — with the reducer's own reason and the tile.
+test("route: records a gather miss (missing-tool) on a mining node crossed without a pick", () => {
+  for (let i = 0; i < 120; i++) {
+    const mapSeed = `trv:map:0:${i}`;
+    const grid = generateGrid(mapSeed, rollBiome(mapSeed), 1);
+    const node = grid.pois.find((p) => {
+      if (p.kind !== "mining" || p.material === null) return false;
+      const line = lineTiles(grid.entry, p);
+      return line.slice(0, -1).every((t) => walkable(grid, t.x, t.y) && !isMonster(grid, t.x, t.y) && !grid.pois.some((q) => q.x === t.x && q.y === t.y));
+    });
+    if (!node) continue;
+    const r = route(expeditionAt(mapSeed, grid.entry, ["axe"]), [{ x: node.x, y: node.y }]);
+    expect(r.halt).toBeNull();
+    expect(r.misses).toEqual([{ at: { x: node.x, y: node.y }, reason: "missing-tool" }]);
+    expect(r.gathered).toBe(0);
+    return;
+  }
+  throw new Error("no straight-line-clear mining node found (test setup)");
+});

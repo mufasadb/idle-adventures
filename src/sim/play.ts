@@ -34,18 +34,23 @@ export type RouteResult = {
   gathered: number; // auto-gathers that landed
   halt: RouteHalt | null; // null = every waypoint reached
   remaining: { x: number; y: number }[]; // waypoints not yet reached (the current one included)
+  // Auto-gathers the walk TRIED and the reducer rejected (missing-tool / tool-too-weak /
+  // exhausted / carry-full …), with the tile — the web paints a "needs pick" cue there
+  // (rx5). Additive: the console never reads it. "no-node" steps are not recorded.
+  misses: { at: { x: number; y: number }; reason: RejectionReason }[];
 };
 
 export function route(state: GameState, waypoints: { x: number; y: number }[]): RouteResult {
   if (!state.expedition) {
-    return { state, events: [{ type: "action-rejected", action: "move", reason: "not-on-expedition" }], steps: 0, gathered: 0, halt: { kind: "rejected", reason: "not-on-expedition" }, remaining: [...waypoints] };
+    return { state, events: [{ type: "action-rejected", action: "move", reason: "not-on-expedition" }], steps: 0, gathered: 0, halt: { kind: "rejected", reason: "not-on-expedition" }, remaining: [...waypoints], misses: [] };
   }
   let cur = state;
   const events: GameEvent[] = [];
   let steps = 0;
   let gathered = 0;
+  const misses: RouteResult["misses"] = [];
   for (let i = 0; i < waypoints.length; i++) {
-    const halt = (h: RouteHalt): RouteResult => ({ state: cur, events, steps, gathered, halt: h, remaining: waypoints.slice(i) });
+    const halt = (h: RouteHalt): RouteResult => ({ state: cur, events, steps, gathered, halt: h, remaining: waypoints.slice(i), misses });
     for (const tile of lineTiles(cur.expedition!.pos, waypoints[i]!)) {
       const moved = reduce(cur, { type: "move", to: tile });
       events.push(...moved.events);
@@ -57,11 +62,13 @@ export function route(state: GameState, waypoints: { x: number; y: number }[]): 
 
       if (cur.expedition && (cur.expedition.autoGather ?? true)) {
         const g = reduce(cur, { type: "gather" });
+        const gRej = g.events.find((e): e is Extract<GameEvent, { type: "action-rejected" }> => e.type === "action-rejected");
+        if (gRej && gRej.reason !== "no-node") misses.push({ at: { ...cur.expedition.pos }, reason: gRej.reason });
         if (g.events.some((e) => e.type === "gathered")) {
           cur = g.state;
           events.push(...g.events);
           gathered += 1;
-        } else if (g.events.some((e) => e.type === "action-rejected" && e.reason === "carry-full")) {
+        } else if (gRej?.reason === "carry-full") {
           events.push(...g.events); // bag full → pause the route here
           return halt({ kind: "bag-full" });
         }
@@ -69,7 +76,7 @@ export function route(state: GameState, waypoints: { x: number; y: number }[]): 
       }
     }
   }
-  return { state: cur, events, steps, gathered, halt: null, remaining: [] };
+  return { state: cur, events, steps, gathered, halt: null, remaining: [], misses };
 }
 
 export function play(
