@@ -265,7 +265,7 @@ function bankStrip(state: GameState, legal: Action[]): string {
     const canSpare = worn && eq[slot as EquipSlot] && legal.some((a) => a.type === "pack" && a.slot === "spare" && a.itemId === s.defId);
     packables.push(`<span class="pk-chipwrap"><button class="pk-chip${ok ? "" : " nofit"}${worn ? " wear" : ""}" data-bank="${s.defId}" data-pack="${s.defId}" data-slot="${slot}" title="${tip}">${ic(s.defId, 18)}${name(s.defId)} ${left}</button>${canSpare ? `<button class="pk-spare" data-pack="${s.defId}" data-slot="spare" title="pack a SPARE ${name(s.defId)} in the bag (1 slot) — don it mid-run">+spare</button>` : ""}</span>`);
   }
-  return `<div class="pk-bank"><div class="lab">Bank · tap to pack</div><div class="chips">${packables.join("")}${mats.join("")}${packables.length + mats.length ? "" : `<span class="muted small">(empty)</span>`}</div></div>`;
+  return `<div class="pk-bank"><div class="lab">Bank · tap to pack · hold for details</div><div class="chips">${packables.join("")}${mats.join("")}${packables.length + mats.length ? "" : `<span class="muted small">(empty)</span>`}</div></div>`;
 }
 
 // 4. Worn: free, no slots. Tap a worn row for its swap menu (other bank pieces for

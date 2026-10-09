@@ -1,4 +1,4 @@
-import { RESEARCH_INKS, RESEARCH_SEARCHES_PER_INK, LOOT_TABLE, CATEGORY_LOOT_TABLE, MAP_SCROLL_ID, WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE, QUAFF_ENERGY, DON_DOFF_ENERGY, FLASK_EFFECT, ANTIDOTE, MAP_HINTS, DMG_ARMOUR_MATRIX, TERRAIN_HP_WARD } from "../data/constants";
+import { BIOMES, RESEARCH_INKS, RESEARCH_SEARCHES_PER_INK, LOOT_TABLE, CATEGORY_LOOT_TABLE, MAP_SCROLL_ID, WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE, QUAFF_ENERGY, DON_DOFF_ENERGY, FLASK_EFFECT, ANTIDOTE, MAP_HINTS, DMG_ARMOUR_MATRIX, TERRAIN_HP_WARD } from "../data/constants";
 import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType, FishWater, HintMetric } from "../data/constants";
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
@@ -374,7 +374,7 @@ const SIZE_FLAVOR: Record<number, string> = { 1: "a small", 2: "a fair-sized", 3
 // Qualitative matrix character + the ranged verb; never numbers. Data-driven
 // off WEAPONS.dmgType so future weapons get a hint for free.
 const WEAPON_CLASS_HINT: Record<DmgType, string> = {
-  melee: "melee — steady steel; strongest against soft, unarmoured hides",
+  melee: "melee — hand-to-hand; strongest against soft, unarmoured hides",
   ranged: "ranged — strike FIRST from a tile away (needs arrows; empty quiver = a club); flies true against soft hides, blunted by plate",
   magic: "magic — burns through plate and scale, fizzles against soft robes",
 };
@@ -863,4 +863,27 @@ export function isExhausted(state: { phase: string; expedition?: Expedition | nu
   return !legal.some((a) =>
     a.type === "move" || a.type === "eat" ||
     (a.type === "craft" && FOOD.includes(RECIPE[a.recipeId]?.output.defId ?? "")));
+}
+
+/** Where an item comes from, in player words (user 2026-10-10: "where do I get flint?"):
+ *  the node kinds + biomes whose material tables hold it (with the tool that node
+ *  needs), the monsters that drop it, and whether it's crafted. Empty = nothing known. */
+export function itemSources(defId: string): string[] {
+  const out: string[] = [];
+  const byKind = new Map<string, string[]>();
+  for (const [biome, b] of Object.entries(BIOMES)) {
+    for (const [kind, table] of Object.entries(b.materialTable)) {
+      if (!table || !(defId in table)) continue;
+      byKind.set(kind, [...(byKind.get(kind) ?? []), name(biome)]);
+    }
+  }
+  for (const [kind, biomes] of byKind) {
+    const tool = NODE_TOOL[kind as GatherableNodeType];
+    const noun = GATHER_VERB[kind]?.noun ?? kindLabel(kind as NodeType);
+    out.push(`${capFirst(noun)} in ${biomes.join(", ")} · ${tool ? `needs a ${name(tool)}` : "bare hands"}`);
+  }
+  const droppers = Object.entries(LOOT_TABLE).filter(([, drops]) => drops.some((d) => d.defId === defId)).map(([m]) => name(m));
+  if (droppers.length) out.push(`Dropped by ${droppers.join(", ")}`);
+  if (Object.values(RECIPE).some((r) => r.output.defId === defId)) out.push("Crafted");
+  return out;
 }

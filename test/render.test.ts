@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { flavorDetail, matchupLessons, combatForecast, poiGlyph, kindLabel, POI_CHAR } from "../src/render/render";
+import { flavorDetail, matchupLessons, combatForecast, poiGlyph, kindLabel, POI_CHAR, itemSources } from "../src/render/render";
 import { emptyLoadout } from "../src/engine/loadout";
 import { playerDamage, damageTaken } from "../src/engine/combat";
 import { MONSTERS, MONSTER_TIER_HP_CURVE } from "../src/data/constants";
@@ -70,4 +70,12 @@ test("flavorDetail names node magnitude variants", () => {
   expect(flavorDetail({ tier: 1, material: "berries", magnitude: 2 }, "herb")).toBe("berries patch");
   // base (magnitude 1/absent) unchanged
   expect(flavorDetail({ tier: 1, material: "iron-ore" }, "mining")).toBe("iron-ore");
+});
+
+test("itemSources says where a material comes from (user 2026-10-10: 'where do I get flint?')", () => {
+  const flint = itemSources("flint");
+  expect(flint.some((s) => s.includes("bare hands") && s.includes("Woodland"))).toBe(true);
+  expect(itemSources("iron-ore").some((s) => s.includes("Pick"))).toBe(true);
+  expect(itemSources("werewolf-pelt")).toContain("Dropped by Werewolf");
+  expect(itemSources("club")).toEqual(["Crafted"]);
 });
