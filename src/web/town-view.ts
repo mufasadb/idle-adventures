@@ -1,29 +1,22 @@
 // Town screens (zpm.3 two-step flow): the map overview (where to?) and the prep
-// screen (loadout plan + embark), plus the bank and the recipe book.
+// screen (d13: the packing sheet + embark), plus the bank and the recipe book.
 import { localMap, mapEpithet, mapHintIds } from "../engine/town";
 import { hintLabel, hintFamily } from "../engine/hints";
 import { legalActions, whyNot } from "../sim/legal";
 import { slotOf } from "../engine/catalog";
 import { recipeOutputQty } from "../engine/craft";
-import { carryCap } from "../engine/carry";
-import { ARMOUR_SLOTS } from "../engine/pack";
-import { heldFoodEnergy } from "../engine/food";
+import { freeLootStacks, slotCap, energyCapOf } from "../engine/carry";
+import { EQUIP_SLOTS } from "../engine/pack";
+import type { EquipSlot } from "../engine/pack";
+import { heldFoodEnergy, foodEnergyOf } from "../engine/food";
 import { wieldsRanged, hasAmmo } from "../engine/combat";
-import { RECIPE, MAX_ENERGY, TENT_FOOD_MULTIPLIER, INKS, QUIVER_AMMO_CAP, STUDY_COST } from "../data/constants";
+import { RECIPE, MAX_ENERGY, TENT_FOOD_MULTIPLIER, INKS, QUIVER_AMMO_CAP, STUDY_COST, STACK_CAP, FLASK_STACK_CAP, ARROW_STACK_CAP } from "../data/constants";
 import type { BiomeId } from "../data/constants";
-import { weaponHint, logisticsEffect, enhancementHint, describe, recipeGateHint, name, heldMapTitle, townRecipeIds, rejectCopy, fieldRecipeIds, fieldRecipeNote } from "../render/render";
-import type { GameState, Action, MapItem } from "../engine/types";
-import { inventoryGrid } from "./inventory";
+import { weaponHint, logisticsEffect, enhancementHint, describe, recipeGateHint, name, heldMapTitle, townRecipeIds, rejectCopy, fieldRecipeIds, fieldRecipeNote, carryBreakdown, bagRows, bagCells, POCKET_SLOTS, hintNeed, expectedHaul, toolGloss, battleItemEffect } from "../render/render";
+import type { GameState, Action, MapItem, Loadout } from "../engine/types";
 import { planActions } from "./persist";
 import { packedCounts } from "./feedback";
-import { iconStyle } from "./assets";
-
-// beh: a packed piece of kit reads as a CHIP (icon + name) in the loadout plan, so
-// "is my pick packed?" is answered at a glance; data-def lets the pack glow find it.
-function gearChip(defId: string): string {
-  const st = iconStyle(defId);
-  return `<span class="gearchip" data-def="${defId}" title="${describe(defId)}">${st ? `<span class="gc-icon" style="${st}"></span>` : ""}${name(defId)}</span>`;
-}
+import { iconStyle, nodeIconId } from "./assets";
 
 // Map hints (D95, Muse brief C option 1 — chips): one chip per hint, "G: boggy ground";
 // a sealed hint shows only its family. `studied` = how many of `ids` are revealed.
@@ -73,30 +66,29 @@ function heldMapSuffix(m: MapItem): string {
 }
 
 export type TownTab = "main" | "bank" | "recipes";
+// d13: view-only state for the packing screen — which worn slot's swap menu is open.
+export type PackUi = { wornOpen?: string | null };
 
-export function townView(state: GameState, prep: string | null, hasLastPlan: boolean, tab: TownTab = "main"): string {
+export function townView(state: GameState, prep: string | null, hasLastPlan: boolean, tab: TownTab = "main", ui: PackUi = {}): string {
   const local = localMap(state.seed, state.runs ?? 0);
   const heldMaps = state.maps ?? [];
   // prep may point at a map that no longer exists (consumed/rotated) — fall back to overview.
   const inPrep = prep !== null && (prep === local.mapSeed || heldMaps.some((m) => m.mapSeed === prep));
+  // d13: preparing a map is the full-screen packing sheet (its own Pack | Recipes tabs).
+  if (inPrep) return packScreen(state, prep!, local, heldMaps, hasLastPlan, tab === "recipes" ? "recipes" : "main", ui);
   const header = `<header><h1>Town</h1><span class="muted">seed "${state.seed}"</span><button class="link" data-newgame>new game</button></header>`;
   // kml: on phones the three town panels are TABS (the recipe book alone is a long
   // scroll); on wide screens they sit side by side and the tab bar hides (CSS).
-  const first = inPrep ? "Loadout" : "Maps";
-  const tabBtn = (t: TownTab, label: string) => `<button class="tab${(inPrep && tab === "bank" ? "main" : tab) === t ? " on" : ""}" data-town-tab="${t}">${label}</button>`;
-  // Packing moves items bank → loadout, so in prep the two share one tab (side by side).
-  const shown: TownTab = inPrep && tab === "bank" ? "main" : tab;
-  const nav = `<nav class="tabs town-tabs">${tabBtn("main", inPrep ? "Loadout & Bank" : first)}${inPrep ? "" : tabBtn("bank", "Bank")}${tabBtn("recipes", "Recipes")}</nav>`;
+  const tabBtn = (t: TownTab, label: string) => `<button class="tab${tab === t ? " on" : ""}" data-town-tab="${t}">${label}</button>`;
+  const nav = `<nav class="tabs town-tabs">${tabBtn("main", "Maps")}${tabBtn("bank", "Bank")}${tabBtn("recipes", "Recipes")}</nav>`;
   return `${header}
-    ${inPrep ? prepBar(state, prep!, local, heldMaps) : ""}
     ${nav}
-    <div class="cols town show-${shown}">
-      <div class="tsec${inPrep ? " duo" : ""}" data-tsec="main">${inPrep ? loadoutSection(state, hasLastPlan) + bankSection(state) : mapSelectSection(state, local, heldMaps)}</div>
-      ${inPrep ? "" : `<div class="tsec" data-tsec="bank">${bankSection(state)}</div>`}
+    <div class="cols town show-${tab}">
+      <div class="tsec" data-tsec="main">${mapSelectSection(state, local, heldMaps)}</div>
+      <div class="tsec" data-tsec="bank">${bankSection(state)}</div>
       <div class="tsec" data-tsec="recipes">${recipeSection(state)}</div>
     </div>`;
 }
-
 // STEP 1 (zpm.3): the town overview — pick where to go. The FREE local map reads
 // as mundane/renewable; EARNED maps carry a tier badge and "spent on embark" so a
 // player never burns a T3 thinking it's the freebie. Each card leads to Prepare.
@@ -130,51 +122,211 @@ function mapSelectSection(state: GameState, local: ReturnType<typeof localMap>, 
     </section>`;
 }
 
-// STEP 2 (zpm.3): the prep banner — the chosen map pinned, the spend-vs-free call
-// spelled out, the loadout warnings, and the FINAL commit button. The only place
-// embark fires; its copy states the cost so the resource-spend is deliberate.
-function prepBar(state: GameState, mapSeed: string, local: ReturnType<typeof localMap>, heldMaps: MapItem[]): string {
-  const isLocal = mapSeed === local.mapSeed;
-  const held = heldMaps.find((m) => m.mapSeed === mapSeed);
-  const label = isLocal
-    ? `${local.preview.headline}${epithetSuffix(local.mapSeed, local.biomeId)} <span class="maptag free">FREE · T1</span>`
-    : `${name(held!.biomeId)} map${heldMapSuffix(held!)} <span class="maptag tier">T${held?.tier ?? 1}</span>`;
-  const spendNote = isLocal
-    ? `<span class="muted small">free local run — the map is not used up</span>`
-    : `<span class="warn small">⚠ embarking SPENDS this map</span>`;
-  const lo = state.loadout;
-  const warns = `${lo.food.length === 0 ? `<div class="warn">⚠ no food packed → you embark at full ${MAX_ENERGY} energy but nothing to eat mid-run — no way to refill stamina</div>` : ""}${wieldsRanged(lo) && !hasAmmo(lo) ? `<div class="warn">⚠ ${name(lo.equipment.weapon!)} packed with no ammo it can shoot → it will swing like a club (1 dmg). Pack its ammo to shoot.</div>` : ""}`;
-  return `
-  <div class="prepbar">
-    <button class="link" data-back>← back to maps</button>
-    <div class="prephead"><span class="muted small">Preparing</span> ${label} · ${spendNote}${
-      isLocal ? "" : held && (held.studied ?? 0) > 0 ? hintChips(mapHintIds(held).slice(0, held.studied), held.studied!) : ""}</div>
-    <button class="embark-final" data-embark="${mapSeed}">Embark ▶${isLocal ? "" : " — spends this map"}</button>
-  </div>
-  ${warns}`;
+// ===== d13: the packing screen (Muse-approved mock, packmock) =====================
+// Built to TEACH the carry rules at a glance: a segmented bag gauge (capacity by
+// source; packed units red, free slots green "loot ×5"), the destination's scout
+// reports checked against the plan, the bag (one row per packed item, its slot
+// cost, − to unpack) over a bank strip (tap to pack), the worn column (free — no
+// slots), and a footer with energy + warnings + Embark. Every number is read off the
+// engine (carryCap/freeLootStacks via render's carryBreakdown/bagRows/bagCells), and
+// what's tappable off legalActions/whyNot — the web decides nothing.
+const ICON_PX = 24; // the atlases' CSS frame size; ic() zooms to the size asked
+
+function ic(defId: string | null, px: number): string {
+  const st = defId ? iconStyle(defId) : null;
+  return st
+    ? `<span class="pk-ic" style="${st};zoom:${(px / ICON_PX).toFixed(3)}" aria-hidden="true"></span>`
+    : `<span class="pk-ic none" style="width:${px}px;height:${px}px" aria-hidden="true">${defId ? name(defId).charAt(0) : "·"}</span>`;
 }
 
-function loadoutSection(state: GameState, hasLastPlan: boolean): string {
+type LocalMap = ReturnType<typeof localMap>;
+
+function packScreen(state: GameState, mapSeed: string, local: LocalMap, heldMaps: MapItem[], hasLastPlan: boolean, tab: "main" | "recipes", ui: PackUi): string {
+  const isLocal = mapSeed === local.mapSeed;
+  const held = heldMaps.find((m) => m.mapSeed === mapSeed) ?? null;
+  const tabBtn = (t: "main" | "recipes", label: string) => `<button class="tab${tab === t ? " on" : ""}" data-town-tab="${t}">${label}</button>`;
+  const top = `<div class="pk-top">
+      <button class="link" data-back>← maps</button>
+      <nav class="pk-tabs">${tabBtn("main", "Pack")}${tabBtn("recipes", "Recipes")}</nav>
+      <span class="pk-dest muted small">${isLocal ? "free local run — the map is not used up" : `<span class="warn">⚠ embarking SPENDS this map</span>`}</span>
+    </div>`;
+  if (tab === "recipes") return `<div class="packscreen recipes">${top}<div class="pk-recipes">${recipeSection(state)}</div></div>`;
+  const legal = legalActions(state);
+  return `<div class="packscreen" data-loadout>
+    ${top}
+    ${bagGauge(state.loadout)}
+    <div class="pk-book">
+      ${mapPage(state, isLocal, local, held)}
+      ${bagPage(state, legal)}
+      ${wornColumn(state, legal, ui.wornOpen ?? null)}
+    </div>
+    ${packFooter(state, mapSeed, isLocal, held, hasLastPlan)}
+  </div>`;
+}
+
+// 1. The segmented gauge: one group per capacity source, labelled so the parts add
+// up to the bag's size (a backpack REPLACES the pockets; transport/panniers add on).
+function bagGauge(lo: Loadout): string {
+  const parts = carryBreakdown(lo.equipment);
+  const cap = parts.reduce((n, p) => n + p.slots, 0); // === carryCap(lo.equipment)
+  const cells = bagCells(lo);
+  const free = freeLootStacks(lo);
+  const size = cap > 18 ? "s" : cap > 14 ? "m" : "l"; // cell size class so a big late-game bag still fits one row
+  let k = 0;
+  const cell = () => {
+    const c = cells[k++];
+    if (!c) return `<div class="pk-cell free" title="free slot — holds a stack of ${STACK_CAP} loot">loot<br>×${STACK_CAP}</div>`;
+    return `<div class="pk-cell full" data-def="${c.defId}" title="${name(c.defId)}${c.qty > 1 ? ` ×${c.qty}` : ""} — 1 slot">${ic(c.defId, 24)}${c.qty > 1 ? `<span class="tag">${c.qty}</span>` : ""}</div>`;
+  };
+  const groups = parts.map((p, i) => {
+    const label = p.source === "pockets" ? `${p.slots} Pockets` : `${i ? "+" : ""}${p.slots} ${name(p.defId!)}`;
+    const tip = p.source === "backpack" ? `${name(p.defId!)}: ${p.slots} slots — it replaces your ${POCKET_SLOTS} pockets`
+      : p.source === "pockets" ? `no backpack: ${p.slots} pockets` : `${name(p.defId!)} adds ${p.slots} slots`;
+    return `<div class="pk-grp"><div class="lab" title="${tip}">${label}</div><div class="cells">${Array.from({ length: p.slots }, cell).join("")}</div></div>`;
+  }).join("");
+  // Over capacity can only follow a carry-source removal the replay couldn't fully drop.
+  const over = cells.length > cap ? `<div class="pk-grp"><div class="lab bad">over</div><div class="cells">${cells.slice(cap).map(() => cell()).join("")}</div></div>` : "";
+  const sum = free > 0
+    ? `<span class="loot">${free} free = room for ${free * STACK_CAP} loot</span>`
+    : `<span class="bad">0 free: no room for loot!</span>`;
+  return `<div class="pk-gauge size-${size}">${groups}${over}<div class="pk-sum"><b>BAG ${cells.length}/${cap}</b><br>${sum}</div></div>`;
+}
+
+// 2. The map page: where you're going, its scout reports and whether the plan answers them.
+const FAMILY_GLYPH: Record<string, string> = { ground: "⛰", threat: "⚔", bounty: "✦" };
+function mapPage(state: GameState, isLocal: boolean, local: LocalMap, held: MapItem | null): string {
   const lo = state.loadout;
-  const eq = lo.equipment;
-  const cap = carryCap(eq);
-  const inv = inventoryGrid(lo, [], cap);
-  const equipRow = (label: string, val: string | null) =>
-    `<div class="row"><span class="k">${label}</span><span class="v gearrow">${val ?? "<span class='muted'>—</span>"}</span></div>`;
-  return `
-    <section data-loadout>
-      <h2>Loadout plan <button class="link" data-reset>reset</button>${hasLastPlan && planActions(lo).length === 0 ? ` <button class="link" data-repack title="re-pack the loadout you took last run (skips anything no longer in the bank)">↻ repack last</button>` : ""}</h2>
-      ${equipRow("weapon", eq.weapon ? gearChip(eq.weapon) : null)}
-      ${equipRow("armour", ARMOUR_SLOTS.map((s) => eq[s]).filter(Boolean).map((d) => gearChip(d as string)).join("") || null)}
-      ${equipRow("transport", eq.transport ? `${gearChip(eq.transport)}${TRANSPORT_ROLE[eq.transport] ? ` <span class="muted small">${TRANSPORT_ROLE[eq.transport]}</span>` : ""}` : null)}
-      ${eq.panniers ? equipRow("panniers", gearChip(eq.panniers)) : ""}
-      ${eq.quiver ? equipRow("quiver", `${gearChip(eq.quiver)} <span class="muted small">holds ${QUIVER_AMMO_CAP[eq.quiver] ?? 0} ammo off your back</span>`) : ""}
-      ${equipRow("backpack", eq.backpack ? gearChip(eq.backpack) : "none")}
-      ${equipRow("tools", eq.tools.map(gearChip).join("") || `<span class="muted">none packed — pack a pick / axe / knife from the bank to work nodes</span>`)}
-      <div class="row"><span class="k">bag</span><span class="v">${inv.used}/${cap} slots</span></div>
-      ${inv.html}
-      <div class="muted small">worn gear (ghosted) is free · each food / potion / battle-item / tool takes one slot — bring several tools to work different node types · you embark at ${MAX_ENERGY} energy; packed food holds ≈ ${heldFoodEnergy(lo.food)} energy of refills to eat back as you travel${eq.tools.includes("tent") ? ` · tent — food restores +${Math.round((TENT_FOOD_MULTIPLIER - 1) * 100)}%` : ""}</div>
-    </section>`;
+  const title = isLocal
+    ? `${name(local.biomeId)} · T1${epithetSuffix(local.mapSeed, local.biomeId)}`
+    : `${name(held!.biomeId)} · T${held!.tier ?? 1}${heldMapSuffix(held!)}`;
+  let reports: string;
+  if (isLocal || !held) {
+    reports = `<div class="pk-hint plain"><span>plain country — no scout reports</span></div><div class="sub">the free local map: never used up. Hinted maps drop from humanoids.</div>`;
+  } else {
+    const ids = mapHintIds(held), studied = held.studied ?? 0;
+    reports = ids.map((id, i) => {
+      const fam = hintFamily(id) ?? "";
+      if (i >= studied) return `<div class="pk-hint sealed"><span class="glyph">${FAMILY_GLYPH[fam] ?? "?"}</span><span>sealed ${fam} report</span><span class="need muted">study to read</span></div>`;
+      const need = hintNeed(id, lo);
+      const icon = need?.node ? ic(nodeIconId(need.node), 20) : need?.gear ? ic(need.gear, 20) : `<span class="glyph">${FAMILY_GLYPH[fam] ?? "?"}</span>`;
+      const verdict = !need ? `<span class="muted">nothing to bring</span>`
+        : need.ok ? `<span class="ok">${need.have} ✓</span>` : `<span class="miss">needs ${need.want}</span>`;
+      return `<div class="pk-hint" title="${fam} report">${icon}<span>${hintLabel(id)}</span><span class="need">${verdict}</span></div>`;
+    }).join("") + (studied < ids.length ? `<div class="pk-study">${studyControl(state, held)}</div>` : "");
+  }
+  const haul = expectedHaul(lo.equipment.tools);
+  const onlyForage = haul.length === 1;
+  return `<div class="pk-page pk-map">
+    <h3>${title}</h3>
+    <div class="sub">what the scouts say → what you'll need</div>
+    ${reports}
+    <div class="sub haul">Expected haul: <b>${haul.join(" · ")}</b>${onlyForage ? " — pack a pick, axe or trap + knife to bring more home" : ""}</div>
+  </div>`;
+}
+
+// 3. The bag page: one row per packed item (slot cost + unpack), then the bank strip.
+function bagPage(state: GameState, legal: Action[]): string {
+  const lo = state.loadout;
+  const rows = bagRows(lo);
+  const spare = new Set((lo.spares ?? []).map((s) => s.defId));
+  const rowHtml = rows.map((r) => {
+    const gloss = r.packSlot === "tool" ? toolGloss(r.defId, lo.equipment.tools)
+      : r.packSlot === "food" ? `+${foodEnergyOf(r.defId)} energy each`
+      : battleItemEffect(r.defId);
+    const cost = r.slots === 0 ? "in quiver" : `${r.slots} slot${r.slots === 1 ? "" : "s"}${r.perSlot > 1 ? ` (${r.perSlot}/slot)` : ""}${r.quivered ? " + quiver" : ""}`;
+    return `<div class="pk-row" data-def="${r.defId}" title="${describe(r.defId)}">${ic(r.defId, 20)}<span class="nm">${name(r.defId)}${r.packSlot === "spare" && spare.has(r.defId) ? ` <span class="q">spare</span>` : ""}</span>${r.qty > 1 ? `<span class="q">×${r.qty}</span>` : ""}${gloss ? `<span class="gives">→ ${gloss}</span>` : ""}<span class="sl">${cost}</span><button class="pk-btn" data-unpack="${r.defId}" data-unpack-slot="${r.packSlot}" title="unpack one" aria-label="unpack one ${name(r.defId)}">−</button></div>`;
+  }).join("");
+  const empty = rows.length ? "" : `<div class="pk-empty">Nothing packed yet. Tap the bank below — every tool, food and potion takes one slot; worn gear is free.</div>`;
+  return `<div class="pk-page pk-bag">
+    <h3>In the bag <span class="sub-inline">· one slot per item (flasks ${FLASK_STACK_CAP}, arrows ${ARROW_STACK_CAP})</span></h3>
+    <div class="pk-rows">${rowHtml}${empty}</div>
+    ${bankStrip(state, legal)}
+  </div>`;
+}
+
+const EQUIP: readonly string[] = EQUIP_SLOTS;
+function bankStrip(state: GameState, legal: Action[]): string {
+  const packed = packedCounts(state.loadout);
+  const eq = state.loadout.equipment;
+  const packables: string[] = [], mats: string[] = [];
+  for (const s of state.bank) {
+    const left = s.qty - (packed.get(s.defId) ?? 0); // D28: the bank is debited at embark — show what's left to pack
+    if (left <= 0) continue;
+    const slot = slotOf(s.defId);
+    if (slot === null) {
+      mats.push(`<span class="pk-chip mat" title="${name(s.defId)} — a material: crafting stock, not packable">${ic(s.defId, 18)}${name(s.defId)} ${left}</span>`);
+      continue;
+    }
+    const ok = legal.some((a) => a.type === "pack" && a.slot === slot && a.itemId === s.defId);
+    const why = ok ? null : whyNot(state, { type: "pack", slot, itemId: s.defId });
+    const worn = EQUIP.includes(slot);
+    const tip = ok ? (worn ? `wear it (${slot}) — worn gear takes no slot` : "pack one — takes a bag slot") : `can't pack: ${why ? rejectCopy(why, undefined, "pack") : "not now"}`;
+    // 82r: a spare goes IN the bag (1 slot) to swap mid-run — offered once that worn slot is filled.
+    const canSpare = worn && eq[slot as EquipSlot] && legal.some((a) => a.type === "pack" && a.slot === "spare" && a.itemId === s.defId);
+    packables.push(`<span class="pk-chipwrap"><button class="pk-chip${ok ? "" : " nofit"}${worn ? " wear" : ""}" data-bank="${s.defId}" data-pack="${s.defId}" data-slot="${slot}" title="${tip}">${ic(s.defId, 18)}${name(s.defId)} ${left}</button>${canSpare ? `<button class="pk-spare" data-pack="${s.defId}" data-slot="spare" title="pack a SPARE ${name(s.defId)} in the bag (1 slot) — don it mid-run">+spare</button>` : ""}</span>`);
+  }
+  return `<div class="pk-bank"><div class="lab">Bank · tap to pack</div><div class="chips">${packables.join("")}${mats.join("")}${packables.length + mats.length ? "" : `<span class="muted small">(empty)</span>`}</div></div>`;
+}
+
+// 4. Worn: free, no slots. Tap a worn row for its swap menu (other bank pieces for
+// that slot + take off); carry sources show what they add.
+const WORN_ROWS: { slot: EquipSlot; empty: string }[] = [
+  { slot: "weapon", empty: "no weapon" }, { slot: "helmet", empty: "helm" }, { slot: "chest", empty: "chest" },
+  { slot: "legs", empty: "legs" }, { slot: "boots", empty: "boots" }, { slot: "gloves", empty: "gloves" },
+  { slot: "transport", empty: "no mount" }, { slot: "backpack", empty: "no backpack" },
+  { slot: "quiver", empty: "no quiver" }, { slot: "panniers", empty: "no panniers" },
+];
+function wornColumn(state: GameState, legal: Action[], open: string | null): string {
+  const lo = state.loadout, eq = lo.equipment;
+  const parts = carryBreakdown(eq);
+  const alts = (slot: EquipSlot) => legal.filter((a): a is Extract<Action, { type: "pack" }> => a.type === "pack" && a.slot === slot && a.itemId !== eq[slot]);
+  const rows = WORN_ROWS.map(({ slot, empty }) => {
+    const id = eq[slot] ?? null;
+    const options = alts(slot);
+    // quiver/panniers only matter once you own one
+    if (!id && options.length === 0 && (slot === "quiver" || slot === "panniers")) return "";
+    let extra = "";
+    if (slot === "transport" && id) extra = (parts.find((p) => p.source === "transport")?.slots ?? 0) ? `+${parts.find((p) => p.source === "transport")!.slots}` : "";
+    if (slot === "backpack") extra = id ? `${slotCap(id)} slots` : `${POCKET_SLOTS} pockets`;
+    if (slot === "panniers" && id) { const n = parts.find((p) => p.source === "panniers")?.slots ?? 0; extra = n ? `+${n}` : "needs a beast"; }
+    if (slot === "quiver" && id) extra = `${QUIVER_AMMO_CAP[id] ?? 0} arrows`;
+    const bad = (slot === "weapon" && wieldsRanged(lo) && !hasAmmo(lo)) || (slot === "panniers" && extra === "needs a beast");
+    if (slot === "weapon" && bad) extra = "no ammo";
+    const tip = id ? `${name(id)} — worn, no slot${slot === "transport" && TRANSPORT_ROLE[id] ? ` · ${TRANSPORT_ROLE[id]}` : ""}${slot === "backpack" ? ` · ${slotCap(id)} slots, replaces your ${POCKET_SLOTS} pockets` : ""} · tap to swap or take off`
+      : options.length ? `tap to wear one` : `${empty} — none in the bank`;
+    const clickable = !!id || options.length > 0;
+    const isOpen = open === slot && clickable;
+    const label = id ? name(id) : empty;
+    const menu = isOpen ? `<div class="pk-wmenu">${options.map((a) => `<button class="pk-chip wear" data-pack="${a.itemId}" data-slot="${slot}" title="wear ${name(a.itemId)} instead">${ic(a.itemId, 18)}${name(a.itemId)}</button>`).join("")}${id ? `<button class="pk-chip off" data-unpack="${id}" data-unpack-slot="${slot}" title="take it off (back to the bank)">take off</button>` : ""}</div>` : "";
+    const inner = `${id ? ic(id, 22) : `<span class="pk-ic none" style="width:22px;height:22px">·</span>`}<span class="wl">${label}</span>${extra ? `<span class="x${bad ? " bad" : ""}">${extra}</span>` : ""}`;
+    return clickable
+      ? `<div class="pk-wslot${isOpen ? " open" : ""}"><button class="pk-wi${id ? "" : " empty"}" data-worn-open="${slot}"${id ? ` data-def="${id}"` : ""} title="${tip}">${inner}</button>${menu}</div>`
+      : `<div class="pk-wslot"><div class="pk-wi empty" title="${tip}">${inner}</div></div>`;
+  }).join("");
+  return `<div class="pk-worn"><h4>Worn</h4><div class="free">free · no slots</div>${rows}</div>`;
+}
+
+// 5. Footer: energy (base + food), the warnings, Repack / Reset / Embark.
+function packFooter(state: GameState, mapSeed: string, isLocal: boolean, held: MapItem | null, hasLastPlan: boolean): string {
+  const lo = state.loadout, eq = lo.equipment;
+  const startEnergy = MAX_ENERGY + energyCapOf(eq);
+  const food = heldFoodEnergy(lo.food);
+  const warns: { short: string; full: string }[] = [];
+  if (lo.food.length === 0) warns.push({ short: "no food", full: `no food packed → you embark at ${startEnergy} energy with nothing to eat mid-run — no way to refill stamina` });
+  if (wieldsRanged(lo) && !hasAmmo(lo)) warns.push({ short: `${name(eq.weapon!)}, no ammo`, full: `${name(eq.weapon!)} packed with no ammo it can shoot → it will swing like a club. Pack its ammo to shoot.` });
+  if (freeLootStacks(lo) <= 0) warns.push({ short: "bag full before you start", full: "every slot is taken before you leave — nothing you gather or loot will fit" });
+  if (held && !isLocal) {
+    const unmet = mapHintIds(held).slice(0, held.studied ?? 0).map((id) => ({ id, need: hintNeed(id, lo) })).filter((h) => h.need && !h.need.ok);
+    for (const h of unmet) warns.push({ short: `map wants ${h.need!.want}`, full: `scouts say "${hintLabel(h.id)}" — you've packed no ${h.need!.want}` });
+  }
+  const repack = hasLastPlan && planActions(lo).length === 0
+    ? `<button class="pk-ghost" data-repack title="re-pack the loadout you took last run (skips anything no longer in the bank)">↻ Repack last</button>` : "";
+  return `<div class="pk-foot">
+    <span class="en" title="you embark at full energy; packed food is eaten back as you travel">Energy <b>${startEnergy}</b> + <b>${food}</b> from food${eq.tools.includes("tent") ? ` <span class="muted small">· tent: food +${Math.round((TENT_FOOD_MULTIPLIER - 1) * 100)}%</span>` : ""}</span>
+    <span class="warns">${warns.map((w) => `<span class="warn" title="${w.full}">⚠ ${w.short}</span>`).join("")}</span>
+    ${repack}<button class="pk-ghost" data-reset title="clear the whole plan">Reset</button>
+    <button class="embark-final" data-embark="${mapSeed}">Embark ▶${isLocal ? "" : `<small> spends map</small>`}</button>
+  </div>`;
 }
 
 function bankSection(state: GameState): string {

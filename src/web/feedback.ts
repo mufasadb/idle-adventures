@@ -4,7 +4,7 @@
 // node you walked across, a "+1 Pick — in bank" next to the craft button. Nothing
 // here decides legality — every record is read off an event or a rejection reason.
 // The DOM painting lives in fx.ts.
-import type { Expedition, GameEvent, Loadout, RejectionReason } from "../engine/types";
+import type { Expedition, GameEvent, Loadout, LoadoutSlot, RejectionReason } from "../engine/types";
 import { NODE_TOOL, NODE_SECONDARY_TOOL, TOOL_CAPABILITY } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
 import { name, nodeToolShort, rejectCopy } from "../render/render";
@@ -93,10 +93,12 @@ export function packedCounts(lo: Loadout): Map<string, number> {
 
 // beh: the plan with ONE `defId` taken out (its last occurrence) — replayed through
 // reduce from an empty loadout, that is "unpack one". Null when it isn't packed.
-export function planWithout(lo: Loadout, defId: string): PackStep[] | null {
+// d13: `slot` narrows it to that pack slot, so taking off a worn sword doesn't drop
+// the spare sword in the bag instead (and vice versa).
+export function planWithout(lo: Loadout, defId: string, slot?: LoadoutSlot): PackStep[] | null {
   const steps = planActions(lo);
   let i = -1;
-  for (let j = steps.length - 1; j >= 0; j--) if (steps[j]!.itemId === defId) { i = j; break; }
+  for (let j = steps.length - 1; j >= 0; j--) if (steps[j]!.itemId === defId && (slot === undefined || steps[j]!.slot === slot)) { i = j; break; }
   if (i === -1) return null;
   return [...steps.slice(0, i), ...steps.slice(i + 1)];
 }

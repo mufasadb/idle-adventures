@@ -52,6 +52,8 @@ let drawerOpen = false;
 let drawerTab: DrawerTab = "here";
 let wasEngaged = false;
 let townTab: TownTab = "main";
+// d13: the packing screen's open worn-slot swap menu (view-only).
+let wornOpen: string | null = null;
 // beh/rx5/mki: transient action feedback (tile cues, pack glow, craft notes) — painted
 // over each render by paintFx; purely presentational, never saved.
 const fx = emptyFx();
@@ -112,6 +114,7 @@ function apply(action: Action): void {
   if (action.type === "pack") {
     if (rej?.type === "action-rejected") fx.note = { ok: false, text: `✗ can't pack ${name(action.itemId)} — ${rejectCopy(rej.reason, undefined, "pack")}`, anchor: `[data-bank="${action.itemId}"]`, t0: now() };
     else fx.packed = { defId: action.itemId, t0: now() };
+    wornOpen = null;
   }
   for (const e of events) {
     // gate-legibility (playtest 2026-07-09 #1): a rejected CRAFT knows its recipeId
@@ -129,8 +132,8 @@ function note(line: string): void { log.unshift({ t: "note", text: line }); trim
 function trimAndDraw(): void { log = log.slice(0, 16); draw(); }
 // beh: unpack ONE of an item — rebuild the plan without it, replaying every other pack
 // through reduce (same path as repack; the engine has no unpack action, D28 plan-only).
-function unpack(defId: string): void {
-  const steps = planWithout(state.loadout, defId);
+function unpack(defId: string, slot?: LoadoutSlot): void {
+  const steps = planWithout(state.loadout, defId, slot);
   if (!steps) return;
   let lo = { ...state, loadout: newGame(seed).loadout };
   let skipped = 0;
@@ -141,7 +144,10 @@ function unpack(defId: string): void {
   }
   state = lo;
   fx.packed = null;
-  note(`· unpacked 1× ${name(defId)}${skipped ? ` · ${skipped} other item(s) no longer fit and were dropped from the plan` : ""}`);
+  wornOpen = null;
+  const text = `unpacked 1× ${name(defId)}${skipped ? ` · ${skipped} other item(s) no longer fit and were dropped from the plan` : ""}`;
+  fx.note = { ok: skipped === 0, text, anchor: null, t0: now() }; // d13: the log is hidden on the packing screen — say it as a toast
+  note(`· ${text}`);
 }
 function planReset(): void {
   // pack is only a PLAN on state.loadout (D28: bank untouched until embark).
@@ -186,7 +192,7 @@ function draw(): void {
   wasEngaged = engaged;
   document.body.classList.toggle("in-expedition", state.phase !== "town");
   app.innerHTML = state.phase === "town"
-    ? `${townView(state, prep, loadLastPlan(SAVE_KEY).length > 0, townTab)}${logView(log)}`
+    ? `${townView(state, prep, loadLastPlan(SAVE_KEY).length > 0, townTab, { wornOpen })}${logView(log)}`
     : expeditionView(state, route, { drawerOpen, tab: drawerTab, logHtml: logView(log) });
   wire(); save(SAVE_KEY, state, log);
   // c67 camera-follow, now a real camera (kml): re-centre on the player when their
@@ -281,10 +287,11 @@ function wire(): void {
   app.querySelectorAll<HTMLElement>("[data-open-tab]").forEach((el) => el.onclick = () => { drawerTab = el.dataset.openTab as DrawerTab; drawerOpen = true; draw(); });
   app.querySelectorAll<HTMLElement>("[data-embark]").forEach((el) => el.onclick = () => apply({ type: "embark", mapSeed: el.dataset.embark! }));
   app.querySelectorAll<HTMLElement>("[data-prepare]").forEach((el) => el.onclick = () => { prep = el.dataset.prepare!; route = []; draw(); }); // zpm.3: enter the prep screen for this map
-  app.querySelectorAll<HTMLElement>("[data-back]").forEach((el) => el.onclick = () => { prep = null; draw(); }); // zpm.3: back to the map overview
+  app.querySelectorAll<HTMLElement>("[data-back]").forEach((el) => el.onclick = () => { prep = null; wornOpen = null; draw(); }); // zpm.3: back to the map overview
   app.querySelectorAll<HTMLElement>("[data-craft]").forEach((el) => el.onclick = () => apply({ type: "craft", recipeId: el.dataset.craft! }));
   app.querySelectorAll<HTMLElement>("[data-pack]").forEach((el) => el.onclick = () => apply({ type: "pack", slot: el.dataset.slot as LoadoutSlot, itemId: el.dataset.pack! }));
-  app.querySelectorAll<HTMLElement>("[data-unpack]").forEach((el) => el.onclick = () => unpack(el.dataset.unpack!));
+  app.querySelectorAll<HTMLElement>("[data-unpack]").forEach((el) => el.onclick = () => unpack(el.dataset.unpack!, el.dataset.unpackSlot as LoadoutSlot | undefined));
+  app.querySelectorAll<HTMLElement>("[data-worn-open]").forEach((el) => el.onclick = () => { wornOpen = wornOpen === el.dataset.wornOpen ? null : el.dataset.wornOpen!; draw(); }); // d13: worn slot swap menu
   app.querySelectorAll<HTMLElement>("[data-drop]").forEach((el) => el.onclick = () => apply({ type: "drop", itemId: el.dataset.drop! }));
   app.querySelectorAll<HTMLElement>("[data-don]").forEach((el) => el.onclick = () => apply({ type: "don", itemId: el.dataset.don! }));
   app.querySelectorAll<HTMLElement>("[data-doff]").forEach((el) => el.onclick = () => apply({ type: "doff", itemId: el.dataset.doff! }));

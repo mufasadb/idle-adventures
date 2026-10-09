@@ -1,12 +1,13 @@
-import { LOOT_TABLE, CATEGORY_LOOT_TABLE, MAP_SCROLL_ID, WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE, QUAFF_ENERGY, DON_DOFF_ENERGY, FLASK_EFFECT, ANTIDOTE } from "../data/constants";
-import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType, FishWater } from "../data/constants";
+import { LOOT_TABLE, CATEGORY_LOOT_TABLE, MAP_SCROLL_ID, WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE, QUAFF_ENERGY, DON_DOFF_ENERGY, FLASK_EFFECT, ANTIDOTE, MAP_HINTS, DMG_ARMOUR_MATRIX, TERRAIN_HP_WARD } from "../data/constants";
+import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType, FishWater, HintMetric } from "../data/constants";
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
 import { playerDamage, damageTaken, strikeExchange, wieldsRanged, hasAmmo, loadedAmmoIndex, rollLoot } from "../engine/combat";
-import { consumeOne, addToCarry, freeLootStacks } from "../engine/carry";
+import { consumeOne, addToCarry, freeLootStacks, carryCap, slotCap, quiverAmmoSlots } from "../engine/carry";
+import { CONSUMABLE_KINDS, CONSUMABLE_KEYS } from "../engine/catalog";
 import { moveCost } from "../engine/move";
 import { ARMOUR_SLOTS } from "../engine/pack";
-import type { Action, Equipment, Expedition, Loadout, MapItem, RejectionReason, GameEvent, ItemStack } from "../engine/types";
+import type { Action, Equipment, Expedition, Loadout, MapItem, RejectionReason, GameEvent, ItemStack, LoadoutSlot } from "../engine/types";
 import { mapEpithet } from "../engine/town";
 import { hintLabel } from "../engine/hints";
 
@@ -34,7 +35,10 @@ export function rejectCopy(reason: RejectionReason, recipeId?: string, action?: 
     case "carry-full": return action === "fight" || action === "throw" ? "bag full — a fight needs a free bag slot for each kind of loot the monster drops" : "bag full — no free slot for that";
     case "exhausted": return "out of energy";
     case "engaged": return "you're engaged — fight or flee below";
-    case "insufficient": return "nothing to use for that (or it'd have no effect)"; // no potion/material/charge, or already at full HP/max
+    // d13: the packing screen's refusals (tap a bank chip that won't go in)
+    case "no-slot": return "bag full — every slot is taken (unpack something, or wear a bigger pack)";
+    case "already-packed": return "already packed — one of each tool is all you need";
+    case "insufficient": if (action === "pack") return "none left in the bank"; return "nothing to use for that (or it'd have no effect)"; // no potion/material/charge, or already at full HP/max
     case "no-monster": return action === "throw" ? "no monster on or next to you to throw at" : "nothing to fight here";
     case "not-poisoned": return "you're not poisoned — save the antidote";
     case "missing-station": return gate ? `can't craft — ${gate} (build the station first)` : "needs a station you haven't built";
@@ -709,3 +713,138 @@ export function kindLabel(kind: NodeType): string {
 // (1z7: the three render.ts grid drawers — render/renderGridText/renderGridHtml —
 // were used by zero shipped surfaces and are gone; the glyph maps stay.)
 export const PLAYER_CHAR = "@";
+
+// --- Packing sheet (d13): the town prep screen's carry-rule selectors -------------
+// Pure, data-shaped reads of the ENGINE's own carry math (carryCap / slotCap /
+// consumableSlots / quiverAmmoSlots) and the levers, so the packing screen can show
+// WHY the bag holds what it does without re-deriving a single rule.
+
+// Where bag capacity comes from (sums to carryCap): the backpack REPLACES the bare
+// pockets (slotCap), transport adds its bonus, panniers add theirs only on a beast.
+// Each part's size is a difference of carryCap calls, so the engine stays the authority.
+export type CapacityPart = { source: "pockets" | "backpack" | "transport" | "panniers"; defId: string | null; slots: number };
+export function carryBreakdown(equipment: Equipment): CapacityPart[] {
+  const base = slotCap(equipment.backpack);
+  const parts: CapacityPart[] = [{ source: equipment.backpack ? "backpack" : "pockets", defId: equipment.backpack, slots: base }];
+  const withTransport = carryCap({ ...equipment, panniers: null });
+  if (withTransport > base) parts.push({ source: "transport", defId: equipment.transport, slots: withTransport - base });
+  const all = carryCap(equipment);
+  if (all > withTransport) parts.push({ source: "panniers", defId: equipment.panniers, slots: all - withTransport });
+  return parts;
+}
+// The bare-pockets size a backpack replaces (for "replaces your 6 pockets" copy).
+export const POCKET_SLOTS = slotCap(null);
+
+// One packed item as the bag lists it: `slots` = the carry slots it costs (the
+// registry's units-per-slot; ammo the quiver holds costs none — `quivered` slots of
+// it ride in the quiver). Σ slots === consumableSlots(loadout).
+export type BagRow = { defId: string; qty: number; slots: number; perSlot: number; packSlot: LoadoutSlot; quivered: number };
+export function bagRows(loadout: Loadout): BagRow[] {
+  const rows: BagRow[] = loadout.equipment.tools.map((t) => ({ defId: t, qty: 1, slots: 1, perSlot: 1, packSlot: "tool" as LoadoutSlot, quivered: 0 }));
+  let quiverLeft = quiverAmmoSlots(loadout.equipment);
+  for (const key of CONSUMABLE_KEYS) {
+    const kind = CONSUMABLE_KINDS[key];
+    for (const s of loadout[key] ?? []) {
+      let slots = Math.ceil(s.qty / kind.stackCapPerSlot);
+      let quivered = 0;
+      if (key === "ammo" && quiverLeft > 0) { quivered = Math.min(quiverLeft, slots); quiverLeft -= quivered; slots -= quivered; }
+      rows.push({ defId: s.defId, qty: s.qty, slots, perSlot: kind.stackCapPerSlot, packSlot: kind.slot, quivered });
+    }
+  }
+  return rows;
+}
+// The bag's filled slots in order, one entry per slot: the defId and how many units
+// sit in that slot (flasks 3, arrows 10 — the rest 1). Length === consumableSlots.
+export function bagCells(loadout: Loadout): { defId: string; qty: number }[] {
+  const cells: { defId: string; qty: number }[] = [];
+  for (const r of bagRows(loadout)) {
+    let rest = r.qty - Math.min(r.qty, r.quivered * r.perSlot); // the quiver takes the first slots' worth
+    for (let i = 0; i < r.slots; i++) { const q = Math.min(r.perSlot, rest); cells.push({ defId: r.defId, qty: q }); rest -= q; }
+  }
+  return cells;
+}
+
+// What a gather kind yields, as the haul line says it.
+export const HAUL_NOUN: Record<GatherableNodeType, string> = { mining: "ore", wood: "wood", animal: "animals", herb: "forage" };
+const GATHER_KINDS = Object.keys(NODE_TOOL) as GatherableNodeType[];
+const hasCap = (tools: string[], cap: string) => tools.some((t) => TOOL_CAPABILITY[t] === cap);
+// The node kinds these tools can work (herbs need none, so they're always in), plus
+// fish when a rod is packed — the "expected haul" line.
+export function expectedHaul(tools: string[]): string[] {
+  const kinds = GATHER_KINDS.filter((k) => nodeToolShort(k, tools) === null).map((k) => HAUL_NOUN[k]);
+  return hasCap(tools, "fish") ? [...kinds, "fish"] : kinds;
+}
+// What a packed tool is FOR, in a couple of words: the haul it opens ("ore"), with the
+// partner tool an AND-gated kind still needs ("animals, with a knife"); else its
+// terrain/stamina effect (logisticsEffect); null for tools that need no gloss.
+export function toolGloss(defId: string, tools: string[]): string | null {
+  const cap = TOOL_CAPABILITY[defId];
+  if (cap === undefined) return null;
+  const kinds = GATHER_KINDS.filter((k) => NODE_TOOL[k] === cap || NODE_SECONDARY_TOOL[k] === cap);
+  if (kinds.length) {
+    return kinds.map((k) => {
+      const missing = [NODE_TOOL[k], NODE_SECONDARY_TOOL[k] ?? null].filter((c): c is string => c !== null && c !== cap && !hasCap(tools, c));
+      return `${HAUL_NOUN[k]}${missing.length ? `, with a ${missing.join(" + ")}` : ""}`;
+    }).join(" · ");
+  }
+  if (cap === "fish") return "fish";
+  return logisticsEffect(defId) ?? TOOL_PURPOSE[cap] ?? null;
+}
+
+// Scout reports → kit (d13): what each map hint asks of the loadout, checked against
+// the plan. ground = the gear that opens/speeds/wards that terrain (TERRAIN_GATE,
+// TRANSPORT_MULTIPLIER, TERRAIN_HP_WARD); threat = the armour class that best resists
+// that attack (or the attack that best beats that hide) off DMG_ARMOUR_MATRIX, or
+// potions for a dangerous map; bounty = the node kind's tools (NODE_TOOL /
+// NODE_SECONDARY_TOOL), or food for thin forage. "Nothing remarkable" hints, and
+// low-terrain ones, ask for nothing (null). `have` names what in the plan answers it.
+export type HintNeed = { want: string; have: string | null; ok: boolean; gear: string | null; node: GatherableNodeType | null };
+const HINT_TERRAINS: Partial<Record<HintMetric, Terrain[]>> = {
+  mountain: ["mountain"], mud: ["mud"], river: ["river"], ice: ["ice"], water: ["lake", "shallows"], spores: ["spore-thicket"],
+};
+const HINT_NODE: Partial<Record<HintMetric, GatherableNodeType>> = { mining: "mining", wood: "wood", animal: "animal", herb: "herb" };
+const argBest = <K extends string>(rec: Record<K, number>, better: (a: number, b: number) => boolean): K =>
+  (Object.keys(rec) as K[]).reduce((best, k) => (better(rec[k], rec[best]) ? k : best));
+export function hintNeed(hintId: string, loadout: Loadout): HintNeed | null {
+  const trait = MAP_HINTS.find((t) => t.id === hintId);
+  if (!trait) return null; // a fallback ("nothing unusual") hint
+  const lowRelative = "dir" in trait.test && trait.test.dir === "low";
+  const eq = loadout.equipment;
+  const held = [...eq.tools, ...(eq.transport ? [eq.transport] : [])];
+  const terrains = HINT_TERRAINS[trait.metric];
+  if (terrains) {
+    if (lowRelative) return null; // "open country" / "little water" / "clear air" — nothing to bring
+    const gear = [...new Set(terrains.flatMap((t) => { const g = terrainGear(t); return [...g.opens, ...g.speeds, ...(TERRAIN_HP_WARD[t] ?? [])]; }))];
+    if (!gear.length) return null;
+    const have = gear.filter((g) => held.includes(g));
+    return { want: orList(gear.map(name)), have: have.length ? have.map(name).join(" + ") : null, ok: have.length > 0, gear: have[0] ?? gear[0]!, node: null };
+  }
+  const node = HINT_NODE[trait.metric];
+  if (node) {
+    const caps = [NODE_TOOL[node], NODE_SECONDARY_TOOL[node] ?? null].filter((c): c is string => c !== null);
+    if (!caps.length) return null; // forage: bare hands
+    const have = eq.tools.filter((t) => caps.includes(TOOL_CAPABILITY[t] ?? ""));
+    const ok = nodeToolShort(node, eq.tools) === null;
+    return { want: caps.map((c) => name(c)).join(" + "), have: ok ? have.map(name).join(" + ") : null, ok, gear: null, node };
+  }
+  if (trait.metric === "food") {
+    const units = loadout.food.reduce((n, s) => n + s.qty, 0);
+    return { want: "food from home", have: units ? `${units} food` : null, ok: units > 0, gear: loadout.food[0]?.defId ?? "ration", node: null };
+  }
+  if (trait.metric === "melee" || trait.metric === "ranged" || trait.metric === "magic") {
+    const best = argBest(DMG_ARMOUR_MATRIX[trait.metric], (a, b) => a < b);
+    const ok = armourTypesWorn(eq).includes(best);
+    return { want: `${best} armour`, have: ok ? `${best} armour` : null, ok, gear: null, node: null };
+  }
+  if (trait.metric === "plate") {
+    const dmg = (Object.keys(DMG_ARMOUR_MATRIX) as DmgType[]).reduce((b, d) => (DMG_ARMOUR_MATRIX[d].plate > DMG_ARMOUR_MATRIX[b].plate ? d : b));
+    const ok = playerAttackType(loadout) === dmg;
+    return { want: `a ${dmg} weapon`, have: ok && eq.weapon ? name(eq.weapon) : null, ok, gear: eq.weapon, node: null };
+  }
+  if (trait.metric === "monster" || trait.metric === "maxTier") {
+    if (lowRelative) return null; // "quiet country"
+    const units = loadout.potions.reduce((n, s) => n + s.qty, 0);
+    return { want: "potions", have: units ? `${units} potion${units > 1 ? "s" : ""}` : null, ok: units > 0, gear: loadout.potions[0]?.defId ?? "potion", node: null };
+  }
+  return null;
+}
