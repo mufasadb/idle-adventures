@@ -99,13 +99,13 @@ export function townSceneView(state: GameState, o: SceneOpts): string {
       <nav class="ts-tabs">${tab("maps", "Maps")}${tab("bank", "Bank")}${tab("recipes", "Recipes")}${tab("research", "Research")}${tab("stable", "Stable")}${tab("log", "Log")}${chosen ? `<button class="ts-tab go" data-open-pack title="pack for ${chosenLabel} and embark">Pack ▶</button>` : ""}</nav>
       <span class="ts-aux"><button class="link" data-town-mode="menus" title="the plain menus, without the square">≡ menus</button><button class="link" data-newgame>new game</button></span>
     </div>`;
-  const wide = scene.panel === "recipes"; // 675: the crafting tree gets a wider panel on big screens
-  const panel = scene.panel ? `<aside class="ts-panel${scene.hero.x > 0.5 ? " left" : ""}${wide ? " wide" : ""}" data-ts-panel="${scene.panel}">
+  // o9vr: the workshop (recipes) is its own full-screen crafting tree, not a side panel
+  const panel = scene.panel === "recipes" ? recipeSection(state) : scene.panel ? `<aside class="ts-panel${scene.hero.x > 0.5 ? " left" : ""}" data-ts-panel="${scene.panel}">
       <div class="ts-panel-head"><b>${PANEL_TITLE[scene.panel]}</b><button class="ts-close" data-panel-close aria-label="close">✕</button></div>
       <div class="ts-panel-body">${panelBody(state, scene.panel, o)}</div>
     </aside>` : "";
   const hint = chosen ? `<div class="ts-hint">${chosenLabel} chosen — the packing cloth is by the gate ▶</div>` : "";
-  return `<div class="town-scene${scene.panel ? ` has-panel${scene.hero.x > 0.5 ? " panel-left" : ""}${wide ? " wide-panel" : ""}` : ""}">
+  return `<div class="town-scene${scene.panel ? ` has-panel${scene.hero.x > 0.5 ? " panel-left" : ""}` : ""}">
     <div class="ts-vp" data-ts-vp>
       <div class="ts-world" data-ts-world>
         <img class="ts-ground" src="${TOWN_GROUND}" alt="" draggable="false">
