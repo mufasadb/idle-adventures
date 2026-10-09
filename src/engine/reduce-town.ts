@@ -3,11 +3,13 @@ import { expeditionGrid, rollBiome } from "./grid";
 import { emptyLoadout } from "./loadout";
 import { energyCapOf } from "./carry";
 import { subtractStacks } from "./bank";
-import { rand } from "./rng";
+import { rand, weightedPick } from "./rng";
 import { craft as applyRecipe } from "./craft";
 import { packItem, reserveLoadout } from "./pack";
 import { localMap } from "./town";
-import { MAX_ENERGY, PLAYER_BASE_HP, INKS, RECIPE, STUDY_COST } from "../data/constants";
+import { MAX_ENERGY, PLAYER_BASE_HP, INKS, RECIPE, STUDY_COST, RESEARCH_INKS, RESEARCH_SEARCHES_PER_INK } from "../data/constants";
+import { isRecipeKnown, unheldInputs } from "./knowledge";
+import { researchCandidates, freeResearchLeft } from "./research";
 import { mapHintIds } from "./town";
 import { rejected } from "./reduce-shared";
 import { fieldCraftAction } from "./reduce-expedition";
@@ -130,6 +132,9 @@ export function craftAction(
   state: GameState,
   recipeId: string,
 ): { state: GameState; events: GameEvent[] } {
+  // 675 (D104): with the recipe fog on, an unknown recipe can't be crafted in town OR
+  // the field — checked first so a rejection never leaks anything about the recipe.
+  if (RECIPE[recipeId] && !isRecipeKnown(state, recipeId)) return rejected(state, "craft", "recipe-unknown");
   // ke3.4: one craft Action, routed by phase. On expedition → field crafting.
   if (state.phase === "expedition") return fieldCraftAction(state, recipeId);
   if (state.phase !== "town") return rejected(state, "craft", "not-in-town");
@@ -166,5 +171,56 @@ export function packAction(
   return {
     state: { ...state, loadout: result.loadout },
     events: [{ type: "packed", slot, defId: itemId }],
+  };
+}
+
+// The town research table (675, D104): a word → ONE matching recipe you don't know yet,
+// within reach of your progress tier, revealed with its DIRECT inputs only. EVERY search
+// costs one (user 2026-10-09 — hit or miss: learning the vocabulary pays off): the free
+// search first (one per town visit), else a bought charge. A miss — nothing matches, OR
+// only beyond-tier recipes do — reads the same either way (no spoilers). With no search
+// available the table refuses ('no-research') and nothing is spent.
+export function researchAction(state: GameState, query: string): { state: GameState; events: GameEvent[] } {
+  if (state.phase !== "town") return rejected(state, "research", "not-in-town");
+  const free = freeResearchLeft(state) > 0;
+  const charges = state.researchCharges ?? 0;
+  if (!free && charges <= 0) return rejected(state, "research", "no-research");
+  const runs = state.runs ?? 0;
+  const spent: GameState = free
+    ? { ...state, freeResearchRun: runs, freeResearchUsed: (state.freeResearchRun === runs ? (state.freeResearchUsed ?? 0) : 0) + 1 }
+    : { ...state, researchCharges: charges - 1 };
+  const chargesLeft = free ? charges : charges - 1;
+  const { candidates, inReachKnown } = researchCandidates(state, query);
+  if (!candidates.length) {
+    return { state: spent, events: [{ type: "research-miss", query, free, charges: chargesLeft, ...(inReachKnown > 0 ? { alreadyKnown: true } : {}) }] };
+  }
+  // Seeded pick over the SORTED candidates; the counter (reveals so far) moves the roll
+  // on so repeating a word walks through its matches rather than stalling.
+  const revealed = state.revealed ?? [];
+  const roll = rand(state.seed, "research", revealed.length, candidates.join(","));
+  const recipeId = weightedPick(Object.fromEntries(candidates.map((id) => [id, 1])), candidates, roll);
+  const newHeard = unheldInputs(state, recipeId).map((i) => i.defId).filter((d) => !(state.heard ?? []).includes(d));
+  return {
+    state: { ...spent, revealed: [...revealed, recipeId], heard: [...(state.heard ?? []), ...newHeard] },
+    events: [{
+      type: "research-hit",
+      recipeId,
+      inputs: RECIPE[recipeId]!.inputs.map((i) => ({ ...i })),
+      free,
+      charges: chargesLeft,
+    }],
+  };
+}
+
+// Spend one research ink (RESEARCH_INKS) at the table for RESEARCH_SEARCHES_PER_INK searches.
+export function buyResearch(state: GameState, inkId: string): { state: GameState; events: GameEvent[] } {
+  if (state.phase !== "town") return rejected(state, "buy-research", "not-in-town");
+  if (!RESEARCH_INKS.includes(inkId)) return rejected(state, "buy-research", "insufficient");
+  const bank = subtractStacks(state.bank, [{ defId: inkId, qty: 1 }]);
+  if (bank === null) return rejected(state, "buy-research", "insufficient");
+  const charges = (state.researchCharges ?? 0) + RESEARCH_SEARCHES_PER_INK;
+  return {
+    state: { ...state, bank, researchCharges: charges },
+    events: [{ type: "research-bought", inkId, charges }],
   };
 }

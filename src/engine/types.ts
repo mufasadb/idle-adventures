@@ -96,6 +96,16 @@ export type GameState = {
   runs?: number; // completed expeditions — advances the candidate-map offer so town shows FRESH maps each visit (not the same 3 forever). Optional/absent = 0 (old saves, terse test states); reads guard with `?? 0`.
   maps?: MapItem[]; // held maps (xzx): pocketed from the offer, consumed on embark. Optional/absent = [] (old saves, terse test states); reads guard with `?? []`.
   stations?: StationId[]; // built home stations (ke3): non-bank permanent infra that gates deep recipes. Optional/absent = [] (old saves, pre-ke3 states); reads guard with `?? []`. Written by crafting a recipe with `buildsStation` (ke3.2).
+  // --- Crafting fog + research table (675, D104) ---
+  recipeFog?: boolean; // the recipe book is fogged: only KNOWN recipes (starter / crafted / revealed / "next") can be crafted. Optional/absent = false (old saves, terse test states, the balance sim + harness). newGame(seed, { recipeFog: true }) or enableRecipeFog turns it on.
+  seen?: string[]; // defIds EVER held in bank/loadout/carry (675): drives "next" knowledge. Maintained by reduce's knowledge hook ONLY while recipeFog is on. Optional/absent = []; `?? []`.
+  crafted?: string[]; // recipe ids ever crafted (675). Maintained while recipeFog is on. Optional/absent = []; `?? []`.
+  revealed?: string[]; // recipe ids revealed by the research table (675). Optional/absent = []; `?? []`.
+  heard?: string[]; // input defIds named by a research reveal that you hadn't held yet (675) — the web shows them as greyed named nodes. Append-only; filter by `seen` for "still only heard of". Optional/absent = []; `?? []`.
+  maxTier?: number; // highest map tier embarked on (675): research's progress tier. Maintained while recipeFog is on. Optional/absent = 1; `?? 1`.
+  researchCharges?: number; // bought research searches (RESEARCH_SEARCHES_PER_INK per ink, 675). Optional/absent = 0; `?? 0`.
+  freeResearchRun?: number; // the `runs` value at which the free search(es) were last spent (675); free searches refresh when `runs` differs. Optional/absent = never spent; read as-is.
+  freeResearchUsed?: number; // free searches spent at `freeResearchRun` (675) — lets RESEARCH_FREE_PER_TRIP exceed 1. Optional/absent = 0; `?? 0`.
 };
 
 // Loadout slots an action can target when packing.
@@ -144,6 +154,8 @@ export type Action =
   | { type: "set-auto-eat-food"; defId: string | null } // designate the food that auto-eats waste-free (mco); null clears it (auto-eat off). Supersedes toggle-auto-eat.
   | { type: "drop"; itemId: string }
   | { type: "drop-map"; mapSeed: string } // discard a carried map mid-run (8ec) — frees its slot; no re-pickup
+  | { type: "research"; query: string } // town research table (675): a word → reveal ONE matching unknown recipe. Every search (hit or miss) spends the free search, else a charge
+  | { type: "buy-research"; inkId: string } // spend 1 research ink (RESEARCH_INKS) for RESEARCH_SEARCHES_PER_INK searches (675)
   | { type: "return" };
 
 // Closed set of every reason a reducer can reject an action (D30). Split out so
@@ -184,6 +196,8 @@ export type RejectionReason =
   | "not-food" // set-auto-eat-food with a defId that isn't a food (mco)
   | "no-water" // fish: no water tile on or beside you (si7.6.2)
   | "fished-out" // fish: every water tile on or beside you was already fished this run (si7.6.2)
+  | "recipe-unknown" // craft: recipe fog is on and you don't know this recipe yet (675)
+  | "no-research" // research: no free search left this visit and no bought charges (675)
   | "already-resolved"; // survey of a POI whose detail is already in focus (54f)
 
 // Events are a render byproduct emitted by reduce. Named GameEvent (not Event)
@@ -252,6 +266,9 @@ export type GameEvent =
   | { type: "map-dropped"; at: { x: number; y: number }; mapSeed: string; biomeId: BiomeId; carried: boolean; tier: number; source?: "fished" } // source (si7.6.2): absent = a humanoid kill // humanoid kill minted a map (8ec); carried=false → pack full, left behind
   | { type: "map-discarded"; mapSeed: string } // drop-map (8ec): carried map thrown away mid-run
   | { type: "packed"; slot: LoadoutSlot; defId: string }
+  | { type: "research-hit"; recipeId: string; inputs: ItemStack[]; free: boolean; charges: number } // 675: the table revealed this recipe (its DIRECT inputs only); free = spent the free search, charges = bought searches left
+  | { type: "research-miss"; query: string; free: boolean; charges: number; alreadyKnown?: boolean } // 675: nothing new (nothing matches, OR beyond your tier — same line, no spoiler); alreadyKnown = every in-reach match is one you know. Still COSTS the search (user 2026-10-09): free/charges as on a hit
+  | { type: "research-bought"; inkId: string; charges: number } // 675: spent an ink at the table; charges = bought searches now held
   | { type: "run-ended"; reason: string; flavor?: string } // flavor (xwp): a cosmetic return beat, present only on voluntary "returned"; absent on defeat
   | {
       type: "action-rejected";

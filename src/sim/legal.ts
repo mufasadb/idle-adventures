@@ -5,7 +5,7 @@
 // future terrain-gating gear is reflected for free).
 import type { Action, GameState, RejectionReason } from "../engine/types";
 import { reduce } from "../engine/reduce";
-import { RECIPE, INKS } from "../data/constants";
+import { RECIPE, INKS, RESEARCH_INKS } from "../data/constants";
 import { slotOf, isGear } from "../engine/catalog";
 import { wornPieces } from "../engine/pack";
 import { localMap } from "../engine/town";
@@ -50,6 +50,9 @@ export function townActions(state: GameState): Action[] {
   const inkIds = state.bank.filter((s) => s.defId in INKS).map((s) => s.defId);
   for (const m of state.maps ?? []) for (const inkId of inkIds) candidates.push({ type: "ink", mapSeed: m.mapSeed, inkId });
   for (const m of state.maps ?? []) candidates.push({ type: "study", mapSeed: m.mapSeed }); // D95
+  // buy-research (675): each research ink you hold. `research` itself takes free text,
+  // so it can't be enumerated here — surfaces prompt for the word (researchStatus).
+  for (const inkId of RESEARCH_INKS) candidates.push({ type: "buy-research", inkId });
   return candidates.filter((a) => accepts(state, a));
 }
 

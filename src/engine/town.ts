@@ -13,8 +13,11 @@ import { familyHints, hintLabel, rollMapHints } from "./hints";
 // Modest, functional starter kit: enough to run a real first expedition. You
 // start with NO backpack (bare BASE_CARRY_SLOTS) — the small-backpack is your
 // first craftable upgrade. Everything else comes from crafting the haul.
-export function newGame(seed: string): GameState {
-  return {
+// 675 (D104): `recipeFog` fogs the recipe book — real players' new games (web + the
+// console) pass it; the balance sim / harness / tests don't, so their numbers never move.
+// A fogged game starts having "seen" only its starter bank and knowing STARTER_RECIPES.
+export function newGame(seed: string, opts: { recipeFog?: boolean } = {}): GameState {
+  const base: GameState = {
     seed,
     phase: "town",
     bank: STARTER_BANK.map((s) => ({ ...s })), // clone the lever so run-state never mutates it (e96)
@@ -22,6 +25,7 @@ export function newGame(seed: string): GameState {
     expedition: null,
     runs: 0,
   };
+  return opts.recipeFog ? { ...base, recipeFog: true, seen: base.bank.map((s) => s.defId), crafted: [] } : base;
 }
 
 // Map hints (3iq, D95): a held map's hint ids in reveal order — rolled at mint and

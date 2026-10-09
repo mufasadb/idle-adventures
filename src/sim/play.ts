@@ -79,11 +79,14 @@ export function route(state: GameState, waypoints: { x: number; y: number }[]): 
   return { state: cur, events, steps, gathered, halt: null, remaining: [], misses };
 }
 
+// opts.recipeFog (675): the console surfaces (playtest/cli) start fogged like a real
+// player; tests and the harness keep the default (fog off — every recipe known).
 export function play(
   seed: string,
   actions: DriverAction[],
+  opts: { recipeFog?: boolean } = {},
 ): { state: GameState; events: GameEvent[] } {
-  let state = newGame(seed);
+  let state = newGame(seed, opts);
   const events: GameEvent[] = [];
   for (const action of actions) {
     if (action.type === "route") {

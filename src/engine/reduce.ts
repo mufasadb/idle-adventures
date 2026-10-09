@@ -1,5 +1,6 @@
 import type { GameState, Action, GameEvent } from "./types";
-import { embark, inkMap, studyMap, craftAction, packAction } from "./reduce-town";
+import { embark, inkMap, studyMap, craftAction, packAction, researchAction, buyResearch } from "./reduce-town";
+import { trackKnowledge } from "./knowledge";
 import { move, gather, fish, drop, dropMap, eat, setAutoEatFood, survey, returnHome, don, doff, toggleAutoQuaff, toggleAutoGather } from "./reduce-expedition";
 import { fight, flee, quaff, useItem, enhance, throwFlask, toggleAutoFinish } from "./reduce-combat";
 
@@ -7,7 +8,17 @@ import { fight, flee, quaff, useItem, enhance, throwFlask, toggleAutoFinish } fr
 // reduce-expedition / reduce-combat / reduce-shared); this file is the single
 // exhaustive dispatch switch — the drift guarantee lives HERE (assertNever), not
 // in file colocation. Adding a new Action variant without a case is a compile error.
+// 675 (D104): every result passes through the knowledge hook (trackKnowledge) — the ONE
+// choke point that folds newly-held items into `seen` while the recipe fog is on (a
+// no-op with fog off or on a rejection, so those states stay byte-identical).
 export function reduce(
+  state: GameState,
+  action: Action,
+): { state: GameState; events: GameEvent[] } {
+  return trackKnowledge(state, dispatch(state, action));
+}
+
+function dispatch(
   state: GameState,
   action: Action,
 ): { state: GameState; events: GameEvent[] } {
@@ -60,6 +71,10 @@ export function reduce(
       return craftAction(state, action.recipeId);
     case "pack":
       return packAction(state, action.slot, action.itemId);
+    case "research":
+      return researchAction(state, action.query);
+    case "buy-research":
+      return buyResearch(state, action.inkId);
     case "return":
       return returnHome(state);
     default:

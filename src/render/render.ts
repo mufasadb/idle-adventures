@@ -1,4 +1,4 @@
-import { LOOT_TABLE, CATEGORY_LOOT_TABLE, MAP_SCROLL_ID, WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE, QUAFF_ENERGY, DON_DOFF_ENERGY, FLASK_EFFECT, ANTIDOTE, MAP_HINTS, DMG_ARMOUR_MATRIX, TERRAIN_HP_WARD } from "../data/constants";
+import { RESEARCH_INKS, RESEARCH_SEARCHES_PER_INK, LOOT_TABLE, CATEGORY_LOOT_TABLE, MAP_SCROLL_ID, WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE, QUAFF_ENERGY, DON_DOFF_ENERGY, FLASK_EFFECT, ANTIDOTE, MAP_HINTS, DMG_ARMOUR_MATRIX, TERRAIN_HP_WARD } from "../data/constants";
 import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType, FishWater, HintMetric } from "../data/constants";
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
@@ -47,6 +47,8 @@ export function rejectCopy(reason: RejectionReason, recipeId?: string, action?: 
     case "fully-read": return "you've read everything this map has to tell";
     case "fished-out": return "you've fished all the water within reach — move along the bank (or out on a raft)";
     case "tool-too-weak": return "your tool is too weak for this material's tier";
+    case "recipe-unknown": return "you don't know that recipe yet — hold all its ingredients, or ask at the research table in town";
+    case "no-research": return `no searches left — come back from a trip for a free one, or spend an ink (${RESEARCH_INKS.join(" / ")}) for ${RESEARCH_SEARCHES_PER_INK} more`;
     case "not-field-craftable": return "that recipe is town-only — it can't be made in the field";
     case "not-near-terrain": {
       const terr = recipeId ? recipeTerrainGate(recipeId) : null;
@@ -111,6 +113,9 @@ export function formatEvent(e: GameEvent, name: (defId: string) => string): stri
       : `🗺️ a T${e.tier} ${name(e.biomeId)} map dropped — pack full, left behind`;
     case "map-discarded": return `🗺️ discarded a carried map`;
     case "packed": return `packed ${name(e.defId)} → ${e.slot}`;
+    case "research-hit": return `📖 research: someone in town knows how to make ${name(RECIPE[e.recipeId]?.output.defId ?? e.recipeId)} — ${e.inputs.map((i) => `${i.qty}× ${name(i.defId)}`).join(" + ")} (recipe ${e.recipeId})${e.free ? " · free search spent" : ` · ${e.charges} search${e.charges === 1 ? "" : "es"} left`}`;
+    case "research-miss": return `${e.alreadyKnown ? `📖 research: "${e.query}" — you already know everything the town can tell you about that` : `📖 research: "${e.query}" — Nobody in town has heard of that.`}${e.free ? " · free search spent" : ` · ${e.charges} search${e.charges === 1 ? "" : "es"} left`}`;
+    case "research-bought": return `🖋 spent 1× ${name(e.inkId)} at the research table · ${e.charges} search${e.charges === 1 ? "" : "es"} banked`;
     case "run-ended": return e.flavor ? `${e.flavor}\n— run ended (${e.reason}) —` : `— run ended (${e.reason}) —`;
     case "action-rejected": return `✗ ${e.action} — ${rejectCopy(e.reason, undefined, e.action)}`;
     case "engaged": return e.ranged

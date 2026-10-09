@@ -36,7 +36,7 @@ const params = new URLSearchParams(location.search);
 const seed = params.get("seed") ?? "play";
 const SAVE_KEY = `idle-adv:${seed}`;
 
-let state: GameState = load(SAVE_KEY) ?? newGame(seed);
+let state: GameState = load(SAVE_KEY) ?? newGame(seed, { recipeFog: true }); // 675: new games are fogged; old saves stay unfogged until the web pass decides on enableRecipeFog
 let log: LogEntry[] = loadLog(SAVE_KEY);
 // eot: routing is the PLAYER's job. `route` is the planned list of waypoints (the
 // player's tile is the implicit head); each leg between consecutive points is drawn
@@ -88,7 +88,7 @@ function recordCues(events: GameEvent[], misses: GatherMiss[]): void {
   if (defs.length) fx.flash = { defs, t0 };
 }
 
-function newRun(): void { state = newGame(seed); log = [{ t: "note", text: "· new game" }]; route = []; draw(); }
+function newRun(): void { state = newGame(seed, { recipeFog: true }); log = [{ t: "note", text: "· new game" }]; route = []; draw(); }
 
 // Replay each stored pack through reduce; items eaten/lost/sold-off last run just
 // reject (insufficient / wrong-slot for a dead defId) and are counted as skipped.

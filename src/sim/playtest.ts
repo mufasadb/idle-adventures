@@ -40,6 +40,9 @@ import { costToReach } from "../engine/reach";
 import { foodEnergyOf } from "../engine/food";
 import { wieldsRanged } from "../engine/combat";
 import type { Action, GameState } from "../engine/types";
+import { isRecipeKnown, recipeKnowledge } from "../engine/knowledge";
+import { researchStatus } from "../engine/research";
+import { RESEARCH_SEARCHES_PER_INK } from "../data/constants";
 
 // Optional `--reach` flag: an OPT-IN query that prints the gear-adjusted energy
 // cost to reach each node (one Dijkstra covers the whole map) — run it only when
@@ -52,7 +55,7 @@ if (!seed) {
   process.exit(1);
 }
 const actions: Action[] = actionsArg ? (JSON.parse(actionsArg) as Action[]) : [];
-const { state, events } = play(seed, actions);
+const { state, events } = play(seed, actions, { recipeFog: true }); // 675: a real player's game starts fogged
 
 // --- events this batch (human-readable; fights include the lesson) ---
 // exm: the console shares the ONE formatEvent switch (render.ts); its `name` fn is the
@@ -134,13 +137,17 @@ function printTown(st: GameState): void {
     const known = revealedHints(m), sealed = mapHintIds(m).length - known.length;
     console.log(`      hints: ${known.length ? known.map((h) => `"${h}"`).join(", ") : "(none read yet)"}${sealed ? `  ·  ${sealed} sealed — study mapSeed="${m.mapSeed}" (costs ${STUDY_COST.map((c) => `${c.qty} ${c.defId}`).join(" + ")})` : ""}`);
   }
+  const knowledge = new Map(recipeKnowledge(st).map((k) => [k.recipeId, k])); // 675
   const affordable = new Set(
     legalActions(st).filter((a) => a.type === "craft").map((a) => (a as { recipeId: string }).recipeId),
   );
   console.log("\nRecipe book (every craftable output + its ingredients; where to FIND ingredients is for you to discover):");
   // Same rows as the web town craftlist (townRecipeIds: no field-only recipes, no
   // rebuild row for an already-built station).
+  // 675 (D104): with the recipe fog on, only KNOWN/REVEALED recipes print (filter only —
+  // every printed row keeps its shape). fog off → isRecipeKnown is always true.
   const ids = townRecipeIds(st.stations ?? [])
+    .filter((id) => isRecipeKnown(st, id))
     .sort((a, b) => (affordable.has(a) ? 0 : 1) - (affordable.has(b) ? 0 : 1));
   // ke3.3: outputScale recipes report their REAL yield at the current knife tier.
   const townTools = [...st.bank.map((s) => s.defId), ...st.loadout.equipment.tools];
@@ -157,14 +164,28 @@ function printTown(st: GameState): void {
     // The reason comes from the reducer (whyNot — ciq), never re-derived here.
     const why = affordable.has(id) ? null : whyNot(st, { type: "craft", recipeId: id });
     const gateNote = why === "missing-station" || why === "missing-tool" ? `  ·  [${recipeGateHint(id)}]` : "";
-    console.log(`  ${affordable.has(id) ? "✓" : "·"} ${recipeOutputQty(r, townTools)}× ${r.output.defId}  ←  ${ing}  ·  craft recipeId="${id}"${hint ? `  ·  ${hint}` : ""}${gateNote}`);
+    // 675: a research-revealed recipe whose ingredients you haven't all held yet says so (append-only suffix).
+    const kn = knowledge.get(id);
+    const revealNote = kn?.status === "revealed" ? `  ·  [revealed at the research table — not yet held: ${kn.inputs.filter((i) => i.status !== "seen").map((i) => i.defId).join(", ")}]` : "";
+    console.log(`  ${affordable.has(id) ? "✓" : "·"} ${recipeOutputQty(r, townTools)}× ${r.output.defId}  ←  ${ing}  ·  craft recipeId="${id}"${hint ? `  ·  ${hint}` : ""}${gateNote}${revealNote}`);
   }
+  // 675: how much of the book is still fogged (appended line; absent with fog off).
+  const hiddenCount = [...knowledge.values()].filter((k) => k.status === "hidden").length;
+  if (hiddenCount) console.log(`  + ${hiddenCount} recipes not yet discovered — hold all of a recipe's ingredients to learn it, or try the research table`);
   console.log("\nTip: tools each take one bag slot — you can pack several (pick + axe + knife + …).");
   // Playtest 2026-09-30 (append-only): field-only recipes, which the town can't craft.
   console.log("\nField recipes (craft these OUT on an expedition, not in town):");
-  for (const id of fieldRecipeIds()) {
+  for (const id of fieldRecipeIds().filter((id) => isRecipeKnown(st, id))) { // 675: fogged → known/revealed only
     const r = RECIPE[id]!;
     console.log(`  · ${r.output.qty}× ${r.output.defId}  ←  ${r.inputs.map((i) => `${i.qty}× ${i.defId}`).join(" + ")}  ·  craft recipeId="${id}"  ·  ${fieldRecipeNote(id)}`);
+  }
+  // 675 (D104): the research table (appended block). `research` takes a free-text word,
+  // so it never appears in LEGAL ACTIONS — this line is how a console player finds it.
+  if (st.recipeFog) {
+    const rs = researchStatus(st);
+    console.log("\nResearch table (name a thing you'd like to make — one matching recipe you don't know yet is revealed, ingredients only; every search costs one, hit or miss):");
+    console.log(`  searches: ${rs.freeAvailable ? `${rs.freeLeft} free this visit` : "free search used this visit (another after your next trip)"} · ${rs.charges} bought · inks held: ${rs.inks.map((i) => `${i.qty}× ${i.inkId}`).join(", ") || "none"}`);
+    console.log(`  → {"type":"research","query":"<word>"}  e.g. "bag", "boat", "armour"${rs.inks.length ? `  ·  {"type":"buy-research","inkId":"${rs.inks[0]!.inkId}"} spends 1 ink for ${RESEARCH_SEARCHES_PER_INK} searches` : ""}`);
   }
 }
 

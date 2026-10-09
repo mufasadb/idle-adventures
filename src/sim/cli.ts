@@ -22,7 +22,7 @@ if (!seed) {
   process.exit(1);
 }
 const actions: DriverAction[] = actionsArg ? (JSON.parse(actionsArg) as DriverAction[]) : [];
-const { state, events } = play(seed, actions);
+const { state, events } = play(seed, actions, { recipeFog: true }); // 675: a real player's game is fogged
 
 console.log("=== events ===");
 for (const e of events) console.log(JSON.stringify(e));

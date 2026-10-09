@@ -9,6 +9,7 @@ export * from "./spec";
 export * from "./combat";
 export * from "./crafting";
 export * from "./hints";
+export * from "./research"; // 675 (D104): crafting fog + research table
 
 // --- Map & perception (filled in M1) ---
 // D84: a 35×35 SQUARE you drill into the CENTER (was a 20×60 portrait strip with a
