@@ -3,6 +3,8 @@
 // localStorage touch is try/caught — storage disabled is non-fatal.
 import type { GameState, ItemStack, Loadout, LoadoutSlot } from "../engine/types";
 import type { LogEntry } from "./log";
+import type { ResearchLogEntry } from "./craft-tree";
+import { enableRecipeFog } from "../engine/knowledge";
 
 export function save(key: string, state: GameState, log: LogEntry[]): void {
   try {
@@ -52,4 +54,23 @@ export function saveLastPlan(key: string, lo: Loadout): void {
 }
 export function loadLastPlan(key: string): PackStep[] {
   try { const raw = localStorage.getItem(`${key}:lastPlan`); return raw ? (JSON.parse(raw) as PackStep[]) : []; } catch { return []; }
+}
+
+// --- crafting fog (675) ----------------------------------------------------------
+// A save from before the fog (recipeFog undefined) is switched on ONCE at load:
+// enableRecipeFog seeds `seen` from everything held and `crafted` from what you own,
+// so nothing you hold — or can make from what you hold — goes missing. Returns null
+// when the save is already fogged (or explicitly unfogged) — nothing to do.
+export const FOG_NOTICE = "📖 The workshop's recipe book has been put away — research and discovery reveal it now.";
+export function migrateFog(state: GameState): GameState | null {
+  return state.recipeFog === undefined ? enableRecipeFog(state) : null;
+}
+
+// The research table's search history (word → result), newest first, beside the save.
+export const RESEARCH_HISTORY_MAX = 8;
+export function saveResearchLog(key: string, h: ResearchLogEntry[]): void {
+  try { localStorage.setItem(`${key}:research`, JSON.stringify(h.slice(0, RESEARCH_HISTORY_MAX))); } catch { /* storage disabled */ }
+}
+export function loadResearchLog(key: string): ResearchLogEntry[] {
+  try { const raw = localStorage.getItem(`${key}:research`); return raw ? (JSON.parse(raw) as ResearchLogEntry[]) : []; } catch { return []; }
 }

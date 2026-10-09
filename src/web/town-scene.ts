@@ -15,6 +15,7 @@ import type { StationId } from "../data/constants";
 import { TOWN_ART, TOWN_GROUND, HERO_FRAMES } from "./assets";
 import { scenePlacements, spotAt, spotBox, walkMs, cameraX, clampCam, HERO_HOME, HERO_H, GATE_OUTSIDE, GROUND } from "./town-layout";
 import type { Pt, Spot, TownPanel } from "./town-layout";
+import type { ResearchLogEntry } from "./craft-tree";
 import { mapSelectSection, bankSection, recipeSection, stableSection, researchSection, ic, prepValid } from "./town-view";
 
 export type { TownPanel } from "./town-layout";
@@ -78,7 +79,7 @@ function heroStyle(p: Pt): string {
   return `left:${pct(p.x - w / 2)};top:${pct(p.y - HERO_H)};width:${pct(w)};height:${pct(HERO_H)};z-index:${Math.round(p.y * 1000) + 1}`;
 }
 
-export type SceneOpts = { prep: string | null; logHtml: string; lastLine: string };
+export type SceneOpts = { prep: string | null; logHtml: string; lastLine: string; research?: { history: ResearchLogEntry[]; last: ResearchLogEntry | null } };
 
 export function townSceneView(state: GameState, o: SceneOpts): string {
   const spots = scenePlacements((state.stations ?? []) as StationId[]);
@@ -95,15 +96,16 @@ export function townSceneView(state: GameState, o: SceneOpts): string {
   const chosenLabel = chosen ? (chosen === local.mapSeed ? "the local map" : "an earned map") : null;
   const bar = `<div class="ts-bar">
       <h1>Town</h1>
-      <nav class="ts-tabs">${tab("maps", "Maps")}${tab("bank", "Bank")}${tab("recipes", "Recipes")}${tab("stable", "Stable")}${tab("log", "Log")}${chosen ? `<button class="ts-tab go" data-open-pack title="pack for ${chosenLabel} and embark">Pack ▶</button>` : ""}</nav>
+      <nav class="ts-tabs">${tab("maps", "Maps")}${tab("bank", "Bank")}${tab("recipes", "Recipes")}${tab("research", "Research")}${tab("stable", "Stable")}${tab("log", "Log")}${chosen ? `<button class="ts-tab go" data-open-pack title="pack for ${chosenLabel} and embark">Pack ▶</button>` : ""}</nav>
       <span class="ts-aux"><button class="link" data-town-mode="menus" title="the plain menus, without the square">≡ menus</button><button class="link" data-newgame>new game</button></span>
     </div>`;
-  const panel = scene.panel ? `<aside class="ts-panel${scene.hero.x > 0.5 ? " left" : ""}" data-ts-panel="${scene.panel}">
+  const wide = scene.panel === "recipes"; // 675: the crafting tree gets a wider panel on big screens
+  const panel = scene.panel ? `<aside class="ts-panel${scene.hero.x > 0.5 ? " left" : ""}${wide ? " wide" : ""}" data-ts-panel="${scene.panel}">
       <div class="ts-panel-head"><b>${PANEL_TITLE[scene.panel]}</b><button class="ts-close" data-panel-close aria-label="close">✕</button></div>
-      <div class="ts-panel-body">${panelBody(state, scene.panel, o.logHtml)}</div>
+      <div class="ts-panel-body">${panelBody(state, scene.panel, o)}</div>
     </aside>` : "";
   const hint = chosen ? `<div class="ts-hint">${chosenLabel} chosen — the packing cloth is by the gate ▶</div>` : "";
-  return `<div class="town-scene${scene.panel ? ` has-panel${scene.hero.x > 0.5 ? " panel-left" : ""}` : ""}">
+  return `<div class="town-scene${scene.panel ? ` has-panel${scene.hero.x > 0.5 ? " panel-left" : ""}${wide ? " wide-panel" : ""}` : ""}">
     <div class="ts-vp" data-ts-vp>
       <div class="ts-world" data-ts-world>
         <img class="ts-ground" src="${TOWN_GROUND}" alt="" draggable="false">
@@ -118,14 +120,14 @@ export function townSceneView(state: GameState, o: SceneOpts): string {
   ${scene.panel ? "" : `<div class="ts-below"><p class="muted small">Tap a building and you walk over to it · drag to look around the square.</p>${o.logHtml}</div>`}`;
 }
 
-function panelBody(state: GameState, p: TownPanel, logHtml: string): string {
+function panelBody(state: GameState, p: TownPanel, o: SceneOpts): string {
   switch (p) {
     case "maps": return mapSelectSection(state, localMap(state.seed, state.runs ?? 0), state.maps ?? []);
     case "bank": return bankSection(state);
     case "recipes": return recipeSection(state);
     case "stable": return stableSection(state);
-    case "research": return researchSection();
-    case "log": return logHtml;
+    case "research": return researchSection(state, o.research?.history ?? [], o.research?.last ?? null);
+    case "log": return o.logHtml;
   }
 }
 

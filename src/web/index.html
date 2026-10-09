@@ -572,6 +572,73 @@
       }
       @media (max-height: 430px) { .ts-tab { padding: 4px 7px; font-size: 13px; } .ts-bar h1 { font-size: 1rem; } }
       @media (prefers-reduced-motion: reduce) { .ts-hero { transition: none; } .ts-spot img, .ts-label { transition: none; } }
+      /* ===== 675 (D104): the crafting tree (workshop) + the research table ===== */
+      .ts-panel.wide { width: min(760px, 58%); }
+      .town-scene.has-panel.wide-panel:not(.panel-left) .ts-bar { right: min(760px, 58%); }
+      .town-scene.panel-left.wide-panel .ts-bar { left: min(760px, 58%); }
+      @media (max-aspect-ratio: 4/5) { .ts-panel.wide { width: auto; } }
+      .cols.town.show-research .tsec[data-tsec="research"] { display: block; }
+      @media (min-width: 1000px) { .cols.town .tsec[data-tsec="recipes"] { flex: 1 1 100%; } .cols.town .tsec[data-tsec="research"] { flex: 0 1 420px; } }
+      .ct-tree { position: relative; display: flex; flex-direction: column; gap: 2px; }
+      svg.ct-links { position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; overflow: visible; }
+      svg.ct-links path { fill: none; stroke: #c9a55a; stroke-opacity: 0.2; stroke-width: 1.25; }
+      svg.ct-links path.on { stroke-opacity: 0.95; stroke-width: 2.5; }
+      .ct-tier { position: relative; z-index: 1; border-top: 1px dashed #3a3226; padding-top: 3px; }
+      .ct-tier:last-child { border-bottom: 1px solid var(--gold-dim); padding-bottom: 4px; }
+      .ct-tlabel { display: flex; align-items: baseline; gap: 0.6rem; font: 700 13px/1.2 "Alegreya SC", "Cinzel", Georgia, serif; color: var(--gold); }
+      .ct-tier.empty .ct-tlabel b { color: var(--gold-dim); }
+      .ct-undisc { font: italic 400 12.5px "Crimson Pro", Georgia, serif; color: var(--muted); cursor: help; }
+      .ct-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 8px; padding: 5px 0 4px; }
+      .ct-card { position: relative; flex: 1 1 140px; max-width: 220px; min-width: 132px; box-sizing: border-box; background: #18171b; border: 1px solid #3d3628; border-radius: 5px; padding: 4px 6px 5px; display: flex; flex-direction: column; gap: 3px; }
+      .ct-card.can { border-color: var(--gold); box-shadow: 0 0 0 1px #c9a55a40, 0 0 8px #c9a55a22; }
+      .ct-card.dim > * { opacity: 0.62; }
+      .ct-card.researched { border-style: dashed; border-color: #5a7a9a; }
+      .ct-head { display: flex; align-items: center; gap: 5px; min-width: 0; }
+      .ct-nm { font-size: 14.5px; line-height: 1.12; min-width: 0; }
+      .ct-nm b { font-weight: 600; }
+      .ct-q { color: var(--muted); font-size: 13px; }
+      .ct-nm .have { font-size: 12.5px; white-space: nowrap; }
+      .ct-mark { position: absolute; top: -8px; right: 6px; font: 600 10px/1.3 "Crimson Pro", Georgia, serif; letter-spacing: 0.04em; text-transform: uppercase; color: #b8d4ee; background: #18222c; border: 1px solid #5a7a9a; border-radius: 2px; padding: 0 4px; }
+      .ct-hint { font-size: 12px; line-height: 1.15; color: var(--muted); }
+      .ct-path { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; border-top: 1px dotted #33302a; padding-top: 3px; }
+      .ct-chips { display: flex; flex-wrap: wrap; gap: 3px; flex: 1 1 auto; min-width: 0; }
+      .ct-chip { display: inline-flex; align-items: center; gap: 2px; font-size: 12.5px; line-height: 1; background: #222127; border: 1px solid #3c3a42; border-radius: 3px; padding: 1px 5px 1px 1px; white-space: nowrap; }
+      .ct-chip.heard { color: #9a9284; border-style: dashed; font-style: italic; }
+      .ct-chip.heard .pk-ic { filter: grayscale(1) brightness(0.7); }
+      .ct-chip.unknown { color: var(--muted); border-style: dashed; }
+      .ct-gate { font-size: 12px; color: #ff9a5e; }
+      .ct-note { font-size: 11.5px; color: var(--muted); flex-basis: 100%; }
+      .ct-card .craftbtn { margin-left: auto; padding: 0.1rem 0.65rem; }
+      .ct-card .fxnote { margin: 0; }
+      .ct-field { margin-bottom: 0.4rem; }
+      .ct-field > .ct-undisc { align-self: center; }
+      @keyframes ct-flash { 0%, 30%, 60% { box-shadow: 0 0 0 3px var(--gold), 0 0 18px var(--gold); background: #3a3018; } 15%, 45%, 100% { box-shadow: 0 0 0 1px var(--gold-dim); } }
+      .ct-card.ct-flash { animation: ct-flash 2400ms ease-out both; }
+      .ct-card.ct-flash > * { opacity: 1; }
+      .ct-sub { margin: -0.2rem 0 0.3rem; }
+      .rs-ledger { margin-top: 0.6rem; background: linear-gradient(135deg, var(--parch), var(--parch-2)); color: var(--ink); border: 2px solid #4a3a26; border-radius: 4px; box-shadow: inset 0 0 18px rgba(60, 40, 15, 0.45); padding: 8px 12px 10px; display: flex; flex-direction: column; gap: 6px; }
+      .rs-title { font: 700 21px/1.1 "Alegreya SC", "Cinzel", Georgia, serif; color: var(--ink-head); border-bottom: 1px solid var(--ink-rule); padding-bottom: 3px; }
+      .rs-hint { font-size: 14px; font-style: italic; color: var(--ink-dim); }
+      .rs-form { display: flex; gap: 6px; }
+      .rs-form input { flex: 1; min-width: 0; font: 400 17px "Crimson Pro", Georgia, serif; color: var(--ink); background: #f3e8cc; border: 1px solid #8f7a52; border-radius: 3px; padding: 4px 8px; }
+      .rs-form input:focus { outline: 2px solid var(--ink-head); outline-offset: 0; }
+      .rs-form button { flex: none; }
+      .rs-status { font-size: 14px; color: var(--ok-ink); font-weight: 600; }
+      .rs-status.none { color: var(--miss-ink); }
+      .rs-inks { display: flex; flex-wrap: wrap; gap: 5px; }
+      button.rs-ink { background: #3a2c1a; color: #f0dfb8; border-color: #6b5432; font-size: 14px; }
+      .rs-result { border-top: 1px solid var(--ink-rule); padding-top: 6px; font-size: 15px; }
+      .rs-result.miss { color: var(--miss-ink); }
+      .rs-result .ct-row { padding: 6px 0 2px; }
+      .rs-result .ct-card { color: var(--text); flex-basis: 240px; }
+      .rs-q { font-weight: 600; color: var(--ink-head); }
+      .rs-ledger button.link { color: #2c4f80; font-weight: 600; font-size: 15px; padding: 0; text-decoration: underline; }
+      .rs-hist { border-top: 1px solid var(--ink-rule); padding-top: 4px; font-size: 14px; }
+      .rs-hlab { font: 700 12px "Alegreya SC", "Cinzel", Georgia, serif; color: var(--ink-head); }
+      .rs-hrow { padding: 1px 0; border-bottom: 1px dotted var(--ink-rule); }
+      .rs-hrow .muted { color: var(--ink-dim); }
+      .rs-hrow button.link { font-size: 14px; }
+      @media (prefers-reduced-motion: reduce) { .ct-card.ct-flash { animation: none; outline: 3px solid var(--gold); } }
     </style>
   </head>
   <body>

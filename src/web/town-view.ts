@@ -4,19 +4,22 @@ import { localMap, mapEpithet, mapHintIds } from "../engine/town";
 import { hintLabel, hintFamily } from "../engine/hints";
 import { legalActions, whyNot } from "../sim/legal";
 import { slotOf } from "../engine/catalog";
-import { recipeOutputQty } from "../engine/craft";
 import { freeLootStacks, slotCap, energyCapOf } from "../engine/carry";
 import { EQUIP_SLOTS } from "../engine/pack";
 import type { EquipSlot } from "../engine/pack";
 import { heldFoodEnergy, foodEnergyOf } from "../engine/food";
 import { wieldsRanged, hasAmmo } from "../engine/combat";
-import { RECIPE, MAX_ENERGY, TENT_FOOD_MULTIPLIER, INKS, QUIVER_AMMO_CAP, STUDY_COST, STACK_CAP, FLASK_STACK_CAP, ARROW_STACK_CAP } from "../data/constants";
+import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, INKS, QUIVER_AMMO_CAP, STUDY_COST, STACK_CAP, FLASK_STACK_CAP, ARROW_STACK_CAP } from "../data/constants";
 import type { BiomeId } from "../data/constants";
-import { weaponHint, logisticsEffect, enhancementHint, describe, recipeGateHint, name, heldMapTitle, townRecipeIds, rejectCopy, fieldRecipeIds, fieldRecipeNote, carryBreakdown, bagRows, bagCells, POCKET_SLOTS, hintNeed, expectedHaul, toolGloss, battleItemEffect } from "../render/render";
+import { logisticsEffect, describe, name, heldMapTitle, rejectCopy, carryBreakdown, bagRows, bagCells, POCKET_SLOTS, hintNeed, expectedHaul, toolGloss, battleItemEffect } from "../render/render";
 import type { GameState, Action, MapItem, Loadout } from "../engine/types";
 import { planActions } from "./persist";
 import { packedCounts } from "./feedback";
-import { iconStyle, nodeIconId } from "./assets";
+import { nodeIconId } from "./assets";
+import { ic } from "./icons";
+import { workshopSection, researchSection } from "./craft-tree";
+import type { ResearchLogEntry } from "./craft-tree";
+export { ic };
 
 // Map hints (D95, Muse brief C option 1 — chips): one chip per hint, "G: boggy ground";
 // a sealed hint shows only its family. `studied` = how many of `ids` are revealed.
@@ -65,9 +68,9 @@ function heldMapSuffix(m: MapItem): string {
   return ` <span class="muted"${tip}>of ${label}</span>`;
 }
 
-export type TownTab = "main" | "bank" | "recipes";
+export type TownTab = "main" | "bank" | "recipes" | "research";
 // d13: view-only state for the packing screen — which worn slot's swap menu is open.
-export type PackUi = { wornOpen?: string | null };
+export type PackUi = { wornOpen?: string | null; research?: { history: ResearchLogEntry[]; last: ResearchLogEntry | null } };
 
 /** Whether `prep` still names a map you can embark on (the free local one or a held one). */
 export function prepValid(state: GameState, prep: string | null): boolean {
@@ -85,13 +88,14 @@ export function townView(state: GameState, prep: string | null, hasLastPlan: boo
   // kml: on phones the three town panels are TABS (the recipe book alone is a long
   // scroll); on wide screens they sit side by side and the tab bar hides (CSS).
   const tabBtn = (t: TownTab, label: string) => `<button class="tab${tab === t ? " on" : ""}" data-town-tab="${t}">${label}</button>`;
-  const nav = `<nav class="tabs town-tabs">${tabBtn("main", "Maps")}${tabBtn("bank", "Bank")}${tabBtn("recipes", "Recipes")}</nav>`;
+  const nav = `<nav class="tabs town-tabs">${tabBtn("main", "Maps")}${tabBtn("bank", "Bank")}${tabBtn("recipes", "Recipes")}${tabBtn("research", "Research")}</nav>`;
   return `${header}
     ${nav}
     <div class="cols town show-${tab}">
       <div class="tsec" data-tsec="main">${mapSelectSection(state, local, heldMaps)}</div>
       <div class="tsec" data-tsec="bank">${bankSection(state)}</div>
       <div class="tsec" data-tsec="recipes">${recipeSection(state)}</div>
+      <div class="tsec" data-tsec="research">${researchSection(state, ui.research?.history ?? [], ui.research?.last ?? null)}</div>
     </div>`;
 }
 // STEP 1 (zpm.3): the town overview — pick where to go. The FREE local map reads
@@ -135,15 +139,6 @@ export function mapSelectSection(state: GameState, local: ReturnType<typeof loca
 // slots), and a footer with energy + warnings + Embark. Every number is read off the
 // engine (carryCap/freeLootStacks via render's carryBreakdown/bagRows/bagCells), and
 // what's tappable off legalActions/whyNot — the web decides nothing.
-const ICON_PX = 24; // the atlases' CSS frame size; ic() zooms to the size asked
-
-export function ic(defId: string | null, px: number): string {
-  const st = defId ? iconStyle(defId) : null;
-  return st
-    ? `<span class="pk-ic" style="${st};zoom:${(px / ICON_PX).toFixed(3)}" aria-hidden="true"></span>`
-    : `<span class="pk-ic none" style="width:${px}px;height:${px}px" aria-hidden="true">${defId ? name(defId).charAt(0) : "·"}</span>`;
-}
-
 type LocalMap = ReturnType<typeof localMap>;
 
 function packScreen(state: GameState, mapSeed: string, local: LocalMap, heldMaps: MapItem[], hasLastPlan: boolean, tab: "main" | "recipes", ui: PackUi): string {
@@ -361,69 +356,9 @@ export function bankSection(state: GameState): string {
     </section>`;
 }
 
+// 675: the recipe book is now the crafting tree (craft-tree.ts) — fogged, in tier rows.
 export function recipeSection(state: GameState): string {
-  const legal = legalActions(state);
-  const craftable = legal.filter((a): a is Extract<Action, { type: "craft" }> => a.type === "craft");
-  return `
-    <section>
-      <h2>Recipe book <span class="muted small">one line per output · each ingredient path listed below it</span></h2>
-      <div class="craftlist">
-        ${(() => {
-          const affordable = new Set(craftable.map((a) => a.recipeId));
-          // group recipe ids by the defId they output, preserving catalog order
-          const byOutput = new Map<string, string[]>();
-          for (const id of townRecipeIds(state.stations ?? [])) {
-            const out = RECIPE[id]!.output.defId;
-            (byOutput.get(out) ?? byOutput.set(out, []).get(out)!).push(id);
-          }
-          // outputs with any affordable path first, else stable insertion order
-          const outputs = [...byOutput.keys()].sort((a, b) => {
-            const av = byOutput.get(a)!.some((id) => affordable.has(id)) ? 0 : 1;
-            const bv = byOutput.get(b)!.some((id) => affordable.has(id)) ? 0 : 1;
-            return av - bv;
-          });
-          // ke3.3: town tool pool (bank ∪ equipped) → outputScale recipes show
-          // their REAL yield at your current knife tier, not the base qty.
-          const townTools = [...state.bank.map((s) => s.defId), ...state.loadout.equipment.tools];
-          return outputs.map((out) => {
-            const ids = byOutput.get(out)!;
-            const qty = recipeOutputQty(RECIPE[ids[0]!]!, townTools);
-            const anyCan = ids.some((id) => affordable.has(id));
-            const paths = ids.map((id) => {
-              const r = RECIPE[id]!;
-              const ing = r.inputs.map((i) => `${i.qty}× ${name(i.defId)}`).join(" + ");
-              const can = affordable.has(id);
-              // gate-legibility (playtest 2026-07-09 #1): a locked row named its
-              // ingredients but not its STATION/TOOL gate — players only inferred
-              // "I lack mats." If the reducer rejects on a hard gate, name it (ciq:
-              // the reason comes from whyNot, never re-derived from the catalog).
-              const why = can ? null : whyNot(state, { type: "craft", recipeId: id });
-              const gate = why === "missing-station" || why === "missing-tool" ? recipeGateHint(id) : null;
-              return `<div class="craftpath${can ? "" : " locked"}" data-recipe="${id}">← ${ing}${
-                can ? ` <button class="craftbtn" data-craft="${id}">Craft</button>` : gate ? ` <span class="warn small">🔒 ${gate}</span>` : ""
-              }</div>`;
-            }).join("");
-            const hint = weaponHint(out) ?? logisticsEffect(out) ?? enhancementHint(out); // 57l weapon hint; wzk range/carry; 7ao coating effect (disjoint sets)
-            // mki: how many you already hold, so a craft visibly moves the number.
-            const have = state.bank.filter((b) => b.defId === out).reduce((n, b) => n + b.qty, 0);
-            return `<div class="craftgroup${anyCan ? "" : " locked"}">
-              <div class="craftname" title="${describe(out)}">${qty}× ${name(out)}${hint ? ` <span class="muted small">· ${hint}</span>` : ""}${have ? ` <span class="have small">· have ${have}</span>` : ""}</div>
-              ${paths}
-            </div>`;
-          }).join("");
-        })()}
-      </div>
-      <h2>Field recipes <span class="muted small">made out on an expedition, not in town</span></h2>
-      <div class="craftlist">
-        ${fieldRecipeIds().map((id) => {
-          const r = RECIPE[id]!;
-          return `<div class="craftgroup locked">
-            <div class="craftname" title="${describe(r.output.defId)}">${r.output.qty}× ${name(r.output.defId)}</div>
-            <div class="craftpath locked">← ${r.inputs.map((i) => `${i.qty}× ${name(i.defId)}`).join(" + ")} <span class="muted small">· ${fieldRecipeNote(id)}</span></div>
-          </div>`;
-        }).join("")}
-      </div>
-    </section>`;
+  return workshopSection(state);
 }
 
 // 0m4: the stable — your animals and carts (owned transport + panniers), and whether
@@ -448,6 +383,4 @@ export function stableSection(state: GameState): string {
   </section>`;
 }
 
-export function researchSection(): string {
-  return `<section><h2>The research table</h2><p>The research table — coming soon.</p></section>`;
-}
+export { researchSection };

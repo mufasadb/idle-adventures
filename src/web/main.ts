@@ -17,7 +17,9 @@ import { name, rejectCopy } from "../render/render";
 import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot } from "../engine/types";
 import type { LogEntry } from "./log";
 import { logView } from "./log";
-import { save, load, loadLog, saveLastPlan, loadLastPlan } from "./persist";
+import { save, load, loadLog, saveLastPlan, loadLastPlan, migrateFog, FOG_NOTICE, loadResearchLog, saveResearchLog, RESEARCH_HISTORY_MAX } from "./persist";
+import { paintTreeLinks, flashRecipe } from "./craft-tree";
+import type { ResearchLogEntry } from "./craft-tree";
 import { townView, prepValid } from "./town-view";
 import { townSceneView, mountScene, walkOut, walkIn, goToSpot, resetScene, scene } from "./town-scene";
 import { scenePlacements } from "./town-layout";
@@ -36,8 +38,13 @@ const params = new URLSearchParams(location.search);
 const seed = params.get("seed") ?? "play";
 const SAVE_KEY = `idle-adv:${seed}`;
 
-let state: GameState = load(SAVE_KEY) ?? newGame(seed, { recipeFog: true }); // 675: new games are fogged; old saves stay unfogged until the web pass decides on enableRecipeFog
+let state: GameState = load(SAVE_KEY) ?? newGame(seed, { recipeFog: true }); // 675: new games are fogged
 let log: LogEntry[] = loadLog(SAVE_KEY);
+// 675: a save from before the fog gets it switched on once (nothing held is stranded — persist.migrateFog).
+{ const fogged = migrateFog(state); if (fogged) { state = fogged; log.unshift({ t: "note", text: FOG_NOTICE }); save(SAVE_KEY, state, log); } }
+// 675: the research table's history (persisted beside the save) + this session's latest result.
+let researchLog: ResearchLogEntry[] = loadResearchLog(SAVE_KEY);
+let researchLast: ResearchLogEntry | null = null;
 // eot: routing is the PLAYER's job. `route` is the planned list of waypoints (the
 // player's tile is the implicit head); each leg between consecutive points is drawn
 // as a naive STRAIGHT line (lineTiles), never an energy-optimal path. Clicks build,
@@ -88,7 +95,7 @@ function recordCues(events: GameEvent[], misses: GatherMiss[]): void {
   if (defs.length) fx.flash = { defs, t0 };
 }
 
-function newRun(): void { state = newGame(seed, { recipeFog: true }); log = [{ t: "note", text: "· new game" }]; route = []; draw(); }
+function newRun(): void { state = newGame(seed, { recipeFog: true }); log = [{ t: "note", text: "· new game" }]; route = []; researchLog = []; researchLast = null; saveResearchLog(SAVE_KEY, researchLog); draw(); }
 
 // Replay each stored pack through reduce; items eaten/lost/sold-off last run just
 // reject (insufficient / wrong-slot for a dead defId) and are counted as skipped.
@@ -105,7 +112,7 @@ function repackLast(): void {
 }
 
 // --- action plumbing: one funnel so every interaction goes through reduce ----
-function apply(action: Action): void {
+function apply(action: Action): GameEvent[] {
   const prevLoadout = state.loadout; // embark consumes this plan — stash it for repack
   const { state: next, events } = reduce(state, action);
   if (action.type === "embark" && !events.some((e) => e.type === "action-rejected")) saveLastPlan(SAVE_KEY, prevLoadout);
@@ -139,6 +146,24 @@ function apply(action: Action): void {
     }
   }
   trimAndDraw();
+  return events;
+}
+// 675: ask the research table. Hit or miss, the result shows in the panel and joins the history.
+function research(query: string): void {
+  const q = query.trim();
+  if (!q) return;
+  const ev = reduce(state, { type: "research", query: q }).events; // peek: is it accepted? (apply logs + draws either way)
+  const hit = ev.find((e) => e.type === "research-hit");
+  const miss = ev.find((e) => e.type === "research-miss");
+  const entry: ResearchLogEntry | null = hit?.type === "research-hit" ? { q, hit: hit.recipeId } : miss?.type === "research-miss" ? { q, ...(miss.alreadyKnown ? { known: true } : {}) } : null;
+  if (entry) { researchLast = entry; researchLog = [entry, ...researchLog].slice(0, RESEARCH_HISTORY_MAX); saveResearchLog(SAVE_KEY, researchLog); }
+  apply({ type: "research", query: q });
+}
+// 675: "find it in the workshop →" — open the tree and flash the recipe's card.
+function findRecipe(recipeId: string): void {
+  if (townMode === "scene") scene.panel = "recipes"; else townTab = "recipes";
+  draw();
+  flashRecipe(app, recipeId);
 }
 function note(line: string): void { log.unshift({ t: "note", text: line }); trimAndDraw(); }
 function trimAndDraw(): void { log = log.slice(0, 16); draw(); }
@@ -216,8 +241,8 @@ function draw(): void {
   app.innerHTML = state.phase !== "town"
     ? expeditionView(state, route, { drawerOpen, tab: drawerTab, logHtml: logView(log) })
     : inScene
-      ? townSceneView(state, { prep, logHtml: logView(log), lastLine: log[0] ? formatLogEntry(log[0]).replace(/<br>/g, " ") : "" })
-      : `${townView(state, prep, hasLast, townTab, { wornOpen })}${logView(log)}`;
+      ? townSceneView(state, { prep, logHtml: logView(log), lastLine: log[0] ? formatLogEntry(log[0]).replace(/<br>/g, " ") : "", research: { history: researchLog, last: researchLast } })
+      : `${townView(state, prep, hasLast, townTab, { wornOpen, research: { history: researchLog, last: researchLast } })}${logView(log)}`;
   wire(); save(SAVE_KEY, state, log);
   if (inScene) {
     mountScene(app, arriveAt, state);
@@ -232,6 +257,7 @@ function draw(): void {
     if (p !== camPos) { centerOnPlayer(); camPos = p; } else applyCam();
   } else camPos = null;
   paintFx(app, fx, now()); // after the camera: tile cues read live tile positions
+  if (state.phase === "town") paintTreeLinks(app); // 675: the crafting tree's connector lines (after paintFx — a craft note shifts the layout)
 }
 
 // --- map camera (kml) ----------------------------------------------------------
@@ -304,7 +330,7 @@ document.addEventListener("keydown", (ev) => {
   ev.preventDefault();
   panBy(v[0] * step, v[1] * step);
 });
-addEventListener("resize", () => applyCam());
+addEventListener("resize", () => { applyCam(); if (state.phase === "town") paintTreeLinks(app); });
 
 // --- wiring: attach handlers after each render -------------------------------
 function wire(): void {
@@ -328,6 +354,10 @@ function wire(): void {
     packOpen = townMode === "scene" ? false : packOpen; if (townMode === "menus") prep = null;
     draw();
   });
+  // 675: the research table — search (Enter submits the form), spend an ink, find a revealed recipe
+  app.querySelectorAll<HTMLFormElement>("[data-research-form]").forEach((f) => f.onsubmit = (ev) => { ev.preventDefault(); research(f.querySelector<HTMLInputElement>("[data-research-q]")?.value ?? ""); });
+  app.querySelectorAll<HTMLElement>("[data-buy-research]").forEach((el) => el.onclick = () => apply({ type: "buy-research", inkId: el.dataset.buyResearch! }));
+  app.querySelectorAll<HTMLElement>("[data-find-recipe]").forEach((el) => el.onclick = () => findRecipe(el.dataset.findRecipe!));
   app.querySelectorAll<HTMLElement>("[data-craft]").forEach((el) => el.onclick = () => apply({ type: "craft", recipeId: el.dataset.craft! }));
   app.querySelectorAll<HTMLElement>("[data-pack]").forEach((el) => el.onclick = () => apply({ type: "pack", slot: el.dataset.slot as LoadoutSlot, itemId: el.dataset.pack! }));
   app.querySelectorAll<HTMLElement>("[data-unpack]").forEach((el) => el.onclick = () => unpack(el.dataset.unpack!, el.dataset.unpackSlot as LoadoutSlot | undefined));
@@ -391,9 +421,7 @@ function arriveAt(s: Spot): void {
   else return;
   draw();
   if (a.kind === "plot" && !(state.stations ?? []).includes(a.station)) {
-    const row = app.querySelector<HTMLElement>(`.ts-panel [data-recipe="${a.station}"]`);
-    row?.scrollIntoView({ block: "center" });
-    row?.classList.add("fx-flash");
+    flashRecipe(app, a.station); // 675: scroll the tree to the station's card and flash it (absent while still undiscovered)
   }
 }
 // Embark: in the square the gate opens and the hero walks out first (a refused embark
