@@ -18,7 +18,11 @@ import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot } from "../en
 import type { LogEntry } from "./log";
 import { logView } from "./log";
 import { save, load, loadLog, saveLastPlan, loadLastPlan } from "./persist";
-import { townView } from "./town-view";
+import { townView, prepValid } from "./town-view";
+import { townSceneView, mountScene, walkOut, walkIn, goToSpot, resetScene, scene } from "./town-scene";
+import { scenePlacements } from "./town-layout";
+import type { Spot } from "./town-layout";
+import { formatLogEntry } from "./log";
 import type { TownTab } from "./town-view";
 import { expeditionView, currentDerived } from "./expedition-view";
 import type { DrawerTab } from "./expedition-view";
@@ -54,6 +58,14 @@ let wasEngaged = false;
 let townTab: TownTab = "main";
 // d13: the packing screen's open worn-slot swap menu (view-only).
 let wornOpen: string | null = null;
+// 0m4: the town is a walkable square (the scene) by default; "menus" is the plain tabbed
+// town, kept as a fallback so every function stays reachable without the scene.
+type TownMode = "scene" | "menus";
+let townMode: TownMode = (() => { try { return localStorage.getItem("ia-town") === "menus" ? "menus" : "scene"; } catch { return "scene"; } })();
+// In the scene, `prep` is the CHOSEN map and the Pack sheet is a separate overlay —
+// closing it keeps the choice (the cloth by the gate reopens it).
+let packOpen = false;
+let lastPhase: GameState["phase"] | null = null;
 // beh/rx5/mki: transient action feedback (tile cues, pack glow, craft notes) — painted
 // over each render by paintFx; purely presentational, never saved.
 const fx = emptyFx();
@@ -186,15 +198,33 @@ function walkRoute(wps: Pos[]): void {
 
 // --- rendering ---------------------------------------------------------------
 function draw(): void {
-  if (state.phase !== "town") prep = null; // leaving town drops the prep selection (zpm.3)
+  const cameHome = lastPhase !== null && lastPhase !== "town" && state.phase === "town";
+  if (lastPhase === "town" && state.phase !== "town") resetScene();
+  lastPhase = state.phase;
+  if (state.phase !== "town") { prep = null; packOpen = false; } // leaving town drops the prep selection (zpm.3)
+  if (packOpen && !prepValid(state, prep)) packOpen = false;
   const engaged = !!state.expedition?.combat;
   if (engaged && !wasEngaged) { drawerOpen = false; drawerTab = "here"; } // eor: a fight just started — its sheet sits over the map, so get the drawer out of the way
   wasEngaged = engaged;
   document.body.classList.toggle("in-expedition", state.phase !== "town");
-  app.innerHTML = state.phase === "town"
-    ? `${townView(state, prep, loadLastPlan(SAVE_KEY).length > 0, townTab, { wornOpen })}${logView(log)}`
-    : expeditionView(state, route, { drawerOpen, tab: drawerTab, logHtml: logView(log) });
+  const inScene = state.phase === "town" && townMode === "scene" && !packOpen;
+  document.body.classList.toggle("in-town-scene", inScene);
+  // keep the open panel's scroll across re-renders (a craft/pack re-renders everything)
+  const panelEl = app.querySelector<HTMLElement>(".ts-panel");
+  const keepScroll = panelEl && panelEl.dataset.tsPanel === scene.panel ? panelEl.querySelector<HTMLElement>(".ts-panel-body")?.scrollTop ?? 0 : 0;
+  const hasLast = loadLastPlan(SAVE_KEY).length > 0;
+  app.innerHTML = state.phase !== "town"
+    ? expeditionView(state, route, { drawerOpen, tab: drawerTab, logHtml: logView(log) })
+    : inScene
+      ? townSceneView(state, { prep, logHtml: logView(log), lastLine: log[0] ? formatLogEntry(log[0]).replace(/<br>/g, " ") : "" })
+      : `${townView(state, prep, hasLast, townTab, { wornOpen })}${logView(log)}`;
   wire(); save(SAVE_KEY, state, log);
+  if (inScene) {
+    mountScene(app, arriveAt, state);
+    const body = app.querySelector<HTMLElement>(".ts-panel-body");
+    if (body && keepScroll) body.scrollTop = keepScroll;
+    if (cameHome) void walkIn().then(() => { if (state.phase === "town") { scene.panel = "log"; draw(); } }); // the run's summary is in the log
+  }
   // c67 camera-follow, now a real camera (kml): re-centre on the player when their
   // POSITION changes; otherwise keep wherever the player panned to.
   if (state.phase !== "town" && state.expedition) {
@@ -285,9 +315,19 @@ function wire(): void {
   const handle = app.querySelector<HTMLElement>("[data-drawer-toggle]"); if (handle) handle.onclick = () => { drawerOpen = !drawerOpen; draw(); };
   app.querySelectorAll<HTMLElement>("[data-tab]").forEach((el) => el.onclick = () => { drawerTab = el.dataset.tab as DrawerTab; drawerOpen = true; draw(); });
   app.querySelectorAll<HTMLElement>("[data-open-tab]").forEach((el) => el.onclick = () => { drawerTab = el.dataset.openTab as DrawerTab; drawerOpen = true; draw(); });
-  app.querySelectorAll<HTMLElement>("[data-embark]").forEach((el) => el.onclick = () => apply({ type: "embark", mapSeed: el.dataset.embark! }));
-  app.querySelectorAll<HTMLElement>("[data-prepare]").forEach((el) => el.onclick = () => { prep = el.dataset.prepare!; route = []; draw(); }); // zpm.3: enter the prep screen for this map
-  app.querySelectorAll<HTMLElement>("[data-back]").forEach((el) => el.onclick = () => { prep = null; wornOpen = null; draw(); }); // zpm.3: back to the map overview
+  app.querySelectorAll<HTMLElement>("[data-embark]").forEach((el) => el.onclick = () => embark(el.dataset.embark!));
+  app.querySelectorAll<HTMLElement>("[data-prepare]").forEach((el) => el.onclick = () => prepare(el.dataset.prepare!)); // zpm.3: enter the prep screen for this map
+  app.querySelectorAll<HTMLElement>("[data-back]").forEach((el) => el.onclick = () => { if (townMode === "scene") packOpen = false; else prep = null; wornOpen = null; draw(); }); // zpm.3: back to the map overview / the square
+  // 0m4: the square — tab strip, panel close, the Pack shortcut, the menus/scene switch
+  app.querySelectorAll<HTMLElement>("[data-panel]").forEach((el) => el.onclick = () => { scene.panel = scene.panel === el.dataset.panel ? null : el.dataset.panel as typeof scene.panel; draw(); });
+  app.querySelectorAll<HTMLElement>("[data-panel-close]").forEach((el) => el.onclick = () => { scene.panel = null; scene.labelOn = null; draw(); });
+  app.querySelectorAll<HTMLElement>("[data-open-pack]").forEach((el) => el.onclick = () => { scene.panel = null; packOpen = true; draw(); });
+  app.querySelectorAll<HTMLElement>("[data-town-mode]").forEach((el) => el.onclick = () => {
+    townMode = el.dataset.townMode === "menus" ? "menus" : "scene";
+    try { localStorage.setItem("ia-town", townMode); } catch { /* private mode: not remembered */ }
+    packOpen = townMode === "scene" ? false : packOpen; if (townMode === "menus") prep = null;
+    draw();
+  });
   app.querySelectorAll<HTMLElement>("[data-craft]").forEach((el) => el.onclick = () => apply({ type: "craft", recipeId: el.dataset.craft! }));
   app.querySelectorAll<HTMLElement>("[data-pack]").forEach((el) => el.onclick = () => apply({ type: "pack", slot: el.dataset.slot as LoadoutSlot, itemId: el.dataset.pack! }));
   app.querySelectorAll<HTMLElement>("[data-unpack]").forEach((el) => el.onclick = () => unpack(el.dataset.unpack!, el.dataset.unpackSlot as LoadoutSlot | undefined));
@@ -331,6 +371,40 @@ function wire(): void {
     el.onclick = handler;
     el.oncontextmenu = handler; // right-click works too
   });
+}
+
+// --- the town square (0m4) ---------------------------------------------------------
+const spotById = (id: string): Spot => scenePlacements(state.stations ?? []).find((s) => s.id === id)!;
+// Pick a map → in the square the hero walks to the packing cloth, then the Pack sheet opens.
+function prepare(mapSeed: string): void {
+  prep = mapSeed; route = [];
+  if (townMode !== "scene") { draw(); return; }
+  scene.panel = null; draw();
+  void goToSpot(spotById("cloth"));
+}
+// The hero arrived at a station: open what it's for.
+function arriveAt(s: Spot): void {
+  const a = s.action;
+  if (a.kind === "panel") scene.panel = a.panel;
+  else if (a.kind === "gate") { if (prepValid(state, prep)) { scene.panel = null; packOpen = true; } else scene.panel = "maps"; }
+  else if (a.kind === "plot") scene.panel = "recipes";
+  else return;
+  draw();
+  if (a.kind === "plot" && !(state.stations ?? []).includes(a.station)) {
+    const row = app.querySelector<HTMLElement>(`.ts-panel [data-recipe="${a.station}"]`);
+    row?.scrollIntoView({ block: "center" });
+    row?.classList.add("fx-flash");
+  }
+}
+// Embark: in the square the gate opens and the hero walks out first (a refused embark
+// skips the show and just logs why).
+function embark(mapSeed: string): void {
+  const action: Action = { type: "embark", mapSeed };
+  if (townMode !== "scene" || reduce(state, action).events.some((e) => e.type === "action-rejected")) { apply(action); return; }
+  packOpen = false; scene.panel = null; scene.labelOn = null;
+  scene.hero = { ...spotById("cloth").stand };
+  draw();
+  void walkOut().then(() => apply(action));
 }
 
 // A tile click builds the plan (eot): clear on self, TRUNCATE if the tile is already

@@ -141,3 +141,44 @@ export function nodeIconId(kind: string, material?: string): string {
 export function iconStyle(defId: string): string | null {
   return frameStyle("icon", defId);
 }
+
+// 0m4: the walkable town's layers (one .webp each, prepared in the assets repo by
+// py/town_prep.py). Keys match town-layout.ts's ART table + the hero's frames.
+import townGround from "./assets/town/ground.webp";
+import townBank from "./assets/town/bank.webp";
+import townBoard from "./assets/town/board.webp";
+import townWorkshop from "./assets/town/workshop.webp";
+import townResearch from "./assets/town/research.webp";
+import townStable from "./assets/town/stable.webp";
+import townGateClosed from "./assets/town/gate-closed.webp";
+import townGateOpen from "./assets/town/gate-open.webp";
+import townCloth from "./assets/town/cloth.webp";
+import townCart from "./assets/town/cart.webp";
+import townPlot from "./assets/town/plot.webp";
+import townSmokehouse from "./assets/town/smokehouse.webp";
+import townAlchemist from "./assets/town/alchemist.webp";
+import townAnvil from "./assets/town/anvil.webp";
+import townStill from "./assets/town/still.webp";
+import heroStandL from "./assets/town/hero/stand-left.webp";
+import heroStandR from "./assets/town/hero/stand-right.webp";
+import heroW1L from "./assets/town/hero/walk1-left.webp";
+import heroW2L from "./assets/town/hero/walk2-left.webp";
+import heroW3L from "./assets/town/hero/walk3-left.webp";
+import heroW4L from "./assets/town/hero/walk4-left.webp";
+import heroW1R from "./assets/town/hero/walk1-right.webp";
+import heroW2R from "./assets/town/hero/walk2-right.webp";
+import heroW3R from "./assets/town/hero/walk3-right.webp";
+import heroW4R from "./assets/town/hero/walk4-right.webp";
+import type { ArtKey } from "./town-layout";
+
+export const TOWN_GROUND: string = townGround;
+export const TOWN_ART: Record<ArtKey, string> = {
+  bank: townBank, board: townBoard, workshop: townWorkshop, research: townResearch, stable: townStable,
+  "gate-closed": townGateClosed, "gate-open": townGateOpen, cloth: townCloth, cart: townCart, plot: townPlot,
+  smokehouse: townSmokehouse, alchemist: townAlchemist, anvil: townAnvil, still: townStill,
+};
+/** The hero's frames by facing: [stand, walk1..walk4]. */
+export const HERO_FRAMES: Record<"left" | "right", readonly string[]> = {
+  left: [heroStandL, heroW1L, heroW2L, heroW3L, heroW4L],
+  right: [heroStandR, heroW1R, heroW2R, heroW3R, heroW4R],
+};

@@ -6,7 +6,7 @@
     <title>Idle Adventure</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Crimson+Pro:wght@400;600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Alegreya+SC:wght@500;700&family=Cinzel:wght@500;700&family=Crimson+Pro:wght@400;600&display=swap" rel="stylesheet" />
     <style>
       /* kml: "Gothic Obsidian" — near-black panels, thin tarnished-gold rules, a carved
          serif for headings, a book serif for text. Kept deliberately sparse. */
@@ -509,6 +509,69 @@
         @keyframes fx-shake-x { 0%, 100% { transform: none; } }
         @keyframes toast { 0%, 85% { opacity: 1; } 100% { opacity: 0; } }
       }
+
+      /* ===== 0m4: the town square — a walkable scene ===== */
+      body.in-town-scene { padding: 0; overflow: hidden; height: 100dvh; }
+      body.in-town-scene #app > .logbox { display: none; }
+      .town-scene { position: fixed; inset: 0; background: #0b0a08; }
+      .ts-vp { position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+      .ts-vp.dragging { cursor: grabbing; }
+      .ts-world { position: absolute; left: 0; top: 0; will-change: transform; }
+      .ts-ground { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+      .ts-spot { position: absolute; padding: 0; margin: 0; border: none; background: none; pointer-events: none; }
+      .ts-spot img { width: 100%; height: 100%; display: block; object-fit: contain; object-position: 50% 100%; transition: filter 0.15s; pointer-events: none; }
+      .ts-spot.hover img, .ts-spot:focus-visible img, .ts-spot.label-on img { filter: brightness(1.18) drop-shadow(0 0 6px #c9a55a88); }
+      .ts-spot:focus-visible { outline: none; }
+      .ts-label { position: absolute; z-index: 1500; transform: translate(-50%, 3px); white-space: nowrap; font: 700 15px/1.1 "Alegreya SC", "Cinzel", Georgia, serif; color: var(--gold); text-shadow: 0 1px 2px #000, 0 0 6px #000; background: rgba(9, 9, 11, 0.72); border: 1px solid var(--gold-dim); border-radius: 3px; padding: 1px 7px 2px; opacity: 0; transition: opacity 0.15s; pointer-events: none; }
+      .ts-label.hover, .ts-label.label-on, .ts-label.on { opacity: 1; }
+      .ts-hero { position: absolute; pointer-events: none; transition: opacity 0.25s; }
+      .ts-hero img { width: 100%; height: 100%; display: block; filter: drop-shadow(0 3px 2px #000a); }
+      .ts-hero.gone { opacity: 0; }
+      .ts-cloth-items { position: absolute; display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 1px; pointer-events: none; zoom: var(--ts-k, 1); }
+      .ts-cloth-items .pk-ic { filter: drop-shadow(0 1px 1px #000c); }
+      .ts-bar { position: absolute; top: 0; left: 0; right: 0; z-index: 2000; display: flex; align-items: center; gap: 0.5rem; padding: 6px 10px; background: linear-gradient(#09090bdd, #09090b00); pointer-events: none; }
+      .ts-bar > * { pointer-events: auto; }
+      .ts-bar h1 { font-family: "Alegreya SC", "Cinzel", Georgia, serif; font-weight: 700; text-shadow: 0 1px 3px #000; }
+      .ts-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+      .ts-tab { font: 600 14px/1 "Alegreya SC", "Cinzel", Georgia, serif; color: var(--gold); background: rgba(9, 9, 11, 0.75); border-color: var(--gold-dim); padding: 5px 9px; }
+      .ts-tab.on { background: #2a2214; border-color: var(--gold); }
+      .ts-tab.go { background: #2a2214; border-color: var(--gold); }
+      .ts-aux { margin-left: auto; display: flex; gap: 0.3rem; font-size: 0.85rem; text-shadow: 0 1px 2px #000; }
+      .ts-hint { position: absolute; right: 10px; bottom: 34px; z-index: 2000; max-width: 60%; font-size: 0.85rem; color: var(--gold); background: rgba(9, 9, 11, 0.8); border: 1px solid var(--gold-dim); border-radius: 3px; padding: 2px 8px; pointer-events: none; }
+      .ts-last { position: absolute; left: 10px; right: 10px; bottom: 6px; z-index: 2000; font-size: 0.82rem; color: var(--text); background: rgba(9, 9, 11, 0.78); border: 1px solid var(--line); border-radius: 3px; padding: 2px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+      .ts-panel { position: fixed; z-index: 3000; top: 0; right: 0; bottom: 0; width: min(480px, 58%); display: flex; flex-direction: column; background: var(--panel); border-left: 1px solid var(--gold-dim); box-shadow: -8px 0 24px #000a; }
+      .ts-panel.left { right: auto; left: 0; border-left: none; border-right: 1px solid var(--gold-dim); box-shadow: 8px 0 24px #000a; }
+      .town-scene.panel-left .ts-bar { left: min(480px, 58%); }
+      .town-scene.panel-left .ts-bar h1 { display: none; }
+      .town-scene.has-panel:not(.panel-left) .ts-bar { right: min(480px, 58%); }
+      .town-scene.has-panel .ts-aux { display: none; }
+      .ts-aux { white-space: nowrap; }
+      .ts-panel:is([data-ts-panel="bank"], [data-ts-panel="stable"], [data-ts-panel="research"]) .ts-panel-body > section > h2:first-child { display: none; }
+      .ts-panel-body > section > :first-child:not(h2) { margin-top: 0.6rem; }
+      .ts-panel-head { display: flex; align-items: center; gap: 0.5rem; padding: 6px 10px; border-bottom: 1px solid var(--gold-dim); font: 700 16px "Alegreya SC", "Cinzel", Georgia, serif; color: var(--gold); }
+      .ts-close { margin-left: auto; padding: 2px 9px; }
+      .ts-panel-body { flex: 1; min-height: 0; overflow: auto; padding: 0 12px 12px; }
+      .ts-panel-body section { min-width: 0; }
+      .ts-panel-body .logbox { margin-top: 0; border-top: none; }
+      .ts-panel-body .logbox h2 { display: none; }
+      .town-scene.has-panel .ts-hint { display: none; }
+      .ts-below { display: none; }
+      /* portrait phones: a shorter scene on top, the panel (or the log) below it in the page flow */
+      @media (max-aspect-ratio: 4/5) {
+        body.in-town-scene { overflow: auto; height: auto; }
+        .town-scene { position: relative; height: 50dvh; }
+        .town-scene.has-panel { height: 38dvh; }
+        .ts-panel { position: static; width: auto; border-left: none; border-top: 1px solid var(--gold-dim); box-shadow: none; }
+        .ts-panel-body { overflow: visible; }
+        .ts-below { display: block; padding: 0 12px 12px; }
+        .ts-last, .ts-hint { display: none; }
+        .ts-vp { touch-action: pan-y; }
+        .ts-bar { top: auto; bottom: 0; flex-wrap: wrap; padding: 4px 6px; background: linear-gradient(#09090b00, #09090bdd); }
+        .ts-bar h1 { display: none; }
+        .ts-aux { margin-left: 0; }
+      }
+      @media (max-height: 430px) { .ts-tab { padding: 4px 7px; font-size: 13px; } .ts-bar h1 { font-size: 1rem; } }
+      @media (prefers-reduced-motion: reduce) { .ts-hero { transition: none; } .ts-spot img, .ts-label { transition: none; } }
     </style>
   </head>
   <body>

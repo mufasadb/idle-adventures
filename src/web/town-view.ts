@@ -43,7 +43,7 @@ function studyControl(state: GameState, m: MapItem): string {
 }
 
 // Transport role hints (web copy only — mirrors TRANSPORT_MULTIPLIER intent).
-const TRANSPORT_ROLE: Record<string, string> = {
+export const TRANSPORT_ROLE: Record<string, string> = {
   horse: "faster on open ground",
   wagon: "faster on ice",
   mule: "slow but hauls",
@@ -69,6 +69,11 @@ export type TownTab = "main" | "bank" | "recipes";
 // d13: view-only state for the packing screen — which worn slot's swap menu is open.
 export type PackUi = { wornOpen?: string | null };
 
+/** Whether `prep` still names a map you can embark on (the free local one or a held one). */
+export function prepValid(state: GameState, prep: string | null): boolean {
+  return prep !== null && (prep === localMap(state.seed, state.runs ?? 0).mapSeed || (state.maps ?? []).some((m) => m.mapSeed === prep));
+}
+
 export function townView(state: GameState, prep: string | null, hasLastPlan: boolean, tab: TownTab = "main", ui: PackUi = {}): string {
   const local = localMap(state.seed, state.runs ?? 0);
   const heldMaps = state.maps ?? [];
@@ -76,7 +81,7 @@ export function townView(state: GameState, prep: string | null, hasLastPlan: boo
   const inPrep = prep !== null && (prep === local.mapSeed || heldMaps.some((m) => m.mapSeed === prep));
   // d13: preparing a map is the full-screen packing sheet (its own Pack | Recipes tabs).
   if (inPrep) return packScreen(state, prep!, local, heldMaps, hasLastPlan, tab === "recipes" ? "recipes" : "main", ui);
-  const header = `<header><h1>Town</h1><span class="muted">seed "${state.seed}"</span><button class="link" data-newgame>new game</button></header>`;
+  const header = `<header><h1>Town</h1><span class="muted">seed "${state.seed}"</span><button class="link" data-town-mode="scene" title="back to the village square">◱ the square</button><button class="link" data-newgame>new game</button></header>`;
   // kml: on phones the three town panels are TABS (the recipe book alone is a long
   // scroll); on wide screens they sit side by side and the tab bar hides (CSS).
   const tabBtn = (t: TownTab, label: string) => `<button class="tab${tab === t ? " on" : ""}" data-town-tab="${t}">${label}</button>`;
@@ -92,7 +97,7 @@ export function townView(state: GameState, prep: string | null, hasLastPlan: boo
 // STEP 1 (zpm.3): the town overview — pick where to go. The FREE local map reads
 // as mundane/renewable; EARNED maps carry a tier badge and "spent on embark" so a
 // player never burns a T3 thinking it's the freebie. Each card leads to Prepare.
-function mapSelectSection(state: GameState, local: ReturnType<typeof localMap>, heldMaps: MapItem[]): string {
+export function mapSelectSection(state: GameState, local: ReturnType<typeof localMap>, heldMaps: MapItem[]): string {
   const legal = legalActions(state);
   return `
     <section>
@@ -132,7 +137,7 @@ function mapSelectSection(state: GameState, local: ReturnType<typeof localMap>, 
 // what's tappable off legalActions/whyNot — the web decides nothing.
 const ICON_PX = 24; // the atlases' CSS frame size; ic() zooms to the size asked
 
-function ic(defId: string | null, px: number): string {
+export function ic(defId: string | null, px: number): string {
   const st = defId ? iconStyle(defId) : null;
   return st
     ? `<span class="pk-ic" style="${st};zoom:${(px / ICON_PX).toFixed(3)}" aria-hidden="true"></span>`
@@ -146,7 +151,7 @@ function packScreen(state: GameState, mapSeed: string, local: LocalMap, heldMaps
   const held = heldMaps.find((m) => m.mapSeed === mapSeed) ?? null;
   const tabBtn = (t: "main" | "recipes", label: string) => `<button class="tab${tab === t ? " on" : ""}" data-town-tab="${t}">${label}</button>`;
   const top = `<div class="pk-top">
-      <button class="link" data-back>← maps</button>
+      <button class="link" data-back>← town</button>
       <nav class="pk-tabs">${tabBtn("main", "Pack")}${tabBtn("recipes", "Recipes")}</nav>
       <span class="pk-dest muted small">${isLocal ? "free local run — the map is not used up" : `<span class="warn">⚠ embarking SPENDS this map</span>`}</span>
     </div>`;
@@ -329,7 +334,7 @@ function packFooter(state: GameState, mapSeed: string, isLocal: boolean, held: M
   </div>`;
 }
 
-function bankSection(state: GameState): string {
+export function bankSection(state: GameState): string {
   const legal = legalActions(state);
   // beh: the bank is untouched until embark (D28), so a packed pick still shows ×1 here —
   // say so on the row ("✓ packed") instead of just swapping the button for a slot word.
@@ -356,7 +361,7 @@ function bankSection(state: GameState): string {
     </section>`;
 }
 
-function recipeSection(state: GameState): string {
+export function recipeSection(state: GameState): string {
   const legal = legalActions(state);
   const craftable = legal.filter((a): a is Extract<Action, { type: "craft" }> => a.type === "craft");
   return `
@@ -419,4 +424,30 @@ function recipeSection(state: GameState): string {
         }).join("")}
       </div>
     </section>`;
+}
+
+// 0m4: the stable — your animals and carts (owned transport + panniers), and whether
+// each is in this trip's plan. Packing goes through the same `pack` action as the sheet.
+export function stableSection(state: GameState): string {
+  const legal = legalActions(state);
+  const eq = state.loadout.equipment;
+  const rows = state.bank.filter((s) => { const sl = slotOf(s.defId); return sl === "transport" || sl === "panniers"; }).map((s) => {
+    const slot = slotOf(s.defId) as "transport" | "panniers";
+    const taking = eq[slot] === s.defId;
+    const can = !taking && legal.some((a) => a.type === "pack" && a.slot === slot && a.itemId === s.defId);
+    const role = TRANSPORT_ROLE[s.defId] ?? logisticsEffect(s.defId) ?? "";
+    return `<div class="bankitem${taking ? " packed" : ""}" data-bank="${s.defId}">${ic(s.defId, 22)}
+      <span class="chip" title="${describe(s.defId)}">${name(s.defId)} ×${s.qty}</span>${role ? ` <span class="muted small">${role}</span>` : ""}
+      ${taking ? `<span class="packed-badge">✓ coming along</span>` : can ? `<button data-pack="${s.defId}" data-slot="${slot}">take it</button>` : ""}
+    </div>`;
+  }).join("");
+  return `<section>
+    <h2>Stable</h2>
+    <div class="muted small">Animals and carts carry more and travel faster — a beast can also wear panniers. Taking one costs no bag slot.</div>
+    <div class="bank">${rows || `<span class="muted small">(no animals or carts yet)</span>`}</div>
+  </section>`;
+}
+
+export function researchSection(): string {
+  return `<section><h2>The research table</h2><p>The research table — coming soon.</p></section>`;
 }
