@@ -11,7 +11,7 @@ import { deriveRoute } from "./route";
 import type { Pos } from "./route";
 import { PLAYER_BASE_HP, RECIPE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_CAMP_MEALS, QUAFF_ENERGY, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, FISH_CAST_ENERGY, FISH_DEEP_DEPTH, ANTIDOTE, TERRAIN_HP_COST } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
-import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, GATHER_VERB, round1, preFightVerdict, tileName, tileYield, slowRouteNote, blockedRouteNote } from "../render/render";
+import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, GATHER_VERB, round1, preFightVerdict, isExhausted, tileName, tileYield, slowRouteNote, blockedRouteNote } from "../render/render";
 import type { FightVerdict } from "../render/render";
 import { fightSheet, preFightCard, throwLegal, enhanceButtons, verdictDot } from "./fight-view";
 import { perceive } from "../engine/perceive";
@@ -107,7 +107,7 @@ function poisonChip(exp: NonNullable<GameState["expedition"]>, legal: Action[]):
 }
 
 export type DrawerTab = "here" | "bag" | "craft" | "log";
-export type ExpeditionUi = { drawerOpen: boolean; tab: DrawerTab; logHtml: string };
+export type ExpeditionUi = { drawerOpen: boolean; tab: DrawerTab; logHtml: string; confirmHome?: boolean; stuckDismissed?: boolean };
 
 export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi): string {
   const exp = state.expedition!;
@@ -310,7 +310,6 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
         ${exp.loadout.equipment.tools.includes("tent") ? `<span class="campmeal-badge${campMealReady ? " ready" : " spent"}" title="${campMealReady ? "eat a food from your bag as a CAMP MEAL — over max at +50%, once per run" : "camp meal spent this run"}">🏕 camp meal ${campMealReady ? "ready" : "spent"}</span>` : ""}
         ${legal.some((a) => a.type === "quaff") ? `<button data-act="quaff" title="drink a potion here (−${QUAFF_ENERGY}e)">🧪 Potion (−${QUAFF_ENERGY}e)</button>` : ""}
         ${exp.combat ? "" : enhanceButtons(exp, legal)}
-        <button data-act="return">⏎ Return to town</button>
       </div>
       ${exp.weaponBuff ? `<div class="muted small">🗡️ ${name(exp.weaponBuff.id)} · ${exp.weaponBuff.charges} strike${exp.weaponBuff.charges === 1 ? "" : "s"} left</div>` : ""}
       <details class="settings"><summary>Settings</summary>
@@ -382,6 +381,8 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
       <button class="pan pan-w" data-pan="-2,0" aria-label="pan west">◀</button>
       <button class="pan pan-e" data-pan="2,0" aria-label="pan east">▶</button>
       <button class="recentre" data-recentre title="centre on you" aria-label="centre on you">◎</button>
+      ${exp.combat ? "" : `<button class="home-btn" data-home title="head home" aria-label="head home">🏠</button>`}
+      ${homeSheet(state, legal, ui)}
       ${quick.length ? `<div class="quick">${quick.join("")}</div>` : ""}
       ${routeBar}
       ${exp.combat ? fightSheet(exp, legal) : ""}
@@ -406,4 +407,19 @@ export function currentDerived(state: GameState, route: Pos[]) {
   const resolved = new Set([...perceived].filter(([, p]) => p.detail != null).map(([k]) => k));
   const cleared = new Set(exp.cleared.map(kk));
   return { grid, perceived, cleared, rt: deriveRoute(grid, exp, route, resolved, cleared) };
+}
+
+// The way home lives on the map (user 2026-10-10): the 🏠 button asks first; when
+// you're out of energy and food with nothing to cook (isExhausted), the same card
+// comes up on its own. Return is free (D62).
+function homeSheet(state: GameState, legal: Action[], ui: ExpeditionUi): string {
+  const stuck = isExhausted(state, legal) && !ui.stuckDismissed;
+  if (!stuck && !ui.confirmHome) return "";
+  const body = stuck
+    ? `<h3>You're exhausted</h3><p>No energy left, nothing to eat, and nothing here to cook. Head home with what you carry?</p>`
+    : `<h3>Head home?</h3><p>You'll walk back to town with everything you carry. The trip home is free.</p>`;
+  return `<div class="home-sheet${stuck ? " stuck" : ""}" role="dialog" aria-label="head home">
+    ${body}
+    <div class="actions"><button class="primary" data-act="return">🏠 Go home</button><button data-home-cancel>${stuck ? "Not yet" : "Stay"}</button></div>
+  </div>`;
 }

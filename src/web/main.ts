@@ -61,6 +61,8 @@ const app = document.querySelector<HTMLDivElement>("#app")!;
 // screens) holds everything that isn't the map; the map is a camera over the grid.
 let drawerOpen = false;
 let drawerTab: DrawerTab = "here";
+let confirmHome = false; // the 🏠 button's "head home?" card is up
+let stuckDismissed = false; // "Not yet" on the exhausted card (cleared on any accepted action)
 let wasEngaged = false;
 let townTab: TownTab = "main";
 // d13: the packing screen's open worn-slot swap menu (view-only).
@@ -118,6 +120,7 @@ function apply(action: Action): GameEvent[] {
   if (action.type === "embark" && !events.some((e) => e.type === "action-rejected")) saveLastPlan(SAVE_KEY, prevLoadout);
   state = next;
   const rej = events.find((e) => e.type === "action-rejected");
+  if (!rej) stuckDismissed = false; // the world moved on: re-check exhaustion fresh
   // rx5: a manual gather that the reducer refused gets the same tile cue a walk-over does.
   const misses: GatherMiss[] = action.type === "gather" && rej?.type === "action-rejected" && state.expedition
     ? [{ at: { ...state.expedition.pos }, reason: rej.reason }] : [];
@@ -239,7 +242,7 @@ function draw(): void {
   const keepScroll = panelEl && panelEl.dataset.tsPanel === scene.panel ? panelEl.querySelector<HTMLElement>(".ts-panel-body")?.scrollTop ?? 0 : 0;
   const hasLast = loadLastPlan(SAVE_KEY).length > 0;
   app.innerHTML = state.phase !== "town"
-    ? expeditionView(state, route, { drawerOpen, tab: drawerTab, logHtml: logView(log) })
+    ? expeditionView(state, route, { drawerOpen, tab: drawerTab, logHtml: logView(log), confirmHome, stuckDismissed })
     : inScene
       ? townSceneView(state, { prep, logHtml: logView(log), lastLine: log[0] ? formatLogEntry(log[0]).replace(/<br>/g, " ") : "", research: { history: researchLog, last: researchLast } })
       : `${townView(state, prep, hasLast, townTab, { wornOpen, research: { history: researchLog, last: researchLast } })}${logView(log)}`;
@@ -381,7 +384,9 @@ function wire(): void {
   });
   app.querySelectorAll<HTMLElement>("[data-use-item]").forEach((el) => el.onclick = () => apply({ type: "use-item", itemId: el.dataset.useItem! }));
   app.querySelectorAll<HTMLElement>("[data-enhance]").forEach((el) => el.onclick = () => apply({ type: "enhance", id: el.dataset.enhance! }));
-  app.querySelectorAll<HTMLElement>("[data-act]").forEach((el) => el.onclick = () => { route = []; apply({ type: el.dataset.act! } as Action); });
+  app.querySelectorAll<HTMLElement>("[data-act]").forEach((el) => el.onclick = () => { route = []; confirmHome = false; apply({ type: el.dataset.act! } as Action); });
+  const home = app.querySelector<HTMLElement>("[data-home]"); if (home) home.onclick = () => { confirmHome = true; draw(); };
+  const homeCancel = app.querySelector<HTMLElement>("[data-home-cancel]"); if (homeCancel) homeCancel.onclick = () => { confirmHome = false; stuckDismissed = true; draw(); };
   const gatherToggle = app.querySelector<HTMLElement>("[data-toggle-autogather]"); if (gatherToggle) gatherToggle.onclick = () => apply({ type: "toggle-auto-gather" });
   // Auto-eat designation (mco): right-click a food box to set it as the auto-eat
   // food; right-clicking the already-designated one clears it (null = off).

@@ -853,3 +853,14 @@ export function hintNeed(hintId: string, loadout: Loadout): HintNeed | null {
   }
   return null;
 }
+
+/** Out on the map with nowhere left to go: no step is affordable, nothing in the bag
+ *  can be eaten, and nothing you could craft right here is food. Surfaces offer the
+ *  trip home (return is always free, D62). `legal` is legalActions(state). */
+export function isExhausted(state: { phase: string; expedition?: Expedition | null }, legal: Action[]): boolean {
+  const exp = state.expedition;
+  if (state.phase !== "expedition" || !exp || exp.combat) return false;
+  return !legal.some((a) =>
+    a.type === "move" || a.type === "eat" ||
+    (a.type === "craft" && FOOD.includes(RECIPE[a.recipeId]?.output.defId ?? "")));
+}
