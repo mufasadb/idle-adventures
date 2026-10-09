@@ -13,7 +13,7 @@ import { reduce } from "../engine/reduce";
 import { route as walkWaypoints } from "../sim/play";
 import { routeAfterClick } from "./route";
 import type { Pos } from "./route";
-import { name, rejectCopy } from "../render/render";
+import { name, rejectCopy, setEnergyUnit } from "../render/render";
 import { installItemCard } from "./item-card";
 import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot } from "../engine/types";
 import type { LogEntry } from "./log";
@@ -58,6 +58,7 @@ let route: Pos[] = [];
 // we leave town (draw() guards it) so a consumed/rotated map can never linger.
 let prep: string | null = null;
 const app = document.querySelector<HTMLDivElement>("#app")!;
+setEnergyUnit("⚡"); // user 2026-10-10: lightning for energy (the console keeps "e")
 installItemCard(app); // f2i7: hold (or tap) an item to see what it does
 // kml: landscape-first expedition UI. The drawer (slide-up on phones, a sidebar on wide
 // screens) holds everything that isn't the map; the map is a camera over the grid.

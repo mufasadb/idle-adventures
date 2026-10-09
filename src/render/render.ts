@@ -82,6 +82,12 @@ function catchWords(caught: string, contents: ItemStack[], name: (defId: string)
 // One-decimal display rounding for log numbers (matches the web's historical style).
 export const round1 = (n: number) => Math.round(n * 10) / 10;
 
+// The energy unit in event lines: "e" on the console (its lines are parsed — never
+// reshape them), ⚡ on the web (user 2026-10-10). The web calls setEnergyUnit at boot.
+let EN = "e";
+export function setEnergyUnit(unit: string): void { EN = unit; }
+export const energyUnit = (): string => EN;
+
 // THE GameEvent → text formatter (exm): one exhaustive switch, shared by the web and
 // the headless playtest console. The `name` fn is the surface's only vocabulary knob —
 // the web passes display `name()`, the console passes identity (raw defIds, the
@@ -91,11 +97,11 @@ export const round1 = (n: number) => Math.round(n * 10) / 10;
 export function formatEvent(e: GameEvent, name: (defId: string) => string): string {
   switch (e.type) {
     case "embarked": return `▶ embarked on a ${e.biomeId} map — ${e.energy} energy`;
-    case "moved": return `walked to (${e.to.x},${e.to.y}) on ${e.terrain} · −${round1(e.cost)}e → ${round1(e.energy)}e${e.hazardTaken ? ` · 🍄 spores −${round1(e.hazardTaken)}hp` : ""}${e.poisonTaken ? ` · ☠ poison −${round1(e.poisonTaken)}hp` : ""}${e.hp !== undefined ? ` → ${round1(e.hp)}hp` : ""}`;
-    case "gathered": return `${GATHER_VERB[e.kind]?.past ?? "gathered"} ${e.qty}× ${name(e.material)} · −${round1(e.cost)}e → ${round1(e.energy)}e`;
-    case "fished": return `🎣 fished the ${FISH_WATER_WORDS[e.water]} — ${catchWords(e.catch, e.contents, name)} · −${round1(e.cost)}e → ${round1(e.energy)}e`;
+    case "moved": return `walked to (${e.to.x},${e.to.y}) on ${e.terrain} · −${round1(e.cost)}${EN} → ${round1(e.energy)}${EN}${e.hazardTaken ? ` · 🍄 spores −${round1(e.hazardTaken)}hp` : ""}${e.poisonTaken ? ` · ☠ poison −${round1(e.poisonTaken)}hp` : ""}${e.hp !== undefined ? ` → ${round1(e.hp)}hp` : ""}`;
+    case "gathered": return `${GATHER_VERB[e.kind]?.past ?? "gathered"} ${e.qty}× ${name(e.material)} · −${round1(e.cost)}${EN} → ${round1(e.energy)}${EN}`;
+    case "fished": return `🎣 fished the ${FISH_WATER_WORDS[e.water]} — ${catchWords(e.catch, e.contents, name)} · −${round1(e.cost)}${EN} → ${round1(e.energy)}${EN}`;
     case "dropped": return `dropped ${e.qty}× ${name(e.defId)}`;
-    case "ate": return `${e.campMeal ? "🏕 camp meal — ate" : "🍖 ate"} ${name(e.defId)} · +${round1(e.restored)}e → ${round1(e.energy)}e${e.campMeal ? " (over max — banked reach)" : ""}`;
+    case "ate": return `${e.campMeal ? "🏕 camp meal — ate" : "🍖 ate"} ${name(e.defId)} · +${round1(e.restored)}${EN} → ${round1(e.energy)}${EN}${e.campMeal ? " (over max — banked reach)" : ""}`;
     case "auto-eat-set": return e.defId ? `🍴 auto-eat: ${name(e.defId)}` : `🍴 auto-eat off`;
     case "fought": {
       const lessons = matchupLessons(e.matchup);
@@ -123,7 +129,7 @@ export function formatEvent(e: GameEvent, name: (defId: string) => string): stri
       : `⚔ engaged the ${name(e.creature)}`;
     case "exchanged": return `${e.thrown ? `💥 threw a ${name(e.thrown)} at the ${name(e.creature)}${e.dmgTaken === 0 && e.monsterHp > 0 ? " (it can't answer yet)" : ""} —` : `⚔ traded blows with the ${name(e.creature)} —`} dealt ${round1(e.dmgDealt)}, took ${round1(e.dmgTaken)} · ${round1(e.hp)}hp left${e.arrowSpent ? (e.ammoSpent ? ` · 🎯 −1 ${name(e.ammoSpent)}` : " · 🏹 −1 arrow") : ""}${e.poisonDmg ? ` · ☠ poison ${round1(e.poisonDmg)}` : ""}${e.poisonTaken ? ` · ☠ your poison −${round1(e.poisonTaken)}hp` : ""}${e.envenomed ? " · ☠ its bite POISONED you (antidote cures)" : ""}`;
     case "fled": return `🏃 fled the ${name(e.creature)} · −${round1(e.partingHit)}hp → ${round1(e.hp)}hp`;
-    case "quaffed": return `🧪 quaffed ${name(e.defId)} · +${round1(e.healed)}hp → ${round1(e.hp)}hp${e.energy !== undefined ? ` · −${QUAFF_ENERGY}e → ${round1(e.energy)}e` : ""}`;
+    case "quaffed": return `🧪 quaffed ${name(e.defId)} · +${round1(e.healed)}hp → ${round1(e.hp)}hp${e.energy !== undefined ? ` · −${QUAFF_ENERGY}${EN} → ${round1(e.energy)}${EN}` : ""}`;
     case "item-used": if (e.cured) return `🧪 drank the ${name(e.defId)} — the poison is gone`;
       return `⚗ used ${name(e.defId)} this fight${e.damageAdd ? ` · +${round1(e.damageAdd)} dmg` : ""}${e.mitigationAdd ? ` · +${round1(e.mitigationAdd)} mitigation` : ""}`;
     case "enhanced": return `🗡️ coated your weapon with ${name(e.id)} · ${e.charges} charge${e.charges === 1 ? "" : "s"}`;
@@ -134,8 +140,8 @@ export function formatEvent(e: GameEvent, name: (defId: string) => string): stri
     case "auto-finish-toggled": return `auto-finish fights ${e.on ? "on" : "off"}`;
     case "auto-gather-toggled": return `auto-gather ${e.on ? "on" : "off"}`;
     case "provoked": return `⚔ the ${name(e.creature)} strikes while you act · −${round1(e.hit)}hp → ${round1(e.hp)}hp`;
-    case "donned": return `🧤 donned ${name(e.defId)}${e.displaced ? ` (stowed ${name(e.displaced)})` : ""} · −${DON_DOFF_ENERGY}e → ${round1(e.energy)}e`;
-    case "doffed": return `🎒 doffed ${name(e.defId)} to the bag · −${DON_DOFF_ENERGY}e → ${round1(e.energy)}e`;
+    case "donned": return `🧤 donned ${name(e.defId)}${e.displaced ? ` (stowed ${name(e.displaced)})` : ""} · −${DON_DOFF_ENERGY}${EN} → ${round1(e.energy)}${EN}`;
+    case "doffed": return `🎒 doffed ${name(e.defId)} to the bag · −${DON_DOFF_ENERGY}${EN} → ${round1(e.energy)}${EN}`;
   }
 }
 

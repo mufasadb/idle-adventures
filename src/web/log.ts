@@ -19,7 +19,7 @@ export function formatLogEntry(entry: LogEntry): string {
     case "event": return formatEvent(entry.e, name).replace(/\n/g, "<br>");
     case "note": return entry.text;
     case "walk": {
-      const delta = entry.net >= 0 ? `−${round1(entry.net)}e` : `+${round1(-entry.net)}e`;
+      const delta = entry.net >= 0 ? `−${round1(entry.net)}⚡` : `+${round1(-entry.net)}⚡`;
       const ateClause = entry.ate > 0 ? ` · auto-ate ${entry.ate}× ration` : "";
       const gatheredClause = entry.gathered > 0 ? ` · auto-gathered ${entry.gathered}× node${entry.gathered !== 1 ? "s" : ""}` : "";
       return `🚶 walked ${entry.steps} tile${entry.steps !== 1 ? "s" : ""} → (${entry.pos.x},${entry.pos.y}) · ${delta}${ateClause}${gatheredClause}`;

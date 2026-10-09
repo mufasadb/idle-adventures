@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { flavorDetail, matchupLessons, combatForecast, poiGlyph, kindLabel, POI_CHAR, itemSources } from "../src/render/render";
+import { flavorDetail, matchupLessons, combatForecast, poiGlyph, kindLabel, POI_CHAR, itemSources, formatEvent, setEnergyUnit } from "../src/render/render";
 import { emptyLoadout } from "../src/engine/loadout";
 import { playerDamage, damageTaken } from "../src/engine/combat";
 import { MONSTERS, MONSTER_TIER_HP_CURVE } from "../src/data/constants";
@@ -78,4 +78,11 @@ test("itemSources says where a material comes from (user 2026-10-10: 'where do I
   expect(itemSources("iron-ore").some((s) => s.includes("Pick"))).toBe(true);
   expect(itemSources("werewolf-pelt")).toContain("Dropped by Werewolf");
   expect(itemSources("club")).toEqual(["Crafted"]);
+});
+
+test("energy unit: the console keeps 'e'; the web swaps in ⚡ (user 2026-10-10)", () => {
+  const ev = { type: "doffed", defId: "club", energy: 40 } as unknown as Parameters<typeof formatEvent>[0];
+  expect(formatEvent(ev, String)).toMatch(/\de → 40e$/);
+  setEnergyUnit("⚡");
+  try { expect(formatEvent(ev, String)).toMatch(/\d⚡ → 40⚡$/); } finally { setEnergyUnit("e"); }
 });

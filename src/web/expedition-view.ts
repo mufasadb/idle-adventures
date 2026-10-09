@@ -30,7 +30,7 @@ function stepExplain(bd: ReturnType<typeof moveCostBreakdown>): string {
   if (bd.enabled) parts.push(`→ ${bd.enabled.to} (${name(bd.enabled.tool)})`);
   for (const d of bd.discounts) parts.push(`− ${d.amount} (${name(d.tool)})`);
   if (bd.transport) parts.push(`÷${bd.transport.divisor} (${name(bd.transport.id)})`);
-  return `${parts.join(" ")} = ${round1(bd.final)}e`;
+  return `${parts.join(" ")} = ${round1(bd.final)}⚡`;
 }
 
 // What the player is standing on — always shown, so gather/fight has context.
@@ -91,7 +91,7 @@ function herePanel(state: GameState, grid: Grid, exp: NonNullable<GameState["exp
 // the reason both come from the reducer (D29, ciq).
 function fishLine(state: GameState, legal: Action[]): string {
   if (legal.some((a) => a.type === "fish")) {
-    return `<div class="here fish"><button data-act="fish">🎣 Fish</button> the deepest water beside you (−${FISH_CAST_ENERGY}e) · each spot bites once; deeper water, bigger catch.</div>`;
+    return `<div class="here fish"><button data-act="fish">🎣 Fish</button> the deepest water beside you (−${FISH_CAST_ENERGY}⚡) · each spot bites once; deeper water, bigger catch.</div>`;
   }
   const reason = whyNot(state, { type: "fish" });
   if (!reason || reason === "no-water" || reason === "engaged") return "";
@@ -244,14 +244,14 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   const autoGatherOn = exp.autoGather ?? true;
   // kml: compact HUD bars that float over the map (landscape-first layout).
   const bars = `
-    <div class="bar"><span>Energy</span><div class="track">${energyFill}</div><b>${energyLabel}</b></div>
+    <div class="bar"><span>⚡ Energy</span><div class="track">${energyFill}</div><b>${energyLabel}</b></div>
     <div class="bar"><span>HP</span><div class="track"><div class="fill hp" style="width:${Math.min(100, (exp.hp / PLAYER_BASE_HP) * 100)}%"></div></div><b>${round1(exp.hp)}</b>${poisonChip(exp, legal)}</div>`;
 
   // End-of-route affordances (eot): the LAST waypoint drives Fight/Shoot/Survey.
   const endPoi = route.length ? poiAt.get(goalK) : undefined;
   const fight = endPoi && endPoi.kind === "monster" && endPoi.creature && !cleared.has(goalK) ? endPoi.creature : undefined;
   const shoot = fight !== undefined && legal.some((a) => a.type === "fight" && a.at !== undefined && a.at.x === rt.end.x && a.at.y === rt.end.y);
-  const costClause = `<b class="${overBudget ? "over" : ""}">−${round1(total)}e</b>${rt.actionCost > 0 ? ` <span class="muted">(${round1(rt.walkCost)} walk + ${round1(rt.actionCost)} gather)</span>` : ""}`;
+  const costClause = `<b class="${overBudget ? "over" : ""}">−${round1(total)}⚡</b>${rt.actionCost > 0 ? ` <span class="muted">(${round1(rt.walkCost)} walk + ${round1(rt.actionCost)} gather)</span>` : ""}`;
   // eor (D103): a monster at the route's end gets the pre-fight card — verdict colour,
   // both sides' attack/armour types, loot, bag-slot warning. No round counts.
   const verdictFor = (creature: string): FightVerdict => preFightVerdict(exp.loadout, creature, exp.hp, exp.weaponBuff, exp.mapTier ?? 1, exp.poisoned);
@@ -276,7 +276,7 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   // kml: the route bar floats at the bottom of the map — only when there's something to say.
   // A live fight has its own sheet (eor), so no route bar then.
   const routeBar = !exp.combat && hasRoute
-    ? `<div class="routebar${rt.blocked ? " blocked" : ""}${fight ? " has-fight" : ""}">${crossWarn}${blockNote}${fightCard}<div class="routeline">${rt.walkable.length} tile${rt.walkable.length !== 1 ? "s" : ""} · ${costClause}${hpClause}</div>${slowNote}<div class="routebtns"><button class="primary" data-walk${rt.blocked ? " disabled" : ""}>${fight ? "Fight ▶" : "Walk ▶"}</button>${shoot ? `<button data-shoot title="engage from here — your opener lands first">🏹 Shoot</button>` : ""}${throwables.map((id) => `<button class="throw" data-throw="${id}" data-throw-x="${rt.end.x}" data-throw-y="${rt.end.y}" title="throw from here — ${describe(id)}">💥 Throw ${name(id).toLowerCase()} <span class="free-opener">FREE OPENER</span></button>`).join("")}${surveyAtEnd ? `<button data-survey-x="${rt.end.x}" data-survey-y="${rt.end.y}" title="resolve its detail from here">🔭 −${SURVEY_ENERGY}e</button>` : ""}<button data-cancelpath title="clear the route">✕</button></div></div>`
+    ? `<div class="routebar${rt.blocked ? " blocked" : ""}${fight ? " has-fight" : ""}">${crossWarn}${blockNote}${fightCard}<div class="routeline">${rt.walkable.length} tile${rt.walkable.length !== 1 ? "s" : ""} · ${costClause}${hpClause}</div>${slowNote}<div class="routebtns"><button class="primary" data-walk${rt.blocked ? " disabled" : ""}>${fight ? "Fight ▶" : "Walk ▶"}</button>${shoot ? `<button data-shoot title="engage from here — your opener lands first">🏹 Shoot</button>` : ""}${throwables.map((id) => `<button class="throw" data-throw="${id}" data-throw-x="${rt.end.x}" data-throw-y="${rt.end.y}" title="throw from here — ${describe(id)}">💥 Throw ${name(id).toLowerCase()} <span class="free-opener">FREE OPENER</span></button>`).join("")}${surveyAtEnd ? `<button data-survey-x="${rt.end.x}" data-survey-y="${rt.end.y}" title="resolve its detail from here">🔭 −${SURVEY_ENERGY}⚡</button>` : ""}<button data-cancelpath title="clear the route">✕</button></div></div>`
     : "";
 
   // qba: the tapped tile (the route's end) names itself and what reaching it costs —
@@ -287,7 +287,7 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   const endName = tileName(endTerrain, endPoi ?? null, endPer?.detail ?? null, endCleared);
   const endBlocked = firstBlock !== null;
   const tileLabel = hasRoute
-    ? `<div class="tilelabel${endBlocked ? " blocked" : ""}" style="left:${2 + rt.end.x * 33 + 16}px;top:${2 + rt.end.y * 33}px">${endVerdict ? verdictDot(endVerdict) : ""}${endName} · ${endBlocked ? "can't reach" : `−${round1(rt.walkCost)}e`}</div>`
+    ? `<div class="tilelabel${endBlocked ? " blocked" : ""}" style="left:${2 + rt.end.x * 33 + 16}px;top:${2 + rt.end.y * 33}px">${endVerdict ? verdictDot(endVerdict) : ""}${endName} · ${endBlocked ? "can't reach" : `−${round1(rt.walkCost)}⚡`}</div>`
     : "";
 
   // kml: contextual quick actions on the map itself (so the common verbs never need
@@ -295,7 +295,7 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   const here = grid.pois.find((p) => p.x === exp.pos.x && p.y === exp.pos.y);
   const quick: string[] = [];
   if (!exp.combat && here && legal.some((a) => a.type === "gather")) quick.push(`<button data-act="gather">${GATHER_VERB[here.kind]?.label ?? "Gather"}</button>`);
-  if (!exp.combat && canFish) quick.push(`<button data-act="fish" title="cast into the deepest water beside you (−${FISH_CAST_ENERGY}e)">🎣 Fish</button>`);
+  if (!exp.combat && canFish) quick.push(`<button data-act="fish" title="cast into the deepest water beside you (−${FISH_CAST_ENERGY}⚡)">🎣 Fish</button>`);
 
   const cap = carryCap(exp.loadout.equipment);
   // 7lr: which foods can actually be eaten right now (speculative-reduce filtered), and
@@ -308,7 +308,7 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
       ${exp.combat ? `<div class="here monster">⚔ <b>Fighting the ${name(exp.combat.creature)}</b> — your moves are in the fight panel over the map.</div>` : herePanel(state, grid, exp, legal) + fishLine(state, legal)}
       <div class="actions">
         ${exp.loadout.equipment.tools.includes("tent") ? `<span class="campmeal-badge${campMealReady ? " ready" : " spent"}" title="${campMealReady ? "eat a food from your bag as a CAMP MEAL — over max at +50%, once per run" : "camp meal spent this run"}">🏕 camp meal ${campMealReady ? "ready" : "spent"}</span>` : ""}
-        ${legal.some((a) => a.type === "quaff") ? `<button data-act="quaff" title="drink a potion here (−${QUAFF_ENERGY}e)">🧪 Potion (−${QUAFF_ENERGY}e)</button>` : ""}
+        ${legal.some((a) => a.type === "quaff") ? `<button data-act="quaff" title="drink a potion here (−${QUAFF_ENERGY}⚡)">🧪 Potion (−${QUAFF_ENERGY}⚡)</button>` : ""}
         ${exp.combat ? "" : enhanceButtons(exp, legal)}
       </div>
       ${exp.weaponBuff ? `<div class="muted small">🗡️ ${name(exp.weaponBuff.id)} · ${exp.weaponBuff.charges} strike${exp.weaponBuff.charges === 1 ? "" : "s"} left</div>` : ""}
@@ -324,8 +324,8 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   const bagTab = `
       <div class="muted small">${inv.used}/${cap} slots · tap a food to eat one · long-press / right-click a food to auto-eat it${exp.autoEatFood ? ` (now: <b>${name(exp.autoEatFood)}</b>)` : ""}</div>
       ${inv.html}
-      ${exp.carry.length ? `<div class="bank">${exp.carry.map((s) => `<div class="bankitem"><span class="chip" title="${describe(s.defId)}">${name(s.defId)} ×${s.qty}</span>${legal.some((a) => a.type === "don" && a.itemId === s.defId) ? `<button data-don="${s.defId}" title="equip it (−${DON_DOFF_ENERGY}e)">don</button>` : ""}<button data-drop="${s.defId}">drop</button></div>`).join("")}</div>` : ""}
-      ${(() => { const doffable = legal.filter((a) => a.type === "doff").map((a) => (a as { itemId: string }).itemId); return doffable.length ? `<div class="bank">${doffable.map((id) => `<div class="bankitem"><span class="chip" title="worn · ${describe(id)}">${name(id)} (worn)</span><button data-doff="${id}" title="stow it (−${DON_DOFF_ENERGY}e; takes a slot)">doff</button></div>`).join("")}</div>` : ""; })()}
+      ${exp.carry.length ? `<div class="bank">${exp.carry.map((s) => `<div class="bankitem"><span class="chip" title="${describe(s.defId)}">${name(s.defId)} ×${s.qty}</span>${legal.some((a) => a.type === "don" && a.itemId === s.defId) ? `<button data-don="${s.defId}" title="equip it (−${DON_DOFF_ENERGY}⚡)">don</button>` : ""}<button data-drop="${s.defId}">drop</button></div>`).join("")}</div>` : ""}
+      ${(() => { const doffable = legal.filter((a) => a.type === "doff").map((a) => (a as { itemId: string }).itemId); return doffable.length ? `<div class="bank">${doffable.map((id) => `<div class="bankitem"><span class="chip" title="worn · ${describe(id)}">${name(id)} (worn)</span><button data-doff="${id}" title="stow it (−${DON_DOFF_ENERGY}⚡; takes a slot)">doff</button></div>`).join("")}</div>` : ""; })()}
       ${(exp.carriedMaps ?? []).length ? `<div class="muted small">maps ${(exp.carriedMaps ?? []).length}/${mapCarryCap(state.bank)}</div><div class="bank">${(exp.carriedMaps ?? []).map((m) => `<div class="bankitem"><span class="chip" title="banks as a held map when the run ends">🗺️ T${m.tier ?? 1} ${name(m.biomeId)}</span><button data-drop-map="${m.mapSeed}">drop</button></div>`).join("")}</div>` : ""}`;
 
   const craftTab = (() => {
@@ -343,13 +343,13 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
       const ing = r.inputs.map((i) => `${i.qty}× ${name(i.defId)}`).join(" + ");
       // mki: the button is the one clickable thing; "have N" shows the craft land in the bag.
       const have = heldOnRun(exp, r.output.defId);
-      return `<div class="craftpath" data-recipe="${a.recipeId}"><button class="craftbtn" data-craft="${a.recipeId}" title="field-craft (−${FIELD_CRAFT_ENERGY}e)">🔥 Craft</button> <span>${recipeOutputQty(r, pool)}× ${name(r.output.defId)}${have ? ` <span class="have small">· have ${have}</span>` : ""} <span class="muted small">← ${ing}</span></span></div>`;
+      return `<div class="craftpath" data-recipe="${a.recipeId}"><button class="craftbtn" data-craft="${a.recipeId}" title="field-craft (−${FIELD_CRAFT_ENERGY}⚡)">🔥 Craft</button> <span>${recipeOutputQty(r, pool)}× ${name(r.output.defId)}${have ? ` <span class="have small">· have ${have}</span>` : ""} <span class="muted small">← ${ing}</span></span></div>`;
     }).join("");
     const lockedRows = kitLocked.map((id) => {
       const r = RECIPE[id]!;
       return `<div class="craftpath locked" data-recipe="${id}">🔒 ${name(r.output.defId)} <span class="warn small">${recipeGateHint(id)}</span></div>`;
     }).join("");
-    return `<div class="muted small">−${FIELD_CRAFT_ENERGY}e each</div><div class="craftlist">${readyRows}${lockedRows}</div>`;
+    return `<div class="muted small">−${FIELD_CRAFT_ENERGY}⚡ each</div><div class="craftlist">${readyRows}${lockedRows}</div>`;
   })();
 
   const tabBody = ui.tab === "bag" ? bagTab : ui.tab === "craft" ? craftTab : ui.tab === "log" ? ui.logHtml : hereTab;
