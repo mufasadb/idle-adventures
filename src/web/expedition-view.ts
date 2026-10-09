@@ -11,7 +11,7 @@ import { deriveRoute } from "./route";
 import type { Pos } from "./route";
 import { PLAYER_BASE_HP, RECIPE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_CAMP_MEALS, QUAFF_ENERGY, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, FISH_CAST_ENERGY, FISH_DEEP_DEPTH, ANTIDOTE, TERRAIN_HP_COST } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
-import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, GATHER_VERB, round1, preFightVerdict, isExhausted, tileName, tileYield, slowRouteNote, blockedRouteNote } from "../render/render";
+import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, GATHER_VERB, round1, preFightVerdict, isExhausted, costBand, tileName, tileYield, slowRouteNote, blockedRouteNote } from "../render/render";
 import type { FightVerdict } from "../render/render";
 import { fightSheet, preFightCard, throwLegal, enhanceButtons, verdictDot } from "./fight-view";
 import { perceive } from "../engine/perceive";
@@ -107,7 +107,7 @@ function poisonChip(exp: NonNullable<GameState["expedition"]>, legal: Action[]):
 }
 
 export type DrawerTab = "here" | "bag" | "craft" | "log";
-export type ExpeditionUi = { drawerOpen: boolean; tab: DrawerTab; logHtml: string; confirmHome?: boolean; stuckDismissed?: boolean };
+export type ExpeditionUi = { drawerOpen: boolean; tab: DrawerTab; logHtml: string; confirmHome?: boolean; stuckDismissed?: boolean; costTint?: boolean };
 
 export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi): string {
   const exp = state.expedition!;
@@ -134,7 +134,9 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
     // 9e0 (Muse option 2): stepped depth bands on standing water, a crosshatch on any
     // tile you can't cross with what you carry now, a bobber on water you could fish.
     if (terr === "lake" || terr === "sea") cls.push(`d${Math.min(depth, 3)}`);
-    if (!Number.isFinite(moveCost(terr, exp.loadout.equipment.transport, exp.loadout.equipment.tools))) cls.push("blocked");
+    const band = costBand(moveCost(terr, exp.loadout.equipment.transport, exp.loadout.equipment.tools));
+    if (band === null) cls.push("blocked");
+    else if (ui.costTint ?? true) cls.push(`cost${band}`); // the cost tint: green cheap → red slow, with your gear
     if ((exp.fished ?? []).some((f) => f.x === x && f.y === y)) cls.push("fished");
     else if (canFish && Math.abs(x - exp.pos.x) <= 1 && Math.abs(y - exp.pos.y) <= 1 && grid.catches?.[y]?.[x]) cls.push("bobber");
     if (isPlayer && (terr === "lake" || terr === "sea")) cls.push("on-raft"); // Muse option 1: you're on the raft
@@ -314,6 +316,7 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
       ${exp.weaponBuff ? `<div class="muted small">🗡️ ${name(exp.weaponBuff.id)} · ${exp.weaponBuff.charges} strike${exp.weaponBuff.charges === 1 ? "" : "s"} left</div>` : ""}
       <details class="settings"><summary>Settings</summary>
         <div class="actions">
+          <button data-toggle-costtint title="tint each tile by what a step onto it costs you, with what you carry">Cost colours: <b>${(ui.costTint ?? true) ? "on" : "off"}</b></button>
           <button data-toggle-autogather>Auto-gather on walk: <b>${autoGatherOn ? "on" : "off"}</b></button>
           <button data-act="toggle-auto-quaff" title="auto-drink a potion when HP drops low mid-fight">Auto-potion: <b>${(exp.autoQuaff ?? true) ? "on" : "off"}</b></button>
           <button data-act="toggle-auto-finish" title="resolve whole fights in one tap">Auto-finish fights: <b>${(exp.autoFinish ?? false) ? "on" : "off"}</b></button>

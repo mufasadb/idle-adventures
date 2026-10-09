@@ -64,6 +64,7 @@ installItemCard(app); // f2i7: hold (or tap) an item to see what it does
 // screens) holds everything that isn't the map; the map is a camera over the grid.
 let drawerOpen = false;
 let drawerTab: DrawerTab = "here";
+let costTint = (() => { try { return localStorage.getItem("idle-adv:costTint") !== "off"; } catch { return true; } })(); // per-viewer map setting
 let confirmHome = false; // the 🏠 button's "head home?" card is up
 let stuckDismissed = false; // "Not yet" on the exhausted card (cleared on any accepted action)
 let wasEngaged = false;
@@ -268,7 +269,7 @@ function draw(): void {
   const keepScroll = panelEl && panelEl.dataset.tsPanel === scene.panel ? panelEl.querySelector<HTMLElement>(".ts-panel-body")?.scrollTop ?? 0 : 0;
   const hasLast = loadLastPlan(SAVE_KEY).length > 0;
   app.innerHTML = state.phase !== "town"
-    ? expeditionView(state, route, { drawerOpen, tab: drawerTab, logHtml: logView(log), confirmHome, stuckDismissed })
+    ? expeditionView(state, route, { drawerOpen, tab: drawerTab, logHtml: logView(log), confirmHome, stuckDismissed, costTint })
     : inScene
       ? townSceneView(state, { prep, logHtml: logView(log), lastLine: log[0] ? formatLogEntry(log[0]).replace(/<br>/g, " ") : "", research: { history: researchLog, last: researchLast } })
       : `${townView(state, prep, hasLast, townTab, { wornOpen, research: { history: researchLog, last: researchLast } })}${logView(log)}`;
@@ -411,6 +412,11 @@ function wire(): void {
   app.querySelectorAll<HTMLElement>("[data-use-item]").forEach((el) => el.onclick = () => apply({ type: "use-item", itemId: el.dataset.useItem! }));
   app.querySelectorAll<HTMLElement>("[data-enhance]").forEach((el) => el.onclick = () => apply({ type: "enhance", id: el.dataset.enhance! }));
   app.querySelectorAll<HTMLElement>("[data-act]").forEach((el) => el.onclick = () => { route = []; confirmHome = false; apply({ type: el.dataset.act! } as Action); });
+  const tint = app.querySelector<HTMLElement>("[data-toggle-costtint]"); if (tint) tint.onclick = () => {
+    costTint = !costTint;
+    try { localStorage.setItem("idle-adv:costTint", costTint ? "on" : "off"); } catch { /* private mode: session-only */ }
+    draw();
+  };
   const home = app.querySelector<HTMLElement>("[data-home]"); if (home) home.onclick = () => { confirmHome = true; draw(); };
   const homeCancel = app.querySelector<HTMLElement>("[data-home-cancel]"); if (homeCancel) homeCancel.onclick = () => { confirmHome = false; stuckDismissed = true; draw(); };
   const gatherToggle = app.querySelector<HTMLElement>("[data-toggle-autogather]"); if (gatherToggle) gatherToggle.onclick = () => apply({ type: "toggle-auto-gather" });

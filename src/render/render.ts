@@ -893,3 +893,15 @@ export function itemSources(defId: string): string[] {
   if (Object.values(RECIPE).some((r) => r.output.defId === defId)) out.push("Crafted");
   return out;
 }
+
+/** Rough step-cost band for the map's cost tint (user 2026-10-10: "use colours to
+ *  indicate the rough cost of moving"). Effective energy per step with your gear:
+ *  1 = plains-cheap or better, 2 = a bit slow (mud), 3 = slow (ice), 4 = very slow
+ *  (river, shallows, mountains with a pick). Impassable tiles return null (they
+ *  already wear the blocked crosshatch). */
+export const COST_BANDS = [10, 15, 20] as const; // upper bound (inclusive) of bands 1–3
+export function costBand(stepCost: number): 1 | 2 | 3 | 4 | null {
+  if (!Number.isFinite(stepCost)) return null;
+  const i = COST_BANDS.findIndex((max) => stepCost <= max);
+  return (i === -1 ? 4 : i + 1) as 1 | 2 | 3 | 4;
+}

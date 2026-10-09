@@ -193,7 +193,7 @@
       .hud { position: absolute; top: 8px; left: 8px; z-index: 10; background: rgba(9, 9, 11, 0.82); border: 1px solid var(--gold-dim); border-radius: 3px; padding: 0.3rem 0.6rem 0.1rem; }
       .hud-title { font-family: "Cinzel", Georgia, serif; color: var(--gold); font-size: 0.85rem; letter-spacing: 0.06em; text-transform: capitalize; }
       .hud .bar { margin-bottom: 0.15rem; font-size: 0.85rem; }
-      .hud .bar span { width: 3.2rem; }
+      .hud .bar span { width: 4.4rem; white-space: nowrap; }
       .hud .track { width: 130px; height: 0.5rem; }
       .pan, .recentre { position: absolute; z-index: 9; width: 30px; height: 30px; padding: 0; border-radius: 50%; background: rgba(9, 9, 11, 0.7); color: var(--gold); border-color: var(--gold-dim); font-size: 0.75rem; }
       .pan-n { top: 6px; left: 50%; transform: translateX(-50%); }
@@ -459,6 +459,12 @@
       .routebar .slow { color: #e0b45e; font-size: 0.85rem; }
       @media (prefers-reduced-motion: reduce) { .fs-verdict.pulse { animation: none; outline: 2px solid #fff; } }
       /* ===== 9e0 (Muse option 2 + option 1's raft): map legibility ===== */
+      /* move-cost tint (user 2026-10-10): what a step onto the tile costs with your gear */
+      .tile.cost1::before, .tile.cost2::before, .tile.cost3::before, .tile.cost4::before { content: ""; position: absolute; inset: 0; pointer-events: none; }
+      .tile.cost1::before { background: #4caf501c; }
+      .tile.cost2::before { background: #d4c43a26; }
+      .tile.cost3::before { background: #f0902a2e; }
+      .tile.cost4::before { background: #e0442e40; }
       .tile.blocked::before { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
         background: repeating-linear-gradient(45deg, rgba(160, 36, 30, 0.42) 0 2px, transparent 2px 7px); }
       .tile.d1 { filter: brightness(1); }

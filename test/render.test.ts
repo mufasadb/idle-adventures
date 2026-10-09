@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { flavorDetail, matchupLessons, combatForecast, poiGlyph, kindLabel, POI_CHAR, itemSources, formatEvent, setEnergyUnit } from "../src/render/render";
+import { flavorDetail, matchupLessons, combatForecast, poiGlyph, kindLabel, POI_CHAR, itemSources, formatEvent, setEnergyUnit, costBand } from "../src/render/render";
 import { emptyLoadout } from "../src/engine/loadout";
 import { playerDamage, damageTaken } from "../src/engine/combat";
 import { MONSTERS, MONSTER_TIER_HP_CURVE } from "../src/data/constants";
@@ -85,4 +85,13 @@ test("energy unit: the console keeps 'e'; the web swaps in ⚡ (user 2026-10-10)
   expect(formatEvent(ev, String)).toMatch(/\de → 40e$/);
   setEnergyUnit("⚡");
   try { expect(formatEvent(ev, String)).toMatch(/\d⚡ → 40⚡$/); } finally { setEnergyUnit("e"); }
+});
+
+test("costBand: cheap → slow bands, impassable has none (user 2026-10-10 cost tint)", () => {
+  expect(costBand(5)).toBe(1);
+  expect(costBand(10)).toBe(1);
+  expect(costBand(15)).toBe(2);
+  expect(costBand(20)).toBe(3);
+  expect(costBand(30)).toBe(4);
+  expect(costBand(Infinity)).toBeNull();
 });
