@@ -13,7 +13,7 @@ import { bagCells, name } from "../render/render";
 import { EQUIP_SLOTS } from "../engine/pack";
 import type { StationId } from "../data/constants";
 import { TOWN_ART, TOWN_GROUND, HERO_FRAMES } from "./assets";
-import { scenePlacements, spotAt, spotBox, walkMs, cameraX, clampCam, HERO_HOME, HERO_H, GATE_OUTSIDE, GROUND } from "./town-layout";
+import { scenePlacements, spotAt, spotBox, walkPlan, cameraX, clampCam, HERO_HOME, HERO_H, GATE_OUTSIDE, GROUND } from "./town-layout";
 import type { Pt, Spot, TownPanel } from "./town-layout";
 import type { ResearchLogEntry } from "./craft-tree";
 import { mapSelectSection, bankSection, recipeSection, stableSection, researchSection, ic, prepValid } from "./town-view";
@@ -185,24 +185,42 @@ function setGate(open: boolean): void {
   g.querySelector("img")?.setAttribute("src", TOWN_ART[open ? "gate-open" : "gate-closed"]);
 }
 
-/** Walk the hero to `to` (ground fraction); resolves on arrival. A newer walk cancels this one. */
-export function walkTo(to: Pt, ms = walkMs(scene.hero, to)): Promise<boolean> {
+/** Walk the hero to `to` (ground fraction); resolves on arrival. A newer walk cancels
+ *  this one. With no `ms`, a long way is a few steps then a fade to the spot (walkPlan);
+ *  an explicit `ms` always walks the whole way (the gate). */
+export async function walkTo(to: Pt, ms?: number): Promise<boolean> {
   const token = ++scene.walkToken;
   scene.cam = null; // follow the hero again
   if (to.x !== scene.hero.x) scene.facing = to.x < scene.hero.x ? "left" : "right";
-  if (reducedMotion() || ms === 0) {
+  const plan = ms === undefined ? walkPlan(scene.hero, to) : { walk: to, ms, blink: false };
+  if (reducedMotion() || plan.ms === 0) {
     scene.hero = { ...to }; scene.frame = 0;
     paintHero(); applyCam();
-    return Promise.resolve(true);
+    return true;
   }
+  if (!plan.blink) return stride(plan.walk, plan.ms, token);
+  const h = () => app?.querySelector<HTMLElement>(".ts-hero");
+  setTimeout(() => { if (token === scene.walkToken) h()?.classList.add("blink"); }, plan.ms - FADE_MS);
+  const ok = await stride(plan.walk, plan.ms, token);
+  if (!ok) { h()?.classList.remove("blink"); return false; }
+  scene.hero = { ...to }; scene.frame = 0;
+  paintHero(); applyCam();
+  h()?.classList.remove("blink"); // fades back in where it was sent
+  await new Promise((r) => setTimeout(r, FADE_MS));
+  return token === scene.walkToken;
+}
+
+const FADE_MS = 250; // matches .ts-hero's opacity transition
+
+/** Walk in a straight line at a steady pace (the walk-cycle frames + a little bob). */
+function stride(to: Pt, ms: number, token: number): Promise<boolean> {
   const from = { ...scene.hero }, t0 = performance.now();
   return new Promise((done) => {
     const step = (now: number) => {
       if (token !== scene.walkToken) return done(false);
       const t = Math.min(1, (now - t0) / ms);
-      const e = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2; // ease in-out
-      scene.hero = { x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e };
-      const n = Math.floor((now - t0) / 120);
+      scene.hero = { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
+      const n = Math.floor((now - t0) / 140);
       scene.frame = t < 1 ? 1 + (n % 4) : 0;
       paintHero(t < 1 && n % 2 ? -1.5 : 0); // the two-pose cycle gets a little bob
       applyCam();

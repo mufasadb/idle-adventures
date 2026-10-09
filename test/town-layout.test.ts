@@ -1,7 +1,7 @@
 // 0m4: the walkable town's layout table — positions, hit-testing, plot sprites.
 import { describe, expect, test } from "bun:test";
 import { readFileSync, existsSync } from "node:fs";
-import { ART, GROUND, PLOTS, TOWN_LAYOUT, HERO_HOME, plotArt, scenePlacements, spotAt, spotBox, walkMs, cameraX, clampCam } from "../src/web/town-layout";
+import { ART, GROUND, PLOTS, TOWN_LAYOUT, HERO_HOME, plotArt, scenePlacements, spotAt, spotBox, walkMs, walkPlan, WALK_SPEED, BLINK_LEAD_MS, cameraX, clampCam } from "../src/web/town-layout";
 import type { ArtKey, Spot } from "../src/web/town-layout";
 import type { StationId } from "../src/data/constants";
 
@@ -99,12 +99,22 @@ describe("layout", () => {
 });
 
 describe("walking + camera", () => {
-  test("a walk takes ~0.5–1s; standing still takes none", () => {
+  test("a walk goes at WALK_SPEED; standing still takes none", () => {
     expect(walkMs(HERO_HOME, HERO_HOME)).toBe(0);
-    expect(walkMs(HERO_HOME, { x: 0.52, y: 0.72 })).toBe(500);
-    expect(walkMs({ x: 0.05, y: 0.5 }, { x: 0.95, y: 0.5 })).toBe(1000);
-    const mid = walkMs(HERO_HOME, { x: 0.65, y: 0.6 });
-    expect(mid).toBeGreaterThan(500); expect(mid).toBeLessThan(1000);
+    const hop = walkMs(HERO_HOME, { x: 0.52, y: 0.72 });
+    expect(hop).toBe(Math.round((0.02 * GROUND.w / GROUND.h / WALK_SPEED) * 1000));
+    expect(walkMs({ x: 0.05, y: 0.5 }, { x: 0.95, y: 0.5 })).toBeGreaterThan(walkMs(HERO_HOME, { x: 0.65, y: 0.6 }));
+  });
+
+  test("a short walk goes all the way; a long one sets off, then blinks to the spot", () => {
+    const near = { x: 0.53, y: 0.72 };
+    expect(walkPlan(HERO_HOME, near)).toEqual({ walk: near, ms: walkMs(HERO_HOME, near), blink: false });
+    const far = { x: 0.95, y: 0.5 };
+    const p = walkPlan({ x: 0.05, y: 0.5 }, far);
+    expect(p.blink).toBe(true);
+    expect(p.ms).toBe(BLINK_LEAD_MS);
+    expect(p.walk.x).toBeGreaterThan(0.05); expect(p.walk.x).toBeLessThan(0.3); // set off the right way, a few steps
+    expect(p.walk.y).toBe(0.5);
   });
 
   test("the camera centres the hero but never shows past the ground's edges", () => {

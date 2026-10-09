@@ -126,10 +126,28 @@ export function spotAt(spots: readonly Spot[], p: Pt, inset = 0.12): Spot | null
   return hit;
 }
 
-/** Walk time in ms: ~0.5s for a short hop up to ~1s across the square. */
+/** Walking pace in ground heights per second (the hero is HERO_H tall, so ~3 body
+ *  lengths a second: a brisk stroll, not a glide). */
+export const WALK_SPEED = 0.45;
+/** A walk longer than this is cut short: the hero sets off for BLINK_LEAD_MS, fades
+ *  out, and fades back in at the destination (user 2026-10-10: "looks normal but we
+ *  don't have to watch them"). */
+export const BLINK_AFTER_MS = 1000;
+export const BLINK_LEAD_MS = 650;
+
+/** Walk time in ms at WALK_SPEED; standing still takes none. */
 export function walkMs(from: Pt, to: Pt): number {
   const d = Math.hypot((to.x - from.x) * GROUND.w / GROUND.h, to.y - from.y); // in ground heights
-  return d < 0.005 ? 0 : Math.round(Math.min(1000, Math.max(500, 450 + d * 350)));
+  return d < 0.005 ? 0 : Math.round((d / WALK_SPEED) * 1000);
+}
+
+/** How to get from `from` to `to`: walk there outright, or (a long way) walk toward
+ *  `walk` for `ms`, then blink to `to`. */
+export function walkPlan(from: Pt, to: Pt): { walk: Pt; ms: number; blink: boolean } {
+  const ms = walkMs(from, to);
+  if (ms <= BLINK_AFTER_MS) return { walk: to, ms, blink: false };
+  const f = BLINK_LEAD_MS / ms;
+  return { walk: { x: from.x + (to.x - from.x) * f, y: from.y + (to.y - from.y) * f }, ms: BLINK_LEAD_MS, blink: true };
 }
 
 /** The camera's left edge (px) to centre `x` (ground fraction) in a view `viewW` wide,
