@@ -75,6 +75,9 @@ test("no rod → missing-tool; no water around → no-water", () => {
   const dry = find((g, p) => isLand(g, p) && waterAround(g, p).length === 0);
   const r2 = reduce(at(dry.seed, dry.pos), { type: "fish" });
   expect(r2.events[0]).toMatchObject({ type: "action-rejected", reason: "no-water" });
+  // no rod AND no water → no-water (not "needs a rod" on every dry tile)
+  const r3 = reduce(at(dry.seed, dry.pos, { tools: [] }), { type: "fish" });
+  expect(r3.events[0]).toMatchObject({ type: "action-rejected", reason: "no-water" });
 });
 
 test("a cast spends FISH_CAST_ENERGY, lands the catch, and marks the tile fished", () => {

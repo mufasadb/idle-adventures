@@ -137,9 +137,6 @@ export function fish(state: GameState): { state: GameState; events: GameEvent[] 
   const expedition = state.expedition;
   if (state.phase !== "expedition" || !expedition) return rejected(state, "fish", "not-on-expedition");
   if (expedition.combat) return rejected(state, "fish", "engaged");
-  if (!expedition.loadout.equipment.tools.some((t) => TOOL_CAPABILITY[t] === "fish")) {
-    return rejected(state, "fish", "missing-tool");
-  }
   const grid = expeditionGrid(expedition);
   const fished = expedition.fished ?? [];
   let anyWater = false;
@@ -158,6 +155,11 @@ export function fish(state: GameState): { state: GameState; events: GameEvent[] 
     if (!spot || score > spot.score) spot = { x, y, catch: caught, depth, score };
   }
   if (!anyWater) return rejected(state, "fish", "no-water");
+  // Water before rod: away from water a rodless player has nothing to be told (the
+  // surfaces only nag about a rod when there's water to cast into).
+  if (!expedition.loadout.equipment.tools.some((t) => TOOL_CAPABILITY[t] === "fish")) {
+    return rejected(state, "fish", "missing-tool");
+  }
   if (!spot) return rejected(state, "fish", "fished-out");
   const cost = FISH_CAST_ENERGY;
   if (cost > expedition.energy) return rejected(state, "fish", "exhausted");
