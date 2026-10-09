@@ -283,7 +283,14 @@ function centerOnPlayer(): void {
   const vp = viewportEl();
   const pl = app.querySelector<HTMLElement>(".tile.player");
   if (!vp || !pl) return;
-  cam = { x: (pl.offsetLeft + 16) * ZOOM - vp.clientWidth / 2, y: (pl.offsetTop + 16) * ZOOM - vp.clientHeight / 2 };
+  // centre in the part of the map an open drawer leaves showing (a side sheet in
+  // landscape, a bottom sheet in portrait)
+  const v = vp.getBoundingClientRect(), dEl = app.querySelector<HTMLElement>(".drawer.open");
+  const d = dEl && getComputedStyle(dEl).position === "fixed" ? dEl.getBoundingClientRect() : null;
+  const side = !!d && d.top <= v.top + 1, bottom = !!d && !side;
+  const viewW = side ? Math.max(0, d!.left - v.left) : vp.clientWidth;
+  const viewH = bottom ? Math.max(0, d!.top - v.top) : vp.clientHeight;
+  cam = { x: (pl.offsetLeft + 16) * ZOOM - viewW / 2, y: (pl.offsetTop + 16) * ZOOM - viewH / 2 };
   applyCam();
 }
 function panBy(dx: number, dy: number): void { cam = { x: cam.x + dx, y: cam.y + dy }; applyCam(); }
@@ -338,7 +345,7 @@ function wire(): void {
   app.querySelectorAll<HTMLElement>("[data-town-tab]").forEach((el) => el.onclick = () => { townTab = el.dataset.townTab as TownTab; draw(); });
   app.querySelectorAll<HTMLElement>("[data-pan]").forEach((el) => el.onclick = () => { const [dx, dy] = el.dataset.pan!.split(",").map(Number); panBy(dx! * TILE_PX * ZOOM, dy! * TILE_PX * ZOOM); });
   const recentre = app.querySelector<HTMLElement>("[data-recentre]"); if (recentre) recentre.onclick = () => centerOnPlayer();
-  const handle = app.querySelector<HTMLElement>("[data-drawer-toggle]"); if (handle) handle.onclick = () => { drawerOpen = !drawerOpen; draw(); };
+  const handle = app.querySelector<HTMLElement>("[data-drawer-toggle]"); if (handle) handle.onclick = () => { drawerOpen = !drawerOpen; draw(); setTimeout(centerOnPlayer, 200); }; // after the drawer's height transition
   app.querySelectorAll<HTMLElement>("[data-tab]").forEach((el) => el.onclick = () => { drawerTab = el.dataset.tab as DrawerTab; drawerOpen = true; draw(); });
   app.querySelectorAll<HTMLElement>("[data-open-tab]").forEach((el) => el.onclick = () => { drawerTab = el.dataset.openTab as DrawerTab; drawerOpen = true; draw(); });
   app.querySelectorAll<HTMLElement>("[data-embark]").forEach((el) => el.onclick = () => embark(el.dataset.embark!));
