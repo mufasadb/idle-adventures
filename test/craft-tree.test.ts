@@ -1,5 +1,5 @@
-// 675 web pass: the crafting tree's pure layout (tier rows, undiscovered counts,
-// connector pairs), the rendered workshop + research table, and the one-time fog
+// 675 web pass: the crafting tree's card model (tiers, undiscovered counts,
+// connector pairs), the rendered workshop (o9vr: Civ-style; geometry in tree-layout.test.ts) + research table, and the one-time fog
 // migration for a pre-fog save.
 import { describe, expect, test } from "bun:test";
 import { newGame } from "../src/engine/town";
@@ -9,7 +9,7 @@ import { legalActions } from "../src/sim/legal";
 import { townRecipeIds, fieldRecipeIds } from "../src/render/render";
 import { STARTER_RECIPES, RESEARCH_SEARCHES_PER_INK } from "../src/data/constants";
 import type { GameState, ItemStack } from "../src/engine/types";
-import { treeLayout, connectorPairs, workshopSection, researchSection, researchStatusLine } from "../src/web/craft-tree";
+import { treeLayout, connectorPairs, workshopSection, researchSection, researchStatusLine, freshTreeUi } from "../src/web/craft-tree";
 import { migrateFog } from "../src/web/persist";
 
 const stacks = (o: Record<string, number>): ItemStack[] => Object.entries(o).map(([defId, qty]) => ({ defId, qty }));
@@ -74,33 +74,63 @@ describe("treeLayout", () => {
   });
 });
 
-describe("workshopSection (rendered)", () => {
-  test("fresh: the four starter cards with named (not ???) inputs, tier rows top-down T5…T1 with undiscovered counts", () => {
-    const html = workshopSection(fresh());
-    for (const id of STARTER_RECIPES) expect(html).toContain(`data-card="${id}"`);
-    expect(html).not.toContain('data-card="canteen"');
-    expect(html).toContain("Flint");
-    expect(html).not.toContain("???");
-    const order = [...html.matchAll(/data-tier="(\d)"/g)].map((m) => Number(m[1]));
-    expect(order).toEqual([5, 4, 3, 2, 1]);
-    expect(html).toMatch(/\+ \d+ undiscovered/);
+describe("workshopSection (rendered — o9vr: the Civ-style tree)", () => {
+  test("fresh: the four starter nodes with named (not ???) inputs, tier columns left → right with known/hidden counts and a fog node each", () => {
+    const html = workshopSection(fresh(), freshTreeUi());
+    for (const id of STARTER_RECIPES) expect(html).toContain(`data-ct-node="${id}"`);
+    expect(html).not.toContain('data-ct-node="canteen"');
+    expect(html).not.toContain('class="u">?');
+    const tiers = [...html.matchAll(/class="ct-era"[^>]*>Tier ([IVX]+)<small>(\d+) known · (\d+) hidden/g)].map((m) => m[1]);
+    expect(tiers).toEqual(["I", "II", "III", "IV", "V"]);
+    expect(html).toMatch(/\+\d+ undiscovered/);
+    expect(html).toContain("<svg class=\"ct-links\"");
+    expect(html).toContain('data-tree-close');
   });
 
-  test("a craftable card has a Craft button keyed by recipe; a station-gated one names its gate", () => {
+  test("a craftable node shows ×N and sits in the make-now strip; its tray crafts that recipe; a station-gated node is 🔒 and its tray names the gate as jump chips", () => {
     const s = migrateFog(oldSave())!;
-    const html = workshopSection(s);
-    expect(html).toContain('data-craft="canteen"');
-    expect(html).toMatch(/data-recipe="plate-chest"[^]*?🔒 needs anvil/);
+    const ui = freshTreeUi();
+    const html = workshopSection(s, ui);
+    expect(html).toMatch(/class="ct-node can[^"]*" data-ct-node="canteen"[^]*?class="ct-badge">×\d+/);
+    expect(html).toMatch(/class="ct-now"[^]*data-ct-go="canteen"/);
+    expect(html).toMatch(/Can make \(\d+\)/);
+    expect(html).not.toContain("data-ct-tray"); // nothing selected: no tray
+    const tray = workshopSection(s, { ...ui, sel: "canteen" });
+    expect(tray).toContain('data-ct-craft="canteen"');
+    expect(tray).toMatch(/need \d+ · you have \d+ ✓/);
+    expect(tray).toMatch(/class="ct-node can[^"]* sel"/);
+    expect(html).toMatch(/class="ct-node gated[^"]*" data-ct-node="plate-chest"[^]*?🔒/);
+    const gated = workshopSection(s, { ...ui, sel: "plate-chest" });
+    expect(gated).toMatch(/class="ct-gatebox">🔒 needs [^]*data-ct-go="(anvil|blacksmiths-hammer)"/);
+    expect(gated).toMatch(/data-ct-craft="plate-chest"[^>]*disabled/);
   });
 
-  test("a researched recipe is a greyed card with a 'researched' mark and its unheld inputs named as heard", () => {
+  test("selecting lights its path: feeders gold (hl-in / path.in), what it feeds blue (hl-out / path.out), the rest quiet", () => {
+    const s = migrateFog(oldSave())!;
+    const html = workshopSection(s, { ...freshTreeUi(), sel: "plate-chest" });
+    expect(html).toMatch(/class="ct-node [^"]*hl-in" data-ct-node="blacksmiths-hammer"/);
+    expect(html).toMatch(/<path class="k-tool in"/);
+    expect(html).toMatch(/class="ct-node [^"]*quiet" data-ct-node="ration"/);
+  });
+
+  test("a researched recipe is a dashed (revealed) node; its tray says where it was found", () => {
     const s0 = migrateFog(oldSave())!;
     const r = reduce(s0, { type: "research", query: "tent" });
     const hit = r.events.find((e) => e.type === "research-hit");
     expect(hit?.type === "research-hit" && hit.recipeId).toBe("tent");
-    const html = workshopSection(r.state);
-    expect(html).toMatch(/class="ct-card dim researched" data-card="tent"/);
-    expect(html).toMatch(/ct-chip heard" data-in="pine-log"/);
+    const html = workshopSection(r.state, freshTreeUi());
+    expect(html).toMatch(/class="ct-node (short|gated) revealed" data-ct-node="tent"/);
+    expect(workshopSection(r.state, { ...freshTreeUi(), sel: "tent" })).toContain("found at the research table");
+  });
+
+  test("Field filter lists the field recipes; Materials lights the recipes that use a held material", () => {
+    const s = migrateFog(oldSave())!;
+    const field = workshopSection(s, { ...freshTreeUi(), filter: "field" });
+    expect(field).toContain("ct-fieldview");
+    expect(field).not.toContain("ct-canvas");
+    const mats = workshopSection(s, { ...freshTreeUi(), matsOpen: true, mat: "forest-herb" });
+    expect(mats).toMatch(/class="ct-mchip on" data-ct-mat="forest-herb"/);
+    expect(mats).toMatch(/class="ct-node [^"]*matuse" data-ct-node="ration"/);
   });
 });
 

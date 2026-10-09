@@ -19,7 +19,7 @@ import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot } from "../en
 import type { LogEntry } from "./log";
 import { logView } from "./log";
 import { save, load, loadLog, saveLastPlan, loadLastPlan, migrateFog, FOG_NOTICE, loadResearchLog, saveResearchLog, RESEARCH_HISTORY_MAX } from "./persist";
-import { paintTreeLinks, flashRecipe } from "./craft-tree";
+import { mountTree, focusRecipe } from "./craft-tree";
 import type { ResearchLogEntry } from "./craft-tree";
 import { townView, prepValid } from "./town-view";
 import { townSceneView, mountScene, walkOut, walkIn, goToSpot, resetScene, scene } from "./town-scene";
@@ -117,6 +117,30 @@ function repackLast(): void {
 
 // --- action plumbing: one funnel so every interaction goes through reduce ----
 function apply(action: Action): GameEvent[] {
+  const events = step(action);
+  trimAndDraw();
+  return events;
+}
+// o9vr: craft N from the workshop tray — N real craft actions through the same funnel
+// (the reducer decides each one), drawn once; stops at the first refusal.
+function craftN(recipeId: string, n: number): void {
+  let made = 0, got = 0;
+  for (let i = 0; i < n; i++) {
+    const ev = step({ type: "craft", recipeId });
+    if (ev.some((e) => e.type === "action-rejected")) break;
+    made++;
+    for (const e of ev) if (e.type === "crafted") got += e.output.qty;
+  }
+  // the note names the last craft ("+2 Ration … (now 9)") — say the batch's total instead
+  if (made > 1 && fx.note?.ok) fx.note = { ...fx.note, text: fx.note.text.replace(/^\+\d+/, `+${got}`) };
+  trimAndDraw();
+}
+function closeTree(): void {
+  if (state.phase === "town" && townMode === "scene" && !packOpen) scene.panel = null;
+  else townTab = "main";
+  draw();
+}
+function step(action: Action): GameEvent[] {
   const prevLoadout = state.loadout; // embark consumes this plan — stash it for repack
   const { state: next, events } = reduce(state, action);
   if (action.type === "embark" && !events.some((e) => e.type === "action-rejected")) saveLastPlan(SAVE_KEY, prevLoadout);
@@ -150,7 +174,6 @@ function apply(action: Action): GameEvent[] {
       log.unshift({ t: "event", e });
     }
   }
-  trimAndDraw();
   return events;
 }
 // 675: ask the research table. Hit or miss, the result shows in the panel and joins the history.
@@ -168,7 +191,7 @@ function research(query: string): void {
 function findRecipe(recipeId: string): void {
   if (townMode === "scene") scene.panel = "recipes"; else townTab = "recipes";
   draw();
-  flashRecipe(app, recipeId);
+  focusRecipe(app, recipeId);
 }
 function note(line: string): void { log.unshift({ t: "note", text: line }); trimAndDraw(); }
 function trimAndDraw(): void { log = log.slice(0, 16); draw(); }
@@ -249,6 +272,7 @@ function draw(): void {
       ? townSceneView(state, { prep, logHtml: logView(log), lastLine: log[0] ? formatLogEntry(log[0]).replace(/<br>/g, " ") : "", research: { history: researchLog, last: researchLast } })
       : `${townView(state, prep, hasLast, townTab, { wornOpen, research: { history: researchLog, last: researchLast } })}${logView(log)}`;
   wire(); save(SAVE_KEY, state, log);
+  mountTree(app, state, { craft: craftN, close: closeTree }); // o9vr: the workshop's tree (pan, select, tray) — before paintFx, which anchors the craft note in its tray
   if (inScene) {
     mountScene(app, arriveAt, state);
     const body = app.querySelector<HTMLElement>(".ts-panel-body");
@@ -262,7 +286,6 @@ function draw(): void {
     if (p !== camPos) { centerOnPlayer(); camPos = p; } else applyCam();
   } else camPos = null;
   paintFx(app, fx, now()); // after the camera: tile cues read live tile positions
-  if (state.phase === "town") paintTreeLinks(app); // 675: the crafting tree's connector lines (after paintFx — a craft note shifts the layout)
 }
 
 // --- map camera (kml) ----------------------------------------------------------
@@ -342,7 +365,7 @@ document.addEventListener("keydown", (ev) => {
   ev.preventDefault();
   panBy(v[0] * step, v[1] * step);
 });
-addEventListener("resize", () => { applyCam(); if (state.phase === "town") paintTreeLinks(app); });
+addEventListener("resize", () => applyCam());
 
 // --- wiring: attach handlers after each render -------------------------------
 function wire(): void {
@@ -435,7 +458,7 @@ function arriveAt(s: Spot): void {
   else return;
   draw();
   if (a.kind === "plot" && !(state.stations ?? []).includes(a.station)) {
-    flashRecipe(app, a.station); // 675: scroll the tree to the station's card and flash it (absent while still undiscovered)
+    focusRecipe(app, a.station); // 675: scroll the tree to the station's card and flash it (absent while still undiscovered)
   }
 }
 // Embark: in the square the gate opens and the hero walks out first (a refused embark

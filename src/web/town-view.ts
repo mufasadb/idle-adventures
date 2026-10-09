@@ -94,7 +94,7 @@ export function townView(state: GameState, prep: string | null, hasLastPlan: boo
     <div class="cols town show-${tab}">
       <div class="tsec" data-tsec="main">${mapSelectSection(state, local, heldMaps)}</div>
       <div class="tsec" data-tsec="bank">${bankSection(state)}</div>
-      <div class="tsec" data-tsec="recipes">${recipeSection(state)}</div>
+      <div class="tsec" data-tsec="recipes">${tab === "recipes" ? recipeSection(state) : `<section><h2>Crafting tree</h2><button data-town-tab="recipes">Open the crafting tree ▶</button></section>`}</div>
       <div class="tsec" data-tsec="research">${researchSection(state, ui.research?.history ?? [], ui.research?.last ?? null)}</div>
     </div>`;
 }
@@ -356,7 +356,7 @@ export function bankSection(state: GameState): string {
     </section>`;
 }
 
-// 675: the recipe book is now the crafting tree (craft-tree.ts) — fogged, in tier rows.
+// 675/o9vr: the recipe book is the crafting tree (craft-tree.ts) — fogged, a full-screen workshop.
 export function recipeSection(state: GameState): string {
   return workshopSection(state);
 }
