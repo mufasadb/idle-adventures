@@ -6,10 +6,11 @@ import { playerDamage, damageTaken, strikeExchange, wieldsRanged, hasAmmo, loade
 import { consumeOne, addToCarry, freeLootStacks, carryCap, slotCap, quiverAmmoSlots, energyCapOf } from "../engine/carry";
 import { heldFoodEnergy } from "../engine/food";
 import { toolSpeedFor, secondaryToolSatisfied } from "../engine/tools";
+import { recipeKnowledge } from "../engine/knowledge";
 import { CONSUMABLE_KINDS, CONSUMABLE_KEYS } from "../engine/catalog";
 import { moveCost } from "../engine/move";
 import { ARMOUR_SLOTS } from "../engine/pack";
-import type { Action, Equipment, Expedition, Loadout, MapItem, RejectionReason, GameEvent, ItemStack, LoadoutSlot } from "../engine/types";
+import type { Action, Equipment, Expedition, GameState, Loadout, MapItem, RejectionReason, GameEvent, ItemStack, LoadoutSlot } from "../engine/types";
 import { mapEpithet } from "../engine/town";
 import { hintLabel } from "../engine/hints";
 
@@ -857,6 +858,48 @@ export function tradeoffDeltaText(d: TradeoffDelta): string {
   const reach = [d.energy !== 0 ? `${signed(d.energy)}${EN}` : "", d.tiles !== 0 ? `≈ ${signed(d.tiles)} tiles` : ""].filter(Boolean).join(" ");
   if (reach) parts.push(reach);
   if (d.loot !== 0) parts.push(`${signed(d.loot)} loot`);
+  return parts.join(" · ");
+}
+
+// --- Coming home (seyh.1): what you hauled, what you left unspent, what it unlocked ---
+// Derived from the last expedition state (the step before run-ended) + the town state
+// after it — no engine state. Haul = the loot carry + carried maps exactly as they
+// banked (endExpedition), NOT the supplies that banked back; one entry per defId (the
+// carry's STACK_CAP stacks summed), in first-carried order. Unspent = the energy you
+// still had. New recipes = known now minus known at embark (the web snapshots that set
+// at embark; without it, known just before the return — the D104 fog's "next" flips as
+// you first hold an input, so that fallback usually finds nothing).
+export function knownRecipeIds(state: GameState): string[] {
+  return recipeKnowledge(state).filter((k) => k.status === "known").map((k) => k.recipeId);
+}
+export type Homecoming = { haul: ItemStack[]; maps: MapItem[]; unspent: number; maxEnergy: number; newRecipes: string[]; defeated: boolean };
+export function homecomingSummary(before: GameState, events: GameEvent[], after: GameState, knownAtEmbark: readonly string[] | null = null): Homecoming | null {
+  const exp = before.expedition;
+  const ended = events.find((e): e is Extract<GameEvent, { type: "run-ended" }> => e.type === "run-ended");
+  if (!exp || !ended || after.phase !== "town") return null;
+  const haul: ItemStack[] = [];
+  for (const s of exp.carry) {
+    const h = haul.find((x) => x.defId === s.defId);
+    if (h) h.qty += s.qty; else haul.push({ defId: s.defId, qty: s.qty });
+  }
+  const was = new Set(knownAtEmbark ?? knownRecipeIds(before));
+  return {
+    haul,
+    maps: [...(exp.carriedMaps ?? [])],
+    unspent: exp.energy,
+    maxEnergy: exp.maxEnergy ?? MAX_ENERGY,
+    newRecipes: knownRecipeIds(after).filter((id) => !was.has(id)),
+    defeated: ended.reason === "defeated",
+  };
+}
+// The homecoming as one plain line (the strip's tooltip / screen-reader text; the web
+// draws the same facts as icons): "Home with 3× Oak Log, 1 map · 180⚡ unspent · new: Iron Pick".
+export function homecomingLine(h: Homecoming, nm: (defId: string) => string = name): string {
+  const goods = [...h.haul.map((s) => `${s.qty}× ${nm(s.defId)}`), ...(h.maps.length ? [`${h.maps.length} map${h.maps.length > 1 ? "s" : ""}`] : [])];
+  const lead = h.defeated ? "Beaten and dragged home" : "Home";
+  const parts = [goods.length ? `${lead} with ${goods.join(", ")}` : `${lead} empty-handed`];
+  parts.push(h.unspent > 0 ? `${h.unspent}${EN} unspent` : `every ${EN} spent`);
+  if (h.newRecipes.length) parts.push(`new: ${h.newRecipes.map((id) => nm(RECIPE[id]?.output.defId ?? id)).join(", ")}`);
   return parts.join(" · ");
 }
 

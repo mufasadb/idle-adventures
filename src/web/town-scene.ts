@@ -79,7 +79,7 @@ function heroStyle(p: Pt): string {
   return `left:${pct(p.x - w / 2)};top:${pct(p.y - HERO_H)};width:${pct(w)};height:${pct(HERO_H)};z-index:${Math.round(p.y * 1000) + 1}`;
 }
 
-export type SceneOpts = { prep: string | null; logHtml: string; lastLine: string; research?: { history: ResearchLogEntry[]; last: ResearchLogEntry | null } };
+export type SceneOpts = { prep: string | null; logHtml: string; lastLine: string; research?: { history: ResearchLogEntry[]; last: ResearchLogEntry | null }; homeStrip?: string };
 
 export function townSceneView(state: GameState, o: SceneOpts): string {
   const spots = scenePlacements((state.stations ?? []) as StationId[]);
@@ -114,7 +114,7 @@ export function townSceneView(state: GameState, o: SceneOpts): string {
     </div>
     ${bar}
     ${hint}
-    ${o.lastLine ? `<div class="ts-last" data-panel="log" title="open the log">${o.lastLine}</div>` : ""}
+    ${o.homeStrip ?? (o.lastLine ? `<div class="ts-last" data-panel="log" title="open the log">${o.lastLine}</div>` : "")}
   </div>
   ${panel}
   ${scene.panel ? "" : `<div class="ts-below"><p class="muted small">Tap a building and you walk over to it · drag to look around the square.</p>${o.logHtml}</div>`}`;
@@ -254,8 +254,9 @@ export async function walkOut(): Promise<void> {
   scene.busy = false;
 }
 
-/** Home from a run: the hero comes in through the open gate, which shuts behind him. */
-export async function walkIn(): Promise<void> {
+/** Home from a run: the hero comes in through the open gate, which shuts behind him.
+ *  seyh.1: with a haul he stops at `stopAt` (the packing cloth) to lay it out. */
+export async function walkIn(stopAt: Pt = HERO_HOME): Promise<void> {
   scene.busy = true;
   scene.heroGone = false;
   scene.hero = { ...GATE_OUTSIDE };
@@ -264,8 +265,29 @@ export async function walkIn(): Promise<void> {
   const gate = scenePlacements([]).find((s) => s.id === "gate")!;
   await walkTo(gate.stand, 500);
   setGate(false);
-  await walkTo(HERO_HOME);
+  await walkTo(stopAt);
   scene.busy = false;
+}
+
+/** seyh.1: glide the camera so ground-x `x` is centred (the haul flying to the bank);
+ *  it stays there (a manual camera) until the hero next walks. */
+export function panCamTo(x: number, ms: number): Promise<void> {
+  const vp = vpEl();
+  if (!vp || !worldW) return Promise.resolve();
+  const from = scene.cam ?? cameraX(scene.hero.x, worldW, vp.clientWidth);
+  const to = cameraX(x, worldW, vp.clientWidth);
+  if (reducedMotion() || ms <= 0 || Math.abs(to - from) < 1) { scene.cam = to; applyCam(); return Promise.resolve(); }
+  const t0 = performance.now(), token = scene.walkToken;
+  return new Promise((done) => {
+    const step = (now: number) => {
+      if (token !== scene.walkToken) return done();
+      const t = Math.min(1, (now - t0) / ms), e = t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t); // ease in-out
+      scene.cam = from + (to - from) * e;
+      applyCam();
+      if (t < 1) requestAnimationFrame(step); else done();
+    };
+    requestAnimationFrame(step);
+  });
 }
 
 /** Reset the scene when leaving town (the next visit starts by the gate). */
