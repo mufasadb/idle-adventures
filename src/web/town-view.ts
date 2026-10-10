@@ -148,7 +148,7 @@ function packScreen(state: GameState, mapSeed: string, local: LocalMap, heldMaps
   const top = `<div class="pk-top">
       <button class="link" data-back>← town</button>
       <nav class="pk-tabs">${tabBtn("main", "Pack")}${tabBtn("recipes", "Recipes")}</nav>
-      <span class="pk-dest muted small">${isLocal ? "free local run — the map is not used up" : `<span class="warn">⚠ embarking SPENDS this map</span>`}</span>
+      <span class="pk-dest muted small"><b class="pk-for">Packing for the road</b> · ${isLocal ? "free local run — the map is not used up" : `<span class="warn">⚠ embarking SPENDS this map</span>`}</span>
     </div>`;
   if (tab === "recipes") return `<div class="packscreen recipes">${top}<div class="pk-recipes">${recipeSection(state)}</div></div>`;
   const legal = legalActions(state);
