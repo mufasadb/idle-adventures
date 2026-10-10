@@ -106,7 +106,13 @@ export type GameState = {
   researchCharges?: number; // bought research searches (RESEARCH_SEARCHES_PER_INK per ink, 675). Optional/absent = 0; `?? 0`.
   freeResearchRun?: number; // the `runs` value at which the free search(es) were last spent (675); free searches refresh when `runs` differs. Optional/absent = never spent; read as-is.
   freeResearchUsed?: number; // free searches spent at `freeResearchRun` (675) — lets RESEARCH_FREE_PER_TRIP exceed 1. Optional/absent = 0; `?? 0`.
+  prefs?: RunPrefs; // the player's last run toggles (seyh.31): written by toggle-auto-finish/-quaff/-gather, copied onto the next Expedition at embark so a choice sticks across runs. Optional/absent = {} (each toggle then takes its Expedition default).
 };
+
+// Sticky per-player run toggles (seyh.31). Each key is optional; absent = the
+// matching Expedition field's own default (autoFinish ?? false, autoQuaff ?? true,
+// autoGather ?? true). autoEatFood is NOT carried — it names a food that may not be packed.
+export type RunPrefs = { autoFinish?: boolean; autoQuaff?: boolean; autoGather?: boolean };
 
 // Loadout slots an action can target when packing.
 export type LoadoutSlot =

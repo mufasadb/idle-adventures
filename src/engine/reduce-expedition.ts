@@ -314,14 +314,14 @@ export function toggleAutoQuaff(state: GameState): { state: GameState; events: G
   const expedition = state.expedition;
   if (state.phase !== "expedition" || !expedition) return rejected(state, "toggle-auto-quaff", "not-on-expedition");
   const on = !(expedition.autoQuaff ?? true);
-  return { state: { ...state, expedition: { ...expedition, autoQuaff: on } }, events: [{ type: "auto-quaff-toggled", on }] };
+  return { state: { ...state, expedition: { ...expedition, autoQuaff: on }, prefs: { ...state.prefs, autoQuaff: on } }, events: [{ type: "auto-quaff-toggled", on }] };
 }
 
 export function toggleAutoGather(state: GameState): { state: GameState; events: GameEvent[] } {
   const expedition = state.expedition;
   if (state.phase !== "expedition" || !expedition) return rejected(state, "toggle-auto-gather", "not-on-expedition");
   const on = !(expedition.autoGather ?? true); // eot: default ON
-  return { state: { ...state, expedition: { ...expedition, autoGather: on } }, events: [{ type: "auto-gather-toggled", on }] };
+  return { state: { ...state, expedition: { ...expedition, autoGather: on }, prefs: { ...state.prefs, autoGather: on } }, events: [{ type: "auto-gather-toggled", on }] };
 }
 
 // Shared don/doff plumbing (82r). Out of combat a swap costs DON_DOFF_ENERGY;
