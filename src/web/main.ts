@@ -20,7 +20,7 @@ import { installItemCard } from "./item-card";
 import type { GameState, Action, GameEvent, ItemStack, Loadout, LoadoutSlot } from "../engine/types";
 import type { LogEntry } from "./log";
 import { logView } from "./log";
-import { save, load, loadLog, saveLastPlan, loadLastPlan, migrateFog, FOG_NOTICE, loadResearchLog, saveResearchLog, RESEARCH_HISTORY_MAX, saveRunStart, loadRunStart } from "./persist";
+import { save, load, loadLog, saveLastPlan, loadLastPlan, migrateFog, FOG_NOTICE, loadResearchLog, saveResearchLog, RESEARCH_HISTORY_MAX, saveRunStart, loadRunStart, restOfPlan, replayPlan, repackOffer, planActions } from "./persist";
 import { mountTree, focusRecipe } from "./craft-tree";
 import type { ResearchLogEntry } from "./craft-tree";
 import { townView, prepValid } from "./town-view";
@@ -84,6 +84,9 @@ let townMode: TownMode = (() => { try { return localStorage.getItem("ia-town") =
 // In the scene, `prep` is the CHOSEN map and the Pack sheet is a separate overlay —
 // closing it keeps the choice (the cloth by the gate reopens it).
 let packOpen = false;
+// seyh.31: the pack sheet packs last run's kit by itself the first time it opens in a
+// town stay (empty plan only) — once, so a Reset afterwards stays cleared.
+let autoRepacked = false;
 let lastPhase: GameState["phase"] | null = null;
 // beh/rx5/mki: transient action feedback (tile cues, pack glow, craft notes) — painted
 // over each render by paintFx; purely presentational, never saved.
@@ -116,16 +119,29 @@ function newRun(): void { state = newGame(seed, { recipeFog: true }); log = [{ t
 
 // Replay each stored pack through reduce; items eaten/lost/sold-off last run just
 // reject (insufficient / wrong-slot for a dead defId) and are counted as skipped.
+// seyh.31: only the steps the plan doesn't already hold, so "Repack the rest" after a
+// partial auto-pack never doubles up.
 function repackLast(): void {
+  const rest = restOfPlan(loadLastPlan(SAVE_KEY), state.loadout);
+  if (!rest.length) return;
+  const r = replayPlan(state, rest);
+  state = r.state;
+  note(`↻ repacked last loadout${r.skipped ? ` · skipped ${r.skipped} (not in bank / no slot)` : ""}`);
+}
+// seyh.31 (owner: "if I have the same stuff as last time, default to having that packed"):
+// on the sheet's first opening this town stay, with nothing planned yet, pack last run's
+// kit through the same reduce path the button uses. Partial → a toast says what's missing.
+function autoRepack(): void {
+  autoRepacked = true;
+  if (planActions(state.loadout).length) return;
   const plan = loadLastPlan(SAVE_KEY);
   if (!plan.length) return;
-  let skipped = 0;
-  for (const step of plan) {
-    const { state: next, events } = reduce(state, { type: "pack", slot: step.slot, itemId: step.itemId });
-    if (events.some((e) => e.type === "action-rejected")) { skipped += 1; continue; }
-    state = next;
-  }
-  note(`↻ repacked last loadout${skipped ? ` · skipped ${skipped} (not in bank / no slot)` : ""}`);
+  const r = replayPlan(state, plan);
+  if (!r.packed) return;
+  state = r.state;
+  const text = r.skipped ? `↻ packed what you took last time · ${r.skipped} left behind (not in the bank / no room)` : "↻ packed what you took last time";
+  log.unshift({ t: "note", text });
+  fx.note = { ok: true, text, anchor: null, t0: now() };
 }
 
 // --- action plumbing: one funnel so every interaction goes through reduce ----
@@ -289,6 +305,8 @@ function draw(): void {
   const cameHome = lastPhase !== null && lastPhase !== "town" && state.phase === "town";
   if (lastPhase === "town" && state.phase !== "town") resetScene();
   lastPhase = state.phase;
+  if (state.phase !== "town") autoRepacked = false;
+  if (state.phase === "town" && !autoRepacked && prepValid(state, prep) && (townMode !== "scene" || packOpen)) autoRepack();
   if (state.phase === "town") trail = []; // seyh.10: a new run starts with clean ground
   if (state.phase !== "town") { prep = null; packOpen = false; } // leaving town drops the prep selection (zpm.3)
   if (packOpen && !prepValid(state, prep)) packOpen = false;
@@ -301,13 +319,13 @@ function draw(): void {
   // keep the open panel's scroll across re-renders (a craft/pack re-renders everything)
   const panelEl = app.querySelector<HTMLElement>(".ts-panel");
   const keepScroll = panelEl && panelEl.dataset.tsPanel === scene.panel ? panelEl.querySelector<HTMLElement>(".ts-panel-body")?.scrollTop ?? 0 : 0;
-  const hasLast = loadLastPlan(SAVE_KEY).length > 0;
+  const repack = state.phase === "town" && prep !== null && !inScene ? repackOffer(state, loadLastPlan(SAVE_KEY)) : false;
   if (cameHome && !inScene) homeShown = true; // seyh.1: the plain menus town has no square to fly over
   app.innerHTML = state.phase !== "town"
     ? expeditionView(state, route, { drawerOpen, tab: drawerTab, logHtml: logView(log), confirmHome, stuckDismissed, costTint, trail })
     : inScene
       ? townSceneView(state, { prep, logHtml: logView(log), lastLine: log[0] ? formatLogEntry(log[0]).replace(/<br>/g, " ") : "", research: { history: researchLog, last: researchLast }, homeStrip: homecoming && homeShown ? homeStripHtml(homecoming) : undefined })
-      : `${homecoming && homeShown && !packOpen && !prep ? homeStripHtml(homecoming, "flow") : ""}${townView(state, prep, hasLast, townTab, { wornOpen, embarkConfirm: confirmEmbark, research: { history: researchLog, last: researchLast } })}${logView(log)}`;
+      : `${homecoming && homeShown && !packOpen && !prep ? homeStripHtml(homecoming, "flow") : ""}${townView(state, prep, repack, townTab, { wornOpen, embarkConfirm: confirmEmbark, research: { history: researchLog, last: researchLast } })}${logView(log)}`;
   wire(); save(SAVE_KEY, state, log);
   mountRegion(app, draw); // seyh.28: the region chart's own picks (lands, scraps, panel rows)
   mountTree(app, state, { craft: craftN, close: closeTree }); // o9vr: the workshop's tree (pan, select, tray) — before paintFx, which anchors the craft note in its tray
