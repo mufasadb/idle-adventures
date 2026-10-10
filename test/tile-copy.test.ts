@@ -27,8 +27,9 @@ describe("tileYield (ai8)", () => {
     expect(tileYield(vein, { material: "silver-ore", gatedBy: ["iron-pick", "steel-pick"] }, false, ["pick"])).toBe("Ore vein → Silver Ore (needs iron-pick or steel-pick)");
     expect(tileYield(vein, { material: "silver-ore", gatedBy: ["iron-pick"] }, false, ["pick", "iron-pick"])).toBe("Ore vein → Silver Ore");
   });
-  test("unresolved = '?', and nothing for monsters / empty / cleared tiles", () => {
-    expect(tileYield(vein, null, false, [])).toBe("Ore vein → ?");
+  test("unresolved says 'too far to tell' (seyh.6, never '?'), and nothing for monsters / empty / cleared tiles", () => {
+    expect(tileYield(vein, null, false, [])).toBe("Ore vein (too far to tell)");
+    expect(tileYield(vein, { gatedBy: null }, false, [])).not.toContain("?");
     expect(tileYield({ kind: "monster", creature: "forest-boar" }, null, false, [])).toBeNull();
     expect(tileYield(null, null, false, [])).toBeNull();
     expect(tileYield(vein, { material: "copper-ore" }, true, [])).toBeNull();

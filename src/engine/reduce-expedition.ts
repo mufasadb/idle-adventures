@@ -12,6 +12,7 @@ import { EQUIP_SLOTS } from "./pack";
 import type { EquipSlot } from "./pack";
 import { slotOf, isGear } from "./catalog";
 import { MAX_ENERGY, MAP_WIDTH, MAP_HEIGHT, NODE_TOOL, GATHER_YIELD, NODE_MAGNITUDE_YIELD, FOOD, POTION, TENT_FOOD_MULTIPLIER, TENT_CAMP_MEALS, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, TOOL_CAPABILITY, RECIPE, FISH_CAST_ENERGY, CATCH_EFFECT, LOCKBOX_LOOT, TERRAIN_HP_FLOOR } from "../data/constants";
+import type { GatherableNodeType } from "../data/constants";
 import { visionRadius } from "./perceive";
 import { rejected, autoRefill, livePoiAt, isCleared } from "./reduce-shared";
 import { engage, maybeAutoFinish, provokeTurn, pendingLootFits, mintMap, withPoison } from "./reduce-combat";
@@ -63,6 +64,12 @@ export function move(
   };
 }
 
+// Units one gather of this node kind + magnitude yields — single source for the
+// reducer and the web route preview (seyh.6). Tool speed changes cost, not yield.
+export function gatherYield(kind: GatherableNodeType, magnitude: number | null | undefined): number {
+  return GATHER_YIELD[kind] * (NODE_MAGNITUDE_YIELD[magnitude ?? 1] ?? 1);
+}
+
 export function gather(state: GameState): { state: GameState; events: GameEvent[] } {
   const expedition = state.expedition;
   if (state.phase !== "expedition" || !expedition) {
@@ -103,7 +110,7 @@ export function gather(state: GameState): { state: GameState; events: GameEvent[
   const fed = autoRefill(expedition, expedition.energy - cost);
   const energy = fed.energy;
   const loadout = { ...expedition.loadout, food: fed.food };
-  const qty = GATHER_YIELD[kind] * (NODE_MAGNITUDE_YIELD[poi.magnitude ?? 1] ?? 1);
+  const qty = gatherYield(kind, poi.magnitude);
   // Fresh forage (e3j): a yield that IS food (FOOD catalog) joins the food reserve at
   // the FRONT — eaten before packed food, since fresh stales on return while rations
   // bank back. One slot per unit; a material/gear yield stacks into carry instead.
@@ -523,7 +530,9 @@ export function setAutoEatFood(state: GameState, defId: string | null): { state:
 // before packed food, since it stales on return) or "back" for a crafted reserve.
 // Same-defId stacks coalesce. Returns the updated {loadout, carry}, or null when it
 // won't fit (the caller maps that to its own carry-full rejection).
-function placeYield(
+// Exported for the web route preview (seyh.6) so its "fits ✓" prediction places
+// yields exactly as gather does.
+export function placeYield(
   loadout: Loadout,
   carry: ItemStack[],
   defId: string,

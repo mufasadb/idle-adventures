@@ -66,3 +66,12 @@ test("copy: no em dashes in any flavor line", () => {
     for (const line of pool) expect(line).not.toContain("—");
   }
 });
+
+// D108 (seyh.3): a fresh return is the PLAYER's unspent budget, not an empty world.
+// No line in the fresh pools may blame the map ("nothing here", "beneath you", ...).
+test("copy: the fresh pools point at your leftover energy, never an empty or unworthy map", () => {
+  for (const line of [...RETURN_FLAVOR.bored, ...RETURN_FLAVOR.beneath]) {
+    expect(line).not.toMatch(/nothing here|worth your time|beneath|worthy|standard|seen enough|bored/i);
+  }
+  expect(RETURN_FLAVOR.bored.some((l) => /energy|legs|walking/i.test(l))).toBe(true);
+});

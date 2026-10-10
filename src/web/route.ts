@@ -5,12 +5,14 @@
 // the drawn tiles, per-leg block markers, and an auto-eat-aware energy preview. Pure
 // over its inputs; recomputed each render, never stored.
 import type { Grid } from "../engine/grid";
-import type { Expedition } from "../engine/types";
+import type { Expedition, ItemStack } from "../engine/types";
 import { moveCost, terrainHpCost } from "../engine/move";
 import { lineTiles } from "../engine/line";
 import { gatherCost } from "../engine/tools";
 import { eatToRefill } from "../engine/food";
-import { MAX_ENERGY } from "../data/constants";
+import { addToCarry, carryCap, usedSlots } from "../engine/carry";
+import { gatherYield, placeYield } from "../engine/reduce-expedition";
+import { MAX_ENERGY, FOOD, POTION } from "../data/constants";
 
 export type Pos = { x: number; y: number };
 const kk = (p: Pos) => `${p.x},${p.y}`;
@@ -25,13 +27,20 @@ export type DerivedRoute = {
   walkCost: number; // movement energy over the walkable prefix
   actionCost: number; // auto-gather energy for resolved workable nodes on the walkable prefix
   endEnergy: number; // simulated CURRENT energy after the walk, mirroring the reducer's pay-then-auto-eat per tile (df3)
-  strands: boolean; // the walk would truly run energy ≤ 0 before completing, EVEN WITH designated auto-eat (df3)
+  runsDry: boolean; // the walk would truly run energy ≤ 0 before completing, EVEN WITH designated auto-eat (df3)
   blocked: boolean; // any leg hits a wall → Walk disabled
   hpCost: number; // si7.6.9.6 (D99): HP the walkable prefix's hazardous terrain (spore-thicket, no mask) costs
   hazardKeys: Set<string>; // walkable tiles that cost HP — tinted red on the map
   crossedMonster: { pos: Pos; creature: string } | null; // first UNCLEARED monster on the walkable prefix — the walk auto-engages it (2i8: warn before you commit the route into a fight)
   end: Pos; // last waypoint (or the player, if the route is empty)
+  // seyh.6: what the walk will auto-gather — resolved, workable, affordable nodes on the
+  // walkable prefix, in walk order, up to where the walk would stop (runs dry / walks
+  // into a fight). Empty with auto-gather off. Unresolved nodes are never predicted.
+  gathers: Gather[];
+  fits: boolean; // every predicted gather lands (placed exactly as gather does, after auto-eat)
+  short: number; // bag slots missing for the rest; the walk pauses at the first that won't fit
 };
+export type Gather = { at: Pos; material: string; qty: number };
 
 export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: Set<string>, cleared: Set<string>): DerivedRoute {
   const eq = exp.loadout.equipment;
@@ -45,7 +54,7 @@ export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: S
   let hpCost = 0;
   const hazardKeys = new Set<string>();
   // df3: simulate CURRENT energy tile-by-tile in the SAME order the reducer walks
-  // (pay a cost, THEN waste-free auto-eat the DESIGNATED food) so the "strands you"
+  // (pay a cost, THEN waste-free auto-eat the DESIGNATED food) so the "runs dry"
   // verdict + projected end-energy reflect what the walk ACTUALLY does — never the
   // raw walkCost+actionCost, which ignores mid-walk refills. autoEatFood unset = no
   // refills, so this reduces to the old exp.energy − total behaviour.
@@ -63,7 +72,15 @@ export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: S
       simEnergy = fed.energy;
     }
   };
-  let strands = false; // the walk truly can't finish even WITH auto-eat
+  let runsDry = false; // the walk truly can't finish even WITH auto-eat
+  // seyh.6: the bag as the walk fills it. Gathers land via placeYield (the reducer's own
+  // placement) into the post-auto-eat inventory; once one won't fit, the real walk
+  // pauses (sim/play route: bag-full), so the rest only count toward `short`.
+  const gathers: Gather[] = [];
+  const gatheredKeys = new Set<string>();
+  let simCarry: ItemStack[] = exp.carry;
+  let overflow: { food: ItemStack[]; carry: ItemStack[] } | null = null; // the bag, uncapped, from the first miss on
+  let walkStops = false; // the real walk halts here (a step it can't pay, or a fight)
   let crossedMonster: { pos: Pos; creature: string } | null = null; // first monster the walk would auto-engage
   let globallyBlocked = false; // once the walk hits any wall, later tiles aren't traversed
   let prevWalk: Pos = exp.pos; // previous WALKED tile — sets the next step's diagonal cost
@@ -94,29 +111,50 @@ export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: S
         if (hz > 0) { hpCost += hz; hazardKeys.add(kk(t)); }
         // The reducer rejects a step as "exhausted" when its cost exceeds current
         // energy (auto-eat already ran at the prior tile) — so the walk halts here
-        // and doesn't finish. Flag strand once, but keep summing the raw cost
+        // and doesn't finish. Flag runsDry once, but keep summing the raw cost
         // breakdown so the spend readout still shows the whole planned route.
-        if (!strands && mc > simEnergy) strands = true;
+        if (!runsDry && mc > simEnergy) { runsDry = true; walkStops = true; }
         payThenEat(mc);
-        if ((exp.autoGather ?? true) && !cleared.has(kk(t)) && resolved.has(kk(t))) {
+        if ((exp.autoGather ?? true) && !cleared.has(kk(t)) && resolved.has(kk(t)) && !gatheredKeys.has(kk(t))) {
           const poi = grid.pois.find((p) => p.x === t.x && p.y === t.y);
           if (poi) {
             const gc = gatherCost(poi, eq.tools);
             if (gc !== null) {
               actionCost += gc;
+              gatheredKeys.add(kk(t)); // a worked node is cleared: a looping route doesn't gather it twice
               // Gather also rejects "exhausted" on cost > energy, but a failed
               // gather does NOT stop the walk (main.ts keeps walking) — so it
-              // never strands; only skip its refill/spend when unaffordable.
-              if (gc <= simEnergy) payThenEat(gc);
+              // never runs dry; only skip its refill/spend when unaffordable.
+              if (gc <= simEnergy) {
+                const before = { energy: simEnergy, food: simFood };
+                payThenEat(gc);
+                if (!walkStops && poi.material !== null && poi.kind !== "monster") {
+                  const qty = gatherYield(poi.kind, poi.magnitude);
+                  gathers.push({ at: { x: t.x, y: t.y }, material: poi.material, qty });
+                  const placed = overflow ? null : placeYield({ ...exp.loadout, food: simFood }, simCarry, poi.material, qty, "front");
+                  if (placed) {
+                    simFood = placed.loadout.food;
+                    simCarry = placed.carry;
+                  } else {
+                    // carry-full: the reducer rejects before paying, and the walk pauses here
+                    if (!overflow) { simEnergy = before.energy; simFood = before.food; overflow = { food: simFood, carry: simCarry }; }
+                    overflow = FOOD.includes(poi.material) || POTION.includes(poi.material)
+                      ? { ...overflow, food: [...overflow.food, { defId: poi.material, qty }] } // one slot per unit, like food
+                      : { ...overflow, carry: addToCarry(overflow.carry, poi.material, qty, Infinity)! };
+                  }
+                }
+              }
             }
           }
         }
+        if (crossedMonster && crossedMonster.pos.x === t.x && crossedMonster.pos.y === t.y) walkStops = true; // the walk engages here
       }
     }
     legs.push({ tiles, blockedAt });
     legStart = wp;
   }
-  return { legs, drawn, walkable, waypointKeys, blockKeys, walkCost, actionCost, hpCost, hazardKeys, endEnergy: simEnergy, strands, crossedMonster, blocked: legs.some((l) => l.blockedAt !== null), end: wps.length ? wps[wps.length - 1]! : exp.pos };
+  const short = overflow ? Math.max(1, usedSlots({ ...exp.loadout, food: overflow.food }, overflow.carry) - carryCap(eq)) : 0;
+  return { legs, drawn, walkable, waypointKeys, blockKeys, walkCost, actionCost, hpCost, hazardKeys, endEnergy: simEnergy, runsDry, crossedMonster, blocked: legs.some((l) => l.blockedAt !== null), end: wps.length ? wps[wps.length - 1]! : exp.pos, gathers, fits: overflow === null, short };
 }
 
 // --- click → waypoint list (eot) --------------------------------------------
