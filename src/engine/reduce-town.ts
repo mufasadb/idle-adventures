@@ -74,6 +74,7 @@ export function embark(
         cleared: [],
         carriedMaps: [],
         ...(affixes.length ? { affixes } : {}),
+        ...(state.prefs ?? {}), // seyh.31: last run's auto-finish/-quaff/-gather choices stick
       },
     },
     events: [

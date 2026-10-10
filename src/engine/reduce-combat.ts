@@ -419,7 +419,7 @@ export function toggleAutoFinish(state: GameState): { state: GameState; events: 
   const expedition = state.expedition;
   if (state.phase !== "expedition" || !expedition) return rejected(state, "toggle-auto-finish", "not-on-expedition");
   const on = !(expedition.autoFinish ?? false);
-  return { state: { ...state, expedition: { ...expedition, autoFinish: on } }, events: [{ type: "auto-finish-toggled", on }] };
+  return { state: { ...state, expedition: { ...expedition, autoFinish: on }, prefs: { ...state.prefs, autoFinish: on } }, events: [{ type: "auto-finish-toggled", on }] };
 }
 
 // 67e: a non-flee in-combat action (coat / manual potion / gear-swap) costs a TURN —

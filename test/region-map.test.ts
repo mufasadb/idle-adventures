@@ -135,14 +135,15 @@ describe("an unlit near land says when it's back", () => {
 
 describe("the region view (smoke)", () => {
   const mid = (): GameState => ({ ...newGame("rg-view"), runs: 3, maps: [map("v-c2", "coastal", 2, { hints: ["g-ordinary"] }), map("v-t3", "tundra", 3)] });
-  test("a new game: only the near country, the lit land pre-selected with Walk out", () => {
+  test("a new game: only the near country, the lit land pre-selected with Pack for the road", () => {
     region.sel = null;
     const s = newGame("rg-new");
     const html = regionView(s, null);
     const local = localMap(s.seed, 0);
     expect(html).toContain("data-region");
     expect(html).toContain(`data-prepare="${local.mapSeed}"`);
-    expect(html).toContain("Walk out");
+    expect(html).toContain("Pack for the road ▶"); // seyh.31: choosing walks you to the packing cloth, not out the gate
+    expect(html).not.toContain("Walk out");
     expect(html).toContain(`class="rg-land lit on" `);
     expect(html.match(/class="rg-land lit/g)).toHaveLength(1);
     expect(html).not.toContain("data-region-map");

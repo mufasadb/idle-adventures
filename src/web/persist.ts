@@ -5,6 +5,7 @@ import type { GameState, ItemStack, Loadout, LoadoutSlot } from "../engine/types
 import type { LogEntry } from "./log";
 import type { ResearchLogEntry } from "./craft-tree";
 import { enableRecipeFog } from "../engine/knowledge";
+import { reduce } from "../engine/reduce";
 
 export function save(key: string, state: GameState, log: LogEntry[]): void {
   try {
@@ -54,6 +55,37 @@ export function saveLastPlan(key: string, lo: Loadout): void {
 }
 export function loadLastPlan(key: string): PackStep[] {
   try { const raw = localStorage.getItem(`${key}:lastPlan`); return raw ? (JSON.parse(raw) as PackStep[]) : []; } catch { return []; }
+}
+// seyh.31: the steps of `plan` the current loadout doesn't already hold (a multiset
+// difference over planActions), in plan order — "the rest" of last run's kit.
+export function restOfPlan(plan: PackStep[], lo: Loadout): PackStep[] {
+  const have = new Map<string, number>();
+  for (const s of planActions(lo)) { const k = `${s.slot}|${s.itemId}`; have.set(k, (have.get(k) ?? 0) + 1); }
+  return plan.filter((s) => {
+    const k = `${s.slot}|${s.itemId}`, n = have.get(k) ?? 0;
+    if (n > 0) { have.set(k, n - 1); return false; }
+    return true;
+  });
+}
+// Replay pack steps through reduce (D29: the reducer decides each one); a refused step
+// (not in the bank any more, no slot) is skipped and counted.
+export function replayPlan(state: GameState, steps: PackStep[]): { state: GameState; packed: number; skipped: number } {
+  let packed = 0, skipped = 0;
+  for (const step of steps) {
+    const r = reduce(state, { type: "pack", slot: step.slot, itemId: step.itemId });
+    if (r.events.some((e) => e.type === "action-rejected")) { skipped += 1; continue; }
+    state = r.state; packed += 1;
+  }
+  return { state, packed, skipped };
+}
+// What the pack footer offers (seyh.31): "last" = the plan is empty and some of last
+// run's kit can be packed; "rest" = part of it is packed and more of it can be now;
+// false = nothing of it the reducer would accept.
+export type RepackOffer = "last" | "rest" | false;
+export function repackOffer(state: GameState, plan: PackStep[]): RepackOffer {
+  const rest = restOfPlan(plan, state.loadout);
+  if (!rest.length || replayPlan(state, rest).packed === 0) return false;
+  return planActions(state.loadout).length === 0 ? "last" : "rest";
 }
 
 // --- crafting fog (675) ----------------------------------------------------------

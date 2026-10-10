@@ -13,7 +13,7 @@ import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, INKS, QUIVER_AMMO_CAP, STUDY_COST, ST
 import type { BiomeId } from "../data/constants";
 import { logisticsEffect, describe, name, heldMapTitle, rejectCopy, carryBreakdown, bagRows, bagCells, POCKET_SLOTS, hintNeed, expectedHaul, toolGloss, battleItemEffect, tradeoff, GATHER_VERB } from "../render/render";
 import type { GameState, Action, MapItem, Loadout } from "../engine/types";
-import { planActions } from "./persist";
+import type { RepackOffer } from "./persist";
 import { packedCounts } from "./feedback";
 import { nodeIconId } from "./assets";
 import { ic } from "./icons";
@@ -77,13 +77,13 @@ export function prepValid(state: GameState, prep: string | null): boolean {
   return prep !== null && (prep === localMap(state.seed, state.runs ?? 0).mapSeed || (state.maps ?? []).some((m) => m.mapSeed === prep));
 }
 
-export function townView(state: GameState, prep: string | null, hasLastPlan: boolean, tab: TownTab = "main", ui: PackUi = {}): string {
+export function townView(state: GameState, prep: string | null, repack: RepackOffer, tab: TownTab = "main", ui: PackUi = {}): string {
   const local = localMap(state.seed, state.runs ?? 0);
   const heldMaps = state.maps ?? [];
   // prep may point at a map that no longer exists (consumed/rotated) — fall back to overview.
   const inPrep = prep !== null && (prep === local.mapSeed || heldMaps.some((m) => m.mapSeed === prep));
   // d13: preparing a map is the full-screen packing sheet (its own Pack | Recipes tabs).
-  if (inPrep) return packScreen(state, prep!, local, heldMaps, hasLastPlan, tab === "recipes" ? "recipes" : "main", ui);
+  if (inPrep) return packScreen(state, prep!, local, heldMaps, repack, tab === "recipes" ? "recipes" : "main", ui);
   const header = `<header><h1>Town</h1><span class="muted">seed "${state.seed}"</span><button class="link" data-town-mode="scene" title="back to the village square">◱ the square</button><button class="link" data-newgame>new game</button></header>`;
   // kml: on phones the three town panels are TABS (the recipe book alone is a long
   // scroll); on wide screens they sit side by side and the tab bar hides (CSS).
@@ -141,14 +141,14 @@ export function mapSelectSection(state: GameState, local: ReturnType<typeof loca
 // what's tappable off legalActions/whyNot — the web decides nothing.
 type LocalMap = ReturnType<typeof localMap>;
 
-function packScreen(state: GameState, mapSeed: string, local: LocalMap, heldMaps: MapItem[], hasLastPlan: boolean, tab: "main" | "recipes", ui: PackUi): string {
+function packScreen(state: GameState, mapSeed: string, local: LocalMap, heldMaps: MapItem[], repackOffer: RepackOffer, tab: "main" | "recipes", ui: PackUi): string {
   const isLocal = mapSeed === local.mapSeed;
   const held = heldMaps.find((m) => m.mapSeed === mapSeed) ?? null;
   const tabBtn = (t: "main" | "recipes", label: string) => `<button class="tab${tab === t ? " on" : ""}" data-town-tab="${t}">${label}</button>`;
   const top = `<div class="pk-top">
       <button class="link" data-back>← town</button>
       <nav class="pk-tabs">${tabBtn("main", "Pack")}${tabBtn("recipes", "Recipes")}</nav>
-      <span class="pk-dest muted small">${isLocal ? "free local run — the map is not used up" : `<span class="warn">⚠ embarking SPENDS this map</span>`}</span>
+      <span class="pk-dest muted small"><b class="pk-for">Packing for the road</b> · ${isLocal ? "free local run — the map is not used up" : `<span class="warn">⚠ embarking SPENDS this map</span>`}</span>
     </div>`;
   if (tab === "recipes") return `<div class="packscreen recipes">${top}<div class="pk-recipes">${recipeSection(state)}</div></div>`;
   const legal = legalActions(state);
@@ -160,7 +160,7 @@ function packScreen(state: GameState, mapSeed: string, local: LocalMap, heldMaps
       ${bagPage(state, legal)}
       ${wornColumn(state, legal, ui.wornOpen ?? null)}
     </div>
-    ${packFooter(state, mapSeed, isLocal, held, hasLastPlan, ui.embarkConfirm ?? false)}
+    ${packFooter(state, mapSeed, isLocal, held, repackOffer, ui.embarkConfirm ?? false)}
   </div>`;
 }
 
@@ -332,7 +332,7 @@ export function embarkButton(mapSeed: string, isLocal: boolean, risks: string[],
 }
 
 // 5. Footer: the warnings (the energy figure moved up beside the gauge, seyh.4), Repack / Reset / Embark.
-function packFooter(state: GameState, mapSeed: string, isLocal: boolean, held: MapItem | null, hasLastPlan: boolean, embarkConfirm: boolean): string {
+function packFooter(state: GameState, mapSeed: string, isLocal: boolean, held: MapItem | null, repackOffer: RepackOffer, embarkConfirm: boolean): string {
   const lo = state.loadout, eq = lo.equipment;
   const startEnergy = MAX_ENERGY + energyCapOf(eq);
   const warns: { short: string; full: string }[] = [];
@@ -343,8 +343,12 @@ function packFooter(state: GameState, mapSeed: string, isLocal: boolean, held: M
     const unmet = mapHintIds(held).slice(0, held.studied ?? 0).map((id) => ({ id, need: hintNeed(id, lo) })).filter((h) => h.need && !h.need.ok);
     for (const h of unmet) warns.push({ short: `map wants ${h.need!.want}`, full: `scouts say "${hintLabel(h.id)}" — you've packed no ${h.need!.want}` });
   }
-  const repack = hasLastPlan && planActions(lo).length === 0
-    ? `<button class="pk-ghost" data-repack title="re-pack the loadout you took last run (skips anything no longer in the bank)">↻ Repack last</button>` : "";
+  // seyh.31: the sheet auto-packs last run's kit on opening; the button offers whatever of it
+  // the bank can supply now (the rest after a partial auto-pack, or all of it after Reset).
+  const repack = repackOffer === "last"
+    ? `<button class="pk-ghost" data-repack title="re-pack the loadout you took last run (skips anything no longer in the bank)">↻ Repack last</button>`
+    : repackOffer === "rest"
+      ? `<button class="pk-ghost" data-repack title="pack the rest of last run's loadout the bank can supply now">↻ Repack the rest</button>` : "";
   return `<div class="pk-foot">
     <span class="warns">${warns.map((w) => `<span class="warn" title="${w.full}">⚠ ${w.short}</span>`).join("")}</span>
     ${repack}<button class="pk-ghost" data-reset title="clear the whole plan">Reset</button>

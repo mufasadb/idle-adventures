@@ -7,7 +7,7 @@
 // so the free walk-out costs no extra tap.
 //
 // View-only: the geometry is pure (render.ts regionWedge/regionSpots/ringBand), every
-// action button (Walk out / Pack ▶ → data-prepare, study, ink) is wired by main.ts and
+// action button (Pack for the road ▶ → data-prepare, study, ink) is wired by main.ts and
 // still goes through reduce; what's offered comes off legalActions/whyNot.
 import type { GameState, MapItem } from "../engine/types";
 import type { BiomeId } from "../data/constants";
@@ -173,10 +173,14 @@ function panelHtml(state: GameState, sel: Sel): string {
 }
 
 // --- the card for the selection ------------------------------------------------------
+// seyh.31 (owner: "not clear you're about to pack before you go"): choosing a destination
+// walks you to the packing cloth, not out of the gate — the button says so.
+const GO_BUTTON = (mapSeed: string) =>
+  `<button class="rg-go" data-prepare="${mapSeed}" title="lay out your kit on the packing cloth by the gate — you set off from there">Pack for the road ▶</button>`;
 function cardHtml(state: GameState, sel: Sel): string {
   const local = localMap(state.seed, state.runs ?? 0);
   if (sel.kind === "local") {
-    return `<div class="rg-card local"><div><h3>${name(local.biomeId)}${epithetSuffix(local.mapSeed, local.biomeId)}</h3><div class="sub">just past the gate</div></div><button class="rg-go" data-prepare="${local.mapSeed}">Walk out ▶</button></div>`;
+    return `<div class="rg-card local"><div><h3>${name(local.biomeId)}${epithetSuffix(local.mapSeed, local.biomeId)}</h3><div class="sub">just past the gate</div></div>${GO_BUTTON(local.mapSeed)}</div>`;
   }
   const x = `<button class="rg-x" data-region-clear aria-label="back to the near country">✕</button>`;
   if (sel.kind === "land") {
@@ -189,7 +193,7 @@ function cardHtml(state: GameState, sel: Sel): string {
     .map((inkId) => `<button class="rg-ink" data-ink-map="${m.mapSeed}" data-ink-id="${inkId}" title="apply ${name(inkId)}: rolls an affix from its domain onto this map">${name(inkId)}</button>`).join("");
   return `<div class="rg-card">${x}<h3>${name(m.biomeId)}${heldMapSuffix(m)}</h3><div class="sub">${ringWord(tier)} · tier ${ROMAN[tier] ?? tier}</div>
     ${hintChips(mapHintIds(m), m.studied ?? 0)}
-    <div class="go">${studyControl(state, m)}${inks}<button class="rg-go" data-prepare="${m.mapSeed}">Pack ▶</button></div></div>`;
+    <div class="go">${studyControl(state, m)}${inks}${GO_BUTTON(m.mapSeed)}</div></div>`;
 }
 
 /** The region map, full screen (it replaces the map board as the chooser). */

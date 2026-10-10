@@ -259,3 +259,11 @@ describe("tradeoff / energyReach — the one packing trade-off", () => {
     expect(html).toContain(`⚡ <b>${t.startEnergy}</b> + <b>${t.foodEnergy}</b> food`);
   });
 });
+
+// seyh.31 (owner: "not clear you're about to pack before you go when you hit the gate"):
+// the sheet the gate / the chart's go button opens names itself as the packing step.
+test("the pack sheet's head says it's packing for the road", () => {
+  const s = newGame("d13");
+  const seed = /data-prepare="([^"]+)"/.exec(townView(s, null, false))![1]!;
+  expect(townView(s, seed, false)).toMatch(/<b class="pk-for">Packing for the road<\/b> · free local run/);
+});
