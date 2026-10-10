@@ -871,6 +871,18 @@ export function isExhausted(state: { phase: string; expedition?: Expedition | nu
     (a.type === "craft" && FOOD.includes(RECIPE[a.recipeId]?.output.defId ?? "")));
 }
 
+/** What is still worth staying for once exhausted (seyh.3): the player-words verbs of the
+ *  legal non-home actions that do something out here (an adjacent fight or throw, a field
+ *  craft, a drop). Settings toggles and the auto-eat pick don't count. Empty = the only
+ *  real move left is the free trip home, so the exhausted card offers nothing else. */
+export function stuckOptions(legal: Action[]): string[] {
+  const out: string[] = [];
+  if (legal.some((a) => a.type === "fight" || a.type === "throw")) out.push("fight");
+  if (legal.some((a) => a.type === "craft")) out.push("craft");
+  if (legal.some((a) => a.type === "drop" || a.type === "drop-map")) out.push("drop things");
+  return out;
+}
+
 /** Where an item comes from, in player words (user 2026-10-10: "where do I get flint?"):
  *  the node kinds + biomes whose material tables hold it (with the tool that node
  *  needs), the monsters that drop it, and whether it's crafted. Empty = nothing known. */

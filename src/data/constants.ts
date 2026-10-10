@@ -627,15 +627,17 @@ export const RETURN_FLAVOR: Record<ReturnFlavorBucket, string[]> = {
     "You've had enough for one trip and head home.",
     "Legs aching, you turn for town.",
   ],
+  // D108 (seyh.3): the fresh buckets point at YOUR unspent budget, never at an empty
+  // world. Bucket logic (engine/flavor.ts) is unchanged.
   bored: [
-    "You get bored and wander back.",
-    "Nothing here worth your time, you amble home.",
-    "You've seen enough. Back to town.",
+    "Still fresh, you head home with energy to spare.",
+    "Plenty left in your legs, you call it early and turn for town.",
+    "You head back with half a day's walking still in you.",
   ],
   beneath: [
-    "You've decided this place is beneath you, and stroll home with provisions to spare.",
-    "Pockets full of good food, energy to burn; clearly this land wasn't worthy.",
-    "Rations untouched, chin up: this place simply didn't rise to your standard.",
+    "Fed, rested and barely winded, you stroll home with provisions to spare.",
+    "Pockets full of good food and energy to burn, you call it a day early.",
+    "Rations untouched and legs still fresh, you wander back to town.",
   ],
 };
 

@@ -10,7 +10,7 @@ import { emptyLoadout } from "../src/engine/loadout";
 // df3: the route-energy preview must account for DESIGNATED auto-eat refills that
 // happen DURING the walk. The reducer refills after paying each step's cost, so a
 // route whose raw walkCost exceeds current energy can still complete (and end with
-// energy > 0) when packed food covers it. The old preview flagged "strands you" on
+// energy > 0) when packed food covers it. The old preview flagged "runs dry" on
 // any raw total > energy, lying about a walk that actually succeeds.
 //
 // FIXTURE (found by scanning seeds, _find.ts): map "rp-0", column x=3 has a straight
@@ -42,15 +42,15 @@ function expAt(energy: number, food: { defId: string; qty: number }[], autoEatFo
 // A single waypoint 20 tiles north — the naive line fills the column.
 const wpsNorth = (n: number) => [{ x: START.x, y: START.y - n }];
 
-test("route coverable by auto-eat is NOT flagged as stranding, and end-energy matches a real walk", () => {
+test("route coverable by auto-eat is NOT flagged as running dry, and end-energy matches a real walk", () => {
   // 20 plains tiles north = 200 walkCost. Start with only 50 energy — raw total (200)
   // far exceeds it. But 3 rations (80 each = 240 energy of refills) auto-eat mid-walk.
   const exp = expAt(50, [{ defId: "ration", qty: 3 }], "ration");
   const rt = deriveRoute(GRID, exp, wpsNorth(20), new Set(), new Set());
 
   expect(rt.walkCost).toBe(200); // raw spend
-  expect(rt.walkCost).toBeGreaterThan(exp.energy); // exceeds current energy (old code would strand)
-  expect(rt.strands).toBe(false); // ...but auto-eat covers it, so it does NOT strand
+  expect(rt.walkCost).toBeGreaterThan(exp.energy); // exceeds current energy (old code would flag it)
+  expect(rt.runsDry).toBe(false); // ...but auto-eat covers it, so it does NOT run dry
   expect(rt.endEnergy).toBeGreaterThan(0);
 
   // The preview's projected end-energy must EQUAL what a real reducer walk produces.
@@ -64,12 +64,12 @@ test("route coverable by auto-eat is NOT flagged as stranding, and end-energy ma
   expect(state.expedition!.energy).toBeCloseTo(rt.endEnergy, 5); // preview == reality
 });
 
-test("route NOT coverable (no designated food) is still flagged as stranding", () => {
+test("route NOT coverable (no designated food) is still flagged as running dry", () => {
   // Same 200-cost route, 50 energy, but auto-eat is OFF (no autoEatFood) — the walk
-  // genuinely can't finish, so the honest verdict is still "strands you".
+  // genuinely can't finish, so the honest verdict is still "runs dry".
   const exp = expAt(50, [{ defId: "ration", qty: 3 }] /* packed but not designated */);
   const rt = deriveRoute(GRID, exp, wpsNorth(20), new Set(), new Set());
-  expect(rt.strands).toBe(true);
+  expect(rt.runsDry).toBe(true);
   expect(rt.endEnergy).toBeLessThanOrEqual(0);
 });
 
@@ -78,7 +78,7 @@ test("baseline: preview end-energy tracks a real walk when auto-eat is off (no r
   // simply energy − cost = 20, and a real walk agrees.
   const exp = expAt(50, [{ defId: "ration", qty: 3 }] /* not designated */);
   const rt = deriveRoute(GRID, exp, wpsNorth(3), new Set(), new Set());
-  expect(rt.strands).toBe(false);
+  expect(rt.runsDry).toBe(false);
   expect(rt.endEnergy).toBeCloseTo(20, 5); // 50 − 3×10, no auto-eat
 
   let state: GameState = { seed: "s", phase: "expedition", bank: [], loadout: emptyLoadout(), expedition: exp };

@@ -25,7 +25,7 @@ export type DerivedRoute = {
   walkCost: number; // movement energy over the walkable prefix
   actionCost: number; // auto-gather energy for resolved workable nodes on the walkable prefix
   endEnergy: number; // simulated CURRENT energy after the walk, mirroring the reducer's pay-then-auto-eat per tile (df3)
-  strands: boolean; // the walk would truly run energy ≤ 0 before completing, EVEN WITH designated auto-eat (df3)
+  runsDry: boolean; // the walk would truly run energy ≤ 0 before completing, EVEN WITH designated auto-eat (df3)
   blocked: boolean; // any leg hits a wall → Walk disabled
   hpCost: number; // si7.6.9.6 (D99): HP the walkable prefix's hazardous terrain (spore-thicket, no mask) costs
   hazardKeys: Set<string>; // walkable tiles that cost HP — tinted red on the map
@@ -45,7 +45,7 @@ export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: S
   let hpCost = 0;
   const hazardKeys = new Set<string>();
   // df3: simulate CURRENT energy tile-by-tile in the SAME order the reducer walks
-  // (pay a cost, THEN waste-free auto-eat the DESIGNATED food) so the "strands you"
+  // (pay a cost, THEN waste-free auto-eat the DESIGNATED food) so the "runs dry"
   // verdict + projected end-energy reflect what the walk ACTUALLY does — never the
   // raw walkCost+actionCost, which ignores mid-walk refills. autoEatFood unset = no
   // refills, so this reduces to the old exp.energy − total behaviour.
@@ -63,7 +63,7 @@ export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: S
       simEnergy = fed.energy;
     }
   };
-  let strands = false; // the walk truly can't finish even WITH auto-eat
+  let runsDry = false; // the walk truly can't finish even WITH auto-eat
   let crossedMonster: { pos: Pos; creature: string } | null = null; // first monster the walk would auto-engage
   let globallyBlocked = false; // once the walk hits any wall, later tiles aren't traversed
   let prevWalk: Pos = exp.pos; // previous WALKED tile — sets the next step's diagonal cost
@@ -94,9 +94,9 @@ export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: S
         if (hz > 0) { hpCost += hz; hazardKeys.add(kk(t)); }
         // The reducer rejects a step as "exhausted" when its cost exceeds current
         // energy (auto-eat already ran at the prior tile) — so the walk halts here
-        // and doesn't finish. Flag strand once, but keep summing the raw cost
+        // and doesn't finish. Flag runsDry once, but keep summing the raw cost
         // breakdown so the spend readout still shows the whole planned route.
-        if (!strands && mc > simEnergy) strands = true;
+        if (!runsDry && mc > simEnergy) runsDry = true;
         payThenEat(mc);
         if ((exp.autoGather ?? true) && !cleared.has(kk(t)) && resolved.has(kk(t))) {
           const poi = grid.pois.find((p) => p.x === t.x && p.y === t.y);
@@ -106,7 +106,7 @@ export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: S
               actionCost += gc;
               // Gather also rejects "exhausted" on cost > energy, but a failed
               // gather does NOT stop the walk (main.ts keeps walking) — so it
-              // never strands; only skip its refill/spend when unaffordable.
+              // never runs dry; only skip its refill/spend when unaffordable.
               if (gc <= simEnergy) payThenEat(gc);
             }
           }
@@ -116,7 +116,7 @@ export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: S
     legs.push({ tiles, blockedAt });
     legStart = wp;
   }
-  return { legs, drawn, walkable, waypointKeys, blockKeys, walkCost, actionCost, hpCost, hazardKeys, endEnergy: simEnergy, strands, crossedMonster, blocked: legs.some((l) => l.blockedAt !== null), end: wps.length ? wps[wps.length - 1]! : exp.pos };
+  return { legs, drawn, walkable, waypointKeys, blockKeys, walkCost, actionCost, hpCost, hazardKeys, endEnergy: simEnergy, runsDry, crossedMonster, blocked: legs.some((l) => l.blockedAt !== null), end: wps.length ? wps[wps.length - 1]! : exp.pos };
 }
 
 // --- click → waypoint list (eot) --------------------------------------------

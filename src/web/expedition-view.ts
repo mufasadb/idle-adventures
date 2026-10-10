@@ -11,7 +11,7 @@ import { deriveRoute } from "./route";
 import type { Pos } from "./route";
 import { PLAYER_BASE_HP, RECIPE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_CAMP_MEALS, QUAFF_ENERGY, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, FISH_CAST_ENERGY, FISH_DEEP_DEPTH, ANTIDOTE, TERRAIN_HP_COST } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
-import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, GATHER_VERB, round1, preFightVerdict, isExhausted, costBand, tileName, tileYield, slowRouteNote, blockedRouteNote } from "../render/render";
+import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, GATHER_VERB, round1, preFightVerdict, isExhausted, stuckOptions, costBand, tileName, tileYield, slowRouteNote, blockedRouteNote } from "../render/render";
 import type { FightVerdict } from "../render/render";
 import { fightSheet, preFightCard, throwLegal, enhanceButtons, verdictDot } from "./fight-view";
 import { perceive } from "../engine/perceive";
@@ -223,13 +223,15 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
 
   const maxEnergy = exp.maxEnergy ?? MAX_ENERGY;
   // With a route planned, split the energy bar: the part you'll KEEP (green) + the
-  // part it'll SPEND (orange, red if it would strand you). Planned = walk + auto-gather.
+  // part it'll SPEND (orange, amber if the walk runs dry). Planned = walk + auto-gather.
   const hasRoute = route.length > 0;
   const total = rt.walkCost + rt.actionCost;
-  // df3: the STRAND verdict is auto-eat-aware — the walk over-budgets only when the
+  // df3: the runs-dry verdict is auto-eat-aware — the walk over-budgets only when the
   // simulated energy (mid-walk refills applied) can't finish, not merely when the raw
   // walk+gather spend exceeds current energy. endEnergy is the honest projected end.
-  const overBudget = hasRoute && rt.strands;
+  // seyh.3 (D108): running dry only ends the gathering; home is free from anywhere
+  // (D62), so it reads amber (at risk), never red, and Walk stays enabled.
+  const overBudget = hasRoute && rt.runsDry;
   const spend = Math.min(total, exp.energy); // clamp — a huge route must never blow out the bar
   const keep = exp.energy - spend;
   const pct = (v: number) => Math.min(100, (v / maxEnergy) * 100);
@@ -238,22 +240,23 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   const overFull = !hasRoute && exp.energy > maxEnergy;
   const overSpan = overFull ? ` <span class="overfull">+${round1(exp.energy - maxEnergy)}</span>` : "";
   const energyFill = hasRoute
-    ? `<div class="fill energy" style="width:${pct(keep)}%"></div><div class="fill spend${overBudget ? " over" : ""}" style="width:${pct(spend)}%"></div>`
+    ? `<div class="fill energy" style="width:${pct(keep)}%"></div><div class="fill spend${overBudget ? " amber" : ""}" style="width:${pct(spend)}%"></div>`
     : `<div class="fill energy" style="width:${pct(exp.energy)}%"></div>`;
   const energyLabel = hasRoute
-    ? `${round1(exp.energy)}/${maxEnergy} → <b class="${overBudget ? "over" : ""}">${round1(Math.max(0, rt.endEnergy))}</b>${overBudget ? " ⚠ strands you" : ""}`
+    ? `${round1(exp.energy)}/${maxEnergy} → <b class="${overBudget ? "amber" : ""}">${round1(Math.max(0, rt.endEnergy))}⚡</b>`
     : `${round1(exp.energy)}/${maxEnergy}${overSpan}`;
   const autoGatherOn = exp.autoGather ?? true;
   // kml: compact HUD bars that float over the map (landscape-first layout).
   const bars = `
-    <div class="bar"><span>⚡ Energy</span><div class="track">${energyFill}</div><b>${energyLabel}</b></div>
+    <div class="bar"><span>⚡ Energy</span><div class="track">${energyFill}</div><b>${energyLabel}</b></div>${overBudget ? `
+    <div class="hud-note amber">ends your gathering here (home is still free)</div>` : ""}
     <div class="bar"><span>HP</span><div class="track"><div class="fill hp" style="width:${Math.min(100, (exp.hp / PLAYER_BASE_HP) * 100)}%"></div></div><b>${round1(exp.hp)}</b>${poisonChip(exp, legal)}</div>`;
 
   // End-of-route affordances (eot): the LAST waypoint drives Fight/Shoot/Survey.
   const endPoi = route.length ? poiAt.get(goalK) : undefined;
   const fight = endPoi && endPoi.kind === "monster" && endPoi.creature && !cleared.has(goalK) ? endPoi.creature : undefined;
   const shoot = fight !== undefined && legal.some((a) => a.type === "fight" && a.at !== undefined && a.at.x === rt.end.x && a.at.y === rt.end.y);
-  const costClause = `<b class="${overBudget ? "over" : ""}">−${round1(total)}⚡</b>${rt.actionCost > 0 ? ` <span class="muted">(${round1(rt.walkCost)} walk + ${round1(rt.actionCost)} gather)</span>` : ""}`;
+  const costClause = `<b class="${overBudget ? "amber" : ""}">−${round1(total)}⚡</b>${rt.actionCost > 0 ? ` <span class="muted">(${round1(rt.walkCost)} walk + ${round1(rt.actionCost)} gather)</span>` : ""}`;
   // eor (D103): a monster at the route's end gets the pre-fight card — verdict colour,
   // both sides' attack/armour types, loot, bag-slot warning. No round counts.
   const verdictFor = (creature: string): FightVerdict => preFightVerdict(exp.loadout, creature, exp.hp, exp.weaponBuff, exp.mapTier ?? 1, exp.poisoned);
@@ -384,7 +387,7 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
       <button class="pan pan-w" data-pan="-2,0" aria-label="pan west">◀</button>
       <button class="pan pan-e" data-pan="2,0" aria-label="pan east">▶</button>
       <button class="recentre" data-recentre title="centre on you" aria-label="centre on you">◎</button>
-      ${exp.combat ? "" : `<button class="home-btn" data-home title="head home" aria-label="head home">🏠</button>`}
+      ${exp.combat ? "" : `<button class="home-btn" data-home title="head home (free)" aria-label="head home, free">🏠<span class="home-free">free</span></button>`}
       ${homeSheet(state, legal, ui)}
       ${quick.length ? `<div class="quick">${quick.join("")}</div>` : ""}
       ${routeBar}
@@ -418,11 +421,18 @@ export function currentDerived(state: GameState, route: Pos[]) {
 function homeSheet(state: GameState, legal: Action[], ui: ExpeditionUi): string {
   const stuck = isExhausted(state, legal) && !ui.stuckDismissed;
   if (!stuck && !ui.confirmHome) return "";
+  // seyh.3: "Not yet" only when something besides going home is still worth doing here
+  // (stuckOptions); otherwise it would dismiss into a dead end, so the card offers home only.
+  const left = stuck ? stuckOptions(legal) : [];
+  const leftCopy = left.length > 1 ? `${left.slice(0, -1).join(", ")} or ${left[left.length - 1]}` : left[0] ?? "";
   const body = stuck
-    ? `<h3>You're exhausted</h3><p>No energy left, nothing to eat, and nothing here to cook. Head home with what you carry?</p>`
+    ? left.length
+      ? `<h3>You're exhausted</h3><p>No energy left and nothing to eat. You can still ${leftCopy} here, then walk home free with what you carry.</p>`
+      : `<h3>You're exhausted</h3><p>No energy left, nothing to eat, and nothing here to cook. The walk home is free, and everything you carry comes with you.</p>`
     : `<h3>Head home?</h3><p>You'll walk back to town with everything you carry. The trip home is free.</p>`;
+  const cancel = !stuck ? `<button data-home-cancel>Stay</button>` : left.length ? `<button data-home-cancel>Not yet</button>` : "";
   return `<div class="home-sheet${stuck ? " stuck" : ""}" role="dialog" aria-label="head home">
     ${body}
-    <div class="actions"><button class="primary" data-act="return">🏠 Go home</button><button data-home-cancel>${stuck ? "Not yet" : "Stay"}</button></div>
+    <div class="actions"><button class="primary" data-act="return">🏠 Go home</button>${cancel}</div>
   </div>`;
 }

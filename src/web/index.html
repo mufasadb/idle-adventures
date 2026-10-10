@@ -14,7 +14,7 @@
         color-scheme: dark;
         --bg: #09090b; --panel: #111114; --panel-2: #17171b; --line: #2a2620;
         --gold: #c9a55a; --gold-dim: #6f5a31; --text: #e6dfcf; --muted: #8e8676;
-        --red: #b0392f; --green: #6aa04f; --blue: #7fa6d6;
+        --red: #b0392f; --green: #6aa04f; --blue: #7fa6d6; --amber: #e3b341;
         --handle: 44px;
       }
       body { font-family: "Crimson Pro", Georgia, serif; font-size: 17px; background: var(--bg); color: var(--text); padding: 1rem; margin: 0; font-variant-numeric: tabular-nums; }
@@ -177,7 +177,7 @@
       .fill { height: 100%; }
       .fill.energy { background: #6bbf59; }
       .fill.spend { background: #d98a2b; }        /* a pending walk will spend this much */
-      .fill.spend.over { background: #c03838; }    /* the walk would strand you (cost > energy) */
+      .fill.spend.amber { background: repeating-linear-gradient(135deg, var(--amber) 0 4px, #b8862a 4px 8px); } /* the walk runs dry partway (seyh.3): gathering ends there; home is still free, so amber not red */
       .overfull { color: #6bbf59; font-weight: 600; } /* over-full stamina surplus after a manual over-eat (m0a) — distinct class so it can't tint any .over danger text */
       .fill.hp { background: #c03838; }
       .fill.monster { background: #c0504d; }
@@ -202,6 +202,7 @@
       .pan-e { right: 6px; top: 50%; transform: translateY(-50%); }
       .recentre { top: 8px; right: 8px; font-size: 1rem; }
       .home-btn { position: absolute; z-index: 9; top: 44px; right: 8px; width: 30px; height: 30px; padding: 0; border-radius: 50%; background: rgba(9, 9, 11, 0.7); border-color: var(--gold-dim); font-size: 0.9rem; }
+      .home-btn .home-free { position: absolute; left: 50%; bottom: -0.95rem; transform: translateX(-50%); font-size: 0.62rem; line-height: 1; color: var(--gold); text-shadow: 0 0 3px #000, 0 0 3px #000; letter-spacing: 0.04em; pointer-events: none; } /* seyh.3: the trip home costs nothing */
       .home-sheet { position: absolute; z-index: 15; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(340px, 86%); background: var(--panel); border: 1px solid var(--gold); border-radius: 4px; padding: 0.8rem 1rem; box-shadow: 0 8px 24px #000c; }
       .home-sheet h3 { margin: 0 0 0.4rem; font-family: "Cinzel", Georgia, serif; color: var(--gold); font-size: 1rem; }
       .home-sheet p { margin: 0 0 0.7rem; font-size: 0.9rem; }
@@ -222,7 +223,8 @@
       .routebar { position: absolute; left: 44px; bottom: calc(var(--handle) + 8px); z-index: 11; max-width: min(520px, calc(50% - 64px)); background: rgba(9, 9, 11, 0.9); border: 1px solid var(--gold-dim); border-radius: 3px; padding: 0.35rem 0.6rem; font-size: 0.92rem; display: flex; flex-direction: column; gap: 0.25rem; }
       .routebar.blocked { border-color: var(--red); }
       .routebtns { display: flex; gap: 0.4rem; flex-wrap: wrap; }
-      .over { color: #ff7b6b; } .good { color: #8ccf6f; }
+      .over { color: #ff7b6b; } .good { color: #8ccf6f; } .amber { color: var(--amber); }
+      .hud-note { font-size: 0.75rem; margin: -0.1rem 0 0.15rem; white-space: normal; max-width: 15rem; } /* seyh.3: wraps under the bar so the HUD never grows sideways */
       .drawer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: var(--handle); background: var(--panel); border-top: 1px solid var(--gold-dim); display: flex; flex-direction: column; transition: height 0.18s ease; }
       .drawer.open { height: min(78dvh, 560px); }
       .drawer-handle { flex: none; height: var(--handle); display: flex; align-items: center; gap: 0.7rem; width: 100%; background: none; border: none; border-radius: 0; padding: 0 1rem; color: var(--muted); text-align: left; }
