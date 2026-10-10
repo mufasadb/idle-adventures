@@ -349,7 +349,7 @@ export function tileName(terrain: Terrain, poi: TilePoi, detail: PoiDetail | nul
 export function tileYield(poi: TilePoi, detail: PoiDetail | null, cleared: boolean, tools: string[]): string | null {
   if (!poi || cleared || poi.kind === "monster") return null;
   const noun = capFirst(GATHER_VERB[poi.kind]?.noun ?? kindLabel(poi.kind));
-  if (!detail?.material) return `${noun} → ?`;
+  if (!detail?.material) return `${noun} (too far to tell)`; // seyh.6: say why, not "?"
   const need = nodeToolShort(poi.kind as GatherableNodeType, tools)
     ?? (detail.gatedBy?.length && !detail.gatedBy.some((t) => tools.includes(t)) ? `needs ${detail.gatedBy.join(" or ")}` : null);
   return `${noun} → ${name(detail.material)}${need ? ` (${need})` : ""}`;
@@ -898,6 +898,18 @@ export function haulRoom(exp: Pick<Expedition, "loadout" | "carry">): { haul: nu
 /** "Haul 6 · room for 24" / "Haul 6 · bag full" — the HUD and drawer-handle phrase. */
 export function haulLine(h: { haul: number; roomUnits: number; full: boolean }): string {
   return `Haul ${h.haul} · ${h.full ? "bag full" : `room for ${h.roomUnits}`}`;
+}
+
+/** The route card's "what you'll get" line (seyh.6): the walk's predicted auto-gathers
+ *  summed per material in walk order, then whether it all fits. `icon` lets a surface
+ *  prefix each material (the web's sprite icon); text-only by default. Empty gathers →
+ *  "" (nothing to promise, e.g. auto-gather off). */
+export function yieldLine(gathers: readonly { material: string; qty: number }[], fits: boolean, short: number, icon: (material: string) => string = () => ""): string {
+  if (!gathers.length) return "";
+  const totals = new Map<string, number>();
+  for (const g of gathers) totals.set(g.material, (totals.get(g.material) ?? 0) + g.qty);
+  const items = [...totals].map(([m, q]) => `${icon(m)}${name(m)} +${q}`).join(", ");
+  return `→ ${items} · ${fits ? "fits ✓" : `won't fit (${short} short)`}`;
 }
 
 /** Where an item comes from, in player words (user 2026-10-10: "where do I get flint?"):

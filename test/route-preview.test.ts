@@ -1,4 +1,4 @@
-import { test, expect } from "bun:test";
+import { test, expect, describe } from "bun:test";
 import { deriveRoute } from "../src/web/route";
 import { reduce } from "../src/engine/reduce";
 import { generateGrid, rollBiome } from "../src/engine/grid";
@@ -6,6 +6,10 @@ import { moveCost } from "../src/engine/move";
 import { MAP_WIDTH, MAP_HEIGHT } from "../src/data/constants";
 import type { Expedition, GameState } from "../src/engine/types";
 import { emptyLoadout } from "../src/engine/loadout";
+import { freeLootStacks } from "../src/engine/carry";
+import { gatherYield } from "../src/engine/reduce-expedition";
+import { route as walkWaypoints } from "../src/sim/play";
+import { yieldLine } from "../src/render/render";
 
 // df3: the route-energy preview must account for DESIGNATED auto-eat refills that
 // happen DURING the walk. The reducer refills after paying each step's cost, so a
@@ -129,4 +133,71 @@ test("deriveRoute prices spore-thickets in HP, and a filter-mask zeroes it (si7.
   expect(bare.hazardKeys.size).toBe(3);
   const masked = deriveRoute(g, exp(["filter-mask"]), [{ x: 5, y: 0 }], new Set(), new Set());
   expect(masked.hpCost).toBe(0);
+});
+
+// seyh.6: the route card promises what the walk will gather and whether it fits. The
+// prediction must match a REAL walk (sim/play route — the web's walkWaypoints), so the
+// card can never lie. FIXTURE (seed scan, like scanForPoi): map "yl-0" — from (17,27)
+// the lines to the copper veins at (18,27) and (15,25), and on to the iron vein at
+// (23,21), are walkable and cross no other POI.
+describe("deriveRoute gathers + fits (seyh.6)", () => {
+  const YSEED = "yl-0";
+  const YGRID = generateGrid(YSEED, rollBiome(YSEED));
+  const YSTART = { x: 17, y: 27 };
+  const CU_A = { x: 18, y: 27 }, CU_B = { x: 15, y: 25 }, FE = { x: 23, y: 21 };
+  const allResolved = new Set(YGRID.pois.map((p) => `${p.x},${p.y}`));
+  const yexp = (over: Partial<Expedition> = {}): Expedition => {
+    const loadout = emptyLoadout(); loadout.equipment.tools = ["pick"];
+    return { mapSeed: YSEED, pos: { ...YSTART }, energy: 300, maxEnergy: 300, hp: 30, loadout, carry: [], cleared: [], ...over };
+  };
+  const walk = (exp: Expedition, wps: { x: number; y: number }[]) =>
+    walkWaypoints({ seed: "s", phase: "expedition", bank: [], loadout: emptyLoadout(), expedition: exp }, wps);
+  const gotten = (r: ReturnType<typeof walk>) => r.events.flatMap((e) => (e.type === "gathered" ? [{ material: e.material, qty: e.qty }] : []));
+
+  test("fixture sanity: the three veins are where the scan put them", () => {
+    const at = (p: { x: number; y: number }) => YGRID.pois.find((q) => q.x === p.x && q.y === p.y);
+    expect(at(CU_A)?.material).toBe("copper-ore");
+    expect(at(CU_B)?.material).toBe("copper-ore");
+    expect(at(FE)?.material).toBe("iron-ore");
+  });
+
+  test("a 3-waypoint sweep over 2 resolved copper veins predicts 2 gathers that fit — and a real walk agrees", () => {
+    const exp = yexp();
+    const wps = [CU_A, CU_B, YSTART];
+    const rt = deriveRoute(YGRID, exp, wps, allResolved, new Set());
+    const q = gatherYield("mining", null);
+    expect(rt.gathers.map((g) => ({ material: g.material, qty: g.qty }))).toEqual([{ material: "copper-ore", qty: q }, { material: "copper-ore", qty: q }]);
+    expect(rt.fits).toBe(true);
+    expect(rt.short).toBe(0);
+    expect(yieldLine(rt.gathers, rt.fits, rt.short)).toBe(`→ Copper Ore +${2 * q} · fits ✓`);
+    const r = walk(exp, wps);
+    expect(r.halt).toBeNull();
+    expect(gotten(r)).toEqual(rt.gathers.map((g) => ({ material: g.material, qty: g.qty })));
+  });
+
+  test("1 free slot and 2 new materials → won't fit (1 short), and the real walk pauses bag-full there", () => {
+    const free = freeLootStacks(yexp().loadout); // the pick takes a slot too
+    const carry = Array.from({ length: free - 1 }, () => ({ defId: "oak-log", qty: 1 }));
+    const exp = yexp({ carry });
+    const wps = [CU_A, FE];
+    const rt = deriveRoute(YGRID, exp, wps, allResolved, new Set());
+    expect(rt.gathers.map((g) => g.material)).toEqual(["copper-ore", "iron-ore"]);
+    expect(rt.fits).toBe(false);
+    expect(rt.short).toBe(1);
+    expect(yieldLine(rt.gathers, rt.fits, rt.short)).toContain("won't fit (1 short)");
+    const r = walk(exp, wps);
+    expect(r.halt).toEqual({ kind: "bag-full" });
+    expect(gotten(r).map((g) => g.material)).toEqual(["copper-ore"]); // the fitting prefix landed
+  });
+
+  test("auto-gather off → no gathers, empty yield line (only what the walk will actually do)", () => {
+    const rt = deriveRoute(YGRID, yexp({ autoGather: false }), [CU_A, CU_B], allResolved, new Set());
+    expect(rt.gathers).toEqual([]);
+    expect(yieldLine(rt.gathers, rt.fits, rt.short)).toBe("");
+  });
+
+  test("unresolved nodes are never predicted", () => {
+    const rt = deriveRoute(YGRID, yexp(), [CU_A, CU_B], new Set(), new Set());
+    expect(rt.gathers).toEqual([]);
+  });
 });

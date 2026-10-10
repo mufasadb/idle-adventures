@@ -227,6 +227,10 @@
       .hud-note { font-size: 0.75rem; margin: -0.1rem 0 0.15rem; white-space: normal; max-width: 15rem; } /* seyh.3: wraps under the bar so the HUD never grows sideways */
       .hud-haul { color: var(--gold); font-size: 0.85rem; font-weight: 600; margin: 0 0 0.2rem; white-space: nowrap; } /* seyh.2: the run's score + room left for loot */
       .hud-haul.amber, .drawer-handle .bagcount.amber { color: var(--amber); } /* bag full: at risk, never red */
+      .yieldline { font-size: 0.85rem; color: var(--gold); } /* seyh.6: route card "what you'll get · fits ✓" */
+      .yieldline.amber { color: var(--amber); }
+      .yieldline .y-icon { display: inline-block; vertical-align: middle; background-repeat: no-repeat; zoom: 0.6; margin-right: 0.2rem; }
+      .fs-lootrow .pf-fit { margin-left: 0.3rem; font-weight: 700; } .pf-fit.ok { color: #8ccf6f; } .pf-fit.no { color: var(--amber); } /* seyh.6: does the loot fit? */
       .drawer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: var(--handle); background: var(--panel); border-top: 1px solid var(--gold-dim); display: flex; flex-direction: column; transition: height 0.18s ease; }
       .drawer.open { height: min(78dvh, 560px); }
       .drawer-handle { flex: none; height: var(--handle); display: flex; align-items: center; gap: 0.7rem; width: 100%; background: none; border: none; border-radius: 0; padding: 0 1rem; color: var(--muted); text-align: left; }

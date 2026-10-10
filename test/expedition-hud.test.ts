@@ -3,6 +3,8 @@
 import { test, expect } from "bun:test";
 import { expeditionView } from "../src/web/expedition-view";
 import { deriveRoute } from "../src/web/route";
+import { preFightCard } from "../src/web/fight-view";
+import { freeLootStacks } from "../src/engine/carry";
 import { generateGrid, rollBiome } from "../src/engine/grid";
 import { emptyLoadout } from "../src/engine/loadout";
 import type { Expedition, GameState } from "../src/engine/types";
@@ -46,4 +48,29 @@ test("a route within budget shows no runs-dry note; the 🏠 button says it's fr
   const html = expeditionView(s, [{ x: START.x, y: START.y - 3 }], ui);
   expect(html).not.toContain("home is still free");
   expect(html).toContain('class="home-free">free<');
+});
+
+// seyh.6: the route card says what the walk will gather and whether it fits; the
+// pre-fight card always marks whether the loot fits (✓/✗), not only on overflow.
+test("seyh.6: a route over resolved copper veins shows the yield line with 'fits ✓', and no '?' node label", () => {
+  const seed = "yl-0"; // fixture from route-preview.test.ts: copper veins at (18,27), (15,25) from (17,27)
+  const loadout = emptyLoadout(); loadout.equipment.tools = ["pick"];
+  const exp: Expedition = { mapSeed: seed, pos: { x: 17, y: 27 }, energy: 300, maxEnergy: 300, hp: 30, loadout, carry: [], cleared: [] };
+  const html = expeditionView({ seed: "s", phase: "expedition", bank: [], loadout: emptyLoadout(), expedition: exp }, [{ x: 18, y: 27 }, { x: 15, y: 25 }], ui);
+  expect(html).toMatch(/<div class="yieldline">→ .*Copper Ore \+\d+ · fits ✓<\/div>/);
+  expect(html).not.toContain("→ ?");
+  const off = expeditionView({ seed: "s", phase: "expedition", bank: [], loadout: emptyLoadout(), expedition: { ...exp, autoGather: false } }, [{ x: 18, y: 27 }], ui);
+  expect(off).not.toContain("yieldline");
+});
+
+test("seyh.6: the pre-fight card marks the loot ✓ when it fits and ✗ when it doesn't", () => {
+  const s = stateWith(300);
+  const exp = s.expedition!;
+  let at: { x: number; y: number } | null = null;
+  for (let x = 0; x < 35 && !at; x++) if (preFightCard(s, exp, "forest-boar", { x, y: 0 }, "win", null).includes("pf-fit")) at = { x, y: 0 };
+  expect(at).not.toBeNull(); // some tile's roll drops loot
+  expect(preFightCard(s, exp, "forest-boar", at!, "win", null)).toContain('class="pf-fit ok"');
+  const free = freeLootStacks(exp.loadout);
+  const full = { ...exp, carry: Array.from({ length: free }, (_, i) => ({ defId: i % 2 ? "oak-log" : "iron-ore", qty: 5 })) };
+  expect(preFightCard(s, full, "forest-boar", at!, "win", null)).toContain('class="pf-fit no"');
 });

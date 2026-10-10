@@ -145,7 +145,7 @@ export function preFightCard(state: GameState, exp: Expedition, creature: string
   const { need, free } = lootSlots(state.seed, creature, at, exp.loadout, exp.carry);
   const tight = need > free; // exactly engage()'s pendingLootFits check, as counts
   return `<div class="prefight v-${verdict}">
-    <div class="pf-top">${portrait(monsterStyle(creature), "X")}<div class="pf-id"><b>${name(creature)}</b><span class="fs-verdict v-${verdict}">${VERDICT_LABEL[verdict]}</span></div><div class="fs-lootrow">${lootIcons(creature)}</div></div>
+    <div class="pf-top">${portrait(monsterStyle(creature), "X")}<div class="pf-id"><b>${name(creature)}</b><span class="fs-verdict v-${verdict}">${VERDICT_LABEL[verdict]}</span></div><div class="fs-lootrow">${lootIcons(creature)}${need > 0 ? (tight ? `<span class="pf-fit no" title="won't all fit in your bag">✗</span>` : `<span class="pf-fit ok" title="fits in your bag">✓</span>`) : ""}</div></div>
     <div class="pf-vs"><span class="pf-who">you</span>${playerTypes(exp.loadout)}<span class="pf-who">it</span>${monsterTypes(detail?.dmgType, detail?.armourType)}</div>
     ${tight ? `<div class="pf-bag" title="${rejectCopy("carry-full", undefined, "fight")}">⚠ needs ${need} free slot${need === 1 ? "" : "s"} — bag has ${free}</div>` : ""}
   </div>`;

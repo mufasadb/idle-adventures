@@ -11,7 +11,7 @@ import { deriveRoute } from "./route";
 import type { Pos } from "./route";
 import { PLAYER_BASE_HP, RECIPE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_CAMP_MEALS, QUAFF_ENERGY, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, FISH_CAST_ENERGY, FISH_DEEP_DEPTH, ANTIDOTE, TERRAIN_HP_COST } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
-import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, GATHER_VERB, round1, preFightVerdict, isExhausted, stuckOptions, haulRoom, haulLine, costBand, tileName, tileYield, slowRouteNote, blockedRouteNote } from "../render/render";
+import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, GATHER_VERB, round1, preFightVerdict, isExhausted, stuckOptions, haulRoom, haulLine, yieldLine, costBand, tileName, tileYield, slowRouteNote, blockedRouteNote } from "../render/render";
 import type { FightVerdict } from "../render/render";
 import { fightSheet, preFightCard, throwLegal, enhanceButtons, verdictDot } from "./fight-view";
 import { perceive } from "../engine/perceive";
@@ -281,10 +281,15 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   const blockNote = firstBlock ? `<div class="over">✗ ${capFirst(blockedRouteNote(grid.terrain[firstBlock.y]![firstBlock.x]!))}. <span class="muted">Tap the line to unwind.</span></div>` : "";
   const slow = hasRoute && !firstBlock ? slowRouteNote(rt.walkable.map((t) => grid.terrain[t.y]![t.x]!), exp.loadout.equipment) : null;
   const slowNote = slow ? `<div class="slow">🐢 ${slow}</div>` : "";
+  // seyh.6: what the walk will gather and whether it fits (amber when it won't — the
+  // walk pauses there, it isn't a loss). Only resolved nodes; nothing with auto-gather off.
+  const yieldIcon = (m: string): string => { const st = iconStyle(m); return st ? `<span class="y-icon" style="${st}" aria-hidden="true"></span>` : ""; };
+  const yields = yieldLine(rt.gathers, rt.fits, rt.short, yieldIcon);
+  const yieldRow = yields ? `<div class="yieldline${rt.fits ? "" : " amber"}">${yields}</div>` : "";
   // kml: the route bar floats at the bottom of the map — only when there's something to say.
   // A live fight has its own sheet (eor), so no route bar then.
   const routeBar = !exp.combat && hasRoute
-    ? `<div class="routebar${rt.blocked ? " blocked" : ""}${fight ? " has-fight" : ""}">${crossWarn}${blockNote}${fightCard}<div class="routeline">${rt.walkable.length} tile${rt.walkable.length !== 1 ? "s" : ""} · ${costClause}${hpClause}</div>${slowNote}<div class="routebtns"><button class="primary" data-walk${rt.blocked ? " disabled" : ""}>${fight ? "Fight ▶" : "Walk ▶"}</button>${shoot ? `<button data-shoot title="engage from here — your opener lands first">🏹 Shoot</button>` : ""}${throwables.map((id) => `<button class="throw" data-throw="${id}" data-throw-x="${rt.end.x}" data-throw-y="${rt.end.y}" title="throw from here — ${describe(id)}">💥 Throw ${name(id).toLowerCase()} <span class="free-opener">FREE OPENER</span></button>`).join("")}${surveyAtEnd ? `<button data-survey-x="${rt.end.x}" data-survey-y="${rt.end.y}" title="resolve its detail from here">🔭 −${SURVEY_ENERGY}⚡</button>` : ""}<button data-cancelpath title="clear the route">✕</button></div></div>`
+    ? `<div class="routebar${rt.blocked ? " blocked" : ""}${fight ? " has-fight" : ""}">${crossWarn}${blockNote}${fightCard}<div class="routeline">${rt.walkable.length} tile${rt.walkable.length !== 1 ? "s" : ""} · ${costClause}${hpClause}</div>${yieldRow}${slowNote}<div class="routebtns"><button class="primary" data-walk${rt.blocked ? " disabled" : ""}>${fight ? "Fight ▶" : "Walk ▶"}</button>${shoot ? `<button data-shoot title="engage from here — your opener lands first">🏹 Shoot</button>` : ""}${throwables.map((id) => `<button class="throw" data-throw="${id}" data-throw-x="${rt.end.x}" data-throw-y="${rt.end.y}" title="throw from here — ${describe(id)}">💥 Throw ${name(id).toLowerCase()} <span class="free-opener">FREE OPENER</span></button>`).join("")}${surveyAtEnd ? `<button data-survey-x="${rt.end.x}" data-survey-y="${rt.end.y}" title="resolve its detail from here">🔭 −${SURVEY_ENERGY}⚡</button>` : ""}<button data-cancelpath title="clear the route">✕</button></div></div>`
     : "";
 
   // qba: the tapped tile (the route's end) names itself and what reaching it costs —
