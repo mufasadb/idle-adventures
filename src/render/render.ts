@@ -1,9 +1,9 @@
-import { BIOMES, RESEARCH_INKS, RESEARCH_SEARCHES_PER_INK, LOOT_TABLE, CATEGORY_LOOT_TABLE, MAP_SCROLL_ID, WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE, QUAFF_ENERGY, DON_DOFF_ENERGY, FLASK_EFFECT, ANTIDOTE, MAP_HINTS, DMG_ARMOUR_MATRIX, TERRAIN_HP_WARD } from "../data/constants";
+import { BIOMES, RESEARCH_INKS, RESEARCH_SEARCHES_PER_INK, LOOT_TABLE, CATEGORY_LOOT_TABLE, MAP_SCROLL_ID, WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE, QUAFF_ENERGY, DON_DOFF_ENERGY, FLASK_EFFECT, ANTIDOTE, MAP_HINTS, DMG_ARMOUR_MATRIX, TERRAIN_HP_WARD, STACK_CAP } from "../data/constants";
 import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType, FishWater, HintMetric } from "../data/constants";
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
 import { playerDamage, damageTaken, strikeExchange, wieldsRanged, hasAmmo, loadedAmmoIndex, rollLoot } from "../engine/combat";
-import { consumeOne, addToCarry, freeLootStacks, carryCap, slotCap, quiverAmmoSlots } from "../engine/carry";
+import { consumeOne, addToCarry, freeLootStacks, carryCap, slotCap, quiverAmmoSlots, stackCapOf } from "../engine/carry";
 import { CONSUMABLE_KINDS, CONSUMABLE_KEYS } from "../engine/catalog";
 import { moveCost } from "../engine/move";
 import { ARMOUR_SLOTS } from "../engine/pack";
@@ -881,6 +881,23 @@ export function stuckOptions(legal: Action[]): string[] {
   if (legal.some((a) => a.type === "craft")) out.push("craft");
   if (legal.some((a) => a.type === "drop" || a.type === "drop-map")) out.push("drop things");
   return out;
+}
+
+/** The run's score and how much more it can take (seyh.2): haul = loot units carried;
+ *  room = whole free loot slots × their stack cap + the top-up left in partial carry
+ *  stacks (same-material gathers merge first, as addToCarry does). Carried maps live in
+ *  their own pool (mapCarryCap, zpm.2) and take no loot room. full = nothing more fits. */
+export function haulRoom(exp: Pick<Expedition, "loadout" | "carry">): { haul: number; stacks: number; roomUnits: number; full: boolean } {
+  const haul = exp.carry.reduce((n, s) => n + s.qty, 0);
+  const freeSlots = Math.max(0, freeLootStacks(exp.loadout) - exp.carry.length);
+  const topUp = exp.carry.reduce((n, s) => n + Math.max(0, stackCapOf(s.defId) - s.qty), 0);
+  const roomUnits = freeSlots * STACK_CAP + topUp;
+  return { haul, stacks: exp.carry.length, roomUnits, full: roomUnits === 0 };
+}
+
+/** "Haul 6 · room for 24" / "Haul 6 · bag full" — the HUD and drawer-handle phrase. */
+export function haulLine(h: { haul: number; roomUnits: number; full: boolean }): string {
+  return `Haul ${h.haul} · ${h.full ? "bag full" : `room for ${h.roomUnits}`}`;
 }
 
 /** Where an item comes from, in player words (user 2026-10-10: "where do I get flint?"):

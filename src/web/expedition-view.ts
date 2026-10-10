@@ -11,7 +11,7 @@ import { deriveRoute } from "./route";
 import type { Pos } from "./route";
 import { PLAYER_BASE_HP, RECIPE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_CAMP_MEALS, QUAFF_ENERGY, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, FISH_CAST_ENERGY, FISH_DEEP_DEPTH, ANTIDOTE, TERRAIN_HP_COST } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
-import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, GATHER_VERB, round1, preFightVerdict, isExhausted, stuckOptions, costBand, tileName, tileYield, slowRouteNote, blockedRouteNote } from "../render/render";
+import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, GATHER_VERB, round1, preFightVerdict, isExhausted, stuckOptions, haulRoom, haulLine, costBand, tileName, tileYield, slowRouteNote, blockedRouteNote } from "../render/render";
 import type { FightVerdict } from "../render/render";
 import { fightSheet, preFightCard, throwLegal, enhanceButtons, verdictDot } from "./fight-view";
 import { perceive } from "../engine/perceive";
@@ -246,11 +246,14 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
     ? `${round1(exp.energy)}/${maxEnergy} → <b class="${overBudget ? "amber" : ""}">${round1(Math.max(0, rt.endEnergy))}⚡</b>`
     : `${round1(exp.energy)}/${maxEnergy}${overSpan}`;
   const autoGatherOn = exp.autoGather ?? true;
+  // seyh.2: the score (haul) and the room left for loot, not a merged supplies+loot count.
+  const haul = haulRoom(exp);
   // kml: compact HUD bars that float over the map (landscape-first layout).
   const bars = `
     <div class="bar"><span>⚡ Energy</span><div class="track">${energyFill}</div><b>${energyLabel}</b></div>${overBudget ? `
     <div class="hud-note amber">ends your gathering here (home is still free)</div>` : ""}
-    <div class="bar"><span>HP</span><div class="track"><div class="fill hp" style="width:${Math.min(100, (exp.hp / PLAYER_BASE_HP) * 100)}%"></div></div><b>${round1(exp.hp)}</b>${poisonChip(exp, legal)}</div>`;
+    <div class="bar"><span>HP</span><div class="track"><div class="fill hp" style="width:${Math.min(100, (exp.hp / PLAYER_BASE_HP) * 100)}%"></div></div><b>${Math.round(exp.hp)}/${PLAYER_BASE_HP}</b>${poisonChip(exp, legal)}</div>
+    <div class="hud-haul${haul.full ? " amber" : ""}">${haulLine(haul)}</div>`;
 
   // End-of-route affordances (eot): the LAST waypoint drives Fight/Shoot/Survey.
   const endPoi = route.length ? poiAt.get(goalK) : undefined;
@@ -394,8 +397,8 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
       ${exp.combat ? fightSheet(exp, legal) : ""}
     </div>
     <aside class="drawer${ui.drawerOpen ? " open" : ""}">
-      <button class="drawer-handle" data-drawer-toggle><span class="grip"></span><span class="summary"><span class="sum-here">${hereSummary}</span>${targetSummary}</span><span class="bagcount">${inv.used}/${cap} bag</span><span class="chev">${ui.drawerOpen ? "▾" : "▴"}</span></button>
-      <nav class="tabs">${tabBtn("here", "Here")}${tabBtn("bag", `Bag ${inv.used}/${cap}`)}${tabBtn("craft", "Craft")}${tabBtn("log", "Log")}</nav>
+      <button class="drawer-handle" data-drawer-toggle><span class="grip"></span><span class="summary"><span class="sum-here">${hereSummary}</span>${targetSummary}</span><span class="bagcount${haul.full ? " amber" : ""}">${haulLine(haul)}</span><span class="chev">${ui.drawerOpen ? "▾" : "▴"}</span></button>
+      <nav class="tabs">${tabBtn("here", "Here")}${tabBtn("bag", "Bag")}${tabBtn("craft", "Craft")}${tabBtn("log", "Log")}</nav>
       <div class="drawer-body">${tabBody}</div>
     </aside>
   </div>

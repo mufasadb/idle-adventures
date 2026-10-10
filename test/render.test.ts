@@ -1,8 +1,9 @@
 import { test, expect } from "bun:test";
-import { flavorDetail, matchupLessons, combatForecast, poiGlyph, kindLabel, POI_CHAR, itemSources, formatEvent, setEnergyUnit, costBand } from "../src/render/render";
+import { flavorDetail, matchupLessons, combatForecast, poiGlyph, kindLabel, POI_CHAR, itemSources, formatEvent, setEnergyUnit, costBand, haulRoom, haulLine } from "../src/render/render";
 import { emptyLoadout } from "../src/engine/loadout";
 import { playerDamage, damageTaken } from "../src/engine/combat";
-import { MONSTERS, MONSTER_TIER_HP_CURVE } from "../src/data/constants";
+import { MONSTERS, MONSTER_TIER_HP_CURVE, BACKPACK_SLOTS, STACK_CAP } from "../src/data/constants";
+import type { ItemStack } from "../src/engine/types";
 
 // 1z7: the three render.ts grid drawers (render/renderGridText/renderGridHtml) were
 // used by zero shipped surfaces and have been removed — the web and headless console
@@ -94,4 +95,45 @@ test("costBand: cheap → slow bands, impassable has none (user 2026-10-10 cost 
   expect(costBand(20)).toBe(3);
   expect(costBand(30)).toBe(4);
   expect(costBand(Infinity)).toBeNull();
+});
+
+// seyh.2: the HUD shows the haul (loot units) and the room left for loot, not a merged bag count.
+function bag(carry: ItemStack[], supplies = 11) {
+  const loadout = emptyLoadout();
+  loadout.equipment.backpack = "large-pack"; // 16 slots
+  loadout.equipment.tools = ["axe", "pick"]; // 2 slots
+  loadout.food = [{ defId: "ration", qty: supplies - 2 }]; // one slot per unit
+  return { loadout, carry };
+}
+
+test("haulRoom: empty carry → haul 0, room = free slots × STACK_CAP", () => {
+  expect(BACKPACK_SLOTS["large-pack"]).toBe(16);
+  const h = haulRoom(bag([]));
+  // 16 slots − 11 supplies = 5 free slots × 5 = 25
+  expect(h).toEqual({ haul: 0, stacks: 0, roomUnits: 5 * STACK_CAP, full: false });
+  expect(haulLine(h)).toBe("Haul 0 · room for 25");
+});
+
+test("haulRoom: a partial stack's top-up counts as room (same-material gathers merge)", () => {
+  const h = haulRoom(bag([{ defId: "oak-log", qty: 3 }]));
+  // 4 free slots × 5 + (5 − 3) top-up = 22
+  expect(h).toEqual({ haul: 3, stacks: 1, roomUnits: 22, full: false });
+  expect(haulLine(h)).toBe("Haul 3 · room for 22");
+});
+
+test("haulRoom: every slot full of full stacks → bag full", () => {
+  const carry = Array.from({ length: 5 }, () => ({ defId: "oak-log", qty: STACK_CAP }));
+  const h = haulRoom(bag(carry));
+  expect(h).toEqual({ haul: 25, stacks: 5, roomUnits: 0, full: true });
+  expect(haulLine(h)).toBe("Haul 25 · bag full");
+});
+
+test("haulRoom: no free slot but a partial stack → still room for that top-up", () => {
+  const carry = [...Array.from({ length: 4 }, () => ({ defId: "oak-log", qty: STACK_CAP })), { defId: "iron-ore", qty: 1 }];
+  expect(haulRoom(bag(carry))).toMatchObject({ haul: 21, roomUnits: 4, full: false });
+});
+
+test("haulRoom: carried maps take no loot room (their own pool, zpm.2)", () => {
+  const withMap = { ...bag([]), carriedMaps: [{ mapSeed: "m", biomeId: "woodland" as const }] };
+  expect(haulRoom(withMap).roomUnits).toBe(25);
 });

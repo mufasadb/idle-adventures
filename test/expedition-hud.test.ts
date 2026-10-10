@@ -30,6 +30,17 @@ test("a route that runs dry reads amber 'home is still free', no 'strands', Walk
   expect(html).toMatch(/<button class="primary" data-walk>/); // not disabled: walking until dry is legal
 });
 
+test("seyh.2: the HUD and drawer handle show the haul phrase, HP is an integer over max, the Bag tab has no count", () => {
+  const s = stateWith(50);
+  const hurt: GameState = { ...s, expedition: { ...s.expedition!, hp: 26.6 } };
+  const html = expeditionView(hurt, [], ui);
+  // bare bag (6 slots), nothing packed → 6 free × 5 = 30
+  expect(html).toContain('<div class="hud-haul">Haul 0 · room for 30</div>');
+  expect(html).toContain('<span class="bagcount">Haul 0 · room for 30</span>');
+  expect(html).toContain("<b>27/30</b>");
+  expect(html).toContain('data-tab="bag">Bag</button>');
+});
+
 test("a route within budget shows no runs-dry note; the 🏠 button says it's free", () => {
   const s = stateWith(50);
   const html = expeditionView(s, [{ x: START.x, y: START.y - 3 }], ui);
