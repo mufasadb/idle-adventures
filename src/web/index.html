@@ -646,8 +646,10 @@
       .ts-home .hs-empty { font-style: italic; color: var(--ink-dim); }
       .ts-home .hs-lead { font: 700 13px "Cinzel", Georgia, serif; color: #8a2a20; }
       .ts-home .hs-en { white-space: nowrap; color: var(--ink-dim); } .ts-home .hs-en b { color: #7a5a08; font-weight: 700; }
-      .ts-home .hs-new { font: 700 13.5px "Crimson Pro", Georgia, serif; color: var(--ink-head); background: #efe2c2; border: 1px solid #a58f62; border-radius: 3px; padding: 0 6px; white-space: nowrap; }
-      .ts-home .hs-new:hover { background: #f7ecd2; border-color: var(--ink-head); }
+      .ts-home .hs-new { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+      .ts-home .hs-new-ic { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 2px; background: #efe2c2; border: 1px solid #a58f62; border-radius: 3px; font: 700 12px "Crimson Pro", Georgia, serif; color: var(--ink-head); }
+      .ts-home .hs-new-ic:hover { background: #f7ecd2; border-color: var(--ink-head); }
+      .ts-home .hs-new-tag { font: italic 600 13px "Crimson Pro", Georgia, serif; color: var(--ink-head); margin-left: 2px; }
       .ts-home.defeated { border-color: #6a2a20; }
       .ts-home.flow { position: static; margin: 6px 0; }
       @media (max-aspect-ratio: 4/5) { .ts-home { bottom: auto; top: 6px; } }

@@ -32,7 +32,7 @@ export function homeGoods(h: Homecoming): { defId: string; qty: number }[] {
 }
 
 /** The small strip at the foot of the square (replaces the last-log line until you
- *  next do something in town). Haul as icons × qty, ⚡ unspent, ★ what's new. */
+ *  next do something in town). Haul as icons × qty, ⚡ unspent, new recipes as small icons. */
 export function homeStripHtml(h: Homecoming, cls = ""): string {
   const goods = homeGoods(h).map((g) => `<span class="hs-it" title="${attr(`${g.qty}× ${g.defId === MAP_SCROLL_ID ? (g.qty > 1 ? "maps" : "map") : name(g.defId)}`)}">${ic(g.defId, 22)}<b>${g.qty}</b></span>`).join("");
   const lead = h.defeated ? `<span class="hs-lead" title="you were beaten — what you carried still came home">♥ dragged home</span>` : "";
@@ -40,10 +40,13 @@ export function homeStripHtml(h: Homecoming, cls = ""): string {
   const en = h.unspent > 0
     ? `<span class="hs-en" title="energy you came home with"><b>⚡${h.unspent}</b> unspent</span>`
     : `<span class="hs-en spent" title="you came home with no energy left">⚡ all spent</span>`;
+  // Owner 2026-10-10: a ★ + the name read as "something to find"; show the new
+  // recipes' item icons small with one "recipe unlocked" tag, never the name.
   const shown = h.newRecipes.length > MAX_NEW_IN_STRIP ? h.newRecipes.slice(0, MAX_NEW_IN_STRIP - 1) : h.newRecipes;
-  const rest = h.newRecipes.slice(shown.length);
-  const fresh = shown.map((id) => `<button class="hs-new" data-find-recipe="${attr(id)}" title="you can make this now — find it in the workshop">★ ${name(RECIPE[id]?.output.defId ?? id)}</button>`).join("")
-    + (rest.length ? `<button class="hs-new" data-find-recipe="${attr(rest[0]!)}" title="${attr(rest.map((id) => name(RECIPE[id]?.output.defId ?? id)).join(", "))}">★ +${rest.length} more</button>` : "");
+  const rest = h.newRecipes.length - shown.length;
+  const fresh = h.newRecipes.length
+    ? `<span class="hs-new">${shown.map((id) => `<button class="hs-new-ic" data-find-recipe="${attr(id)}" title="a new recipe — find it in the workshop">${ic(RECIPE[id]?.output.defId ?? id, 18)}</button>`).join("")}${rest ? `<button class="hs-new-ic more" data-find-recipe="${attr(h.newRecipes[shown.length]!)}" title="more new recipes — find them in the workshop">+${rest}</button>` : ""}<span class="hs-new-tag">${h.newRecipes.length > 1 ? "recipes" : "recipe"} unlocked</span></span>`
+    : "";
   return `<div class="ts-home${h.defeated ? " defeated" : ""}${cls ? ` ${cls}` : ""}" role="status" aria-label="${attr(homecomingLine(h))}">${lead}<span class="hs-goods">${goods}${empty}</span>${en}${fresh}</div>`;
 }
 
