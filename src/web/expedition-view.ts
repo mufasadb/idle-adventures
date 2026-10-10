@@ -11,9 +11,11 @@ import { deriveRoute } from "./route";
 import type { Pos } from "./route";
 import { PLAYER_BASE_HP, RECIPE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_CAMP_MEALS, QUAFF_ENERGY, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, FISH_CAST_ENERGY, FISH_DEEP_DEPTH, ANTIDOTE, TERRAIN_HP_COST } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
-import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, GATHER_VERB, round1, preFightVerdict, isExhausted, costBand, tileName, tileYield, slowRouteNote, blockedRouteNote, verdictRoles, roleClass, worstVerdict, stuckOptions, bagCount, bagLine, yieldLine, ownedGear } from "../render/render";
+import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, GATHER_VERB, round1, preFightVerdict, isExhausted, costBand, footprintCount, tileName, tileYield, slowRouteNote, blockedRouteNote, verdictRoles, roleClass, worstVerdict, stuckOptions, bagCount, bagLine, yieldLine, ownedGear } from "../render/render";
 import type { FightVerdict, GearHint } from "../render/render";
 import { ic } from "./icons";
+import { footprintSvg } from "./footprints";
+import type { Step } from "./footprints";
 import { fightSheet, preFightCard, throwLegal, enhanceButtons, verdictDot } from "./fight-view";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action } from "../engine/types";
@@ -116,7 +118,11 @@ function poisonChip(exp: NonNullable<GameState["expedition"]>, legal: Action[]):
 }
 
 export type DrawerTab = "here" | "bag" | "craft" | "log";
-export type ExpeditionUi = { drawerOpen: boolean; tab: DrawerTab; logHtml: string; confirmHome?: boolean; stuckDismissed?: boolean; costTint?: boolean };
+// costTint: the map-wide step-cost tint, opt-in since seyh.10 (D105; absent = off).
+// trail: the tiles walked this run, in order, with each step's direction (seyh.10) —
+// drawn as faint footprints. Absent = [].
+export type TrailStep = { x: number; y: number; dx: number; dy: number };
+export type ExpeditionUi = { drawerOpen: boolean; tab: DrawerTab; logHtml: string; confirmHome?: boolean; stuckDismissed?: boolean; costTint?: boolean; trail?: TrailStep[] };
 
 export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi): string {
   const exp = state.expedition!;
@@ -127,6 +133,14 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   const canFish = legal.some((a) => a.type === "fish");
   const drawnSet = new Set(rt.drawn.map(kk));
   const goalK = kk(rt.end);
+  // seyh.10 (D105): footprints along the planned walk (and, fainter, the walked trail):
+  // the count per tile is the engine's step cost with your current gear.
+  const eqNow = exp.loadout.equipment;
+  const stepAt = (p: Pos, from: Pos) => ({ n: footprintCount(moveCost(grid.terrain[p.y]![p.x]!, eqNow.transport, eqNow.tools)) ?? 0, dx: Math.sign(p.x - from.x), dy: Math.sign(p.y - from.y) });
+  const prints = new Map<string, { step: Step; walked: boolean }>();
+  for (const t of ui.trail ?? []) prints.set(kk(t), { step: stepAt(t, { x: t.x - t.dx, y: t.y - t.dy }), walked: true });
+  // the plan wins over the trail; on a looping route the first pass sets a tile's prints
+  for (const [i, t] of rt.walkable.entries()) { const first = rt.walkable.findIndex((u) => u.x === t.x && u.y === t.y); if (first !== i) continue; prints.set(kk(t), { step: stepAt(t, i ? rt.walkable[i - 1]! : exp.pos), walked: false }); }
 
   let cells = "";
   for (let y = 0; y < MAP_HEIGHT; y++) for (let x = 0; x < MAP_WIDTH; x++) {
@@ -145,7 +159,7 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
     if (terr === "lake" || terr === "sea") cls.push(`d${Math.min(depth, 3)}`);
     const band = costBand(moveCost(terr, exp.loadout.equipment.transport, exp.loadout.equipment.tools));
     if (band === null) cls.push("blocked");
-    else if (ui.costTint ?? true) cls.push(`cost${band}`); // the cost tint: green cheap → red slow, with your gear
+    else if (ui.costTint ?? false) cls.push(`cost${band}`); // the opt-in cost tint (off by default since seyh.10, D105)
     if ((exp.fished ?? []).some((f) => f.x === x && f.y === y)) cls.push("fished");
     else if (canFish && Math.abs(x - exp.pos.x) <= 1 && Math.abs(y - exp.pos.y) <= 1 && grid.catches?.[y]?.[x]) cls.push("bobber");
     if (isPlayer && (terr === "lake" || terr === "sea")) cls.push("on-raft"); // Muse option 1: you're on the raft
@@ -227,7 +241,9 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
       if (terrainStyle && !raft) tileAssetStyle = ` style="${terrainStyle.replace(/;/g, " !important;")} !important"`;
     }
     const glyph = hero ? "" : raft ? `<span class="rider">${ch}</span>` : !isPlayer && (overlay !== "" || !poi) ? "" : isPlayer && overlay ? "" : ch;
-    cells += `<div class="${cls.join(" ")}"${tileAssetStyle} data-x="${x}" data-y="${y}" title="${title}">${overlay}${glyph}</div>`;
+    const fp = !isPlayer ? prints.get(k) : undefined;
+    if (fp) cls.push(fp.walked ? "trail" : "has-prints");
+    cells += `<div class="${cls.join(" ")}"${tileAssetStyle} data-x="${x}" data-y="${y}" title="${title}">${fp ? footprintSvg(fp.step, fp.walked) : ""}${overlay}${glyph}</div>`;
   }
 
   const maxEnergy = exp.maxEnergy ?? MAX_ENERGY;
@@ -345,7 +361,7 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
       ${exp.weaponBuff ? `<div class="muted small">🗡️ ${name(exp.weaponBuff.id)} · ${exp.weaponBuff.charges} strike${exp.weaponBuff.charges === 1 ? "" : "s"} left</div>` : ""}
       <details class="settings"><summary>Settings</summary>
         <div class="actions">
-          <button data-toggle-costtint title="tint each tile by what a step onto it costs you, with what you carry">Cost colours: <b>${(ui.costTint ?? true) ? "on" : "off"}</b></button>
+          <button data-toggle-costtint title="tint each tile by what a step onto it costs you, with what you carry">Cost colours: <b>${(ui.costTint ?? false) ? "on" : "off"}</b></button>
           <button data-toggle-autogather>Auto-gather on walk: <b>${autoGatherOn ? "on" : "off"}</b></button>
           <button data-act="toggle-auto-quaff" title="auto-drink a potion when HP drops low mid-fight">Auto-potion: <b>${(exp.autoQuaff ?? true) ? "on" : "off"}</b></button>
           <button data-act="toggle-auto-finish" title="resolve whole fights in one tap">Auto-finish fights: <b>${(exp.autoFinish ?? false) ? "on" : "off"}</b></button>

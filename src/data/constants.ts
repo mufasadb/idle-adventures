@@ -606,6 +606,15 @@ export const REGION_BEARING: Record<BiomeId, number> = {
 // the player taps an unlit land. Past this horizon it says "not for a good while".
 export const REGION_BACK_HORIZON = 8;
 
+// === Route footprints (idle-adventure-seyh.10, D105/D112) — presentation only ===
+// A planned or walked route draws boot prints on each tile; the count per tile is the
+// engine's orthogonal step cost with your current gear divided by this, rounded up and
+// clamped. More prints = shorter, smaller steps = slower ground. At 5: ice with cleats
+// (5) = 1 print, plains (10) = 2, mud/spores (15) = 3, ice on foot (20) = 4, shallows
+// (25) = 5, river (30) = 6. Lower it to exaggerate the contrast; raise it to calm it.
+export const FOOTPRINT_ENERGY_PER_PRINT = 5;
+export const FOOTPRINT_MAX_PRINTS = 6; // a cap so a mountain climb (40) stays legible on one tile
+
 // === Map-carry capacity (zpm.2) — a DEDICATED pool for carried map-drops, separate
 // from loot/carry slots. Carried maps no longer steal a loot stack (spec §3). ===
 export const MAP_CARRY_BASE = 1; // starter-bag "map pocket": how many map-drops you can carry with NO holder owned.
