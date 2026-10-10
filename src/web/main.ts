@@ -66,6 +66,7 @@ let drawerOpen = false;
 let drawerTab: DrawerTab = "here";
 let costTint = (() => { try { return localStorage.getItem("idle-adv:costTint") !== "off"; } catch { return true; } })(); // per-viewer map setting
 let confirmHome = false; // the 🏠 button's "head home?" card is up
+let confirmEmbark = false; // seyh.5: a risky start's "Embark anyway?" inline confirm is up (cleared by any action)
 let stuckDismissed = false; // "Not yet" on the exhausted card (cleared on any accepted action)
 let wasEngaged = false;
 let townTab: TownTab = "main";
@@ -119,6 +120,7 @@ function repackLast(): void {
 
 // --- action plumbing: one funnel so every interaction goes through reduce ----
 function apply(action: Action): GameEvent[] {
+  confirmEmbark = false;
   const events = step(action);
   trimAndDraw();
   return events;
@@ -272,7 +274,7 @@ function draw(): void {
     ? expeditionView(state, route, { drawerOpen, tab: drawerTab, logHtml: logView(log), confirmHome, stuckDismissed, costTint })
     : inScene
       ? townSceneView(state, { prep, logHtml: logView(log), lastLine: log[0] ? formatLogEntry(log[0]).replace(/<br>/g, " ") : "", research: { history: researchLog, last: researchLast } })
-      : `${townView(state, prep, hasLast, townTab, { wornOpen, research: { history: researchLog, last: researchLast } })}${logView(log)}`;
+      : `${townView(state, prep, hasLast, townTab, { wornOpen, embarkConfirm: confirmEmbark, research: { history: researchLog, last: researchLast } })}${logView(log)}`;
   wire(); save(SAVE_KEY, state, log);
   mountTree(app, state, { craft: craftN, close: closeTree }); // o9vr: the workshop's tree (pan, select, tray) — before paintFx, which anchors the craft note in its tray
   if (inScene) {
@@ -378,9 +380,11 @@ function wire(): void {
   const handle = app.querySelector<HTMLElement>("[data-drawer-toggle]"); if (handle) handle.onclick = () => { drawerOpen = !drawerOpen; draw(); setTimeout(centerOnPlayer, 200); }; // after the drawer's height transition
   app.querySelectorAll<HTMLElement>("[data-tab]").forEach((el) => el.onclick = () => { drawerTab = el.dataset.tab as DrawerTab; drawerOpen = true; draw(); });
   app.querySelectorAll<HTMLElement>("[data-open-tab]").forEach((el) => el.onclick = () => { drawerTab = el.dataset.openTab as DrawerTab; drawerOpen = true; draw(); });
-  app.querySelectorAll<HTMLElement>("[data-embark]").forEach((el) => el.onclick = () => embark(el.dataset.embark!));
+  app.querySelectorAll<HTMLElement>("[data-embark]").forEach((el) => el.onclick = () => { confirmEmbark = false; embark(el.dataset.embark!); });
+  app.querySelectorAll<HTMLElement>("[data-embark-confirm]").forEach((el) => el.onclick = () => { confirmEmbark = true; draw(); }); // seyh.5: risky start → ask first
+  app.querySelectorAll<HTMLElement>("[data-embark-cancel]").forEach((el) => el.onclick = () => { confirmEmbark = false; draw(); });
   app.querySelectorAll<HTMLElement>("[data-prepare]").forEach((el) => el.onclick = () => prepare(el.dataset.prepare!)); // zpm.3: enter the prep screen for this map
-  app.querySelectorAll<HTMLElement>("[data-back]").forEach((el) => el.onclick = () => { if (townMode === "scene") packOpen = false; else prep = null; wornOpen = null; draw(); }); // zpm.3: back to the map overview / the square
+  app.querySelectorAll<HTMLElement>("[data-back]").forEach((el) => el.onclick = () => { if (townMode === "scene") packOpen = false; else prep = null; wornOpen = null; confirmEmbark = false; draw(); }); // zpm.3: back to the map overview / the square
   // 0m4: the square — tab strip, panel close, the Pack shortcut, the menus/scene switch
   app.querySelectorAll<HTMLElement>("[data-panel]").forEach((el) => el.onclick = () => { scene.panel = scene.panel === el.dataset.panel ? null : el.dataset.panel as typeof scene.panel; draw(); });
   app.querySelectorAll<HTMLElement>("[data-panel-close]").forEach((el) => el.onclick = () => { scene.panel = null; scene.labelOn = null; draw(); });

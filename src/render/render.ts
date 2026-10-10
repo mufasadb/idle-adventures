@@ -178,10 +178,14 @@ export function engagementForecast(exp: Expedition): { dmgOut: number; dmgIn: nu
 // --- Fight verdict (eor, D103): the web shows ONE traffic-light verdict instead of
 // round counts. Derived from the forecasts above + the engine's own round function
 // (strikeExchange, auto-quaff semantics) — no new combat math here.
-//   win    — the bare race (combatForecast/engagementForecast `winning`) already wins
-//   costly — the bare race loses, but carried potions (auto-quaffed at the threshold)
-//            turn it into a win
+//   win    — you win without drinking anything
+//   costly — you win, but it COSTS CONSUMABLES (D109, owner 2026-10-10): the engine's
+//            play-out (auto-quaff at the threshold) drinks at least one potion. Either
+//            the bare race loses and potions turn it around, or the bare race wins but
+//            dips under AUTO_POTION_THRESHOLD with auto-quaff on, so a potion goes anyway
 //   lose   — even every carried potion can't save it
+// Potions are the only consumable a fight can spend on your HP (food can't be eaten
+// while engaged and refills energy, not HP).
 export type FightVerdict = "win" | "costly" | "lose";
 export const VERDICT_LABEL: Record<FightVerdict, string> = { win: "Clean win", costly: "Costly win", lose: "You'd lose" };
 
@@ -212,18 +216,21 @@ function potionRace(r: RaceStart): { victory: boolean; potionsUsed: number } {
   }
   return { victory: false, potionsUsed };
 }
-// The classification itself: the bare race first, then the potion-aware play-out.
-// A play-out that wins without drinking anything (a coating's poison finishing it)
-// still counts as a clean win.
-export function fightVerdict(bareWinning: boolean, withPotions: { victory: boolean; potionsUsed: number } | null): FightVerdict {
-  if (bareWinning) return "win";
-  if (!withPotions?.victory) return "lose";
-  return withPotions.potionsUsed > 0 ? "costly" : "win";
+// The classification itself (D109): a winning potion play-out decides green vs orange
+// by whether it drank; without one (no potions carried, or auto-quaff off on a race
+// that wins bare) the bare race decides win vs lose. A play-out that wins without
+// drinking (a coating's poison finishing it) is a clean win.
+export function fightVerdict(bareWinning: boolean, playOut: { victory: boolean; potionsUsed: number } | null): FightVerdict {
+  if (playOut?.victory) return playOut.potionsUsed > 0 ? "costly" : "win";
+  return bareWinning ? "win" : "lose";
 }
+// Run the potion play-out? Only with potions to drink; and on a race that already wins
+// bare, only when auto-quaff would fire on its own (off → nothing gets drunk → green).
+const needsPlayOut = (bare: boolean, lo: Loadout, autoQuaff: boolean) => lo.potions.length > 0 && (!bare || autoQuaff);
 // Before the fight (route end / standing on it): full monster HP, no battle items yet.
-export function preFightVerdict(loadout: Loadout, creature: string, hp: number, weaponBuff?: { id: string; charges: number }, mapTier = 1, playerPoison?: { dmg: number; ticks: number }): FightVerdict {
+export function preFightVerdict(loadout: Loadout, creature: string, hp: number, weaponBuff?: { id: string; charges: number }, mapTier = 1, playerPoison?: { dmg: number; ticks: number }, autoQuaff = true): FightVerdict {
   const bare = combatForecast(loadout, creature, hp, weaponBuff, mapTier).winning;
-  return fightVerdict(bare, bare || !loadout.potions.length ? null : potionRace({
+  return fightVerdict(bare, !needsPlayOut(bare, loadout, autoQuaff) ? null : potionRace({
     loadout, hp, monsterHp: MONSTER_TIER_HP_CURVE[MONSTERS[creature]!.tier]!, creature, weaponBuff, mapTier, ...(playerPoison ? { playerPoison } : {}),
   }));
 }
@@ -231,12 +238,46 @@ export function preFightVerdict(loadout: Loadout, creature: string, hp: number, 
 export function engagementVerdict(exp: Expedition): FightVerdict {
   const c = exp.combat!;
   const bare = engagementForecast(exp).winning;
-  return fightVerdict(bare, bare || !exp.loadout.potions.length ? null : potionRace({
+  return fightVerdict(bare, !needsPlayOut(bare, exp.loadout, exp.autoQuaff ?? true) ? null : potionRace({
     loadout: exp.loadout, hp: exp.hp, monsterHp: c.monsterHp, creature: c.creature,
     damageAdd: c.damageAdd, mitigationAdd: c.mitigationAdd, weaponBuff: exp.weaponBuff, poison: c.poison,
     ...(exp.poisoned ? { playerPoison: exp.poisoned } : {}), opener: c.opener ?? false, mapTier: exp.mapTier ?? 1,
   }));
 }
+
+// D109 (owner Q8, amends D103): each side's damage PER HIT is shown beside its attack
+// type — the inputs, never the margin (no HP-left / HP-lost projection anywhere). A
+// side whose number depends on something you can't yet read (the monster's hide for
+// your hit, its attack for its hit — PERCEIVED detail, `?` until in sight/surveyed)
+// stays null → "?".
+export type HitNumbers = { you: number | null; it: number | null };
+export function preFightHits(loadout: Loadout, creature: string, weaponBuff: { id: string } | undefined, mapTier: number, seen: { dmgType?: DmgType; armourType?: ArmourType } | null): HitNumbers {
+  const f = combatForecast(loadout, creature, 1, weaponBuff, mapTier); // per-hit numbers don't depend on your HP
+  return { you: seen?.armourType ? f.dmgOut : null, it: seen?.dmgType ? f.dmgIn : null };
+}
+export function engagementHits(exp: Expedition): HitNumbers {
+  const f = engagementForecast(exp);
+  return { you: f.dmgOut, it: f.dmgIn };
+}
+export function hitLabel(dmg: number | null): string {
+  return dmg === null ? "? a hit" : `${round1(dmg)} a hit`;
+}
+// The worst of several verdicts (a route that crosses one monster and ends on another).
+const VERDICT_RANK: Record<FightVerdict, number> = { win: 0, costly: 1, lose: 2 };
+export function worstVerdict(...vs: (FightVerdict | null | undefined)[]): FightVerdict | null {
+  return vs.reduce<FightVerdict | null>((w, v) => (v && (!w || VERDICT_RANK[v] > VERDICT_RANK[w]) ? v : w), null);
+}
+// D109 / seyh.5: the main button follows the verdict. `go` is the commit button (Walk ▶ /
+// Fight ▶ / ⚔ Fight), `safe` the way out (✕ Cancel route / 🏃 Flee).
+//   win    → go primary (gold), safe plain
+//   costly → go primary but amber (you'll pay potions), safe plain
+//   lose   → go secondary, safe is the filled primary
+export type ButtonRole = "primary" | "amber" | "secondary";
+export function verdictRoles(v: FightVerdict | null): { go: ButtonRole; safe: ButtonRole } {
+  if (v === "lose") return { go: "secondary", safe: "primary" };
+  return { go: v === "costly" ? "amber" : "primary", safe: "secondary" };
+}
+export const roleClass = (r: ButtonRole): string => (r === "primary" ? "primary" : r === "amber" ? "primary amber" : "");
 
 // eor: each side's attack + armour TYPE (the visible matrix), in place of the numbers.
 export const DMG_TYPE_ICON: Record<DmgType, string> = { melee: "⚔", ranged: "🏹", magic: "✨" };

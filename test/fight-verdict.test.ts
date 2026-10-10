@@ -18,9 +18,16 @@ const sword = (potions: Loadout["potions"] = []): Loadout => {
 };
 
 describe("fightVerdict (the classification)", () => {
-  test("a winning bare race is a clean win, whatever the potion play-out says", () => {
+  test("a winning bare race with no play-out (or a play-out that somehow loses) is a clean win", () => {
     expect(fightVerdict(true, null)).toBe("win");
     expect(fightVerdict(true, { victory: false, potionsUsed: 3 })).toBe("win");
+  });
+  // D109 (owner Q8): orange means "you win but it COSTS consumables" — so a bare-race win
+  // whose play-out still auto-quaffs (dips under the threshold) is orange, not green.
+  // Premise change vs D103, where any bare-race win was green.
+  test("a winning play-out that drinks is costly even when the bare race wins", () => {
+    expect(fightVerdict(true, { victory: true, potionsUsed: 1 })).toBe("costly");
+    expect(fightVerdict(true, { victory: true, potionsUsed: 0 })).toBe("win");
   });
   test("a losing race is costly only when potions turn it around", () => {
     expect(fightVerdict(false, { victory: true, potionsUsed: 2 })).toBe("costly");

@@ -2,7 +2,7 @@
 // the map while engaged — you on the left, the monster on the right, the actions in the
 // middle — and a compact pre-fight card for a monster at the route's end. No round
 // counts: one traffic-light verdict (render.ts fightVerdict) + each side's attack and
-// armour TYPE, so the matrix stays the player's to read. Legality from reduce (D29).
+// armour TYPE and damage per hit (D109), so the matrix stays the player's to read. Legality from reduce (D29).
 import { wieldsRanged, loadedAmmoIndex } from "../engine/combat";
 import { MONSTERS, MONSTER_TIER_HP_CURVE, PLAYER_BASE_HP, ANTIDOTE } from "../data/constants";
 import type { DmgType, ArmourType } from "../data/constants";
@@ -11,8 +11,9 @@ import type { GameState, Action, Expedition, Loadout } from "../engine/types";
 import {
   name, describe, round1, rejectCopy, enhancementHint, battleItemEffect, engagementForecast,
   engagementVerdict, VERDICT_LABEL, DMG_TYPE_ICON, ARMOUR_TYPE_ICON, playerAttackType, armourTypesWorn,
-  lootPreview, lootSlots,
+  lootPreview, lootSlots, preFightHits, engagementHits, hitLabel, verdictRoles, roleClass,
 } from "../render/render";
+import type { HitNumbers } from "../render/render";
 import type { FightVerdict } from "../render/render";
 import { iconStyle, monsterStyle, playerStyle } from "./assets";
 
@@ -36,13 +37,16 @@ export function enhanceButtons(exp: Expedition, legal: Action[], short = false):
 // --- small pieces ---------------------------------------------------------------
 const typeChip = (kind: "atk" | "arm", t: DmgType | ArmourType, title: string) =>
   `<span class="fs-type ${kind} t-${t}" title="${title}">${kind === "atk" ? DMG_TYPE_ICON[t as DmgType] : ARMOUR_TYPE_ICON[t as ArmourType]} ${t}</span>`;
-function playerTypes(lo: Loadout): string {
+// D109: the per-hit number rides right after the attack type — never the margin.
+const hitChip = (dmg: number | null, whose: "you" | "it") =>
+  `<span class="fs-hit${dmg === null ? " unknown" : ""}" title="${dmg === null ? "get closer (or survey) to read it" : whose === "you" ? "what each of your strikes takes off it" : "what each of its strikes takes off you"}">${hitLabel(dmg)}</span>`;
+function playerTypes(lo: Loadout, hit: number | null): string {
   const atk = playerAttackType(lo);
   const arm = armourTypesWorn(lo.equipment);
-  return `${typeChip("atk", atk, `your strikes deal ${atk} damage`)}${arm.length ? arm.map((a) => typeChip("arm", a, `you wear ${a} armour`)).join("") : `<span class="fs-type arm none" title="no armour worn">🛡 none</span>`}`;
+  return `${typeChip("atk", atk, `your strikes deal ${atk} damage`)}${hitChip(hit, "you")}${arm.length ? arm.map((a) => typeChip("arm", a, `you wear ${a} armour`)).join("") : `<span class="fs-type arm none" title="no armour worn">🛡 none</span>`}`;
 }
-function monsterTypes(dmg?: DmgType, arm?: ArmourType): string {
-  return `${dmg ? typeChip("atk", dmg, `it deals ${dmg} damage`) : `<span class="fs-type atk unknown" title="get closer (or survey) to read it">? attack</span>`}${arm ? typeChip("arm", arm, `its hide is ${arm}`) : `<span class="fs-type arm unknown" title="get closer (or survey) to read it">? hide</span>`}`;
+function monsterTypes(dmg: DmgType | undefined, arm: ArmourType | undefined, hit: number | null): string {
+  return `${dmg ? typeChip("atk", dmg, `it deals ${dmg} damage`) : `<span class="fs-type atk unknown" title="get closer (or survey) to read it">? attack</span>`}${hitChip(hit, "it")}${arm ? typeChip("arm", arm, `its hide is ${arm}`) : `<span class="fs-type arm unknown" title="get closer (or survey) to read it">? hide</span>`}`;
 }
 function hpBar(hp: number, max: number, cls: string): string {
   return `<div class="fs-hp"><div class="track"><div class="fill ${cls}" style="width:${Math.max(0, Math.min(100, (hp / max) * 100))}%"></div></div><b>${round1(hp)}/${max}</b></div>`;
@@ -81,6 +85,8 @@ export function fightSheet(exp: Expedition, legal: Action[]): string {
   const pulse = age < PULSE_MS ? ` pulse" style="animation-delay:${-age}ms` : "";
   const has = (type: Action["type"]) => legal.some((a) => a.type === type);
   const { dmgIn } = engagementForecast(exp);
+  const hits: HitNumbers = engagementHits(exp);
+  const roles = verdictRoles(verdict); // seyh.5: lose → Flee is the filled primary, Fight goes secondary
 
   // Your side: quiver / coating / poison chips, potions + auto-quaff.
   const li = loadedAmmoIndex(exp.loadout);
@@ -95,13 +101,13 @@ export function fightSheet(exp: Expedition, legal: Action[]): string {
   const autoQ = exp.autoQuaff ?? true;
   const you = `<div class="fs-side fs-you">
       <div class="fs-head">${portrait(playerStyle(), "@")}<div class="fs-id"><b>You</b>${hpBar(exp.hp, PLAYER_BASE_HP, "hp")}</div></div>
-      <div class="fs-types">${playerTypes(exp.loadout)}${chips}</div>
+      <div class="fs-types">${playerTypes(exp.loadout, hits.you)}${chips}</div>
       <div class="fs-pots"><span title="${pots} potion${pots === 1 ? "" : "s"} carried">🧪 ×${pots}</span><button class="fs-toggle${autoQ ? " on" : ""}" data-act="toggle-auto-quaff" title="auto-drink a potion when HP drops low mid-fight">auto-quaff ${autoQ ? "on" : "off"}</button></div>
     </div>`;
 
   const foe = `<div class="fs-side fs-foe">
       <div class="fs-head"><div class="fs-id"><b>${name(c.creature)}</b>${hpBar(c.monsterHp, maxHp, "monster")}</div>${portrait(monsterStyle(c.creature), "X")}</div>
-      <div class="fs-types">${monsterTypes(m.dmgType, m.armourType)}${c.poison ? `<span class="poison-chip" title="your poison: ${round1(c.poison.dmg)} a round, ${c.poison.rounds} more">☠ ${c.poison.rounds}</span>` : ""}</div>
+      <div class="fs-types">${monsterTypes(m.dmgType, m.armourType, hits.it)}${c.poison ? `<span class="poison-chip" title="your poison: ${round1(c.poison.dmg)} a round, ${c.poison.rounds} more">☠ ${c.poison.rounds}</span>` : ""}</div>
       <div class="fs-lootrow">${lootIcons(c.creature)}</div>
     </div>`;
 
@@ -120,18 +126,19 @@ export function fightSheet(exp: Expedition, legal: Action[]): string {
     .map((a) => `<button class="swap" data-don="${a.itemId}" title="equip ${name(a.itemId)} — costs a turn (the ${creature} strikes)">🛡 Don ${name(a.itemId)}</button>`);
   const doffs = legal.filter((a): a is Extract<Action, { type: "doff" }> => a.type === "doff")
     .map((a) => `<button class="swap" data-doff="${a.itemId}" title="stow ${name(a.itemId)} — costs a turn (the ${creature} strikes)">🎒 Doff ${name(a.itemId)}</button>`);
+  const fightBtn = has("fight") ? `<button class="${roleClass(roles.go)}" data-act="fight" title="trade one round of blows">⚔ Fight</button>` : "";
+  const fleeBtn = has("flee") ? `<button class="${roleClass(roles.safe)}" data-act="flee" title="disengage — take one parting hit (−${round1(dmgIn)} HP); unused battle items keep">🏃 Flee</button>` : "";
   const actions = [
-    has("fight") ? `<button class="primary" data-act="fight" title="trade one round of blows">⚔ Fight</button>` : "",
-    has("flee") ? `<button data-act="flee" title="disengage — take one parting hit (−${round1(dmgIn)} HP); unused battle items keep">🏃 Flee</button>` : "",
-    has("quaff") ? `<button data-act="quaff" title="drink a potion — costs a turn (the ${creature} strikes)">🧪 Quaff</button>` : "",
+    ...(roles.safe === "primary" ? [fleeBtn, fightBtn] : [fightBtn, fleeBtn]), // the filled primary leads
+    has("quaff") ? `<button class="${verdict === "costly" ? "hl" : ""}" data-act="quaff" title="drink a potion — costs a turn (the ${creature} strikes)">🧪 Quaff</button>` : "",
     ...throws, ...cure, ...items, enhanceButtons(exp, legal, true), ...dons, ...doffs,
     `<button class="fs-toggle${(exp.autoFinish ?? false) ? " on" : ""}" data-act="toggle-auto-finish" title="fast-forward whole fights to victory or defeat in one tap">⏩ auto-finish ${(exp.autoFinish ?? false) ? "on" : "off"}</button>`,
   ].filter(Boolean).join("");
 
-  return `<div class="fightsheet v-${verdict}" data-fightsheet>
+  return `<div class="fightsheet v-${verdict}${age < PULSE_MS ? " pulse" : ""}" data-fightsheet>
     ${you}
     <div class="fs-mid">
-      <div class="fs-verdict v-${verdict}${pulse}" title="the fight as it stands — green: you win without potions · orange: only by drinking potions · red: you lose even with them">${VERDICT_LABEL[verdict]}</div>
+      <div class="fs-verdict v-${verdict}${pulse}" title="the fight as it stands — green: you win without drinking · orange: you win, but it costs potions · red: you lose even with them">${VERDICT_LABEL[verdict]}</div>
       <div class="fs-actions">${actions}</div>
     </div>
     ${foe}
@@ -144,9 +151,10 @@ export function fightSheet(exp: Expedition, legal: Action[]): string {
 export function preFightCard(state: GameState, exp: Expedition, creature: string, at: { x: number; y: number }, verdict: FightVerdict, detail: PoiDetail | null): string {
   const { need, free } = lootSlots(state.seed, creature, at, exp.loadout, exp.carry);
   const tight = need > free; // exactly engage()'s pendingLootFits check, as counts
+  const hits = preFightHits(exp.loadout, creature, exp.weaponBuff, exp.mapTier ?? 1, detail);
   return `<div class="prefight v-${verdict}">
     <div class="pf-top">${portrait(monsterStyle(creature), "X")}<div class="pf-id"><b>${name(creature)}</b><span class="fs-verdict v-${verdict}">${VERDICT_LABEL[verdict]}</span></div><div class="fs-lootrow">${lootIcons(creature)}</div></div>
-    <div class="pf-vs"><span class="pf-who">you</span>${playerTypes(exp.loadout)}<span class="pf-who">it</span>${monsterTypes(detail?.dmgType, detail?.armourType)}</div>
+    <div class="pf-vs"><span class="pf-who">you</span>${playerTypes(exp.loadout, hits.you)}<span class="pf-who">it</span>${monsterTypes(detail?.dmgType, detail?.armourType, hits.it)}</div>
     ${tight ? `<div class="pf-bag" title="${rejectCopy("carry-full", undefined, "fight")}">⚠ needs ${need} free slot${need === 1 ? "" : "s"} — bag has ${free}</div>` : ""}
   </div>`;
 }

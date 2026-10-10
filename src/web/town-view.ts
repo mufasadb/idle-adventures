@@ -70,7 +70,7 @@ function heldMapSuffix(m: MapItem): string {
 
 export type TownTab = "main" | "bank" | "recipes" | "research";
 // d13: view-only state for the packing screen — which worn slot's swap menu is open.
-export type PackUi = { wornOpen?: string | null; research?: { history: ResearchLogEntry[]; last: ResearchLogEntry | null } };
+export type PackUi = { wornOpen?: string | null; embarkConfirm?: boolean; research?: { history: ResearchLogEntry[]; last: ResearchLogEntry | null } };
 
 /** Whether `prep` still names a map you can embark on (the free local one or a held one). */
 export function prepValid(state: GameState, prep: string | null): boolean {
@@ -160,7 +160,7 @@ function packScreen(state: GameState, mapSeed: string, local: LocalMap, heldMaps
       ${bagPage(state, legal)}
       ${wornColumn(state, legal, ui.wornOpen ?? null)}
     </div>
-    ${packFooter(state, mapSeed, isLocal, held, hasLastPlan)}
+    ${packFooter(state, mapSeed, isLocal, held, hasLastPlan, ui.embarkConfirm ?? false)}
   </div>`;
 }
 
@@ -306,8 +306,20 @@ function wornColumn(state: GameState, legal: Action[], open: string | null): str
   return `<div class="pk-worn"><h4>Worn</h4><div class="free">free · no slots</div>${rows}</div>`;
 }
 
+// seyh.5: the main button follows the verdict. A start that's bag-full or food-less
+// demotes Embark to secondary; the first tap asks "Embark anyway?" inline (two buttons),
+// the second embarks. View state only (main.ts embarkConfirm) — the reducer still decides.
+export const riskyStart = (lo: Loadout): string[] =>
+  [lo.food.length === 0 ? "no food" : "", freeLootStacks(lo) <= 0 ? "bag full before you start" : ""].filter(Boolean);
+export function embarkButton(mapSeed: string, isLocal: boolean, risks: string[], confirming: boolean): string {
+  const label = `Embark ▶${isLocal ? "" : `<small> spends map</small>`}`;
+  if (!risks.length) return `<button class="embark-final" data-embark="${mapSeed}">${label}</button>`;
+  if (!confirming) return `<button class="embark-final risky" data-embark-confirm title="${risks.join(" · ")} — tap to confirm">${label}</button>`;
+  return `<span class="pk-confirm" data-embark-confirming>Embark anyway? <button class="embark-final" data-embark="${mapSeed}">${label}</button><button class="pk-ghost" data-embark-cancel>Keep packing</button></span>`;
+}
+
 // 5. Footer: energy (base + food), the warnings, Repack / Reset / Embark.
-function packFooter(state: GameState, mapSeed: string, isLocal: boolean, held: MapItem | null, hasLastPlan: boolean): string {
+function packFooter(state: GameState, mapSeed: string, isLocal: boolean, held: MapItem | null, hasLastPlan: boolean, embarkConfirm: boolean): string {
   const lo = state.loadout, eq = lo.equipment;
   const startEnergy = MAX_ENERGY + energyCapOf(eq);
   const food = heldFoodEnergy(lo.food);
@@ -325,7 +337,7 @@ function packFooter(state: GameState, mapSeed: string, isLocal: boolean, held: M
     <span class="en" title="you embark at full energy; packed food is eaten back as you travel">Energy <b>${startEnergy}</b> + <b>${food}</b> from food${eq.tools.includes("tent") ? ` <span class="muted small">· tent: food +${Math.round((TENT_FOOD_MULTIPLIER - 1) * 100)}%</span>` : ""}</span>
     <span class="warns">${warns.map((w) => `<span class="warn" title="${w.full}">⚠ ${w.short}</span>`).join("")}</span>
     ${repack}<button class="pk-ghost" data-reset title="clear the whole plan">Reset</button>
-    <button class="embark-final" data-embark="${mapSeed}">Embark ▶${isLocal ? "" : `<small> spends map</small>`}</button>
+    ${embarkButton(mapSeed, isLocal, riskyStart(lo), embarkConfirm)}
   </div>`;
 }
 

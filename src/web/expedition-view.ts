@@ -11,7 +11,7 @@ import { deriveRoute } from "./route";
 import type { Pos } from "./route";
 import { PLAYER_BASE_HP, RECIPE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_CAMP_MEALS, QUAFF_ENERGY, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, FISH_CAST_ENERGY, FISH_DEEP_DEPTH, ANTIDOTE, TERRAIN_HP_COST } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
-import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, GATHER_VERB, round1, preFightVerdict, isExhausted, costBand, tileName, tileYield, slowRouteNote, blockedRouteNote } from "../render/render";
+import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, GATHER_VERB, round1, preFightVerdict, isExhausted, costBand, tileName, tileYield, slowRouteNote, blockedRouteNote, verdictRoles, roleClass, worstVerdict } from "../render/render";
 import type { FightVerdict } from "../render/render";
 import { fightSheet, preFightCard, throwLegal, enhanceButtons, verdictDot } from "./fight-view";
 import { perceive } from "../engine/perceive";
@@ -55,7 +55,7 @@ function herePanel(state: GameState, grid: Grid, exp: NonNullable<GameState["exp
     // (move-onto-tile auto-engages, grid gen bars POIs from the entry tile,
     // victory relocation lands only on cleared tiles) — kept defensively for
     // hand-built/test states. eor: the same pre-fight card the route end shows.
-    const verdict = preFightVerdict(exp.loadout, poi.creature, exp.hp, exp.weaponBuff, exp.mapTier ?? 1, exp.poisoned);
+    const verdict = preFightVerdict(exp.loadout, poi.creature, exp.hp, exp.weaponBuff, exp.mapTier ?? 1, exp.poisoned, exp.autoQuaff ?? true);
     return `<div class="here monster">
       ${preFightCard(state, exp, poi.creature, pos, verdict, per?.detail ?? null)}
       It's static: it won't touch you unless you Fight.
@@ -235,12 +235,13 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   const pct = (v: number) => Math.min(100, (v / maxEnergy) * 100);
   // energy may exceed maxEnergy after a manual over-eat (m0a) — cap the bar fill at
   // 100% and surface the surplus rather than overflowing the track.
-  const overFull = !hasRoute && exp.energy > maxEnergy;
+  const projecting = hasRoute && !rt.blocked; // seyh.5: a blocked route can't be walked — no spend to project
+  const overFull = !projecting && exp.energy > maxEnergy;
   const overSpan = overFull ? ` <span class="overfull">+${round1(exp.energy - maxEnergy)}</span>` : "";
-  const energyFill = hasRoute
+  const energyFill = projecting
     ? `<div class="fill energy" style="width:${pct(keep)}%"></div><div class="fill spend${overBudget ? " over" : ""}" style="width:${pct(spend)}%"></div>`
     : `<div class="fill energy" style="width:${pct(exp.energy)}%"></div>`;
-  const energyLabel = hasRoute
+  const energyLabel = projecting
     ? `${round1(exp.energy)}/${maxEnergy} → <b class="${overBudget ? "over" : ""}">${round1(Math.max(0, rt.endEnergy))}</b>${overBudget ? " ⚠ strands you" : ""}`
     : `${round1(exp.energy)}/${maxEnergy}${overSpan}`;
   const autoGatherOn = exp.autoGather ?? true;
@@ -256,7 +257,7 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   const costClause = `<b class="${overBudget ? "over" : ""}">−${round1(total)}⚡</b>${rt.actionCost > 0 ? ` <span class="muted">(${round1(rt.walkCost)} walk + ${round1(rt.actionCost)} gather)</span>` : ""}`;
   // eor (D103): a monster at the route's end gets the pre-fight card — verdict colour,
   // both sides' attack/armour types, loot, bag-slot warning. No round counts.
-  const verdictFor = (creature: string): FightVerdict => preFightVerdict(exp.loadout, creature, exp.hp, exp.weaponBuff, exp.mapTier ?? 1, exp.poisoned);
+  const verdictFor = (creature: string): FightVerdict => preFightVerdict(exp.loadout, creature, exp.hp, exp.weaponBuff, exp.mapTier ?? 1, exp.poisoned, exp.autoQuaff ?? true);
   const endVerdict = fight ? verdictFor(fight) : null;
   const fightCard = fight && endVerdict ? preFightCard(state, exp, fight, rt.end, endVerdict, perceived.get(goalK)?.detail ?? null) : "";
   const surveyAtEnd = legal.some((a) => a.type === "survey" && a.at.x === rt.end.x && a.at.y === rt.end.y);
@@ -266,9 +267,14 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   // Ambush warning (2i8, playtest F5): the walk auto-engages the FIRST monster on the
   // line — warn prominently when that fight is a forecast LOSS.
   const cm = rt.crossedMonster;
-  const crossWarn = cm && !(fight && cm.pos.x === rt.end.x && cm.pos.y === rt.end.y) && verdictFor(cm.creature) === "lose"
+  const cmVerdict = cm && !(fight && cm.pos.x === rt.end.x && cm.pos.y === rt.end.y) ? verdictFor(cm.creature) : null;
+  const crossWarn = cm && cmVerdict === "lose"
     ? `<div class="over">⚠ runs into a ${name(cm.creature)} at (${cm.pos.x},${cm.pos.y}) you'd LOSE to — reroute.</div>`
     : "";
+  // seyh.5: the main button follows the verdict (worst of the end fight and any ambush):
+  // lose → Walk/Fight goes secondary and "✕ Cancel route" is the filled primary; costly → amber.
+  const roles = verdictRoles(worstVerdict(endVerdict, cmVerdict));
+  const cancelBtn = roles.safe === "primary" ? `<button class="primary" data-cancelpath title="clear the route">✕ Cancel route</button>` : "";
   // 5k4: name the wall a leg hits (and the gear that crosses it, if any); a walkable
   // route over dear terrain says it'll be slower and hints at gear that speeds it.
   const firstBlock = rt.legs.find((l) => l.blockedAt)?.blockedAt ?? null;
@@ -278,7 +284,7 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   // kml: the route bar floats at the bottom of the map — only when there's something to say.
   // A live fight has its own sheet (eor), so no route bar then.
   const routeBar = !exp.combat && hasRoute
-    ? `<div class="routebar${rt.blocked ? " blocked" : ""}${fight ? " has-fight" : ""}">${crossWarn}${blockNote}${fightCard}<div class="routeline">${rt.walkable.length} tile${rt.walkable.length !== 1 ? "s" : ""} · ${costClause}${hpClause}</div>${slowNote}<div class="routebtns"><button class="primary" data-walk${rt.blocked ? " disabled" : ""}>${fight ? "Fight ▶" : "Walk ▶"}</button>${shoot ? `<button data-shoot title="engage from here — your opener lands first">🏹 Shoot</button>` : ""}${throwables.map((id) => `<button class="throw" data-throw="${id}" data-throw-x="${rt.end.x}" data-throw-y="${rt.end.y}" title="throw from here — ${describe(id)}">💥 Throw ${name(id).toLowerCase()} <span class="free-opener">FREE OPENER</span></button>`).join("")}${surveyAtEnd ? `<button data-survey-x="${rt.end.x}" data-survey-y="${rt.end.y}" title="resolve its detail from here">🔭 −${SURVEY_ENERGY}⚡</button>` : ""}<button data-cancelpath title="clear the route">✕</button></div></div>`
+    ? `<div class="routebar${rt.blocked ? " blocked" : ""}${fight ? " has-fight" : ""}">${crossWarn}${blockNote}${fightCard}<div class="routeline">${rt.walkable.length} tile${rt.walkable.length !== 1 ? "s" : ""} · ${costClause}${hpClause}</div>${slowNote}<div class="routebtns">${cancelBtn}<button class="${roleClass(roles.go)}" data-walk${rt.blocked ? " disabled" : ""}>${fight ? "Fight ▶" : "Walk ▶"}</button>${shoot ? `<button data-shoot title="engage from here — your opener lands first">🏹 Shoot</button>` : ""}${throwables.map((id) => `<button class="throw" data-throw="${id}" data-throw-x="${rt.end.x}" data-throw-y="${rt.end.y}" title="throw from here — ${describe(id)}">💥 Throw ${name(id).toLowerCase()} <span class="free-opener">FREE OPENER</span></button>`).join("")}${surveyAtEnd ? `<button data-survey-x="${rt.end.x}" data-survey-y="${rt.end.y}" title="resolve its detail from here">🔭 −${SURVEY_ENERGY}⚡</button>` : ""}${cancelBtn ? "" : `<button data-cancelpath title="clear the route">✕</button>`}</div></div>`
     : "";
 
   // qba: the tapped tile (the route's end) names itself and what reaching it costs —
