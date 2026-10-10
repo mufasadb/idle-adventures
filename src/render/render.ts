@@ -3,7 +3,7 @@ import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType, FishWa
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
 import { playerDamage, damageTaken, strikeExchange, wieldsRanged, hasAmmo, loadedAmmoIndex, rollLoot } from "../engine/combat";
-import { consumeOne, addToCarry, freeLootStacks, carryCap, slotCap, quiverAmmoSlots, energyCapOf, stackCapOf } from "../engine/carry";
+import { consumeOne, addToCarry, freeLootStacks, carryCap, slotCap, quiverAmmoSlots, energyCapOf, usedSlots } from "../engine/carry";
 import { heldFoodEnergy } from "../engine/food";
 import { toolSpeedFor, secondaryToolSatisfied } from "../engine/tools";
 import { recipeKnowledge } from "../engine/knowledge";
@@ -327,11 +327,6 @@ const TERRAIN_PLURAL: Record<Terrain, string> = {
   lake: "lake", sea: "sea", "spore-thicket": "spore-thickets",
 };
 const capFirst = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-// "a raft", "an axe", "waders" (a pair-noun takes no article).
-function gearPhrase(defId: string): string {
-  const n = name(defId).toLowerCase();
-  return /s$/.test(n) ? n : `${/^[aeiou]/.test(n) ? "an" : "a"} ${n}`;
-}
 const orList = (xs: string[]) => xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} or ${xs[xs.length - 1]}`;
 
 // The gear that changes a terrain: `opens` = tools that make an impassable terrain
@@ -347,11 +342,32 @@ export function terrainGear(terrain: Terrain): { opens: string[]; speeds: string
   return { opens, speeds };
 }
 
+// The gear a route note may show (seyh.29, D111): never named in words — the web draws
+// each as a silhouette of its icon, coloured in once `owned`. No gear = this ground is
+// always like this.
+export type GearHint = { id: string; owned: boolean };
+// seyh.29 (D111): has the player ever had this gear? Honest engine-held facts only: it
+// sits in the bank, in the town or expedition loadout (tools, transport, spares), in the
+// carry (a spare unpacks there), or in `seen` (ever held — kept while recipeFog is on).
+// Packed-and-equipped gear is already applied, so the notes never list it anyway.
+export function ownedGear(state: Pick<GameState, "bank" | "loadout" | "expedition" | "seen">): (defId: string) => boolean {
+  const ids = new Set<string>([...state.bank.map((s) => s.defId), ...(state.seen ?? [])]);
+  for (const lo of [state.loadout, state.expedition?.loadout]) {
+    if (!lo) continue;
+    for (const t of lo.equipment.tools) ids.add(t);
+    if (lo.equipment.transport) ids.add(lo.equipment.transport);
+    for (const sp of lo.spares ?? []) ids.add(sp.defId);
+  }
+  for (const c of state.expedition?.carry ?? []) ids.add(c.defId);
+  return (defId) => ids.has(defId);
+}
 // 5k4: a route that crosses terrain dearer than a plains step (with the gear you have)
-// says it'll be slower, naming the terrain and — loosely — gear that would help.
-// `terrains` = the walkable tiles' terrain in walk order. Null = nothing slow.
-const SLOW_HINT_MAX = 3; // how many gear names the hint lists (presentation only)
-export function slowRouteNote(terrains: Terrain[], equipment: Pick<Equipment, "transport" | "tools">): string | null {
+// says it'll be slower, naming the terrain. seyh.29 (D111): it no longer says HOW to
+// speed it up — it returns the helping gear (not already equipped) for the surface to
+// show as silhouettes. `terrains` = the walkable tiles' terrain in walk order. Null =
+// nothing slow.
+const SLOW_HINT_MAX = 3; // how many gear silhouettes the hint shows (presentation only)
+export function slowRouteNote(terrains: Terrain[], equipment: Pick<Equipment, "transport" | "tools">, owned: (defId: string) => boolean = () => false): { text: string; gear: GearHint[] } | null {
   const counts = new Map<Terrain, number>();
   for (const t of terrains) {
     const step = moveCostOf(t, equipment);
@@ -362,14 +378,15 @@ export function slowRouteNote(terrains: Terrain[], equipment: Pick<Equipment, "t
   const held = new Set([...equipment.tools, ...(equipment.transport ? [equipment.transport] : [])]);
   const gear = [...new Set(slow.flatMap((t) => terrainGear(t).speeds))].filter((g) => !held.has(g)).slice(0, SLOW_HINT_MAX);
   const where = orList(slow.map((t) => TERRAIN_PLURAL[t])).replace(/ or /, " and ");
-  return `slower going through the ${where}${gear.length ? ` — ${orList(gear.map(gearPhrase))} would speed it up` : ""}`;
+  return { text: `slower going through the ${where}`, gear: gear.map((id) => ({ id, owned: owned(id) })) };
 }
-// 5k4: a leg that hits a wall names the wall — and, if some gear crosses it, which.
-export function blockedRouteNote(terrain: Terrain): string {
+// 5k4: a leg that hits a wall names the wall. seyh.29 (D111): the gear that crosses it
+// (if any) comes back as silhouettes, never in the copy.
+export function blockedRouteNote(terrain: Terrain, owned: (defId: string) => boolean = () => false): { text: string; gear: GearHint[] } {
   const plural = TERRAIN_PLURAL[terrain];
   const verb = plural.endsWith("s") ? "block" : "blocks";
   const { opens } = terrainGear(terrain);
-  return `the ${plural} ${verb} this path${opens.length ? ` — only ${orList(opens.map(gearPhrase))} gets you across` : ""}`;
+  return { text: `the ${plural} ${verb} this path`, gear: opens.map((id) => ({ id, owned: owned(id) })) };
 }
 // Orthogonal step cost with the given gear (the move engine's own function).
 function moveCostOf(t: Terrain, eq: Pick<Equipment, "transport" | "tools">): number {
@@ -1025,33 +1042,29 @@ export function stuckOptions(legal: Action[]): string[] {
   return out;
 }
 
-/** The run's score and how much more it can take (seyh.2): haul = loot units carried;
- *  room = whole free loot slots × their stack cap + the top-up left in partial carry
- *  stacks (same-material gathers merge first, as addToCarry does). Carried maps live in
- *  their own pool (mapCarryCap, zpm.2) and take no loot room. full = nothing more fits. */
-export function haulRoom(exp: Pick<Expedition, "loadout" | "carry">): { haul: number; stacks: number; roomUnits: number; full: boolean } {
-  const haul = exp.carry.reduce((n, s) => n + s.qty, 0);
-  const freeSlots = Math.max(0, freeLootStacks(exp.loadout) - exp.carry.length);
-  const topUp = exp.carry.reduce((n, s) => n + Math.max(0, stackCapOf(s.defId) - s.qty), 0);
-  const roomUnits = freeSlots * STACK_CAP + topUp;
-  return { haul, stacks: exp.carry.length, roomUnits, full: roomUnits === 0 };
+/** The bag counter (seyh.29, D111 — replaces seyh.2's haul phrase): real slots used
+ *  (consumable units + loot stacks, the engine's `usedSlots`) over the bag's size
+ *  (`carryCap`). full = no slot left. Carried maps have their own pool (zpm.2). */
+export function bagCount(loadout: Loadout, carry: ItemStack[]): { used: number; cap: number; full: boolean } {
+  const used = usedSlots(loadout, carry);
+  const cap = carryCap(loadout.equipment);
+  return { used, cap, full: used >= cap };
 }
-
-/** "Haul 6 · room for 24" / "Haul 6 · bag full" — the HUD and drawer-handle phrase. */
-export function haulLine(h: { haul: number; roomUnits: number; full: boolean }): string {
-  return `Haul ${h.haul} · ${h.full ? "bag full" : `room for ${h.roomUnits}`}`;
+/** "Bag 7/12" — the HUD and drawer-handle counter. */
+export function bagLine(b: { used: number; cap: number }): string {
+  return `Bag ${b.used}/${b.cap}`;
 }
 
 /** The route card's "what you'll get" line (seyh.6): the walk's predicted auto-gathers
- *  summed per material in walk order, then whether it all fits. `icon` lets a surface
+ *  summed per material in walk order (no fit verdict — seyh.29, D111). `icon` lets a surface
  *  prefix each material (the web's sprite icon); text-only by default. Empty gathers →
  *  "" (nothing to promise, e.g. auto-gather off). */
-export function yieldLine(gathers: readonly { material: string; qty: number }[], fits: boolean, short: number, icon: (material: string) => string = () => ""): string {
+export function yieldLine(gathers: readonly { material: string; qty: number }[], icon: (material: string) => string = () => ""): string {
   if (!gathers.length) return "";
   const totals = new Map<string, number>();
   for (const g of gathers) totals.set(g.material, (totals.get(g.material) ?? 0) + g.qty);
   const items = [...totals].map(([m, q]) => `${icon(m)}${name(m)} +${q}`).join(", ");
-  return `→ ${items} · ${fits ? "fits ✓" : `won't fit (${short} short)`}`;
+  return `→ ${items}`;
 }
 
 /** Where an item comes from, in player words (user 2026-10-10: "where do I get flint?"):

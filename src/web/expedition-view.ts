@@ -11,8 +11,9 @@ import { deriveRoute } from "./route";
 import type { Pos } from "./route";
 import { PLAYER_BASE_HP, RECIPE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_CAMP_MEALS, QUAFF_ENERGY, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, FISH_CAST_ENERGY, FISH_DEEP_DEPTH, ANTIDOTE, TERRAIN_HP_COST } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
-import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, GATHER_VERB, round1, preFightVerdict, isExhausted, costBand, tileName, tileYield, slowRouteNote, blockedRouteNote, verdictRoles, roleClass, worstVerdict, stuckOptions, haulRoom, haulLine, yieldLine } from "../render/render";
-import type { FightVerdict } from "../render/render";
+import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, GATHER_VERB, round1, preFightVerdict, isExhausted, costBand, tileName, tileYield, slowRouteNote, blockedRouteNote, verdictRoles, roleClass, worstVerdict, stuckOptions, bagCount, bagLine, yieldLine, ownedGear } from "../render/render";
+import type { FightVerdict, GearHint } from "../render/render";
+import { ic } from "./icons";
 import { fightSheet, preFightCard, throwLegal, enhanceButtons, verdictDot } from "./fight-view";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action } from "../engine/types";
@@ -21,6 +22,14 @@ import { heldOnRun } from "./feedback";
 
 const kk = (p: Pos) => `${p.x},${p.y}`;
 const capFirst = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+// seyh.29 (D111): the gear that would change a slow/blocked route, as icons only — a
+// dark silhouette until you own one, then in colour. Never named for gear you lack
+// (knowledge is earned); your own gear's name rides in the title.
+const GEAR_SIL_PX = 18; // silhouette icon size on the route card (presentation only)
+function gearSilhouettes(gear: readonly GearHint[]): string {
+  if (!gear.length) return "";
+  return ` <span class="gear-sils">${gear.map((g) => `<span class="gear-sil${g.owned ? " owned" : ""}" data-gear="${g.id}" title="${g.owned ? name(g.id) : "something could change this"}">${ic(g.id, GEAR_SIL_PX)}</span>`).join("")}</span>`;
+}
 
 // Human breakdown of a single step's energy — surfaced as a path tile's hover
 // title so the horse/gear effect is visible: "plains 10e ÷2 (horse) = 5e".
@@ -247,14 +256,14 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
     ? `${round1(exp.energy)}/${maxEnergy} → <b class="${overBudget ? "amber" : ""}">${round1(Math.max(0, rt.endEnergy))}⚡</b>`
     : `${round1(exp.energy)}/${maxEnergy}${overSpan}`;
   const autoGatherOn = exp.autoGather ?? true;
-  // seyh.2: the score (haul) and the room left for loot, not a merged supplies+loot count.
-  const haul = haulRoom(exp);
+  // seyh.29 (D111): a plain bag counter, slots used / max (amber when full) — no haul.
+  const bag = bagCount(exp.loadout, exp.carry);
   // kml: compact HUD bars that float over the map (landscape-first layout).
   const bars = `
     <div class="bar"><span>⚡ Energy</span><div class="track">${energyFill}</div><b>${energyLabel}</b></div>${overBudget ? `
     <div class="hud-note amber">ends your gathering here (home is still free)</div>` : ""}
     <div class="bar"><span>HP</span><div class="track"><div class="fill hp" style="width:${Math.min(100, (exp.hp / PLAYER_BASE_HP) * 100)}%"></div></div><b>${Math.round(exp.hp)}/${PLAYER_BASE_HP}</b>${poisonChip(exp, legal)}</div>
-    <div class="hud-haul${haul.full ? " amber" : ""}">${haulLine(haul)}</div>`;
+    <div class="hud-bag${bag.full ? " amber" : ""}">${bagLine(bag)}</div>`;
 
   // End-of-route affordances (eot): the LAST waypoint drives Fight/Shoot/Survey.
   const endPoi = route.length ? poiAt.get(goalK) : undefined;
@@ -281,17 +290,20 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   // lose → Walk/Fight goes secondary and "✕ Cancel route" is the filled primary; costly → amber.
   const roles = verdictRoles(worstVerdict(endVerdict, cmVerdict));
   const cancelBtn = roles.safe === "primary" ? `<button class="primary" data-cancelpath title="clear the route">✕ Cancel route</button>` : "";
-  // 5k4: name the wall a leg hits (and the gear that crosses it, if any); a walkable
-  // route over dear terrain says it'll be slower and hints at gear that speeds it.
+  // 5k4: name the wall a leg hits; a walkable route over dear terrain says it'll be
+  // slower. seyh.29 (D111): neither names the gear — each helping item shows as a
+  // silhouette of its icon (coloured once you own one); no icon = always like this.
+  const owned = ownedGear(state);
   const firstBlock = rt.legs.find((l) => l.blockedAt)?.blockedAt ?? null;
-  const blockNote = firstBlock ? `<div class="over">✗ ${capFirst(blockedRouteNote(grid.terrain[firstBlock.y]![firstBlock.x]!))}. <span class="muted">Tap the line to unwind.</span></div>` : "";
-  const slow = hasRoute && !firstBlock ? slowRouteNote(rt.walkable.map((t) => grid.terrain[t.y]![t.x]!), exp.loadout.equipment) : null;
-  const slowNote = slow ? `<div class="slow">🐢 ${slow}</div>` : "";
-  // seyh.6: what the walk will gather and whether it fits (amber when it won't — the
-  // walk pauses there, it isn't a loss). Only resolved nodes; nothing with auto-gather off.
+  const block = firstBlock ? blockedRouteNote(grid.terrain[firstBlock.y]![firstBlock.x]!, owned) : null;
+  const blockNote = block ? `<div class="over">✗ ${capFirst(block.text)}.${gearSilhouettes(block.gear)} <span class="muted">Tap the line to unwind.</span></div>` : "";
+  const slow = hasRoute && !firstBlock ? slowRouteNote(rt.walkable.map((t) => grid.terrain[t.y]![t.x]!), exp.loadout.equipment, owned) : null;
+  const slowNote = slow ? `<div class="slow">🐢 ${slow.text}${gearSilhouettes(slow.gear)}</div>` : "";
+  // seyh.6: what the walk will gather (only resolved nodes; nothing with auto-gather
+  // off). seyh.29 (D111): no fit verdict — just the yield.
   const yieldIcon = (m: string): string => { const st = iconStyle(m); return st ? `<span class="y-icon" style="${st}" aria-hidden="true"></span>` : ""; };
-  const yields = yieldLine(rt.gathers, rt.fits, rt.short, yieldIcon);
-  const yieldRow = yields ? `<div class="yieldline${rt.fits ? "" : " amber"}">${yields}</div>` : "";
+  const yields = yieldLine(rt.gathers, yieldIcon);
+  const yieldRow = yields ? `<div class="yieldline">${yields}</div>` : "";
   // kml: the route bar floats at the bottom of the map — only when there's something to say.
   // A live fight has its own sheet (eor), so no route bar then.
   const routeBar = !exp.combat && hasRoute
@@ -401,14 +413,14 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
       <button class="pan pan-w" data-pan="-2,0" aria-label="pan west">◀</button>
       <button class="pan pan-e" data-pan="2,0" aria-label="pan east">▶</button>
       <button class="recentre" data-recentre title="centre on you" aria-label="centre on you">◎</button>
-      ${exp.combat ? "" : `<button class="home-btn" data-home title="head home (free)" aria-label="head home, free">🏠<span class="home-free">free</span></button>`}
+      ${exp.combat ? "" : `<button class="home-btn" data-home title="head home" aria-label="head home">🏠<span class="home-tag">head home</span></button>`}
       ${homeSheet(state, legal, ui)}
       ${quick.length ? `<div class="quick">${quick.join("")}</div>` : ""}
       ${routeBar}
       ${exp.combat ? fightSheet(exp, legal) : ""}
     </div>
     <aside class="drawer${ui.drawerOpen ? " open" : ""}">
-      <button class="drawer-handle" data-drawer-toggle><span class="grip"></span><span class="summary"><span class="sum-here">${hereSummary}</span>${targetSummary}</span><span class="bagcount${haul.full ? " amber" : ""}">${haulLine(haul)}</span><span class="chev">${ui.drawerOpen ? "▾" : "▴"}</span></button>
+      <button class="drawer-handle" data-drawer-toggle><span class="grip"></span><span class="summary"><span class="sum-here">${hereSummary}</span>${targetSummary}</span><span class="bagcount${bag.full ? " amber" : ""}">${bagLine(bag)}</span><span class="chev">${ui.drawerOpen ? "▾" : "▴"}</span></button>
       <nav class="tabs">${tabBtn("here", "Here")}${tabBtn("bag", "Bag")}${tabBtn("craft", "Craft")}${tabBtn("log", "Log")}</nav>
       <div class="drawer-body">${tabBody}</div>
     </aside>
