@@ -70,6 +70,14 @@ export const GATHER_VERB: Record<string, { label: string; past: string; noun: st
   animal: { label: "🔪 Hunt", past: "hunted", noun: "animal" },
 };
 
+// seyh.32: the note when a walk stops on a node it couldn't pick up (bag full). Walking
+// never gathers the tile you're already on, so point at what works: make room, then the
+// node's own gather button (its exact label); the rest of the route waits for Walk.
+export function bagFullStopNote(pos: { x: number; y: number }, kind?: string): string {
+  const verb = (kind && GATHER_VERB[kind]?.label) || "Gather";
+  return `🎒 bag full — stopped at (${pos.x},${pos.y}). Make room (drop or eat something), then ${verb} here; Walk carries on after`;
+}
+
 // Fishing log vocabulary (si7.6.2), shared by both surfaces.
 export const FISH_WATER_WORDS: Record<FishWater, string> = {
   river: "river", shallows: "shallows", lake: "lake edge", "deep-lake": "deep lake", sea: "sea", "deep-sea": "open sea",
