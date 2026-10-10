@@ -11,22 +11,26 @@ export const CUE_MS = 1700; // a tile cue's whole life — covers .fly (1.1s + s
 export const FLASH_MS = 900; // the bag-count / slot pulse
 export const PACK_MS = 1400; // the "just packed" glow on the bank row + loadout slot
 export const NOTE_MS = 4500; // an inline note (craft result / pack refusal) + its toast
+export const DELTA_MS = 2400; // seyh.4: the trade-off delta beside the packing line ("+80⚡ ≈ +8 tiles · −5 loot") — long enough to read
 
 export type Fx = {
   cues: { cue: Cue; t0: number }[];
   flash: { defs: string[]; t0: number } | null;
   packed: { defId: string; t0: number } | null;
+  // seyh.4: what the last pack/unpack did to the trade-off line (render.tradeoffDeltaText).
+  delta: { text: string; t0: number } | null;
   // An inline result note under `anchor` (a CSS selector — the recipe row / bank row the
   // player pressed), echoed as a toast. ok=false is a refusal (reject copy).
   note: { ok: boolean; text: string; anchor: string | null; t0: number } | null;
 };
-export const emptyFx = (): Fx => ({ cues: [], flash: null, packed: null, note: null });
+export const emptyFx = (): Fx => ({ cues: [], flash: null, packed: null, delta: null, note: null });
 
 // Drop anything past its lifetime (called before painting).
 export function pruneFx(fx: Fx, now: number): void {
   fx.cues = fx.cues.filter((c) => now - c.t0 < CUE_MS);
   if (fx.flash && now - fx.flash.t0 >= FLASH_MS) fx.flash = null;
   if (fx.packed && now - fx.packed.t0 >= PACK_MS) fx.packed = null;
+  if (fx.delta && now - fx.delta.t0 >= DELTA_MS) fx.delta = null;
   if (fx.note && now - fx.note.t0 >= NOTE_MS) fx.note = null;
 }
 
@@ -100,6 +104,11 @@ export function paintFx(root: HTMLElement, fx: Fx, now: number): void {
   if (fx.packed) {
     const age = now - fx.packed.t0, d = sel(fx.packed.defId);
     root.querySelectorAll(`[data-bank="${d}"], [data-loadout] [data-def="${d}"]`).forEach((e) => pulse(e, "fx-packed", age));
+  }
+  // seyh.4: the trade-off line shows what that pack/unpack bought and cost.
+  if (fx.delta) {
+    const slot = root.querySelector<HTMLElement>("[data-trade-delta]");
+    if (slot) { slot.textContent = fx.delta.text; pulse(slot, "fx-delta", now - fx.delta.t0); }
   }
   // mki: a note under the row you pressed (+ the row flashes), and a toast — a town
   // recipe re-sorts once it's no longer affordable, so the row may have moved.

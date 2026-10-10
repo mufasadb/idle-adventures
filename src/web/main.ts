@@ -13,9 +13,9 @@ import { reduce } from "../engine/reduce";
 import { route as walkWaypoints } from "../sim/play";
 import { routeAfterClick } from "./route";
 import type { Pos } from "./route";
-import { name, rejectCopy, setEnergyUnit } from "../render/render";
+import { name, rejectCopy, setEnergyUnit, tradeoff, tradeoffDelta, tradeoffDeltaText } from "../render/render";
 import { installItemCard } from "./item-card";
-import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot } from "../engine/types";
+import type { GameState, Action, GameEvent, ItemStack, Loadout, LoadoutSlot } from "../engine/types";
 import type { LogEntry } from "./log";
 import { logView } from "./log";
 import { save, load, loadLog, saveLastPlan, loadLastPlan, migrateFog, FOG_NOTICE, loadResearchLog, saveResearchLog, RESEARCH_HISTORY_MAX } from "./persist";
@@ -163,7 +163,7 @@ function step(action: Action): GameEvent[] {
   // beh: a pack glows the bank row + the loadout slot it landed in; a refusal says why there.
   if (action.type === "pack") {
     if (rej?.type === "action-rejected") fx.note = { ok: false, text: `✗ can't pack ${name(action.itemId)} — ${rejectCopy(rej.reason, undefined, "pack")}`, anchor: `[data-bank="${action.itemId}"]`, t0: now() };
-    else fx.packed = { defId: action.itemId, t0: now() };
+    else { fx.packed = { defId: action.itemId, t0: now() }; tradeFlash(prevLoadout); }
     wornOpen = null;
   }
   for (const e of events) {
@@ -209,12 +209,19 @@ function unpack(defId: string, slot?: LoadoutSlot): void {
     if (r.events.some((e) => e.type === "action-rejected")) { skipped += 1; continue; }
     lo = r.state;
   }
+  const before = state.loadout;
   state = lo;
   fx.packed = null;
+  tradeFlash(before);
   wornOpen = null;
   const text = `unpacked 1× ${name(defId)}${skipped ? ` · ${skipped} other item(s) no longer fit and were dropped from the plan` : ""}`;
   fx.note = { ok: skipped === 0, text, anchor: null, t0: now() }; // d13: the log is hidden on the packing screen — say it as a toast
   note(`· ${text}`);
+}
+// seyh.4: flash what a pack/unpack did to the packing trade-off ("+80⚡ ≈ +8 tiles · −5 loot").
+function tradeFlash(before: Loadout): void {
+  const d = tradeoffDelta(tradeoff(before), tradeoff(state.loadout));
+  fx.delta = d ? { text: tradeoffDeltaText(d), t0: now() } : null;
 }
 function planReset(): void {
   // pack is only a PLAN on state.loadout (D28: bank untouched until embark).

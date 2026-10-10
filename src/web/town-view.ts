@@ -7,11 +7,11 @@ import { slotOf } from "../engine/catalog";
 import { freeLootStacks, slotCap, energyCapOf } from "../engine/carry";
 import { EQUIP_SLOTS } from "../engine/pack";
 import type { EquipSlot } from "../engine/pack";
-import { heldFoodEnergy, foodEnergyOf } from "../engine/food";
+import { foodEnergyOf } from "../engine/food";
 import { wieldsRanged, hasAmmo } from "../engine/combat";
 import { MAX_ENERGY, TENT_FOOD_MULTIPLIER, INKS, QUIVER_AMMO_CAP, STUDY_COST, STACK_CAP, FLASK_STACK_CAP, ARROW_STACK_CAP } from "../data/constants";
 import type { BiomeId } from "../data/constants";
-import { logisticsEffect, describe, name, heldMapTitle, rejectCopy, carryBreakdown, bagRows, bagCells, POCKET_SLOTS, hintNeed, expectedHaul, toolGloss, battleItemEffect } from "../render/render";
+import { logisticsEffect, describe, name, heldMapTitle, rejectCopy, carryBreakdown, bagRows, bagCells, POCKET_SLOTS, hintNeed, expectedHaul, toolGloss, battleItemEffect, tradeoff, GATHER_VERB } from "../render/render";
 import type { GameState, Action, MapItem, Loadout } from "../engine/types";
 import { planActions } from "./persist";
 import { packedCounts } from "./feedback";
@@ -186,10 +186,23 @@ function bagGauge(lo: Loadout): string {
   }).join("");
   // Over capacity can only follow a carry-source removal the replay couldn't fully drop.
   const over = cells.length > cap ? `<div class="pk-grp"><div class="lab bad">over</div><div class="cells">${cells.slice(cap).map(() => cell()).join("")}</div></div>` : "";
-  const sum = free > 0
-    ? `<span class="loot">${free} free = room for ${free * STACK_CAP} loot</span>`
-    : `<span class="bad">0 free: no room for loot!</span>`;
-  return `<div class="pk-gauge size-${size}">${groups}${over}<div class="pk-sum"><b>BAG ${cells.length}/${cap}</b><br>${sum}</div></div>`;
+  const sum = free > 0 ? `<span class="loot">${free} free</span>` : `<span class="bad">0 free</span>`;
+  return `<div class="pk-gauge size-${size}">${groups}${over}<div class="pk-sum"><b>BAG ${cells.length}/${cap}</b><br>${sum}</div></div>${tradeLine(lo)}`;
+}
+
+// seyh.4: the one trade-off, under the gauge — the energy you carry as reach (tiles of
+// open ground, or gathers) against the room it leaves for loot. Every number is
+// render's tradeoff() off the engine; a pack/unpack flashes its delta beside it (fx).
+function tradeLine(lo: Loadout): string {
+  const t = tradeoff(lo), eq = lo.equipment;
+  const tent = eq.tools.includes("tent") ? ` <span class="muted small">· tent: food +${Math.round((TENT_FOOD_MULTIPLIER - 1) * 100)}% at camp</span>` : "";
+  const gather = GATHER_VERB[t.gatherKind]?.noun ?? "node";
+  const room = t.lootRoom > 0 ? `<span class="loot">room for <b>${t.lootRoom}</b> loot</span>` : `<span class="bad">no room for loot</span>`;
+  return `<div class="pk-trade" data-trade>
+    <span class="en" title="you embark at full energy; packed food is eaten back as you travel">⚡ <b>${t.startEnergy}</b> + <b>${t.foodEnergy}</b> food${tent}</span>
+    <span class="reach" title="on open ground with this gear; rough ground, rivers and diagonals cost more. A gather here = one ${gather}">→ reach ≈ <b>${t.tiles}</b> tiles of open ground or <b>${t.gathers}</b> gathers</span>
+    <span class="sep">·</span> ${room}<span class="pk-delta" data-trade-delta aria-live="polite"></span>
+  </div>`;
 }
 
 // 2. The map page: where you're going, its scout reports and whether the plan answers them.
@@ -306,11 +319,10 @@ function wornColumn(state: GameState, legal: Action[], open: string | null): str
   return `<div class="pk-worn"><h4>Worn</h4><div class="free">free · no slots</div>${rows}</div>`;
 }
 
-// 5. Footer: energy (base + food), the warnings, Repack / Reset / Embark.
+// 5. Footer: the warnings (the energy figure moved up beside the gauge, seyh.4), Repack / Reset / Embark.
 function packFooter(state: GameState, mapSeed: string, isLocal: boolean, held: MapItem | null, hasLastPlan: boolean): string {
   const lo = state.loadout, eq = lo.equipment;
   const startEnergy = MAX_ENERGY + energyCapOf(eq);
-  const food = heldFoodEnergy(lo.food);
   const warns: { short: string; full: string }[] = [];
   if (lo.food.length === 0) warns.push({ short: "no food", full: `no food packed → you embark at ${startEnergy} energy with nothing to eat mid-run — no way to refill stamina` });
   if (wieldsRanged(lo) && !hasAmmo(lo)) warns.push({ short: `${name(eq.weapon!)}, no ammo`, full: `${name(eq.weapon!)} packed with no ammo it can shoot → it will swing like a club. Pack its ammo to shoot.` });
@@ -322,7 +334,6 @@ function packFooter(state: GameState, mapSeed: string, isLocal: boolean, held: M
   const repack = hasLastPlan && planActions(lo).length === 0
     ? `<button class="pk-ghost" data-repack title="re-pack the loadout you took last run (skips anything no longer in the bank)">↻ Repack last</button>` : "";
   return `<div class="pk-foot">
-    <span class="en" title="you embark at full energy; packed food is eaten back as you travel">Energy <b>${startEnergy}</b> + <b>${food}</b> from food${eq.tools.includes("tent") ? ` <span class="muted small">· tent: food +${Math.round((TENT_FOOD_MULTIPLIER - 1) * 100)}%</span>` : ""}</span>
     <span class="warns">${warns.map((w) => `<span class="warn" title="${w.full}">⚠ ${w.short}</span>`).join("")}</span>
     ${repack}<button class="pk-ghost" data-reset title="clear the whole plan">Reset</button>
     <button class="embark-final" data-embark="${mapSeed}">Embark ▶${isLocal ? "" : `<small> spends map</small>`}</button>

@@ -3,11 +3,15 @@
 // pin the selectors to carryCap / consumableSlots / freeLootStacks rather than to
 // hand-computed values.
 import { describe, expect, test } from "bun:test";
-import { carryBreakdown, bagRows, bagCells, hintNeed, expectedHaul, toolGloss, POCKET_SLOTS, rejectCopy } from "../src/render/render";
+import { carryBreakdown, bagRows, bagCells, hintNeed, expectedHaul, toolGloss, POCKET_SLOTS, rejectCopy, tradeoff, tradeoffDelta, tradeoffDeltaText, energyReach } from "../src/render/render";
+import { energyCapOf } from "../src/engine/carry";
+import { heldFoodEnergy, foodEnergyOf } from "../src/engine/food";
+import { moveCost } from "../src/engine/move";
+import { toolSpeedFor } from "../src/engine/tools";
 import { carryCap, consumableSlots, freeLootStacks } from "../src/engine/carry";
 import { newGame } from "../src/engine/town";
 import { reduce } from "../src/engine/reduce";
-import { BACKPACK_SLOTS, TRANSPORT_CARRY, PANNIERS, BASE_CARRY_SLOTS, HINT_FALLBACK, STACK_CAP } from "../src/data/constants";
+import { BACKPACK_SLOTS, TRANSPORT_CARRY, PANNIERS, BASE_CARRY_SLOTS, HINT_FALLBACK, STACK_CAP, MAX_ENERGY, NODE_HARDNESS, NODE_TOOL } from "../src/data/constants";
 import type { Equipment, GameState, Loadout, LoadoutSlot } from "../src/engine/types";
 import { planWithout } from "../src/web/feedback";
 import { townView } from "../src/web/town-view";
@@ -166,7 +170,7 @@ describe("townView prep — the rendered packing sheet", () => {
     expect(count(prepHtml, /class="pk-cell full"/g)).toBe(consumableSlots(s.loadout));
     expect(count(prepHtml, /class="pk-cell free"/g)).toBe(free);
     expect(prepHtml).toContain(`BAG ${cap - free}/${cap}`);
-    expect(prepHtml).toContain(`room for ${free * STACK_CAP} loot`);
+    expect(prepHtml).toContain(`room for <b>${free * STACK_CAP}</b> loot`); // seyh.4: the trade-off line
   });
 
   test("bank: packables are tappable, materials are not; bag rows unpack by slot", () => {
@@ -178,5 +182,80 @@ describe("townView prep — the rendered packing sheet", () => {
     expect(html).toContain('class="pk-chip mat"');
     expect(html).toContain('data-unpack="pick" data-unpack-slot="tool"');
     expect(html).toContain(`data-embark="${seed}"`);
+  });
+});
+
+// seyh.4: the packing trade-off — reach (energy as tiles of open ground / gathers) vs
+// room for loot. Pinned to the engine's own helpers, never hand numbers.
+describe("tradeoff / energyReach — the one packing trade-off", () => {
+  const withBank = (bank: { defId: string; qty: number }[]): GameState => ({ ...newGame("seyh4"), bank });
+
+  test("tradeoff reads MAX_ENERGY + gear, the packed food's energy and free slots × STACK_CAP", () => {
+    let s = withBank([{ defId: "ration", qty: 5 }, { defId: "canteen", qty: 1 }, { defId: "axe", qty: 1 }]);
+    s = packAll(s, [["tool", "canteen"], ["tool", "axe"], ["food", "ration", 3]]);
+    const t = tradeoff(s.loadout);
+    expect(t.startEnergy).toBe(MAX_ENERGY + energyCapOf(s.loadout.equipment));
+    expect(t.foodEnergy).toBe(heldFoodEnergy(s.loadout.food));
+    expect(t.foodEnergy).toBe(3 * foodEnergyOf("ration"));
+    expect(t.energy).toBe(t.startEnergy + t.foodEnergy);
+    expect(t.freeSlots).toBe(freeLootStacks(s.loadout));
+    expect(t.lootRoom).toBe(freeLootStacks(s.loadout) * STACK_CAP);
+    expect(t.tiles).toBe(Math.floor(t.energy / moveCost("plains", null, s.loadout.equipment.tools)));
+    // an axe packed: a gather is a chop, at the engine's hardness ÷ the axe's speed
+    expect(t.gatherKind).toBe("wood");
+    expect(t.gathers).toBe(Math.floor(t.energy / (NODE_HARDNESS.wood / toolSpeedFor(["canteen", "axe"], NODE_TOOL.wood)!)));
+  });
+
+  test("packing one ration: + its energy ≈ + energy ÷ open-ground step tiles, and − one loot stack", () => {
+    const s0 = withBank([{ defId: "ration", qty: 5 }]);
+    const s1 = packAll(s0, [["food", "ration"]]);
+    const a = tradeoff(s0.loadout), b = tradeoff(s1.loadout);
+    const step = moveCost("plains", null, []);
+    expect(b.energy - a.energy).toBe(foodEnergyOf("ration"));
+    expect(b.tiles - a.tiles).toBe(Math.round(foodEnergyOf("ration") / step));
+    expect(b.lootRoom - a.lootRoom).toBe(-STACK_CAP);
+    const d = tradeoffDelta(a, b)!;
+    expect(d).toEqual({ energy: foodEnergyOf("ration"), tiles: Math.round(foodEnergyOf("ration") / step), loot: -STACK_CAP });
+    expect(tradeoffDeltaText(d)).toBe(`+${d.energy}e ≈ +${d.tiles} tiles · −${STACK_CAP} loot`);
+    expect(tradeoffDelta(a, a)).toBeNull();
+  });
+
+  test("a horse changes the tile estimate (transport divisor) and the loot room (+slots) in the same line", () => {
+    const s0 = packAll(withBank([{ defId: "ration", qty: 5 }, { defId: "horse", qty: 1 }]), [["food", "ration", 2]]);
+    const s1 = packAll(s0, [["transport", "horse"]]);
+    const a = tradeoff(s0.loadout), b = tradeoff(s1.loadout);
+    expect(b.energy).toBe(a.energy); // a horse adds no energy…
+    expect(b.tiles).toBe(Math.floor(b.energy / moveCost("plains", "horse", [])));
+    expect(b.tiles).toBeGreaterThan(a.tiles); // …but each open-ground step is cheaper
+    expect(b.lootRoom - a.lootRoom).toBe((carryCap(s1.loadout.equipment) - carryCap(s0.loadout.equipment)) * STACK_CAP);
+    expect(b.lootRoom).toBeGreaterThan(a.lootRoom);
+    const d = tradeoffDelta(a, b)!;
+    expect(tradeoffDeltaText(d)).toBe(`≈ +${d.tiles} tiles · +${d.loot} loot`); // no "0e" when only the reach moved
+  });
+
+  test("energyReach: transport divides the open-ground step; no gathering tool = a bare-handed forage", () => {
+    const foot = energyReach(600, { transport: null, tools: [] });
+    const horse = energyReach(600, { transport: "horse", tools: [] });
+    expect(foot.tiles).toBe(Math.floor(600 / moveCost("plains", null, [])));
+    expect(horse.tiles).toBe(Math.floor(600 / moveCost("plains", "horse", [])));
+    expect(horse.tiles).toBeGreaterThan(foot.tiles);
+    expect(foot.gatherKind).toBe("herb");
+    expect(foot.gathers).toBe(Math.floor(600 / NODE_HARDNESS.herb));
+    // a trap alone can't hunt (D83 AND-gate) — still forage; trap + knife opens animals
+    expect(energyReach(600, { transport: null, tools: ["trap"] }).gatherKind).toBe("herb");
+    expect(energyReach(600, { transport: null, tools: ["trap", "knife"] }).gatherKind).toBe("animal");
+    expect(energyReach(-5, { transport: null, tools: [] })).toMatchObject({ tiles: 0, gathers: 0 });
+  });
+
+  test("the packing sheet renders the trade-off line from tradeoff()", () => {
+    let s: GameState = withBank([{ defId: "ration", qty: 5 }, { defId: "pick", qty: 1 }]);
+    s = packAll(s, [["tool", "pick"], ["food", "ration", 2]]);
+    const seed = /data-prepare="([^"]+)"/.exec(townView(s, null, false))![1]!;
+    const html = townView(s, seed, false);
+    const t = tradeoff(s.loadout);
+    expect(html).toContain("data-trade-delta");
+    expect(html).toContain(`reach ≈ <b>${t.tiles}</b> tiles of open ground or <b>${t.gathers}</b> gathers`);
+    expect(html).toContain(`room for <b>${t.lootRoom}</b> loot`);
+    expect(html).toContain(`⚡ <b>${t.startEnergy}</b> + <b>${t.foodEnergy}</b> food`);
   });
 });

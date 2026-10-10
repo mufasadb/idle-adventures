@@ -1,9 +1,11 @@
-import { BIOMES, RESEARCH_INKS, RESEARCH_SEARCHES_PER_INK, LOOT_TABLE, CATEGORY_LOOT_TABLE, MAP_SCROLL_ID, WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE, QUAFF_ENERGY, DON_DOFF_ENERGY, FLASK_EFFECT, ANTIDOTE, MAP_HINTS, DMG_ARMOUR_MATRIX, TERRAIN_HP_WARD } from "../data/constants";
+import { BIOMES, RESEARCH_INKS, RESEARCH_SEARCHES_PER_INK, LOOT_TABLE, CATEGORY_LOOT_TABLE, MAP_SCROLL_ID, WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE, QUAFF_ENERGY, DON_DOFF_ENERGY, FLASK_EFFECT, ANTIDOTE, MAP_HINTS, DMG_ARMOUR_MATRIX, TERRAIN_HP_WARD, NODE_HARDNESS, MAX_ENERGY, STACK_CAP } from "../data/constants";
 import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType, FishWater, HintMetric } from "../data/constants";
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
 import { playerDamage, damageTaken, strikeExchange, wieldsRanged, hasAmmo, loadedAmmoIndex, rollLoot } from "../engine/combat";
-import { consumeOne, addToCarry, freeLootStacks, carryCap, slotCap, quiverAmmoSlots } from "../engine/carry";
+import { consumeOne, addToCarry, freeLootStacks, carryCap, slotCap, quiverAmmoSlots, energyCapOf } from "../engine/carry";
+import { heldFoodEnergy } from "../engine/food";
+import { toolSpeedFor, secondaryToolSatisfied } from "../engine/tools";
 import { CONSUMABLE_KINDS, CONSUMABLE_KEYS } from "../engine/catalog";
 import { moveCost } from "../engine/move";
 import { ARMOUR_SLOTS } from "../engine/pack";
@@ -800,6 +802,62 @@ export function toolGloss(defId: string, tools: string[]): string | null {
   }
   if (cap === "fish") return "fish";
   return logisticsEffect(defId) ?? TOOL_PURPOSE[cap] ?? null;
+}
+
+// --- The packing trade-off (seyh.4): reach vs room ------------------------------
+// Packing makes one decision — energy you carry (food) against room for loot (slots).
+// These show the answer instead of the inputs: energy as tiles of OPEN GROUND (plains,
+// one step at the engine's own moveCost with this gear) or as gathers, and free slots
+// as loot units. Estimates on purpose ("≈"): diagonals and slow terrain cost more.
+//
+// A "gather" is one pick-up at the node kind your packed tools are FOR — the cheapest
+// tool-worked kind (wood with an axe, ore with a pick; animals need trap + knife),
+// at the engine's own NODE_HARDNESS ÷ tool speed. With no gathering tool packed it's
+// a bare-handed forage. (Forage is always cheapest, so it's only the fallback —
+// otherwise the estimate would never reflect the tools you packed.)
+export type EnergyReach = { tiles: number; gathers: number; gatherKind: GatherableNodeType; stepCost: number; gatherCost: number };
+export function energyReach(energy: number, equipment: Pick<Equipment, "transport" | "tools">): EnergyReach {
+  const stepCost = moveCost("plains", equipment.transport, equipment.tools);
+  const tools = equipment.tools;
+  let gatherKind: GatherableNodeType = "herb", gatherCost = NODE_HARDNESS.herb / (toolSpeedFor(tools, NODE_TOOL.herb) ?? 1);
+  let found = false;
+  for (const k of GATHER_KINDS) {
+    const cap = NODE_TOOL[k];
+    if (cap === null) continue;
+    const speed = toolSpeedFor(tools, cap);
+    if (speed === null || !secondaryToolSatisfied(k, tools)) continue;
+    const cost = NODE_HARDNESS[k] / speed;
+    if (!found || cost < gatherCost) { gatherKind = k; gatherCost = cost; found = true; }
+  }
+  const e = Math.max(0, energy);
+  return { tiles: Math.floor(e / stepCost), gathers: Math.floor(e / gatherCost), gatherKind, stepCost, gatherCost };
+}
+
+// The whole trade-off for a plan: you embark at full energy (MAX_ENERGY + gear) and
+// eat the packed food back as you go; every free slot holds one loot stack.
+export type Tradeoff = { startEnergy: number; foodEnergy: number; energy: number; tiles: number; gathers: number; gatherKind: GatherableNodeType; freeSlots: number; lootRoom: number };
+export function tradeoff(lo: Loadout): Tradeoff {
+  const startEnergy = MAX_ENERGY + energyCapOf(lo.equipment);
+  const foodEnergy = heldFoodEnergy(lo.food);
+  const energy = startEnergy + foodEnergy;
+  const r = energyReach(energy, lo.equipment);
+  const freeSlots = Math.max(0, freeLootStacks(lo));
+  return { startEnergy, foodEnergy, energy, tiles: r.tiles, gathers: r.gathers, gatherKind: r.gatherKind, freeSlots, lootRoom: freeSlots * STACK_CAP };
+}
+// What one pack/unpack did to it: "+80⚡ ≈ +8 tiles · −5 loot" (null when nothing moved).
+export type TradeoffDelta = { energy: number; tiles: number; loot: number };
+export function tradeoffDelta(before: Tradeoff, after: Tradeoff): TradeoffDelta | null {
+  const d = { energy: after.energy - before.energy, tiles: after.tiles - before.tiles, loot: after.lootRoom - before.lootRoom };
+  return d.energy === 0 && d.tiles === 0 && d.loot === 0 ? null : d;
+}
+const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : "0");
+export function tradeoffDeltaText(d: TradeoffDelta): string {
+  const parts: string[] = [];
+  // a horse moves the reach without moving the energy: "≈ +54 tiles · +10 loot"
+  const reach = [d.energy !== 0 ? `${signed(d.energy)}${EN}` : "", d.tiles !== 0 ? `≈ ${signed(d.tiles)} tiles` : ""].filter(Boolean).join(" ");
+  if (reach) parts.push(reach);
+  if (d.loot !== 0) parts.push(`${signed(d.loot)} loot`);
+  return parts.join(" · ");
 }
 
 // Scout reports → kit (d13): what each map hint asks of the loadout, checked against
