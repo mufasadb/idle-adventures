@@ -84,20 +84,27 @@ export function localMap(
   const key = `${seed}:local:${runs}`;
   const cached = localCache.get(key);
   if (cached) return cached;
-  // D102: the free map is PLAIN — the first candidate seed whose every hint family is
-  // the fallback ("nothing remarkable"), so rerolling it (free return, D62) can't fish
-  // for a good map. Remarkable (hinted) maps only come from drops. No plain candidate
-  // within the cap → the least remarkable one. Candidate 0 keeps the old seed shape.
-  let best = { mapSeed: key, biomeId: rollBiome(key), remarkable: Infinity };
-  for (let k = 0; k < LOCAL_MAP_PLAIN_TRIES && best.remarkable > 0; k++) {
+  // D102: the free map is PLAIN — a candidate seed whose every hint family is the
+  // fallback ("nothing remarkable"), so rerolling it (free return, D62) can't fish
+  // for a good map. Remarkable (hinted) maps only come from drops.
+  // D113: the BIOME is rolled first (candidate 0's own roll — the pre-D102 even split)
+  // and the plain filter searches only candidates that roll that same biome. Filtering
+  // across biomes skewed starters to desert/tundra (woodland is rarely plain). Each
+  // candidate still rolls its own biome from its own seed, so anyone holding the
+  // mapSeed re-derives it (D21) — no new roll. Up to LOCAL_MAP_PLAIN_TRIES in-biome
+  // candidates; none plain → the least remarkable of them.
+  const biomeId = rollBiome(key);
+  let best = { mapSeed: key, remarkable: Infinity };
+  for (let k = 0, tried = 0; tried < LOCAL_MAP_PLAIN_TRIES && best.remarkable > 0; k++) {
     const mapSeed = k === 0 ? key : `${key}:${k}`;
-    const biomeId = rollBiome(mapSeed);
+    if (rollBiome(mapSeed) !== biomeId) continue; // cheap (one rand) — no grid generated
+    tried++;
     const fam = familyHints(generateGrid(mapSeed, biomeId));
     const remarkable = HINT_FAMILIES.filter((f) => fam[f] !== HINT_FALLBACK[f].id).length;
-    if (remarkable < best.remarkable) best = { mapSeed, biomeId, remarkable };
+    if (remarkable < best.remarkable) best = { mapSeed, remarkable };
   }
   // A plain map has nothing to whisper: no hints on the offer (they'd all read "ordinary").
-  const out = { mapSeed: best.mapSeed, biomeId: best.biomeId, preview: { headline: best.biomeId, hints: [] as string[] } };
+  const out = { mapSeed: best.mapSeed, biomeId, preview: { headline: biomeId, hints: [] as string[] } };
   if (localCache.size >= LOCAL_CACHE_CAP) localCache.clear();
   localCache.set(key, out);
   return out;

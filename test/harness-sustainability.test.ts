@@ -129,7 +129,10 @@ test("sustainability: 15 runs on herb-poor tundra never starve the player", () =
     s = sustainingRun(s, "sustain", "tundra"); // throws if no tundra map sustains
     expect(qtyOf(s, "ration")).toBeGreaterThan(0); // replenished — net-neutral-or-better
   }
-});
+}, 60000); // D113: runtime budget only, assertions untouched — the local map is now a
+// plain-map search within a pre-rolled land, so tundra is 1 visit in 3 (was ~44%) and
+// this seed's rotation needs ~165 visits (each a plain-map search) to find 15 workable
+// tundra maps; past bun's 5 s default.
 
 // A biome-diverse rotation (any offered biome) should also sustain, and over the
 // runs earn a backpack from the haul — proving the early climb works end to end.

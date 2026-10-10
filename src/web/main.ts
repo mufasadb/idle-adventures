@@ -14,7 +14,7 @@ import { route as walkWaypoints } from "../sim/play";
 import { routeAfterClick } from "./route";
 import type { Pos } from "./route";
 import { camTransform } from "./camera";
-import { name, rejectCopy, setEnergyUnit, tradeoff, tradeoffDelta, tradeoffDeltaText, homecomingSummary, knownRecipeIds } from "../render/render";
+import { name, rejectCopy, bagFullStopNote, setEnergyUnit, tradeoff, tradeoffDelta, tradeoffDeltaText, homecomingSummary, knownRecipeIds } from "../render/render";
 import type { Homecoming } from "../render/render";
 import { homeStripHtml, homeGoods, playHaul } from "./homecoming";
 import { installItemCard } from "./item-card";
@@ -273,8 +273,8 @@ const foodUnits = (food: ItemStack[]) => food.reduce((n, s) => n + s.qty, 0);
 // Walk the planned waypoints (eot) through the SAME driver the console uses
 // (sim/play route): straight lineTiles legs of single `move`s validated by reduce
 // (D29), auto-gathering each tile landed on. It halts on the first rejection (its
-// true cause, 1te-e), a walked-into fight (1te-a), or a FULL BAG — which pauses with
-// the remaining route intact so you can make room and Walk again. Here we only
+// true cause, 1te-e), a walked-into fight (1te-a), or a FULL BAG — which pauses ON the
+// node with the remaining route intact: make room, Gather it, then Walk on (seyh.32). Here we only
 // summarise the result into the log.
 function walkRoute(wps: Pos[]): void {
   const startEnergy = state.expedition!.energy;
@@ -292,7 +292,7 @@ function walkRoute(wps: Pos[]): void {
   const ate = foodUnits(startFood) - foodUnits(exp.loadout.food);
   if (r.steps > 0) log.unshift({ t: "walk", steps: r.steps, pos: { x: exp.pos.x, y: exp.pos.y }, net, ate, gathered: r.gathered });
   if (r.halt?.kind === "engaged") log.unshift({ t: "note", text: `⚔ engaged the ${name(exp.combat!.creature)} — resolve the fight in the panel below` });
-  if (r.halt?.kind === "bag-full") log.unshift({ t: "note", text: `🎒 bag full — dropped anchor at (${exp.pos.x},${exp.pos.y}); make room and Walk to resume` });
+  if (r.halt?.kind === "bag-full") log.unshift({ t: "note", text: bagFullStopNote(exp.pos, expeditionGrid(exp).pois.find((p) => p.x === exp.pos.x && p.y === exp.pos.y)?.kind) });
   if (r.halt?.kind === "rejected") log.unshift({ t: "note", text: `✋ stopped — ${rejectCopy(r.halt.reason)}` });
   // Preserve the remaining route only on a bag-full pause (resume after making room);
   // a fight or an obstacle clears it so you re-plan from where you are.

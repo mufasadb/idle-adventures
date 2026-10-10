@@ -202,8 +202,9 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
     const locked = !!poi && !isCleared && !!poi.material && materialLocked(poi.material, exp.loadout.equipment.tools);
     if (locked) cls.push("locked");
     const per = poi ? perceived.get(k) : undefined;
-    // cww: a RESOLVED forage node shows its material glyph (f/d/b) + a material colour
-    // class, so the map teaches that forage varies (flint/deadwood look different once near).
+    // cww: a RESOLVED forage node shows its material (seyh.32: its item icon on the web;
+    // f/d/b only as a no-frame fallback) + a material class, so the map teaches that
+    // forage varies (flint/deadwood look different once near).
     if (poi && !isCleared && poi.kind === "herb" && per?.detail?.material) cls.push(`mat-${per.detail.material}`);
     // wzx: a humanoid CAMP (the map-dropper) reads as a landmark at any range.
     const isCamp = !!poi && !isCleared && per?.landmark === "camp";
@@ -236,8 +237,13 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
       if (poi.kind === "monster" && poi.creature) {
         const spriteStyle = monsterStyle(poi.creature);
         if (spriteStyle) overlay = `<span class="sprite" style="${spriteStyle}" aria-hidden="true"></span>`;
-      } else if (!(poi.kind === "herb" && per?.detail?.material && FORAGE_MATERIAL_CHAR[per.detail.material])) {
-        const iconStyleValue = iconStyle(nodeIconId(poi.kind, per?.detail?.material));
+      } else {
+        // seyh.32: a perceived forage material (flint/deadwood/berries) draws ITS item icon
+        // (cel wins, pixel fallback via iconStyle). Only a material with no frame of its
+        // own keeps its letter glyph — never the generic herb icon, which would hide it.
+        const mat = poi.kind === "herb" ? per?.detail?.material : undefined;
+        const letterOnly = !!mat && !!FORAGE_MATERIAL_CHAR[mat] && nodeIconId(poi.kind, mat) !== mat;
+        const iconStyleValue = letterOnly ? null : iconStyle(nodeIconId(poi.kind, per?.detail?.material));
         if (iconStyleValue) overlay = `<span class="nodeicon" style="${iconStyleValue}" aria-hidden="true"></span>`;
       }
     }
