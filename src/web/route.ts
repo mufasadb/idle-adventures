@@ -28,6 +28,11 @@ export type DerivedRoute = {
   actionCost: number; // auto-gather energy for resolved workable nodes on the walkable prefix
   endEnergy: number; // simulated CURRENT energy after the walk, mirroring the reducer's pay-then-auto-eat per tile (df3)
   runsDry: boolean; // the walk would truly run energy ≤ 0 before completing, EVEN WITH designated auto-eat (df3)
+  // seyh.10: per walkable tile, the engine's cost of the step onto it (diagonal flag
+  // included) — what the footprints count, and the index in `walkable` of the first step
+  // the walk can't pay (null = it never runs dry). Same simulation as runsDry.
+  stepCosts: number[];
+  dryAt: number | null;
   blocked: boolean; // any leg hits a wall → Walk disabled
   hpCost: number; // si7.6.9.6 (D99): HP the walkable prefix's hazardous terrain (spore-thicket, no mask) costs
   hazardKeys: Set<string>; // walkable tiles that cost HP — tinted red on the map
@@ -73,6 +78,8 @@ export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: S
     }
   };
   let runsDry = false; // the walk truly can't finish even WITH auto-eat
+  const stepCosts: number[] = [];
+  let dryAt: number | null = null;
   // seyh.6: the bag as the walk fills it. Gathers land via placeYield (the reducer's own
   // placement) into the post-auto-eat inventory; once one won't fit, the real walk
   // pauses (sim/play route: bag-full), so the rest only count toward `short`.
@@ -106,6 +113,7 @@ export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: S
         const diagonal = prevWalk.x !== t.x && prevWalk.y !== t.y;
         const mc = moveCost(grid.terrain[t.y]![t.x]!, eq.transport, eq.tools, diagonal);
         prevWalk = t;
+        stepCosts.push(mc);
         walkCost += mc;
         const hz = terrainHpCost(grid.terrain[t.y]![t.x]!, eq.tools);
         if (hz > 0) { hpCost += hz; hazardKeys.add(kk(t)); }
@@ -113,7 +121,7 @@ export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: S
         // energy (auto-eat already ran at the prior tile) — so the walk halts here
         // and doesn't finish. Flag runsDry once, but keep summing the raw cost
         // breakdown so the spend readout still shows the whole planned route.
-        if (!runsDry && mc > simEnergy) { runsDry = true; walkStops = true; }
+        if (!runsDry && mc > simEnergy) { runsDry = true; walkStops = true; dryAt = walkable.length - 1; }
         payThenEat(mc);
         if ((exp.autoGather ?? true) && !cleared.has(kk(t)) && resolved.has(kk(t)) && !gatheredKeys.has(kk(t))) {
           const poi = grid.pois.find((p) => p.x === t.x && p.y === t.y);
@@ -154,7 +162,7 @@ export function deriveRoute(grid: Grid, exp: Expedition, wps: Pos[], resolved: S
     legStart = wp;
   }
   const short = overflow ? Math.max(1, usedSlots({ ...exp.loadout, food: overflow.food }, overflow.carry) - carryCap(eq)) : 0;
-  return { legs, drawn, walkable, waypointKeys, blockKeys, walkCost, actionCost, hpCost, hazardKeys, endEnergy: simEnergy, runsDry, crossedMonster, blocked: legs.some((l) => l.blockedAt !== null), end: wps.length ? wps[wps.length - 1]! : exp.pos, gathers, fits: overflow === null, short };
+  return { legs, drawn, walkable, waypointKeys, blockKeys, walkCost, actionCost, hpCost, hazardKeys, endEnergy: simEnergy, runsDry, stepCosts, dryAt, crossedMonster, blocked: legs.some((l) => l.blockedAt !== null), end: wps.length ? wps[wps.length - 1]! : exp.pos, gathers, fits: overflow === null, short };
 }
 
 // --- click → waypoint list (eot) --------------------------------------------

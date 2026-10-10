@@ -13,6 +13,7 @@ import { reduce } from "../engine/reduce";
 import { route as walkWaypoints } from "../sim/play";
 import { routeAfterClick } from "./route";
 import type { Pos } from "./route";
+import { camTransform } from "./camera";
 import { name, rejectCopy, setEnergyUnit, tradeoff, tradeoffDelta, tradeoffDeltaText, homecomingSummary, knownRecipeIds } from "../render/render";
 import type { Homecoming } from "../render/render";
 import { homeStripHtml, homeGoods, playHaul } from "./homecoming";
@@ -355,8 +356,8 @@ function applyCam(): void {
   const slack = 48; // a little overscroll so edge tiles can clear the HUD
   const clamp = (v: number, size: number, view: number) =>
     size + 2 * slack <= view ? (size - view) / 2 : Math.max(-slack, Math.min(size - view + slack, v));
-  cam = { x: clamp(cam.x, w, vp.clientWidth), y: clamp(cam.y, h, vp.clientHeight) };
-  g.style.transform = `translate(${-cam.x}px, ${-cam.y}px) scale(${ZOOM})`;
+  cam = { x: clamp(cam.x, w, vp.clientWidth), y: clamp(cam.y, h, vp.clientHeight) }; // kept fractional so slow drags accumulate; camTransform rounds
+  g.style.transform = camTransform(cam, ZOOM); // whole-pixel translate: no tile hairlines (seyh.10)
 }
 function centerOnPlayer(): void {
   const vp = viewportEl();

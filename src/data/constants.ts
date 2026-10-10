@@ -608,7 +608,7 @@ export const REGION_BACK_HORIZON = 8;
 
 // === Route footprints (idle-adventure-seyh.10, D105/D112) — presentation only ===
 // A planned or walked route draws boot prints on each tile; the count per tile is the
-// engine's orthogonal step cost with your current gear divided by this, rounded up and
+// engine's cost of that step (diagonal = floor(orth×√2)) with your current gear ÷ this, rounded up and
 // clamped. More prints = shorter, smaller steps = slower ground. At 5: ice with cleats
 // (5) = 1 print, plains (10) = 2, mud/spores (15) = 3, ice on foot (20) = 4, shallows
 // (25) = 5, river (30) = 6. Lower it to exaggerate the contrast; raise it to calm it.

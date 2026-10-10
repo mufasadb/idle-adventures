@@ -133,14 +133,30 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   const canFish = legal.some((a) => a.type === "fish");
   const drawnSet = new Set(rt.drawn.map(kk));
   const goalK = kk(rt.end);
-  // seyh.10 (D105): footprints along the planned walk (and, fainter, the walked trail):
-  // the count per tile is the engine's step cost with your current gear.
+  // seyh.10 (D105/D112): footprints along the planned walk (and, fainter, the walked
+  // trail): the count per tile is the engine's cost of THAT step with your current gear
+  // (a diagonal costs √2×, so it gets more prints); their size comes from the ground (a
+  // straight step's count), so a diagonal's prints match a straight step's on the same
+  // ground. Past the step where the walk runs dry (the route's own energy simulation)
+  // the prints go hollow, and the last affordable step carries a stop mark.
   const eqNow = exp.loadout.equipment;
-  const stepAt = (p: Pos, from: Pos) => ({ n: footprintCount(moveCost(grid.terrain[p.y]![p.x]!, eqNow.transport, eqNow.tools)) ?? 0, dx: Math.sign(p.x - from.x), dy: Math.sign(p.y - from.y) });
+  const stepAt = (p: Pos, from: Pos, cost?: number): Step => {
+    const dx = Math.sign(p.x - from.x), dy = Math.sign(p.y - from.y);
+    const terr = grid.terrain[p.y]![p.x]!;
+    const diagonal = dx !== 0 && dy !== 0;
+    const n = footprintCount(cost ?? moveCost(terr, eqNow.transport, eqNow.tools, diagonal), diagonal) ?? 0;
+    return { n, unit: footprintCount(moveCost(terr, eqNow.transport, eqNow.tools)) ?? n, dx, dy };
+  };
   const prints = new Map<string, { step: Step; walked: boolean }>();
   for (const t of ui.trail ?? []) prints.set(kk(t), { step: stepAt(t, { x: t.x - t.dx, y: t.y - t.dy }), walked: true });
   // the plan wins over the trail; on a looping route the first pass sets a tile's prints
-  for (const [i, t] of rt.walkable.entries()) { const first = rt.walkable.findIndex((u) => u.x === t.x && u.y === t.y); if (first !== i) continue; prints.set(kk(t), { step: stepAt(t, i ? rt.walkable[i - 1]! : exp.pos), walked: false }); }
+  const dryAt = rt.dryAt ?? Infinity;
+  for (const [i, t] of rt.walkable.entries()) {
+    const first = rt.walkable.findIndex((u) => u.x === t.x && u.y === t.y);
+    if (first !== i) continue;
+    const step = stepAt(t, i ? rt.walkable[i - 1]! : exp.pos, rt.stepCosts[i]);
+    prints.set(kk(t), { step: { ...step, dry: i >= dryAt, stop: i === dryAt - 1 }, walked: false });
+  }
 
   let cells = "";
   for (let y = 0; y < MAP_HEIGHT; y++) for (let x = 0; x < MAP_WIDTH; x++) {
@@ -169,7 +185,7 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
     const isBlock = rt.blockKeys.has(k);
     let stepBd: ReturnType<typeof moveCostBreakdown> | null = null;
     if (isBlock) {
-      cls.push("path", "path-blocked"); // the red "this won't work" marker
+      cls.push("path", "path-blocked"); // the grey "this won't work" marker (seyh.10: grey, red is for danger)
     } else if (onPath) {
       cls.push("path");
       stepBd = moveCostBreakdown(grid.terrain[y]![x]!, exp.loadout.equipment.transport, exp.loadout.equipment.tools);
@@ -361,7 +377,7 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
       ${exp.weaponBuff ? `<div class="muted small">🗡️ ${name(exp.weaponBuff.id)} · ${exp.weaponBuff.charges} strike${exp.weaponBuff.charges === 1 ? "" : "s"} left</div>` : ""}
       <details class="settings"><summary>Settings</summary>
         <div class="actions">
-          <button data-toggle-costtint title="tint each tile by what a step onto it costs you, with what you carry">Cost colours: <b>${(ui.costTint ?? false) ? "on" : "off"}</b></button>
+          <button data-toggle-costtint title="shade each tile darker the more a step onto it costs you, with what you carry">Cost shading: <b>${(ui.costTint ?? false) ? "on" : "off"}</b></button>
           <button data-toggle-autogather>Auto-gather on walk: <b>${autoGatherOn ? "on" : "off"}</b></button>
           <button data-act="toggle-auto-quaff" title="auto-drink a potion when HP drops low mid-fight">Auto-potion: <b>${(exp.autoQuaff ?? true) ? "on" : "off"}</b></button>
           <button data-act="toggle-auto-finish" title="resolve whole fights in one tap">Auto-finish fights: <b>${(exp.autoFinish ?? false) ? "on" : "off"}</b></button>

@@ -1,4 +1,4 @@
-import { BIOMES, RESEARCH_INKS, RESEARCH_SEARCHES_PER_INK, LOOT_TABLE, CATEGORY_LOOT_TABLE, MAP_SCROLL_ID, WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE, QUAFF_ENERGY, DON_DOFF_ENERGY, FLASK_EFFECT, ANTIDOTE, MAP_HINTS, DMG_ARMOUR_MATRIX, TERRAIN_HP_WARD, NODE_HARDNESS, MAX_ENERGY, STACK_CAP, BIOME_IDS, RARE_BIOMES, REGION_BEARING, REGION_BACK_HORIZON, MAP_TIER_MAX, FOOTPRINT_ENERGY_PER_PRINT, FOOTPRINT_MAX_PRINTS } from "../data/constants";
+import { BIOMES, RESEARCH_INKS, RESEARCH_SEARCHES_PER_INK, LOOT_TABLE, CATEGORY_LOOT_TABLE, MAP_SCROLL_ID, WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE, QUAFF_ENERGY, DON_DOFF_ENERGY, FLASK_EFFECT, ANTIDOTE, MAP_HINTS, DMG_ARMOUR_MATRIX, TERRAIN_HP_WARD, NODE_HARDNESS, MAX_ENERGY, STACK_CAP, BIOME_IDS, RARE_BIOMES, REGION_BEARING, REGION_BACK_HORIZON, MAP_TIER_MAX, FOOTPRINT_ENERGY_PER_PRINT, DIAGONAL_MULTIPLIER, FOOTPRINT_MAX_PRINTS } from "../data/constants";
 import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType, FishWater, HintMetric, BiomeId } from "../data/constants";
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
@@ -1102,13 +1102,16 @@ export function costBand(stepCost: number): 1 | 2 | 3 | 4 | null {
   return (i === -1 ? 4 : i + 1) as 1 | 2 | 3 | 4;
 }
 
-/** Route footprints (seyh.10, D105/D112): how many boot prints a route tile gets from
- *  its orthogonal step cost with your gear (the move engine's `moveCost`) — more,
- *  smaller prints on slow ground. null = impassable (no prints; the blocked marker
+/** Route footprints (seyh.10, D105/D112): how many boot prints a route step gets from
+ *  the engine's cost for THAT step with your gear (`moveCost`, diagonal flag included)
+ *  — more, smaller prints on slow ground. A diagonal step costs √2× (floored) and
+ *  covers √2× the distance, so it simply gets proportionally more prints; its cap
+ *  scales the same way (`diagonal`). null = impassable (no prints; the blocked marker
  *  shows). Always at least 1 on a walkable tile. */
-export function footprintCount(stepCost: number): number | null {
+export function footprintCount(stepCost: number, diagonal = false): number | null {
   if (!Number.isFinite(stepCost)) return null;
-  return Math.min(FOOTPRINT_MAX_PRINTS, Math.max(1, Math.ceil(stepCost / FOOTPRINT_ENERGY_PER_PRINT)));
+  const cap = diagonal ? Math.ceil(FOOTPRINT_MAX_PRINTS * DIAGONAL_MULTIPLIER) : FOOTPRINT_MAX_PRINTS;
+  return Math.min(cap, Math.max(1, Math.ceil(stepCost / FOOTPRINT_ENERGY_PER_PRINT)));
 }
 
 // ===== The region map (seyh.28, D106/D110): the town's chart, in tier rings ========

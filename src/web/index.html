@@ -66,13 +66,16 @@
       .tile .fp { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 1; }
       .tile .fp ellipse { fill: #24180ee6; stroke: #f6ead0c0; stroke-width: 3; }
       .tile .fp.walked { opacity: 0.5; }
+      /* seyh.10: past where your energy runs out the prints go hollow and amber; the last affordable step gets a bar across the trail */
+      .tile .fp.dry ellipse { fill: #24180e40; stroke: #f0a83a; stroke-width: 3.5; stroke-dasharray: 5 3; }
+      .tile .fp .stop { fill: #f0a83a; stroke: #24180e; stroke-width: 3; }
       .tile.path-transport { box-shadow: inset 0 0 0 2px #4a90d9; }  /* transport-cheapened */
       .tile.path-tool { box-shadow: inset 0 0 0 2px #48c774; }        /* gear-discounted */
       .tile.path-enabled { box-shadow: inset 0 0 0 2px #f0a020; }     /* climbing-pick unlocked */
       .tile.path-goal { outline: 2px solid var(--gold); outline-offset: -2px; }
-      /* eot: a leg crossing impassable terrain — the red "this won't work" marker */
-      .tile.path-blocked { box-shadow: inset 0 0 0 2px #ff3b3b; background-image: radial-gradient(#ff3b3b88 45%, transparent 47%); }
-      .tile.path-blocked::after { content: "✗"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #ff5b5b; font-weight: bold; pointer-events: none; }
+      /* eot: a leg crossing impassable terrain — the "this won't work" marker. Grey since seyh.10: red is reserved for danger (D107) */
+      .tile.path-blocked { box-shadow: inset 0 0 0 2px #b8b8bc; }
+      .tile.path-blocked::after { content: "✗"; position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; color: #e8e8ea; font-size: 18px; font-weight: bold; text-shadow: 0 0 3px #000, 0 0 2px #000; pointer-events: none; }
       /* eot: a player-placed waypoint (a leg endpoint) */
       .tile.path-hazard { box-shadow: inset 0 0 0 2px #c0392b; background-image: radial-gradient(#c0392b77 40%, transparent 42%); } /* si7.6.9.6: this step costs HP */
       .hp-tag { background: #4a1612; border: 1px solid #c0392b; border-radius: 3px; padding: 0 0.3rem; }
@@ -192,8 +195,9 @@
 
       /* ===== kml: landscape-first expedition layout ===== */
       .exp { position: fixed; inset: 0; display: flex; flex-direction: column; }
-      .viewport { position: relative; flex: 1; overflow: hidden; touch-action: none; background: #050506; }
-      .viewport .grid { position: absolute; left: 0; top: 0; transform-origin: 0 0; border-radius: 0; background: #050506; }
+      /* seyh.10: beyond the map edge is fog over dark ground, not a black void; the map itself sits in a dark-wood frame */
+      .viewport { position: relative; flex: 1; overflow: hidden; touch-action: none; background: radial-gradient(ellipse at 50% 50%, #2a2c30 0%, #1b1d21 60%, #131418 100%); }
+      .viewport .grid { position: absolute; left: 0; top: 0; transform-origin: 0 0; border-radius: 0; background: #050506; box-shadow: 0 0 0 3px #4a3420, 0 0 0 5px #20160c, 0 0 28px 14px #b9c0c833; }
       .hud { position: absolute; top: 8px; left: 8px; z-index: 10; background: rgba(9, 9, 11, 0.82); border: 1px solid var(--gold-dim); border-radius: 3px; padding: 0.3rem 0.6rem 0.1rem; }
       .hud-title { font-family: "Cinzel", Georgia, serif; color: var(--gold); font-size: 0.85rem; letter-spacing: 0.06em; text-transform: capitalize; }
       .hud .bar { margin-bottom: 0.15rem; font-size: 0.85rem; }
@@ -498,14 +502,15 @@
       .routebar .slow { color: #e0b45e; font-size: 0.85rem; }
       @media (prefers-reduced-motion: reduce) { .fs-verdict.pulse { animation: none; outline: 2px solid #fff; } }
       /* ===== 9e0 (Muse option 2 + option 1's raft): map legibility ===== */
-      /* move-cost tint (user 2026-10-10): what a step onto the tile costs with your gear */
+      /* move-cost shading (opt-in, Settings; seyh.10 luminance dim): cheap = as painted, dear = darker. A black veil keeps each terrain's own hue — no colour scale */
       .tile.cost1::before, .tile.cost2::before, .tile.cost3::before, .tile.cost4::before { content: ""; position: absolute; inset: 0; pointer-events: none; }
-      .tile.cost1::before { background: #4caf501c; }
-      .tile.cost2::before { background: #d4c43a26; }
-      .tile.cost3::before { background: #f0902a2e; }
-      .tile.cost4::before { background: #e0442e40; }
+      .tile.cost1::before { background: rgba(0, 0, 0, 0); }
+      .tile.cost2::before { background: rgba(0, 0, 0, 0.15); }
+      .tile.cost3::before { background: rgba(0, 0, 0, 0.3); }
+      .tile.cost4::before { background: rgba(0, 0, 0, 0.45); }
+      /* can't cross with what you carry: a grey diagonal hatch (seyh.10; was red) */
       .tile.blocked::before { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
-        background: repeating-linear-gradient(45deg, rgba(160, 36, 30, 0.42) 0 2px, transparent 2px 7px); }
+        background: repeating-linear-gradient(45deg, rgba(20, 20, 22, 0.5) 0 2px, rgba(200, 200, 204, 0.32) 2px 3px, transparent 3px 7px); }
       .tile.d1 { filter: brightness(1); }
       .tile.d2 { filter: brightness(0.78); }
       .tile.d3 { filter: brightness(0.58); }
