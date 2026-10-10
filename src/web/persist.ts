@@ -74,3 +74,13 @@ export function saveResearchLog(key: string, h: ResearchLogEntry[]): void {
 export function loadResearchLog(key: string): ResearchLogEntry[] {
   try { const raw = localStorage.getItem(`${key}:research`); return raw ? (JSON.parse(raw) as ResearchLogEntry[]) : []; } catch { return []; }
 }
+
+// seyh.1: the recipes known at embark, beside the save — so the homecoming can name
+// what this run unlocked (known at return minus this). Missing (cleared storage, a run
+// started before this shipped) = null; the homecoming then falls back (render.ts).
+export function saveRunStart(key: string, knownRecipes: string[]): void {
+  try { localStorage.setItem(`${key}:runStart`, JSON.stringify(knownRecipes)); } catch { /* storage disabled */ }
+}
+export function loadRunStart(key: string): string[] | null {
+  try { const raw = localStorage.getItem(`${key}:runStart`); return raw ? (JSON.parse(raw) as string[]) : null; } catch { return null; }
+}

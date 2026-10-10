@@ -13,12 +13,14 @@ import { reduce } from "../engine/reduce";
 import { route as walkWaypoints } from "../sim/play";
 import { routeAfterClick } from "./route";
 import type { Pos } from "./route";
-import { name, rejectCopy, setEnergyUnit } from "../render/render";
+import { name, rejectCopy, setEnergyUnit, tradeoff, tradeoffDelta, tradeoffDeltaText, homecomingSummary, knownRecipeIds } from "../render/render";
+import type { Homecoming } from "../render/render";
+import { homeStripHtml, homeGoods, playHaul } from "./homecoming";
 import { installItemCard } from "./item-card";
-import type { GameState, Action, GameEvent, ItemStack, LoadoutSlot } from "../engine/types";
+import type { GameState, Action, GameEvent, ItemStack, Loadout, LoadoutSlot } from "../engine/types";
 import type { LogEntry } from "./log";
 import { logView } from "./log";
-import { save, load, loadLog, saveLastPlan, loadLastPlan, migrateFog, FOG_NOTICE, loadResearchLog, saveResearchLog, RESEARCH_HISTORY_MAX } from "./persist";
+import { save, load, loadLog, saveLastPlan, loadLastPlan, migrateFog, FOG_NOTICE, loadResearchLog, saveResearchLog, RESEARCH_HISTORY_MAX, saveRunStart, loadRunStart } from "./persist";
 import { mountTree, focusRecipe } from "./craft-tree";
 import type { ResearchLogEntry } from "./craft-tree";
 import { townView, prepValid } from "./town-view";
@@ -84,6 +86,11 @@ let lastPhase: GameState["phase"] | null = null;
 // beh/rx5/mki: transient action feedback (tile cues, pack glow, craft notes) — painted
 // over each render by paintFx; purely presentational, never saved.
 const fx = emptyFx();
+// seyh.1: the last run's homecoming (render.homecomingSummary) — shown as the square's
+// foot strip once the haul has flown into the bank (homeShown), until you next act in
+// town. View-only and unsaved: a reload just skips it (the bank already has the haul).
+let homecoming: Homecoming | null = null;
+let homeShown = false;
 const now = () => performance.now();
 
 // rx5: record the on-map cues for a batch of reducer events (+ the walk's gather
@@ -146,11 +153,21 @@ function closeTree(): void {
   draw();
 }
 function step(action: Action): GameEvent[] {
+  const prevState = state; // seyh.1: the last expedition state, for the homecoming
   const prevLoadout = state.loadout; // embark consumes this plan — stash it for repack
   const { state: next, events } = reduce(state, action);
-  if (action.type === "embark" && !events.some((e) => e.type === "action-rejected")) saveLastPlan(SAVE_KEY, prevLoadout);
+  if (action.type === "embark" && !events.some((e) => e.type === "action-rejected")) {
+    saveLastPlan(SAVE_KEY, prevLoadout);
+    saveRunStart(SAVE_KEY, knownRecipeIds(prevState)); // seyh.1: what's "new" at the end of this run
+    homecoming = null;
+  }
   state = next;
   const rej = events.find((e) => e.type === "action-rejected");
+  // seyh.1: every run end (return, or defeat) comes from one action — summarise it here;
+  // any later accepted town action retires a strip that's already been seen.
+  const home = homecomingSummary(prevState, events, next, loadRunStart(SAVE_KEY));
+  if (home) { homecoming = home; homeShown = false; }
+  else if (!rej && homeShown && prevState.phase === "town") homecoming = null;
   if (!rej) stuckDismissed = false; // the world moved on: re-check exhaustion fresh
   // rx5: a manual gather that the reducer refused gets the same tile cue a walk-over does.
   const misses: GatherMiss[] = action.type === "gather" && rej?.type === "action-rejected" && state.expedition
@@ -166,7 +183,7 @@ function step(action: Action): GameEvent[] {
   // beh: a pack glows the bank row + the loadout slot it landed in; a refusal says why there.
   if (action.type === "pack") {
     if (rej?.type === "action-rejected") fx.note = { ok: false, text: `✗ can't pack ${name(action.itemId)} — ${rejectCopy(rej.reason, undefined, "pack")}`, anchor: `[data-bank="${action.itemId}"]`, t0: now() };
-    else fx.packed = { defId: action.itemId, t0: now() };
+    else { fx.packed = { defId: action.itemId, t0: now() }; tradeFlash(prevLoadout); }
     wornOpen = null;
   }
   for (const e of events) {
@@ -212,12 +229,19 @@ function unpack(defId: string, slot?: LoadoutSlot): void {
     if (r.events.some((e) => e.type === "action-rejected")) { skipped += 1; continue; }
     lo = r.state;
   }
+  const before = state.loadout;
   state = lo;
   fx.packed = null;
+  tradeFlash(before);
   wornOpen = null;
   const text = `unpacked 1× ${name(defId)}${skipped ? ` · ${skipped} other item(s) no longer fit and were dropped from the plan` : ""}`;
   fx.note = { ok: skipped === 0, text, anchor: null, t0: now() }; // d13: the log is hidden on the packing screen — say it as a toast
   note(`· ${text}`);
+}
+// seyh.4: flash what a pack/unpack did to the packing trade-off ("+80⚡ ≈ +8 tiles · −5 loot").
+function tradeFlash(before: Loadout): void {
+  const d = tradeoffDelta(tradeoff(before), tradeoff(state.loadout));
+  fx.delta = d ? { text: tradeoffDeltaText(d), t0: now() } : null;
 }
 function planReset(): void {
   // pack is only a PLAN on state.loadout (D28: bank untouched until embark).
@@ -271,11 +295,12 @@ function draw(): void {
   const panelEl = app.querySelector<HTMLElement>(".ts-panel");
   const keepScroll = panelEl && panelEl.dataset.tsPanel === scene.panel ? panelEl.querySelector<HTMLElement>(".ts-panel-body")?.scrollTop ?? 0 : 0;
   const hasLast = loadLastPlan(SAVE_KEY).length > 0;
+  if (cameHome && !inScene) homeShown = true; // seyh.1: the plain menus town has no square to fly over
   app.innerHTML = state.phase !== "town"
     ? expeditionView(state, route, { drawerOpen, tab: drawerTab, logHtml: logView(log), confirmHome, stuckDismissed, costTint })
     : inScene
-      ? townSceneView(state, { prep, logHtml: logView(log), lastLine: log[0] ? formatLogEntry(log[0]).replace(/<br>/g, " ") : "", research: { history: researchLog, last: researchLast } })
-      : `${townView(state, prep, hasLast, townTab, { wornOpen, embarkConfirm: confirmEmbark, research: { history: researchLog, last: researchLast } })}${logView(log)}`;
+      ? townSceneView(state, { prep, logHtml: logView(log), lastLine: log[0] ? formatLogEntry(log[0]).replace(/<br>/g, " ") : "", research: { history: researchLog, last: researchLast }, homeStrip: homecoming && homeShown ? homeStripHtml(homecoming) : undefined })
+      : `${homecoming && homeShown && !packOpen && !prep ? homeStripHtml(homecoming, "flow") : ""}${townView(state, prep, hasLast, townTab, { wornOpen, embarkConfirm: confirmEmbark, research: { history: researchLog, last: researchLast } })}${logView(log)}`;
   wire(); save(SAVE_KEY, state, log);
   mountRegion(app, draw); // seyh.28: the region chart's own picks (lands, scraps, panel rows)
   mountTree(app, state, { craft: craftN, close: closeTree }); // o9vr: the workshop's tree (pan, select, tray) — before paintFx, which anchors the craft note in its tray
@@ -283,7 +308,7 @@ function draw(): void {
     mountScene(app, arriveAt, state);
     const body = app.querySelector<HTMLElement>(".ts-panel-body");
     if (body && keepScroll) body.scrollTop = keepScroll;
-    if (cameHome) void walkIn().then(() => { if (state.phase === "town") { scene.panel = "log"; draw(); } }); // the run's summary is in the log
+    if (cameHome) void homeWalk(); // seyh.1: the haul onto the cloth, into the bank, then the strip
   }
   // c67 camera-follow, now a real camera (kml): re-centre on the player when their
   // POSITION changes; otherwise keep wherever the player panned to.
@@ -292,6 +317,19 @@ function draw(): void {
     if (p !== camPos) { centerOnPlayer(); camPos = p; } else applyCam();
   } else camPos = null;
   paintFx(app, fx, now()); // after the camera: tile cues read live tile positions
+}
+
+// seyh.1 (owner Q10 = B): the hero walks in, stops at the packing cloth with the haul
+// laid out on it, the stacks fly into the Bank, and only then does the strip appear.
+async function homeWalk(): Promise<void> {
+  const h = homecoming;
+  const goods = !!h && homeGoods(h).length > 0;
+  await walkIn(goods ? spotById("cloth").stand : undefined);
+  if (state.phase !== "town" || homecoming !== h) return;
+  if (h && goods) await playHaul(app, h);
+  if (state.phase !== "town" || homecoming !== h) return;
+  homeShown = true;
+  draw();
 }
 
 // --- map camera (kml) ----------------------------------------------------------
@@ -458,6 +496,7 @@ const spotById = (id: string): Spot => scenePlacements(state.stations ?? []).fin
 // Pick a map → in the square the hero walks to the packing cloth, then the Pack sheet opens.
 function prepare(mapSeed: string): void {
   prep = mapSeed; route = [];
+  if (homeShown) homecoming = null; // seyh.1: picking the next map moves on from the last run
   if (townMode !== "scene") { draw(); return; }
   scene.panel = null; draw();
   void goToSpot(spotById("cloth"));

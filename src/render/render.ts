@@ -1,13 +1,16 @@
-import { BIOMES, RESEARCH_INKS, RESEARCH_SEARCHES_PER_INK, LOOT_TABLE, CATEGORY_LOOT_TABLE, MAP_SCROLL_ID, WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE, QUAFF_ENERGY, DON_DOFF_ENERGY, FLASK_EFFECT, ANTIDOTE, MAP_HINTS, DMG_ARMOUR_MATRIX, TERRAIN_HP_WARD, BIOME_IDS, RARE_BIOMES, REGION_BEARING, REGION_BACK_HORIZON, MAP_TIER_MAX, STACK_CAP } from "../data/constants";
-import type { BiomeId, Terrain, NodeType, DmgType, ArmourType, GatherableNodeType, FishWater, HintMetric } from "../data/constants";
+import { BIOMES, RESEARCH_INKS, RESEARCH_SEARCHES_PER_INK, LOOT_TABLE, CATEGORY_LOOT_TABLE, MAP_SCROLL_ID, WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE, QUAFF_ENERGY, DON_DOFF_ENERGY, FLASK_EFFECT, ANTIDOTE, MAP_HINTS, DMG_ARMOUR_MATRIX, TERRAIN_HP_WARD, NODE_HARDNESS, MAX_ENERGY, STACK_CAP, BIOME_IDS, RARE_BIOMES, REGION_BEARING, REGION_BACK_HORIZON, MAP_TIER_MAX } from "../data/constants";
+import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType, FishWater, HintMetric, BiomeId } from "../data/constants";
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
 import { playerDamage, damageTaken, strikeExchange, wieldsRanged, hasAmmo, loadedAmmoIndex, rollLoot } from "../engine/combat";
-import { consumeOne, addToCarry, freeLootStacks, carryCap, slotCap, quiverAmmoSlots, stackCapOf } from "../engine/carry";
+import { consumeOne, addToCarry, freeLootStacks, carryCap, slotCap, quiverAmmoSlots, energyCapOf, stackCapOf } from "../engine/carry";
+import { heldFoodEnergy } from "../engine/food";
+import { toolSpeedFor, secondaryToolSatisfied } from "../engine/tools";
+import { recipeKnowledge } from "../engine/knowledge";
 import { CONSUMABLE_KINDS, CONSUMABLE_KEYS } from "../engine/catalog";
 import { moveCost } from "../engine/move";
 import { ARMOUR_SLOTS } from "../engine/pack";
-import type { Action, Equipment, Expedition, Loadout, MapItem, RejectionReason, GameEvent, ItemStack, LoadoutSlot } from "../engine/types";
+import type { Action, Equipment, Expedition, GameState, Loadout, MapItem, RejectionReason, GameEvent, ItemStack, LoadoutSlot } from "../engine/types";
 import { mapEpithet, localMap } from "../engine/town";
 import { hintLabel } from "../engine/hints";
 
@@ -841,6 +844,104 @@ export function toolGloss(defId: string, tools: string[]): string | null {
   }
   if (cap === "fish") return "fish";
   return logisticsEffect(defId) ?? TOOL_PURPOSE[cap] ?? null;
+}
+
+// --- The packing trade-off (seyh.4): reach vs room ------------------------------
+// Packing makes one decision — energy you carry (food) against room for loot (slots).
+// These show the answer instead of the inputs: energy as tiles of OPEN GROUND (plains,
+// one step at the engine's own moveCost with this gear) or as gathers, and free slots
+// as loot units. Estimates on purpose ("≈"): diagonals and slow terrain cost more.
+//
+// A "gather" is one pick-up at the node kind your packed tools are FOR — the cheapest
+// tool-worked kind (wood with an axe, ore with a pick; animals need trap + knife),
+// at the engine's own NODE_HARDNESS ÷ tool speed. With no gathering tool packed it's
+// a bare-handed forage. (Forage is always cheapest, so it's only the fallback —
+// otherwise the estimate would never reflect the tools you packed.)
+export type EnergyReach = { tiles: number; gathers: number; gatherKind: GatherableNodeType; stepCost: number; gatherCost: number };
+export function energyReach(energy: number, equipment: Pick<Equipment, "transport" | "tools">): EnergyReach {
+  const stepCost = moveCost("plains", equipment.transport, equipment.tools);
+  const tools = equipment.tools;
+  let gatherKind: GatherableNodeType = "herb", gatherCost = NODE_HARDNESS.herb / (toolSpeedFor(tools, NODE_TOOL.herb) ?? 1);
+  let found = false;
+  for (const k of GATHER_KINDS) {
+    const cap = NODE_TOOL[k];
+    if (cap === null) continue;
+    const speed = toolSpeedFor(tools, cap);
+    if (speed === null || !secondaryToolSatisfied(k, tools)) continue;
+    const cost = NODE_HARDNESS[k] / speed;
+    if (!found || cost < gatherCost) { gatherKind = k; gatherCost = cost; found = true; }
+  }
+  const e = Math.max(0, energy);
+  return { tiles: Math.floor(e / stepCost), gathers: Math.floor(e / gatherCost), gatherKind, stepCost, gatherCost };
+}
+
+// The whole trade-off for a plan: you embark at full energy (MAX_ENERGY + gear) and
+// eat the packed food back as you go; every free slot holds one loot stack.
+export type Tradeoff = { startEnergy: number; foodEnergy: number; energy: number; tiles: number; gathers: number; gatherKind: GatherableNodeType; freeSlots: number; lootRoom: number };
+export function tradeoff(lo: Loadout): Tradeoff {
+  const startEnergy = MAX_ENERGY + energyCapOf(lo.equipment);
+  const foodEnergy = heldFoodEnergy(lo.food);
+  const energy = startEnergy + foodEnergy;
+  const r = energyReach(energy, lo.equipment);
+  const freeSlots = Math.max(0, freeLootStacks(lo));
+  return { startEnergy, foodEnergy, energy, tiles: r.tiles, gathers: r.gathers, gatherKind: r.gatherKind, freeSlots, lootRoom: freeSlots * STACK_CAP };
+}
+// What one pack/unpack did to it: "+80⚡ ≈ +8 tiles · −5 loot" (null when nothing moved).
+export type TradeoffDelta = { energy: number; tiles: number; loot: number };
+export function tradeoffDelta(before: Tradeoff, after: Tradeoff): TradeoffDelta | null {
+  const d = { energy: after.energy - before.energy, tiles: after.tiles - before.tiles, loot: after.lootRoom - before.lootRoom };
+  return d.energy === 0 && d.tiles === 0 && d.loot === 0 ? null : d;
+}
+const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : "0");
+export function tradeoffDeltaText(d: TradeoffDelta): string {
+  const parts: string[] = [];
+  // a horse moves the reach without moving the energy: "≈ +54 tiles · +10 loot"
+  const reach = [d.energy !== 0 ? `${signed(d.energy)}${EN}` : "", d.tiles !== 0 ? `≈ ${signed(d.tiles)} tiles` : ""].filter(Boolean).join(" ");
+  if (reach) parts.push(reach);
+  if (d.loot !== 0) parts.push(`${signed(d.loot)} loot`);
+  return parts.join(" · ");
+}
+
+// --- Coming home (seyh.1): what you hauled, what you left unspent, what it unlocked ---
+// Derived from the last expedition state (the step before run-ended) + the town state
+// after it — no engine state. Haul = the loot carry + carried maps exactly as they
+// banked (endExpedition), NOT the supplies that banked back; one entry per defId (the
+// carry's STACK_CAP stacks summed), in first-carried order. Unspent = the energy you
+// still had. New recipes = known now minus known at embark (the web snapshots that set
+// at embark; without it, known just before the return — the D104 fog's "next" flips as
+// you first hold an input, so that fallback usually finds nothing).
+export function knownRecipeIds(state: GameState): string[] {
+  return recipeKnowledge(state).filter((k) => k.status === "known").map((k) => k.recipeId);
+}
+export type Homecoming = { haul: ItemStack[]; maps: MapItem[]; unspent: number; maxEnergy: number; newRecipes: string[]; defeated: boolean };
+export function homecomingSummary(before: GameState, events: GameEvent[], after: GameState, knownAtEmbark: readonly string[] | null = null): Homecoming | null {
+  const exp = before.expedition;
+  const ended = events.find((e): e is Extract<GameEvent, { type: "run-ended" }> => e.type === "run-ended");
+  if (!exp || !ended || after.phase !== "town") return null;
+  const haul: ItemStack[] = [];
+  for (const s of exp.carry) {
+    const h = haul.find((x) => x.defId === s.defId);
+    if (h) h.qty += s.qty; else haul.push({ defId: s.defId, qty: s.qty });
+  }
+  const was = new Set(knownAtEmbark ?? knownRecipeIds(before));
+  return {
+    haul,
+    maps: [...(exp.carriedMaps ?? [])],
+    unspent: exp.energy,
+    maxEnergy: exp.maxEnergy ?? MAX_ENERGY,
+    newRecipes: knownRecipeIds(after).filter((id) => !was.has(id)),
+    defeated: ended.reason === "defeated",
+  };
+}
+// The homecoming as one plain line (the strip's tooltip / screen-reader text; the web
+// draws the same facts as icons): "Home with 3× Oak Log, 1 map · 180⚡ unspent · new: Iron Pick".
+export function homecomingLine(h: Homecoming, nm: (defId: string) => string = name): string {
+  const goods = [...h.haul.map((s) => `${s.qty}× ${nm(s.defId)}`), ...(h.maps.length ? [`${h.maps.length} map${h.maps.length > 1 ? "s" : ""}`] : [])];
+  const lead = h.defeated ? "Beaten and dragged home" : "Home";
+  const parts = [goods.length ? `${lead} with ${goods.join(", ")}` : `${lead} empty-handed`];
+  parts.push(h.unspent > 0 ? `${h.unspent}${EN} unspent` : `every ${EN} spent`);
+  if (h.newRecipes.length) parts.push(`new: ${h.newRecipes.map((id) => nm(RECIPE[id]?.output.defId ?? id)).join(", ")}`);
+  return parts.join(" · ");
 }
 
 // Scout reports → kit (d13): what each map hint asks of the loadout, checked against
