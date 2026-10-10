@@ -61,7 +61,11 @@
       .player { color: #fff; background: #8e2a22 !important; border-radius: 3px; box-shadow: inset 0 0 0 2px var(--gold); }
       .tile { cursor: pointer; }
       .tile:hover { outline: 2px solid #8ab4ff; outline-offset: -2px; }
-      .tile.path { box-shadow: inset 0 0 0 2px #8ab4ff88; background-image: radial-gradient(#8ab4ff55 40%, transparent 42%); }
+      .tile.path { box-shadow: inset 0 0 0 2px #8ab4ff88; }
+      /* seyh.10 (D105): boot prints along the planned (and, fainter, the walked) route — more, smaller prints = slower ground. Dark ink with a pale halo reads on desert/tundra and swamp alike. */
+      .tile .fp { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 1; }
+      .tile .fp ellipse { fill: #24180ee6; stroke: #f6ead0c0; stroke-width: 3; }
+      .tile .fp.walked { opacity: 0.5; }
       .tile.path-transport { box-shadow: inset 0 0 0 2px #4a90d9; }  /* transport-cheapened */
       .tile.path-tool { box-shadow: inset 0 0 0 2px #48c774; }        /* gear-discounted */
       .tile.path-enabled { box-shadow: inset 0 0 0 2px #f0a020; }     /* climbing-pick unlocked */
@@ -202,7 +206,7 @@
       .pan-e { right: 6px; top: 50%; transform: translateY(-50%); }
       .recentre { top: 8px; right: 8px; font-size: 1rem; }
       .home-btn { position: absolute; z-index: 9; top: 44px; right: 8px; width: 30px; height: 30px; padding: 0; border-radius: 50%; background: rgba(9, 9, 11, 0.7); border-color: var(--gold-dim); font-size: 0.9rem; }
-      .home-btn .home-free { position: absolute; left: 50%; bottom: -0.95rem; transform: translateX(-50%); font-size: 0.62rem; line-height: 1; color: var(--gold); text-shadow: 0 0 3px #000, 0 0 3px #000; letter-spacing: 0.04em; pointer-events: none; } /* seyh.3: the trip home costs nothing */
+      .home-btn .home-tag { position: absolute; left: 50%; bottom: -0.95rem; transform: translateX(-50%); font-size: 0.62rem; line-height: 1; white-space: nowrap; color: var(--gold); text-shadow: 0 0 3px #000, 0 0 3px #000; letter-spacing: 0.02em; pointer-events: none; } /* seyh.29: says what the button does */
       .home-sheet { position: absolute; z-index: 15; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(340px, 86%); background: var(--panel); border: 1px solid var(--gold); border-radius: 4px; padding: 0.8rem 1rem; box-shadow: 0 8px 24px #000c; }
       .home-sheet h3 { margin: 0 0 0.4rem; font-family: "Cinzel", Georgia, serif; color: var(--gold); font-size: 1rem; }
       .home-sheet p { margin: 0 0 0.7rem; font-size: 0.9rem; }
@@ -225,12 +229,16 @@
       .routebtns { display: flex; gap: 0.4rem; flex-wrap: wrap; }
       .over { color: #ff7b6b; } .good { color: #8ccf6f; } .amber { color: var(--amber); }
       .hud-note { font-size: 0.75rem; margin: -0.1rem 0 0.15rem; white-space: normal; max-width: 15rem; } /* seyh.3: wraps under the bar so the HUD never grows sideways */
-      .hud-haul { color: var(--gold); font-size: 0.85rem; font-weight: 600; margin: 0 0 0.2rem; white-space: nowrap; } /* seyh.2: the run's score + room left for loot */
-      .hud-haul.amber, .drawer-handle .bagcount.amber { color: var(--amber); } /* bag full: at risk, never red */
-      .yieldline { font-size: 0.85rem; color: var(--gold); } /* seyh.6: route card "what you'll get · fits ✓" */
-      .yieldline.amber { color: var(--amber); }
+      .hud-bag { color: var(--gold); font-size: 0.85rem; font-weight: 600; margin: 0 0 0.2rem; white-space: nowrap; } /* seyh.29: plain bag counter, slots used/max */
+      .hud-bag.amber, .drawer-handle .bagcount.amber { color: var(--amber); } /* bag full: at risk, never red */
+      .yieldline { font-size: 0.85rem; color: var(--gold); } /* seyh.6: route card "what you'll get" */
+      .gear-sils { display: inline-flex; gap: 3px; vertical-align: middle; margin-left: 0.25rem; }
+      .gear-sil { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 3px; background: rgba(232, 220, 196, 0.28); }
+      .gear-sil .pk-ic { filter: brightness(0); opacity: 0.8; } /* seyh.29: gear you've never had — a shape, not a name */
+      .gear-sil .pk-ic.none { color: transparent; background: #000; border-radius: 50%; width: 12px !important; height: 12px !important; }
+      .gear-sil.owned { background: rgba(232, 220, 196, 0.12); }
+      .gear-sil.owned .pk-ic { filter: none; opacity: 1; } .gear-sil.owned .pk-ic.none { color: var(--gold); background: none; }
       .yieldline .y-icon { display: inline-block; vertical-align: middle; background-repeat: no-repeat; zoom: 0.6; margin-right: 0.2rem; }
-      .fs-lootrow .pf-fit { margin-left: 0.3rem; font-weight: 700; } .pf-fit.ok { color: #8ccf6f; } .pf-fit.no { color: var(--amber); } /* seyh.6: does the loot fit? */
       .drawer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: var(--handle); background: var(--panel); border-top: 1px solid var(--gold-dim); display: flex; flex-direction: column; transition: height 0.18s ease; }
       .drawer.open { height: min(78dvh, 560px); }
       .drawer-handle { flex: none; height: var(--handle); display: flex; align-items: center; gap: 0.7rem; width: 100%; background: none; border: none; border-radius: 0; padding: 0 1rem; color: var(--muted); text-align: left; }

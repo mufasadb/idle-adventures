@@ -31,6 +31,7 @@ import type { Spot } from "./town-layout";
 import { formatLogEntry } from "./log";
 import type { TownTab } from "./town-view";
 import { expeditionView, currentDerived } from "./expedition-view";
+import type { TrailStep } from "./expedition-view";
 import type { DrawerTab } from "./expedition-view";
 import { expeditionGrid } from "../engine/grid";
 import type { GatherableNodeType } from "../data/constants";
@@ -54,6 +55,7 @@ let researchLast: ResearchLogEntry | null = null;
 // as a naive STRAIGHT line (lineTiles), never an energy-optimal path. Clicks build,
 // extend, and truncate it; Walk executes it. Empty = nothing planned.
 let route: Pos[] = [];
+let trail: TrailStep[] = []; // seyh.10: tiles walked this run (faint footprints); cleared back in town
 // zpm.3: two-step town flow. `prep` = the mapSeed the player is preparing to embark
 // on (null = the town OVERVIEW where you pick a map). Selecting a map (Prepare)
 // sets it and shows the loadout screen; Embark commits, ← back clears it. Purely a
@@ -67,7 +69,7 @@ installItemCard(app); // f2i7: hold (or tap) an item to see what it does
 // screens) holds everything that isn't the map; the map is a camera over the grid.
 let drawerOpen = false;
 let drawerTab: DrawerTab = "here";
-let costTint = (() => { try { return localStorage.getItem("idle-adv:costTint") !== "off"; } catch { return true; } })(); // per-viewer map setting
+let costTint = (() => { try { return localStorage.getItem("idle-adv:costTint") === "on"; } catch { return false; } })(); // per-viewer map setting; opt-in since seyh.10 (D105) — the route's footprints show cost now
 let confirmHome = false; // the 🏠 button's "head home?" card is up
 let confirmEmbark = false; // seyh.5: a risky start's "Embark anyway?" inline confirm is up (cleared by any action)
 let stuckDismissed = false; // "Not yet" on the exhausted card (cleared on any accepted action)
@@ -260,7 +262,11 @@ const foodUnits = (food: ItemStack[]) => food.reduce((n, s) => n + s.qty, 0);
 function walkRoute(wps: Pos[]): void {
   const startEnergy = state.expedition!.energy;
   const startFood = state.expedition!.loadout.food;
+  const planned = currentDerived(state, wps)?.rt.walkable ?? [];
+  const from = state.expedition!.pos;
   const r = walkWaypoints(state, wps);
+  // seyh.10: the walk follows the derived line, so its first `steps` tiles are where you went
+  trail = [...trail, ...planned.slice(0, r.steps).map((t, i) => { const p = i ? planned[i - 1]! : from; return { x: t.x, y: t.y, dx: Math.sign(t.x - p.x), dy: Math.sign(t.y - p.y) }; })];
   state = r.state;
   const exp = state.expedition!;
   // spend/food computed once from start→end state — no per-step sign juggling,
@@ -283,6 +289,7 @@ function draw(): void {
   const cameHome = lastPhase !== null && lastPhase !== "town" && state.phase === "town";
   if (lastPhase === "town" && state.phase !== "town") resetScene();
   lastPhase = state.phase;
+  if (state.phase === "town") trail = []; // seyh.10: a new run starts with clean ground
   if (state.phase !== "town") { prep = null; packOpen = false; } // leaving town drops the prep selection (zpm.3)
   if (packOpen && !prepValid(state, prep)) packOpen = false;
   const engaged = !!state.expedition?.combat;
@@ -297,7 +304,7 @@ function draw(): void {
   const hasLast = loadLastPlan(SAVE_KEY).length > 0;
   if (cameHome && !inScene) homeShown = true; // seyh.1: the plain menus town has no square to fly over
   app.innerHTML = state.phase !== "town"
-    ? expeditionView(state, route, { drawerOpen, tab: drawerTab, logHtml: logView(log), confirmHome, stuckDismissed, costTint })
+    ? expeditionView(state, route, { drawerOpen, tab: drawerTab, logHtml: logView(log), confirmHome, stuckDismissed, costTint, trail })
     : inScene
       ? townSceneView(state, { prep, logHtml: logView(log), lastLine: log[0] ? formatLogEntry(log[0]).replace(/<br>/g, " ") : "", research: { history: researchLog, last: researchLast }, homeStrip: homecoming && homeShown ? homeStripHtml(homecoming) : undefined })
       : `${homecoming && homeShown && !packOpen && !prep ? homeStripHtml(homecoming, "flow") : ""}${townView(state, prep, hasLast, townTab, { wornOpen, embarkConfirm: confirmEmbark, research: { history: researchLog, last: researchLast } })}${logView(log)}`;

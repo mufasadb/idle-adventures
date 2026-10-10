@@ -1,7 +1,9 @@
 // ai8 / qba / 5k4: tile names, what a tile yields, and slow-vs-blocked route copy —
 // pure render.ts selectors read off the terrain/gear levers.
 import { describe, expect, test } from "bun:test";
-import { tileName, tileYield, terrainGear, slowRouteNote, blockedRouteNote } from "../src/render/render";
+import { tileName, tileYield, terrainGear, slowRouteNote, blockedRouteNote, ownedGear } from "../src/render/render";
+import { emptyLoadout } from "../src/engine/loadout";
+import type { Expedition } from "../src/engine/types";
 import { TERRAIN_GATE, TRANSPORT_MULTIPLIER } from "../src/data/constants";
 
 const onFoot = { transport: null, tools: [] as string[] };
@@ -44,28 +46,52 @@ describe("terrainGear", () => {
   });
 });
 
-describe("slowRouteNote (5k4)", () => {
+// seyh.29 (D111): the notes never name the gear in words; they return the helping
+// gear for the web to draw as silhouettes, `owned` once the player has had one.
+const gearWords = /waders|raft|longboat|pick|cleats|horse|wagon|mule|speed it up|gets you across/;
+describe("slowRouteNote (5k4, seyh.29)", () => {
   test("plains only — not slow", () => {
     expect(slowRouteNote(["plains", "plains"], onFoot)).toBeNull();
   });
-  test("names the slow terrain (most tiles first) and loosely hints gear", () => {
+  test("names the slow terrain (most tiles first), never the gear; the gear comes back as hints", () => {
     const n = slowRouteNote(["mud", "river", "mud", "plains"], onFoot)!;
-    expect(n.startsWith("slower going through the mud and river")).toBe(true);
-    expect(n).toContain("waders");
-    expect(n).toContain("would speed it up");
+    expect(n.text).toBe("slower going through the mud and river");
+    expect(n.text).not.toMatch(gearWords);
+    expect(n.gear.map((g) => g.id)).toContain("waders");
+    expect(n.gear.every((g) => !g.owned)).toBe(true); // default: nothing owned
   });
-  test("gear you already have is not suggested; a fully-sped terrain is no longer slow", () => {
+  test("owned gear is flagged (coloured in), the rest stays a silhouette", () => {
+    const n = slowRouteNote(["mud"], onFoot, (id) => id === "waders")!;
+    expect(n.gear.find((g) => g.id === "waders")!.owned).toBe(true);
+    expect(n.gear.filter((g) => g.id !== "waders").every((g) => !g.owned)).toBe(true);
+  });
+  test("gear you already wear is not hinted; a fully-sped terrain is no longer slow", () => {
     expect(slowRouteNote(["mud"], { transport: null, tools: ["waders"] })).toBeNull(); // 15 − 5 = plains pace
-    expect(slowRouteNote(["river"], { transport: null, tools: ["waders"] })).not.toContain("waders");
+    expect(slowRouteNote(["river"], { transport: null, tools: ["waders"] })!.gear.map((g) => g.id)).not.toContain("waders");
   });
-  test("slow terrain no gear speeds still says slower, without a hint", () => {
-    expect(slowRouteNote(["spore-thicket"], onFoot)).toBe("slower going through the spore-thickets");
+  test("slow ground no gear speeds → no hint at all (it is always like this)", () => {
+    expect(slowRouteNote(["spore-thicket"], onFoot)).toEqual({ text: "slower going through the spore-thickets", gear: [] });
   });
 });
 
-describe("blockedRouteNote (5k4)", () => {
-  test("names the wall and the gear that crosses it", () => {
-    expect(blockedRouteNote("mountain")).toBe("the mountains block this path — only a climbing pick gets you across");
-    expect(blockedRouteNote("sea")).toBe("the sea blocks this path — only a longboat gets you across");
+describe("blockedRouteNote (5k4, seyh.29)", () => {
+  test("names the wall, not the gear; the gear that crosses it comes back as hints", () => {
+    expect(blockedRouteNote("mountain")).toEqual({ text: "the mountains block this path", gear: [{ id: "climbing-pick", owned: false }] });
+    expect(blockedRouteNote("sea", (id) => id === "longboat")).toEqual({ text: "the sea blocks this path", gear: [{ id: "longboat", owned: true }] });
+  });
+});
+
+describe("ownedGear (seyh.29)", () => {
+  test("bank, town loadout, expedition loadout/spares/carry, and ever-seen all count; nothing else", () => {
+    const lo = emptyLoadout();
+    lo.equipment.transport = "horse";
+    const exLo = emptyLoadout();
+    exLo.equipment.tools = ["ice-cleats"];
+    exLo.spares = [{ defId: "raft", qty: 1 }];
+    const exp: Expedition = { mapSeed: "m", pos: { x: 0, y: 0 }, energy: 10, hp: 30, loadout: exLo, carry: [{ defId: "wagon", qty: 1 }], cleared: [] };
+    const owned = ownedGear({ bank: [{ defId: "waders", qty: 1 }], loadout: lo, expedition: exp, seen: ["mule"] });
+    for (const id of ["waders", "horse", "ice-cleats", "raft", "wagon", "mule"]) expect(owned(id)).toBe(true);
+    expect(owned("climbing-pick")).toBe(false);
+    expect(ownedGear({ bank: [], loadout: emptyLoadout(), expedition: null })("waders")).toBe(false);
   });
 });

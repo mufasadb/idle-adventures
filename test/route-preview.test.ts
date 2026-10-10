@@ -169,13 +169,13 @@ describe("deriveRoute gathers + fits (seyh.6)", () => {
     expect(rt.gathers.map((g) => ({ material: g.material, qty: g.qty }))).toEqual([{ material: "copper-ore", qty: q }, { material: "copper-ore", qty: q }]);
     expect(rt.fits).toBe(true);
     expect(rt.short).toBe(0);
-    expect(yieldLine(rt.gathers, rt.fits, rt.short)).toBe(`→ Copper Ore +${2 * q} · fits ✓`);
+    expect(yieldLine(rt.gathers)).toBe(`→ Copper Ore +${2 * q}`); // seyh.29: the yield only, no fit verdict
     const r = walk(exp, wps);
     expect(r.halt).toBeNull();
     expect(gotten(r)).toEqual(rt.gathers.map((g) => ({ material: g.material, qty: g.qty })));
   });
 
-  test("1 free slot and 2 new materials → won't fit (1 short), and the real walk pauses bag-full there", () => {
+  test("1 free slot and 2 new materials → the route model is 1 short, and the real walk pauses bag-full there", () => {
     const free = freeLootStacks(yexp().loadout); // the pick takes a slot too
     const carry = Array.from({ length: free - 1 }, () => ({ defId: "oak-log", qty: 1 }));
     const exp = yexp({ carry });
@@ -184,7 +184,7 @@ describe("deriveRoute gathers + fits (seyh.6)", () => {
     expect(rt.gathers.map((g) => g.material)).toEqual(["copper-ore", "iron-ore"]);
     expect(rt.fits).toBe(false);
     expect(rt.short).toBe(1);
-    expect(yieldLine(rt.gathers, rt.fits, rt.short)).toContain("won't fit (1 short)");
+    expect(yieldLine(rt.gathers)).not.toMatch(/fit|✓|✗/); // seyh.29 (D111): no verdict — the bag counter says the bag is full
     const r = walk(exp, wps);
     expect(r.halt).toEqual({ kind: "bag-full" });
     expect(gotten(r).map((g) => g.material)).toEqual(["copper-ore"]); // the fitting prefix landed
@@ -193,7 +193,7 @@ describe("deriveRoute gathers + fits (seyh.6)", () => {
   test("auto-gather off → no gathers, empty yield line (only what the walk will actually do)", () => {
     const rt = deriveRoute(YGRID, yexp({ autoGather: false }), [CU_A, CU_B], allResolved, new Set());
     expect(rt.gathers).toEqual([]);
-    expect(yieldLine(rt.gathers, rt.fits, rt.short)).toBe("");
+    expect(yieldLine(rt.gathers)).toBe("");
   });
 
   test("unresolved nodes are never predicted", () => {

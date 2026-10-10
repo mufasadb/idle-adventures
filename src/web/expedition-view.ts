@@ -11,8 +11,11 @@ import { deriveRoute } from "./route";
 import type { Pos } from "./route";
 import { PLAYER_BASE_HP, RECIPE, MAP_WIDTH, MAP_HEIGHT, MAX_ENERGY, TENT_CAMP_MEALS, QUAFF_ENERGY, DON_DOFF_ENERGY, SURVEY_ENERGY, FIELD_CRAFT_ENERGY, FISH_CAST_ENERGY, FISH_DEEP_DEPTH, ANTIDOTE, TERRAIN_HP_COST } from "../data/constants";
 import type { GatherableNodeType } from "../data/constants";
-import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, GATHER_VERB, round1, preFightVerdict, isExhausted, costBand, tileName, tileYield, slowRouteNote, blockedRouteNote, verdictRoles, roleClass, worstVerdict, stuckOptions, haulRoom, haulLine, yieldLine } from "../render/render";
-import type { FightVerdict } from "../render/render";
+import { TERRAIN_CHAR, poiGlyph, kindLabel, FORAGE_MATERIAL_CHAR, PLAYER_CHAR, flavorDetail, describe, recipeGateHint, nodeToolHint, nodeGateNote, materialGated, materialLocked, name, rejectCopy, GATHER_VERB, round1, preFightVerdict, isExhausted, costBand, footprintCount, tileName, tileYield, slowRouteNote, blockedRouteNote, verdictRoles, roleClass, worstVerdict, stuckOptions, bagCount, bagLine, yieldLine, ownedGear } from "../render/render";
+import type { FightVerdict, GearHint } from "../render/render";
+import { ic } from "./icons";
+import { footprintSvg } from "./footprints";
+import type { Step } from "./footprints";
 import { fightSheet, preFightCard, throwLegal, enhanceButtons, verdictDot } from "./fight-view";
 import { perceive } from "../engine/perceive";
 import type { GameState, Action } from "../engine/types";
@@ -21,6 +24,14 @@ import { heldOnRun } from "./feedback";
 
 const kk = (p: Pos) => `${p.x},${p.y}`;
 const capFirst = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+// seyh.29 (D111): the gear that would change a slow/blocked route, as icons only — a
+// dark silhouette until you own one, then in colour. Never named for gear you lack
+// (knowledge is earned); your own gear's name rides in the title.
+const GEAR_SIL_PX = 18; // silhouette icon size on the route card (presentation only)
+function gearSilhouettes(gear: readonly GearHint[]): string {
+  if (!gear.length) return "";
+  return ` <span class="gear-sils">${gear.map((g) => `<span class="gear-sil${g.owned ? " owned" : ""}" data-gear="${g.id}" title="${g.owned ? name(g.id) : "something could change this"}">${ic(g.id, GEAR_SIL_PX)}</span>`).join("")}</span>`;
+}
 
 // Human breakdown of a single step's energy — surfaced as a path tile's hover
 // title so the horse/gear effect is visible: "plains 10e ÷2 (horse) = 5e".
@@ -107,7 +118,11 @@ function poisonChip(exp: NonNullable<GameState["expedition"]>, legal: Action[]):
 }
 
 export type DrawerTab = "here" | "bag" | "craft" | "log";
-export type ExpeditionUi = { drawerOpen: boolean; tab: DrawerTab; logHtml: string; confirmHome?: boolean; stuckDismissed?: boolean; costTint?: boolean };
+// costTint: the map-wide step-cost tint, opt-in since seyh.10 (D105; absent = off).
+// trail: the tiles walked this run, in order, with each step's direction (seyh.10) —
+// drawn as faint footprints. Absent = [].
+export type TrailStep = { x: number; y: number; dx: number; dy: number };
+export type ExpeditionUi = { drawerOpen: boolean; tab: DrawerTab; logHtml: string; confirmHome?: boolean; stuckDismissed?: boolean; costTint?: boolean; trail?: TrailStep[] };
 
 export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi): string {
   const exp = state.expedition!;
@@ -118,6 +133,14 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   const canFish = legal.some((a) => a.type === "fish");
   const drawnSet = new Set(rt.drawn.map(kk));
   const goalK = kk(rt.end);
+  // seyh.10 (D105): footprints along the planned walk (and, fainter, the walked trail):
+  // the count per tile is the engine's step cost with your current gear.
+  const eqNow = exp.loadout.equipment;
+  const stepAt = (p: Pos, from: Pos) => ({ n: footprintCount(moveCost(grid.terrain[p.y]![p.x]!, eqNow.transport, eqNow.tools)) ?? 0, dx: Math.sign(p.x - from.x), dy: Math.sign(p.y - from.y) });
+  const prints = new Map<string, { step: Step; walked: boolean }>();
+  for (const t of ui.trail ?? []) prints.set(kk(t), { step: stepAt(t, { x: t.x - t.dx, y: t.y - t.dy }), walked: true });
+  // the plan wins over the trail; on a looping route the first pass sets a tile's prints
+  for (const [i, t] of rt.walkable.entries()) { const first = rt.walkable.findIndex((u) => u.x === t.x && u.y === t.y); if (first !== i) continue; prints.set(kk(t), { step: stepAt(t, i ? rt.walkable[i - 1]! : exp.pos), walked: false }); }
 
   let cells = "";
   for (let y = 0; y < MAP_HEIGHT; y++) for (let x = 0; x < MAP_WIDTH; x++) {
@@ -136,7 +159,7 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
     if (terr === "lake" || terr === "sea") cls.push(`d${Math.min(depth, 3)}`);
     const band = costBand(moveCost(terr, exp.loadout.equipment.transport, exp.loadout.equipment.tools));
     if (band === null) cls.push("blocked");
-    else if (ui.costTint ?? true) cls.push(`cost${band}`); // the cost tint: green cheap → red slow, with your gear
+    else if (ui.costTint ?? false) cls.push(`cost${band}`); // the opt-in cost tint (off by default since seyh.10, D105)
     if ((exp.fished ?? []).some((f) => f.x === x && f.y === y)) cls.push("fished");
     else if (canFish && Math.abs(x - exp.pos.x) <= 1 && Math.abs(y - exp.pos.y) <= 1 && grid.catches?.[y]?.[x]) cls.push("bobber");
     if (isPlayer && (terr === "lake" || terr === "sea")) cls.push("on-raft"); // Muse option 1: you're on the raft
@@ -218,7 +241,9 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
       if (terrainStyle && !raft) tileAssetStyle = ` style="${terrainStyle.replace(/;/g, " !important;")} !important"`;
     }
     const glyph = hero ? "" : raft ? `<span class="rider">${ch}</span>` : !isPlayer && (overlay !== "" || !poi) ? "" : isPlayer && overlay ? "" : ch;
-    cells += `<div class="${cls.join(" ")}"${tileAssetStyle} data-x="${x}" data-y="${y}" title="${title}">${overlay}${glyph}</div>`;
+    const fp = !isPlayer ? prints.get(k) : undefined;
+    if (fp) cls.push(fp.walked ? "trail" : "has-prints");
+    cells += `<div class="${cls.join(" ")}"${tileAssetStyle} data-x="${x}" data-y="${y}" title="${title}">${fp ? footprintSvg(fp.step, fp.walked) : ""}${overlay}${glyph}</div>`;
   }
 
   const maxEnergy = exp.maxEnergy ?? MAX_ENERGY;
@@ -247,14 +272,14 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
     ? `${round1(exp.energy)}/${maxEnergy} → <b class="${overBudget ? "amber" : ""}">${round1(Math.max(0, rt.endEnergy))}⚡</b>`
     : `${round1(exp.energy)}/${maxEnergy}${overSpan}`;
   const autoGatherOn = exp.autoGather ?? true;
-  // seyh.2: the score (haul) and the room left for loot, not a merged supplies+loot count.
-  const haul = haulRoom(exp);
+  // seyh.29 (D111): a plain bag counter, slots used / max (amber when full) — no haul.
+  const bag = bagCount(exp.loadout, exp.carry);
   // kml: compact HUD bars that float over the map (landscape-first layout).
   const bars = `
     <div class="bar"><span>⚡ Energy</span><div class="track">${energyFill}</div><b>${energyLabel}</b></div>${overBudget ? `
     <div class="hud-note amber">ends your gathering here (home is still free)</div>` : ""}
     <div class="bar"><span>HP</span><div class="track"><div class="fill hp" style="width:${Math.min(100, (exp.hp / PLAYER_BASE_HP) * 100)}%"></div></div><b>${Math.round(exp.hp)}/${PLAYER_BASE_HP}</b>${poisonChip(exp, legal)}</div>
-    <div class="hud-haul${haul.full ? " amber" : ""}">${haulLine(haul)}</div>`;
+    <div class="hud-bag${bag.full ? " amber" : ""}">${bagLine(bag)}</div>`;
 
   // End-of-route affordances (eot): the LAST waypoint drives Fight/Shoot/Survey.
   const endPoi = route.length ? poiAt.get(goalK) : undefined;
@@ -281,17 +306,20 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
   // lose → Walk/Fight goes secondary and "✕ Cancel route" is the filled primary; costly → amber.
   const roles = verdictRoles(worstVerdict(endVerdict, cmVerdict));
   const cancelBtn = roles.safe === "primary" ? `<button class="primary" data-cancelpath title="clear the route">✕ Cancel route</button>` : "";
-  // 5k4: name the wall a leg hits (and the gear that crosses it, if any); a walkable
-  // route over dear terrain says it'll be slower and hints at gear that speeds it.
+  // 5k4: name the wall a leg hits; a walkable route over dear terrain says it'll be
+  // slower. seyh.29 (D111): neither names the gear — each helping item shows as a
+  // silhouette of its icon (coloured once you own one); no icon = always like this.
+  const owned = ownedGear(state);
   const firstBlock = rt.legs.find((l) => l.blockedAt)?.blockedAt ?? null;
-  const blockNote = firstBlock ? `<div class="over">✗ ${capFirst(blockedRouteNote(grid.terrain[firstBlock.y]![firstBlock.x]!))}. <span class="muted">Tap the line to unwind.</span></div>` : "";
-  const slow = hasRoute && !firstBlock ? slowRouteNote(rt.walkable.map((t) => grid.terrain[t.y]![t.x]!), exp.loadout.equipment) : null;
-  const slowNote = slow ? `<div class="slow">🐢 ${slow}</div>` : "";
-  // seyh.6: what the walk will gather and whether it fits (amber when it won't — the
-  // walk pauses there, it isn't a loss). Only resolved nodes; nothing with auto-gather off.
+  const block = firstBlock ? blockedRouteNote(grid.terrain[firstBlock.y]![firstBlock.x]!, owned) : null;
+  const blockNote = block ? `<div class="over">✗ ${capFirst(block.text)}.${gearSilhouettes(block.gear)} <span class="muted">Tap the line to unwind.</span></div>` : "";
+  const slow = hasRoute && !firstBlock ? slowRouteNote(rt.walkable.map((t) => grid.terrain[t.y]![t.x]!), exp.loadout.equipment, owned) : null;
+  const slowNote = slow ? `<div class="slow">🐢 ${slow.text}${gearSilhouettes(slow.gear)}</div>` : "";
+  // seyh.6: what the walk will gather (only resolved nodes; nothing with auto-gather
+  // off). seyh.29 (D111): no fit verdict — just the yield.
   const yieldIcon = (m: string): string => { const st = iconStyle(m); return st ? `<span class="y-icon" style="${st}" aria-hidden="true"></span>` : ""; };
-  const yields = yieldLine(rt.gathers, rt.fits, rt.short, yieldIcon);
-  const yieldRow = yields ? `<div class="yieldline${rt.fits ? "" : " amber"}">${yields}</div>` : "";
+  const yields = yieldLine(rt.gathers, yieldIcon);
+  const yieldRow = yields ? `<div class="yieldline">${yields}</div>` : "";
   // kml: the route bar floats at the bottom of the map — only when there's something to say.
   // A live fight has its own sheet (eor), so no route bar then.
   const routeBar = !exp.combat && hasRoute
@@ -333,7 +361,7 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
       ${exp.weaponBuff ? `<div class="muted small">🗡️ ${name(exp.weaponBuff.id)} · ${exp.weaponBuff.charges} strike${exp.weaponBuff.charges === 1 ? "" : "s"} left</div>` : ""}
       <details class="settings"><summary>Settings</summary>
         <div class="actions">
-          <button data-toggle-costtint title="tint each tile by what a step onto it costs you, with what you carry">Cost colours: <b>${(ui.costTint ?? true) ? "on" : "off"}</b></button>
+          <button data-toggle-costtint title="tint each tile by what a step onto it costs you, with what you carry">Cost colours: <b>${(ui.costTint ?? false) ? "on" : "off"}</b></button>
           <button data-toggle-autogather>Auto-gather on walk: <b>${autoGatherOn ? "on" : "off"}</b></button>
           <button data-act="toggle-auto-quaff" title="auto-drink a potion when HP drops low mid-fight">Auto-potion: <b>${(exp.autoQuaff ?? true) ? "on" : "off"}</b></button>
           <button data-act="toggle-auto-finish" title="resolve whole fights in one tap">Auto-finish fights: <b>${(exp.autoFinish ?? false) ? "on" : "off"}</b></button>
@@ -401,14 +429,14 @@ export function expeditionView(state: GameState, route: Pos[], ui: ExpeditionUi)
       <button class="pan pan-w" data-pan="-2,0" aria-label="pan west">◀</button>
       <button class="pan pan-e" data-pan="2,0" aria-label="pan east">▶</button>
       <button class="recentre" data-recentre title="centre on you" aria-label="centre on you">◎</button>
-      ${exp.combat ? "" : `<button class="home-btn" data-home title="head home (free)" aria-label="head home, free">🏠<span class="home-free">free</span></button>`}
+      ${exp.combat ? "" : `<button class="home-btn" data-home title="head home" aria-label="head home">🏠<span class="home-tag">head home</span></button>`}
       ${homeSheet(state, legal, ui)}
       ${quick.length ? `<div class="quick">${quick.join("")}</div>` : ""}
       ${routeBar}
       ${exp.combat ? fightSheet(exp, legal) : ""}
     </div>
     <aside class="drawer${ui.drawerOpen ? " open" : ""}">
-      <button class="drawer-handle" data-drawer-toggle><span class="grip"></span><span class="summary"><span class="sum-here">${hereSummary}</span>${targetSummary}</span><span class="bagcount${haul.full ? " amber" : ""}">${haulLine(haul)}</span><span class="chev">${ui.drawerOpen ? "▾" : "▴"}</span></button>
+      <button class="drawer-handle" data-drawer-toggle><span class="grip"></span><span class="summary"><span class="sum-here">${hereSummary}</span>${targetSummary}</span><span class="bagcount${bag.full ? " amber" : ""}">${bagLine(bag)}</span><span class="chev">${ui.drawerOpen ? "▾" : "▴"}</span></button>
       <nav class="tabs">${tabBtn("here", "Here")}${tabBtn("bag", "Bag")}${tabBtn("craft", "Craft")}${tabBtn("log", "Log")}</nav>
       <div class="drawer-body">${tabBody}</div>
     </aside>
