@@ -22,6 +22,7 @@ import { save, load, loadLog, saveLastPlan, loadLastPlan, migrateFog, FOG_NOTICE
 import { mountTree, focusRecipe } from "./craft-tree";
 import type { ResearchLogEntry } from "./craft-tree";
 import { townView, prepValid } from "./town-view";
+import { mountRegion } from "./region-view";
 import { townSceneView, mountScene, walkOut, walkIn, goToSpot, resetScene, scene } from "./town-scene";
 import { scenePlacements } from "./town-layout";
 import type { Spot } from "./town-layout";
@@ -274,6 +275,7 @@ function draw(): void {
       ? townSceneView(state, { prep, logHtml: logView(log), lastLine: log[0] ? formatLogEntry(log[0]).replace(/<br>/g, " ") : "", research: { history: researchLog, last: researchLast } })
       : `${townView(state, prep, hasLast, townTab, { wornOpen, research: { history: researchLog, last: researchLast } })}${logView(log)}`;
   wire(); save(SAVE_KEY, state, log);
+  mountRegion(app, draw); // seyh.28: the region chart's own picks (lands, scraps, panel rows)
   mountTree(app, state, { craft: craftN, close: closeTree }); // o9vr: the workshop's tree (pan, select, tray) — before paintFx, which anchors the craft note in its tray
   if (inScene) {
     mountScene(app, arriveAt, state);

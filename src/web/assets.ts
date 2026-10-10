@@ -91,6 +91,20 @@ export function tileStyle(terrain: string, biomeId?: string): string | null {
   return (biomeId ? frameStyle("tile", `${biomeId}:${terrain}`) : null) ?? frameStyle("tile", terrain);
 }
 
+/** A terrain tile's frame in its atlas, in CSS px (for drawing it somewhere other than a
+ *  .tile div, e.g. an SVG pattern on the region chart): cel first, pixel as the fallback. */
+export function tileFrameRef(key: string): { url: string; x: number; y: number; w: number; h: number; aw: number; ah: number } | null {
+  const cel = celFrame("tile", key);
+  if (cel) {
+    const m = celManifests.tile, k = m.scale;
+    return { url: celUrls.tile, x: cel.x / k, y: cel.y / k, w: cel.w / k, h: cel.h / k, aw: m.size.w / k, ah: m.size.h / k };
+  }
+  const f = manifests.tile.frames[key];
+  if (!f) return null;
+  const all = Object.values(manifests.tile.frames);
+  return { url: atlasUrls.tile, x: f.x, y: f.y, w: f.w, h: f.h, aw: Math.max(...all.map((g) => g.x + g.w)), ah: Math.max(...all.map((g) => g.y + g.h)) };
+}
+
 // 48l.9: approved idle loops. Each monster's frames sit in one atlas row, so a CSS
 // steps() animation over background-position plays them; "pingpong" loops play forward
 // then back (hides a visible wrap). Frames are larger than the static sprite by

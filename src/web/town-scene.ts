@@ -16,6 +16,7 @@ import { TOWN_ART, TOWN_GROUND, HERO_FRAMES } from "./assets";
 import { scenePlacements, spotAt, spotBox, walkPlan, cameraX, clampCam, HERO_HOME, HERO_H, GATE_OUTSIDE, GROUND } from "./town-layout";
 import type { Pt, Spot, TownPanel } from "./town-layout";
 import type { ResearchLogEntry } from "./craft-tree";
+import { regionView } from "./region-view";
 import { mapSelectSection, bankSection, recipeSection, stableSection, researchSection, ic, prepValid } from "./town-view";
 
 export type { TownPanel } from "./town-layout";
@@ -100,7 +101,8 @@ export function townSceneView(state: GameState, o: SceneOpts): string {
       <span class="ts-aux"><button class="link" data-town-mode="menus" title="the plain menus, without the square">≡ menus</button><button class="link" data-newgame>new game</button></span>
     </div>`;
   // o9vr: the workshop (recipes) is its own full-screen crafting tree, not a side panel
-  const panel = scene.panel === "recipes" ? recipeSection(state) : scene.panel ? `<aside class="ts-panel${scene.hero.x > 0.5 ? " left" : ""}" data-ts-panel="${scene.panel}">
+  // seyh.28 (D106): choosing where to go is the region chart, full screen (the board, the gate with nothing chosen, the Maps tab)
+  const panel = scene.panel === "recipes" ? recipeSection(state) : scene.panel === "maps" ? regionView(state, o.prep) : scene.panel ? `<aside class="ts-panel${scene.hero.x > 0.5 ? " left" : ""}" data-ts-panel="${scene.panel}">
       <div class="ts-panel-head"><b>${PANEL_TITLE[scene.panel]}</b><button class="ts-close" data-panel-close aria-label="close">✕</button></div>
       <div class="ts-panel-body">${panelBody(state, scene.panel, o)}</div>
     </aside>` : "";
