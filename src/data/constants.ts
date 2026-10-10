@@ -584,6 +584,28 @@ export const GATHER_YIELD: Record<GatherableNodeType, number> = {
 // === Map tiers (2yn) — value-scaling generation axis. See spec 2026-07-08-map-tiers. ===
 export const MAP_TIER_MAX = 5; // deepest map tier; drop-mint caps here
 
+// === The region map (seyh.28, D106/D110) — the town's chart of the land around it. ===
+// Each land's FIXED bearing from town (degrees clockwise from north). A land keeps its
+// direction on every tier ring, so a held map always sits in its own land's wedge and
+// the chart never teaches a false geography. On each ring the wedges are split halfway
+// between the bearings of the lands that can appear at that tier (base lands + rare
+// lands from their RARE_BIOMES.minTier), so the inner ring is the three base lands in
+// thirds, the next ring adds the T2 rares between them, and fungal joins from T3.
+// Presentation only: never read by generation. Moving a bearing moves the land on the chart.
+export const REGION_BEARING: Record<BiomeId, number> = {
+  woodland: 0, // north, straight out of the gate
+  swamp: 60,
+  fungal: 90, // squeezed in east from T3, between swamp and desert
+  desert: 120,
+  coastal: 180,
+  tundra: 240,
+  jungle: 300,
+};
+// How many trips ahead the chart looks to say when an unlit near land comes back
+// ("back in 2 trips"). Each look generates a local map (~40ms), so only scanned when
+// the player taps an unlit land. Past this horizon it says "not for a good while".
+export const REGION_BACK_HORIZON = 8;
+
 // === Map-carry capacity (zpm.2) — a DEDICATED pool for carried map-drops, separate
 // from loot/carry slots. Carried maps no longer steal a loot stack (spec §3). ===
 export const MAP_CARRY_BASE = 1; // starter-bag "map pocket": how many map-drops you can carry with NO holder owned.

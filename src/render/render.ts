@@ -1,5 +1,5 @@
-import { BIOMES, RESEARCH_INKS, RESEARCH_SEARCHES_PER_INK, LOOT_TABLE, CATEGORY_LOOT_TABLE, MAP_SCROLL_ID, WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE, QUAFF_ENERGY, DON_DOFF_ENERGY, FLASK_EFFECT, ANTIDOTE, MAP_HINTS, DMG_ARMOUR_MATRIX, TERRAIN_HP_WARD, STACK_CAP } from "../data/constants";
-import type { Terrain, NodeType, DmgType, ArmourType, GatherableNodeType, FishWater, HintMetric } from "../data/constants";
+import { BIOMES, RESEARCH_INKS, RESEARCH_SEARCHES_PER_INK, LOOT_TABLE, CATEGORY_LOOT_TABLE, MAP_SCROLL_ID, WEAPONS, ARMOUR, FOOD, FOOD_ENERGY, ENERGY_PER_FOOD, POTION, POTION_HEAL, POTION_HEAL_BY, COMBAT_BUFF, TOOL_CAPABILITY, TOOL_PURPOSE, ENERGY_CAP_BONUS, BACKPACK_SLOTS, TRANSPORT_CARRY, TRANSPORT_MULTIPLIER, TERRAIN_GATE, TERRAIN_COST, PANNIERS_SLOTS, INKS, AFFIX_EFFECTS, MATERIAL_GATE, TENT_FOOD_MULTIPLIER, RECIPE, NODE_TOOL, NODE_SECONDARY_TOOL, WEAPON_ENHANCEMENT, AFFINITY_MULTIPLIER, MONSTERS, MONSTER_TIER_HP_CURVE, QUAFF_ENERGY, DON_DOFF_ENERGY, FLASK_EFFECT, ANTIDOTE, MAP_HINTS, DMG_ARMOUR_MATRIX, TERRAIN_HP_WARD, BIOME_IDS, RARE_BIOMES, REGION_BEARING, REGION_BACK_HORIZON, MAP_TIER_MAX, STACK_CAP } from "../data/constants";
+import type { BiomeId, Terrain, NodeType, DmgType, ArmourType, GatherableNodeType, FishWater, HintMetric } from "../data/constants";
 import type { PoiDetail } from "../engine/perceive";
 import type { Matchup } from "../engine/combat";
 import { playerDamage, damageTaken, strikeExchange, wieldsRanged, hasAmmo, loadedAmmoIndex, rollLoot } from "../engine/combat";
@@ -8,7 +8,7 @@ import { CONSUMABLE_KINDS, CONSUMABLE_KEYS } from "../engine/catalog";
 import { moveCost } from "../engine/move";
 import { ARMOUR_SLOTS } from "../engine/pack";
 import type { Action, Equipment, Expedition, Loadout, MapItem, RejectionReason, GameEvent, ItemStack, LoadoutSlot } from "../engine/types";
-import { mapEpithet } from "../engine/town";
+import { mapEpithet, localMap } from "../engine/town";
 import { hintLabel } from "../engine/hints";
 
 // --- Shared presentation selectors (eho): pure defId→text + data-shaped derivations
@@ -986,4 +986,92 @@ export function costBand(stepCost: number): 1 | 2 | 3 | 4 | null {
   if (!Number.isFinite(stepCost)) return null;
   const i = COST_BANDS.findIndex((max) => stepCost <= max);
   return (i === -1 ? 4 : i + 1) as 1 | 2 | 3 | 4;
+}
+
+// ===== The region map (seyh.28, D106/D110): the town's chart, in tier rings ========
+// Pure geometry the web chart draws (src/web/region-view.ts). Chart units: the town
+// sits at (0,0) inside REGION_GEOM.town; ring 1 (near) runs out to `near`, and the
+// outer tiers share the rest of the way to `edge` equally. Angles are compass
+// bearings in degrees (0 = north, clockwise); y grows DOWN, as in SVG.
+export const REGION_GEOM = { town: 15, near: 42, edge: 96 } as const;
+/** How the chart names each tier's ring (D106: words, not numerals). */
+export const RING_WORDS: readonly string[] = ["near", "further out", "far", "farther still", "the edge of the chart"];
+export function ringWord(tier: number): string {
+  return RING_WORDS[Math.max(1, Math.min(RING_WORDS.length, tier)) - 1]!;
+}
+/** How many rings the chart draws: always out to far (T3), further if you hold a deeper map. */
+export function regionRings(maps: readonly MapItem[]): number {
+  return Math.min(MAP_TIER_MAX, Math.max(3, ...maps.map((m) => m.tier ?? 1)));
+}
+/** A tier's ring as [inner, outer] radius. */
+export function ringBand(tier: number, rings: number): [number, number] {
+  const { town, near, edge } = REGION_GEOM;
+  if (tier <= 1) return [town, near];
+  const w = (edge - near) / Math.max(1, rings - 1);
+  const t = Math.min(tier, rings);
+  return [near + (t - 2) * w, near + (t - 1) * w];
+}
+/** The lands that can lie on a tier's ring: the base lands, plus each rare land from its minTier. */
+export function landsAt(tier: number): BiomeId[] {
+  return BIOME_IDS.filter((id) => (RARE_BIOMES[id]?.minTier ?? 1) <= tier)
+    .sort((a, b) => REGION_BEARING[a] - REGION_BEARING[b]);
+}
+/** A land's wedge on a tier's ring: from halfway to its anticlockwise neighbour to
+ *  halfway to its clockwise one. `mid` is the land's fixed bearing (REGION_BEARING),
+ *  the same on every ring. a0 < mid < a1 (a1 may pass 360). Null if the land can't
+ *  lie on that ring. */
+export function regionWedge(biome: BiomeId, tier: number): { a0: number; a1: number; mid: number } | null {
+  const lands = landsAt(tier);
+  const i = lands.indexOf(biome);
+  if (i < 0) return null;
+  const mid = REGION_BEARING[biome];
+  if (lands.length === 1) return { a0: mid - 180, a1: mid + 180, mid };
+  const prev = REGION_BEARING[lands[(i - 1 + lands.length) % lands.length]!];
+  const next = REGION_BEARING[lands[(i + 1) % lands.length]!];
+  const back = (((mid - prev) % 360) + 360) % 360, fwd = (((next - mid) % 360) + 360) % 360;
+  return { a0: mid - back / 2, a1: mid + fwd / 2, mid };
+}
+/** A bearing + radius → chart x,y. */
+export function chartPoint(r: number, bearing: number): { x: number; y: number } {
+  const a = (bearing * Math.PI) / 180;
+  return { x: r * Math.sin(a), y: -r * Math.cos(a) };
+}
+export type RegionSpot = { mapSeed: string; tier: number; biomeId: BiomeId; bearing: number; r: number; x: number; y: number; size: number };
+/** Where each held map sits: in its own land's wedge (by the frozen MapItem.biomeId,
+ *  D93) on its tier's ring. Never random: maps of the same land and tier are spread
+ *  evenly across the wedge in mapSeed order (alternating a little in and out). */
+export function regionSpots(maps: readonly MapItem[]): RegionSpot[] {
+  const rings = regionRings(maps);
+  const groups = new Map<string, MapItem[]>();
+  for (const m of maps) {
+    const k = `${Math.min(m.tier ?? 1, rings)}|${m.biomeId}`;
+    groups.set(k, [...(groups.get(k) ?? []), m]);
+  }
+  const out: RegionSpot[] = [];
+  for (const [k, ms] of groups) {
+    const tier = Number(k.split("|")[0]);
+    const biomeId = ms[0]!.biomeId;
+    // a rare land held below its minTier (an old save) still keeps its direction
+    const w = regionWedge(biomeId, tier) ?? regionWedge(biomeId, MAP_TIER_MAX)!;
+    const [r0, r1] = ringBand(tier, rings);
+    const band = r1 - r0, size = Math.min(8, band * 0.3);
+    const sorted = [...ms].sort((a, b) => (a.mapSeed < b.mapSeed ? -1 : a.mapSeed > b.mapSeed ? 1 : 0));
+    sorted.forEach((m, i) => {
+      const n = sorted.length;
+      const bearing = n === 1 ? w.mid : w.a0 + (w.a1 - w.a0) * (0.15 + (0.7 * (i + 0.5)) / n);
+      const r = (r0 + r1) / 2 + (n > 1 ? (i % 2 ? 1 : -1) * band * 0.16 : 0);
+      out.push({ mapSeed: m.mapSeed, tier, biomeId, bearing, r, ...chartPoint(r, bearing), size });
+    });
+  }
+  return out;
+}
+/** When an unlit near land is next the local walk-out (the D80 rotation is fixed by
+ *  (seed, runs), so the chart can know): trips from now, or null past the horizon. */
+export function backInTrips(seed: string, runs: number, biome: BiomeId, horizon = REGION_BACK_HORIZON): number | null {
+  for (let k = 1; k <= horizon; k++) if (localMap(seed, runs + k).biomeId === biome) return k;
+  return null;
+}
+/** The chart's line for an unlit near land. */
+export function backInCopy(n: number | null): string {
+  return n === null ? "not out past the gate for a good while" : n === 1 ? "back past the gate next trip" : `back past the gate in ${n} trips`;
 }

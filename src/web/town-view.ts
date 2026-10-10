@@ -24,7 +24,7 @@ export { ic };
 // Map hints (D95, Muse brief C option 1 — chips): one chip per hint, "G: boggy ground";
 // a sealed hint shows only its family. `studied` = how many of `ids` are revealed.
 const FAMILY_LETTER: Record<string, string> = { ground: "G", threat: "T", bounty: "B" };
-function hintChips(ids: string[], studied: number): string {
+export function hintChips(ids: string[], studied: number): string {
   return `<div class="hintchips">${ids.map((id, i) => {
     const fam = hintFamily(id) ?? "";
     return i < studied
@@ -35,7 +35,7 @@ function hintChips(ids: string[], studied: number): string {
 
 // The study control for a held map: the button (with its cost), a red unaffordable
 // state, or "fully studied" once every hint is read.
-function studyControl(state: GameState, m: MapItem): string {
+export function studyControl(state: GameState, m: MapItem): string {
   const total = mapHintIds(m).length, studied = m.studied ?? 0;
   if (studied >= total) return `<span class="studied-done">fully studied</span>`;
   const cost = STUDY_COST.map((c) => `${c.qty} ${name(c.defId)}`).join(" + ");
@@ -53,7 +53,7 @@ export const TRANSPORT_ROLE: Record<string, string> = {
 };
 
 // q2k: append a notability epithet to a map's name ("… of carbon"), or nothing.
-function epithetSuffix(mapSeed: string, biomeId: BiomeId, tier = 1): string {
+export function epithetSuffix(mapSeed: string, biomeId: BiomeId, tier = 1): string {
   const e = mapEpithet(mapSeed, biomeId, tier);
   return e ? ` <span class="muted">of ${e}</span>` : "";
 }
@@ -61,7 +61,7 @@ function epithetSuffix(mapSeed: string, biomeId: BiomeId, tier = 1): string {
 // A held map's name suffix (affix labels or epithet — heldMapTitle); egd: a title
 // tooltip names the favoured material(s) so an inked map's benefit is legible on
 // the card, not just the moment it was inked.
-function heldMapSuffix(m: MapItem): string {
+export function heldMapSuffix(m: MapItem): string {
   const { label, favours } = heldMapTitle(m);
   if (!label) return "";
   const tip = favours.length ? ` title="favours ${favours.map(name).join(", ")}"` : "";
@@ -108,7 +108,7 @@ export function mapSelectSection(state: GameState, local: ReturnType<typeof loca
       <h2>Where to? <span class="muted small">pick a map — then prepare &amp; embark</span></h2>
       <div class="mapoffer">
         <div class="mapcard local">
-          <span class="maptag free">FREE · always here</span>
+          <span class="maptag free">Walk out (local, T1)</span>
           <b>${local.preview.headline}${epithetSuffix(local.mapSeed, local.biomeId)}</b>
           <div class="muted small">over the hill — a fresh T1 map every visit, never used up. Where food &amp; your first maps come from.</div>
           <div class="muted small">plain country — nothing remarkable. Hinted maps come from drops.</div>
