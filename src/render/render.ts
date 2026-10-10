@@ -757,6 +757,8 @@ export const POI_CHAR: Record<NodeType, string> = {
 // the generic kind glyph, so the map visibly teaches that forage varies. Vague far,
 // specific near (the existing perception model) — this just makes the "near" state
 // legible. Materials absent here (the actual herbs) keep the generic "H".
+// seyh.32: these letters are the CONSOLE's marks (and the web's fallback when a material
+// has no art frame); the web draws the material's item icon once it's perceived.
 export const FORAGE_MATERIAL_CHAR: Record<string, string> = {
   flint: "f",
   deadwood: "d",
