@@ -1,0 +1,97 @@
+[
+  {
+    "id": "Q1",
+    "title": "Move-cost tint: default and form",
+    "question": "The cost tint shipped today (on by default). Both reviews say it kills terrain identity and figure/ground (water turns maroon, desert is uniform). Options: (A) keep it on as is; (B) off by default, keep today's colour tint as an opt-in Settings switch; (C) off by default, and while a route is planned show per-step cost on the route tiles only; the opt-in switch becomes a luminance dim that keeps each terrain's hue; (D) hold-to-preview: tint shows only while a finger/key is held. **Recommend C**: it keeps the information exactly where the decision is made (the planned line), restores negative space, and removes red from the map palette (red stays for can't/lose).",
+    "blocks": [
+      "map-tint-route-only",
+      "verdict-pips-camps"
+    ]
+  },
+  {
+    "id": "Q2",
+    "title": "Surface rule: parchment vs ink",
+    "question": "The reviews disagree. Options: (A) REVIEW: parchment for all content (every panel, drawer, fight sheet, dialogs), ink only for chrome; (B) CRITICAL: by layer: parchment for town documents (board/cupboard, research, packing, workshop tray, run report, town item card), ink for field instruments (HUD, drawer, route/fight cards, field item card); (C) keep the current mix and only fix nesting/links. **Recommend B**: bright cream panels over the dark map hurt figure/ground, and a by-place rule also tells the player where they are. It also fits the diegetic direction: documents you'd hold at a table vs instruments you carry.",
+    "blocks": [
+      "layer-surfaces",
+      "map-chrome-touch"
+    ]
+  },
+  {
+    "id": "Q3",
+    "title": "Where maps live: gate, cupboard, board",
+    "question": "Your direction: the free local map should feel like 'just walk out the door'; held maps come from a map cupboard rather than the big board; or the map goes up on the board as payoff. Options: (A) gate = free walk-out; a new map cupboard/chest holds earned maps; the board becomes a **trophy wall** of maps you've completed (both ideas); (B) gate = free walk-out; earned maps stay on the board (no cupboard, no trophies); (C) gate = free walk-out; cupboard for earned maps; drop the board entirely; (D) keep the board as chooser, just remove the FREE label. **Recommend A**, phased: walk-out first (no new art), then the cupboard (one sprite), then trophies (start web-only/localStorage; promote to engine state only if charting later gates progress). Sub-call for A: should a defeat on an earned map pin a 'lost' map, or nothing?",
+    "blocks": [
+      "walk-out-the-door",
+      "map-trophy",
+      "map-card-decision-support",
+      "town-cta-nameplates"
+    ]
+  },
+  {
+    "id": "Q4",
+    "title": "Bank vs Stable",
+    "question": "Horse/Panniers appear in both Bank and Stable with three verbs (pack, +spare, take it). Options: (A) Bank becomes read-only grouped storage and the Stable folds into it as an 'Animals' group (Stable building taps open the Bank at Animals); (B) Bank read-only; Stable building stays with its own read-only Animals panel (it'll host taming, wgv6); (C) Stable keeps packing mounts (the one place you 'take' an animal), Bank read-only for everything else. **Recommend B**: all packing in one place (the packing sheet), but the Stable keeps its diegetic job and gives taming (wgv6) a home. Relates p139 (bank rethink): fold the answer into that bead if it is already scoped.",
+    "blocks": [
+      "bank-storehouse"
+    ]
+  },
+  {
+    "id": "Q5",
+    "title": "Research suggestion chips",
+    "question": "Research is free-text recall and a miss costs a search (your call, 2026-10-09). Options: (A) chips from words you've met (seen items, read hints) that can still miss, and a miss still costs; (B) chips that are guaranteed hits (filtered by the engine's reach), so a suggested word never wastes a search; typed words still cost on a miss; (C) no chips: show per-tier hidden counts and the fog-node 'hold all ingredients' rule only; (D) chips, and a miss on any word becomes free (revisit the cost rule). **Recommend A**: it turns recall into recognition and teaches the vocabulary without making the table an oracle; B risks trivialising research.",
+    "blocks": [
+      "research-suggestions"
+    ]
+  },
+  {
+    "id": "Q6",
+    "title": "Onboarding approach",
+    "question": "Onboarding scores 1/5 (no first verb, no 'tap a tile', hidden gestures). Options: (A) one-time contextual coach marks (short text near the thing, once per save, skippable); (B) diegetic only: a pulsing gate, a footprint trail, an NPC line at the board; no UI text; (C) a short scripted first run (forced first route and gather); (D) nothing beyond nameplates + a Set out CTA. **Recommend A with B where the world can carry it**: the gate pulse and nameplates teach 'go out' without text; text marks only for invisible gestures (tap tile, tap line to unwind, hold for details) and the 'home is free' rule.",
+    "blocks": [
+      "onboarding-coach"
+    ]
+  },
+  {
+    "id": "Q7",
+    "title": "Straight-line routing vs 'go around'",
+    "question": "Routing is the player's job (eot: straight lines, no pathfinding). The critical review says a line into a monster misreads intent (57). Options: (A) keep straight lines; ring the monster and draw that segment red (no new verb); (B) A plus a one-tap 'Go around' that inserts one suggested waypoint beside the monster (the player still sees and owns the line); (C) full monster-aware auto-pathing (sim/route.ts exists but is parked). **Recommend B**: it reads intent without removing the routing puzzle, and it's one waypoint the player can see and undo.",
+    "blocks": [
+      "ambush-ring"
+    ]
+  },
+  {
+    "id": "Q8",
+    "title": "HP projection vs D103's no-numbers rule",
+    "question": "Energy is projected (282 → 254) but HP isn't, so a CLEAN WIN at full HP and at half HP look the same. D103 retired numbers on the fight card. Options: (A) a ghost segment on the HUD HP bar only (no number); (B) ghost segment plus '→ ~22' text on the HUD (the card stays number-free); (C) no HP projection. **Recommend B**: it mirrors the energy bar exactly (same 'now → after' form), and the card keeps D103's verdict-only design.",
+    "blocks": [
+      "verdict-driven-buttons"
+    ]
+  },
+  {
+    "id": "Q9",
+    "title": "Mid-fight gear swaps",
+    "question": "Eight Doff buttons dominate the fight sheet (67–70). Options: (A) one 'Gear ▾' menu with weapon/armour swaps only, each previewing the verdict it would produce; no tool doffs in a fight; (B) remove don/doff from the fight entirely (swap only outside fights); (C) keep all swaps but collapse them under 'Gear ▾' without previews. **Recommend A**: swaps that change the verdict are a real tactical choice (they cost a turn); tools never are.",
+    "blocks": [
+      "fight-sheet-hierarchy"
+    ]
+  },
+  {
+    "id": "Q10",
+    "title": "Run report: card or world",
+    "question": "Coming home needs a payoff (critical fix #1). Options: (A) a parchment Run report card on walk-in (haul icons, ⚡ unspent, new recipes, one tip); (B) diegetic: the haul is laid out on the packing cloth/cart and items fly into the Bank building, with a small summary strip, no card; (C) both: items fly into the bank in the world, then a compact card with the numbers and tip that dismisses to the square. **Recommend C**: the world carries the 'you brought this home' feeling (your direction), and the card carries the numbers that teach the energy model (unspent ⚡), which the world can't show.",
+    "blocks": [
+      "run-report",
+      "map-trophy"
+    ]
+  },
+  {
+    "id": "Q11",
+    "title": "Town primary action: button or gate",
+    "question": "The square has no primary action. Options: (A) a persistent 'Set out ▶' button bottom-right (becomes 'Embark ▶' once packed); (B) diegetic: the gate glows/pulses and its nameplate reads 'Set out'; a button appears only while the gate is off-screen; (C) both always. **Recommend B**: it fits the 'walk out the door' framing and keeps the square uncluttered, while still guaranteeing a visible first verb on a narrow screen.",
+    "blocks": [
+      "town-cta-nameplates",
+      "onboarding-coach"
+    ]
+  }
+]
